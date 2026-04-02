@@ -6,723 +6,80 @@
 <title>Grimoire — D&D 5e</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 
-<!-- Firebase SDK -->
-// ── FONCTIONS GLOBALES POUR LES BOUTONS ──────────────────────────
-  window._doSignup = async () => {
-    const email = document.getElementById('authEmail').value;
-    const pass  = document.getElementById('authPass').value;
-    try {
-      await createUserWithEmailAndPassword(auth, email, pass);
-    } catch(e) { showAuthError(e.message); }
-  };
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, onSnapshot, getDoc }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  window._doLogin = async () => {
-    const email = document.getElementById('authEmail').value;
-    const pass  = document.getElementById('authPass').value;
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch(e) { showAuthError(e.message); }
-  };
-
-  window._doLogout = async () => {
-    if (unsubscribe) unsubscribe();
-    await signOut(auth);
-  };
-
-  // On expose aussi les autres fonctions nécessaires au fonctionnement
-  window._changeHP = changeHP;
-  window._rollDie = rollDie;
-  window._editAbility = editAbility;
-  window._toggleSave = toggleSave;
-  window._toggleSkillProf = toggleSkillProf;
-  window._toggleCondition = toggleCondition;
-  window._saveSheet = saveSheet;
-  // ── CONFIG FIREBASE ──────────────────────────────────────────────
   const firebaseConfig = {
     apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
     authDomain: "kubbndonjons.firebaseapp.com",
     projectId: "kubbndonjons",
     storageBucket: "kubbndonjons.firebasestorage.app",
     messagingSenderId: "875521195069",
-    appId: "1:875521195069:web:550930281db865a35c7e54",
-    measurementId: "G-EZF0TTNBNB"
+    appId: "1:875521195069:web:550930281db865a35c7e54"
   };
 
-  const app  = initializeApp(firebaseConfig);
+  const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-  const db   = getFirestore(app);
+  const db = getFirestore(app);
 
-  // ── STATE ────────────────────────────────────────────────────────
-  let currentUser = null;
-  let unsubscribe = null;   // listener Firestore
-  let saveTimeout = null;
-  let isLoadingFromDB = false;
-
-  const DEFAULT_SHEET = {
-    name: "Nouveau Personnage", classe: "Guerrier · Niveau 1",
-    race: "Humain · Neutre", background: "Soldat", deity: "", xp: "0",
-    hp: 10, hpMax: 10,
-    abilities: [18,10,16,8,14,16],
-    savesProf: [true,false,false,false,true,false],
-    skillsProf: Array(18).fill(0),
-    spellSlots: [[4,0],[2,0]],
-    conditions: Array(8).fill(false),
-    traits: "", notes: ""
+  // Exposition des fonctions pour le script classique
+  window._doSignup = async () => {
+    const email = document.getElementById('authEmail').value;
+    const pass = document.getElementById('authPass').value;
+    try { await createUserWithEmailAndPassword(auth, email, pass); } catch(e) { alert(e.message); }
   };
 
- // ── AUTH UI (Modifié pour être accessible) ──────────────────────
-  window._doSignup = async function() {
+  window._doLogin = async () => {
     const email = document.getElementById('authEmail').value;
-    const pass  = document.getElementById('authPass').value;
-    try {
-      await createUserWithEmailAndPassword(auth, email, pass);
-    } catch(e) { showAuthError(e.message); }
-  }
+    const pass = document.getElementById('authPass').value;
+    try { await signInWithEmailAndPassword(auth, email, pass); } catch(e) { alert(e.message); }
+  };
 
-  window._doLogin = async function() {
-    const email = document.getElementById('authEmail').value;
-    const pass  = document.getElementById('authPass').value;
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch(e) { showAuthError(e.message); }
-  }
+  window._doLogout = () => signOut(auth);
 
-  window._doLogout = async function() {
-    if (unsubscribe) unsubscribe();
-    await signOut(auth);
-  }
-  // ── AUTH STATE ───────────────────────────────────────────────────
-  onAuthStateChanged(auth, async user => {
-    currentUser = user;
-    if (user) {
-      document.getElementById('authScreen').style.display = 'none';
-      document.getElementById('sheetScreen').style.display = 'block';
-      document.getElementById('userEmail').textContent = user.email;
-      await initSheet(user.uid);
-    } else {
-      document.getElementById('authScreen').style.display = 'flex';
-      document.getElementById('sheetScreen').style.display = 'none';
-    }
+  onAuthStateChanged(auth, user => {
+    document.getElementById('authScreen').style.display = user ? 'none' : 'flex';
+    document.getElementById('sheetScreen').style.display = user ? 'block' : 'none';
+    if(user) document.getElementById('userEmail').textContent = user.email;
   });
-
-  // ── FIRESTORE ────────────────────────────────────────────────────
-  async function initSheet(uid) {
-    const ref = doc(db, 'sheets', uid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, DEFAULT_SHEET);
-    }
-    // Écoute temps réel
-    unsubscribe = onSnapshot(ref, snapshot => {
-      if (snapshot.exists()) {
-        isLoadingFromDB = true;
-        renderSheet(snapshot.data());
-        setTimeout(() => { isLoadingFromDB = false; }, 100);
-      }
-    });
-  }
-
-  // Sauvegarde debounce 800ms
-  function saveSheet() {
-    if (isLoadingFromDB || !currentUser) return;
-    showSyncState('saving');
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, 'sheets', currentUser.uid), collectSheet());
-        showSyncState('saved');
-      } catch(e) {
-        showSyncState('error');
-      }
-    }, 800);
-  };
-
-  function showSyncState(state) {
-    const badge = document.getElementById('syncBadge');
-    const dot   = document.getElementById('syncDot');
-    const label = document.getElementById('syncLabel');
-    if (state === 'saving') {
-      dot.style.background = '#f59e0b';
-      label.textContent = 'Synchronisation…';
-    } else if (state === 'saved') {
-      dot.style.background = '#4caf50';
-      label.textContent = 'Synchronisé';
-    } else {
-      dot.style.background = '#ef4444';
-      label.textContent = 'Erreur réseau';
-    }
-  }
-
-  // ── COLLECT DATA FROM DOM ────────────────────────────────────────
-  function collectSheet() {
-    const abilities = [0,1,2,3,4,5].map(i =>
-      parseInt(document.getElementById(`abilityScore${i}`)?.textContent) || 10
-    );
-    const savesProf = [0,1,2,3,4,5].map(i =>
-      document.getElementById(`savePip${i}`)?.classList.contains('active') || false
-    );
-    const skillsProf = Array.from({length:18},(_,i) => {
-      const p = document.getElementById(`skillPip${i}`);
-      return p?.classList.contains('expert') ? 2 : p?.classList.contains('prof') ? 1 : 0;
-    });
-    const spellSlots = [
-      [document.querySelectorAll('#spellSlots1 .slot').length,
-       document.querySelectorAll('#spellSlots1 .slot.used').length],
-      [document.querySelectorAll('#spellSlots2 .slot').length,
-       document.querySelectorAll('#spellSlots2 .slot.used').length],
-    ];
-    const conditions = Array.from({length:8},(_,i) =>
-      document.getElementById(`cond${i}`)?.classList.contains('active') || false
-    );
-    return {
-      name:       v('fname'),
-      classe:     v('fclasse'),
-      race:       v('frace'),
-      background: v('fbackground'),
-      deity:      v('fdeity'),
-      xp:         v('fxp'),
-      hp:         parseInt(document.getElementById('hpCurrent')?.textContent) || 0,
-      hpMax:      parseInt(v('fhpmax')) || 10,
-      abilities, savesProf, skillsProf, spellSlots, conditions,
-      traits:     document.getElementById('ftraits')?.value || '',
-      notes:      document.getElementById('fnotes')?.value  || '',
-    };
-  }
-
-  function v(id) { return document.getElementById(id)?.value || ''; }
-
-  // ── RENDER FROM DB ───────────────────────────────────────────────
-  function renderSheet(data) {
-    setVal('fname', data.name);
-    setVal('fclasse', data.classe);
-    setVal('frace', data.race);
-    setVal('fbackground', data.background);
-    setVal('fdeity', data.deity);
-    setVal('fxp', data.xp);
-    setVal('fhpmax', data.hpMax);
-    document.getElementById('hpCurrent').textContent = data.hp;
-    document.getElementById('hpBar').style.width = Math.min(100, data.hp / data.hpMax * 100) + '%';
-
-    ABILITIES_DATA.forEach((a, i) => {
-      const score = data.abilities?.[i] ?? a.base;
-      const mod   = Math.floor((score - 10) / 2);
-      const el    = document.getElementById(`abilityScore${i}`);
-      const mel   = document.getElementById(`abilityMod${i}`);
-      if (el) el.textContent = score;
-      if (mel) mel.textContent = (mod >= 0 ? '+' : '') + mod;
-    });
-
-    data.savesProf?.forEach((prof, i) => {
-      const pip = document.getElementById(`savePip${i}`);
-      if (pip) { pip.classList.toggle('active', prof); }
-    });
-
-    data.skillsProf?.forEach((lvl, i) => {
-      const pip = document.getElementById(`skillPip${i}`);
-      if (!pip) return;
-      pip.classList.remove('prof','expert');
-      if (lvl === 1) pip.classList.add('prof');
-      if (lvl === 2) pip.classList.add('expert');
-    });
-
-    data.conditions?.forEach((active, i) => {
-      const el = document.getElementById(`cond${i}`);
-      if (el) { el.classList.toggle('active', active); el.classList.toggle('inactive', !active); }
-    });
-
-    data.spellSlots?.forEach((slot, level) => {
-      renderSlots(`spellSlots${level+1}`, slot[0], slot[1]);
-    });
-
-    const traits = document.getElementById('ftraits');
-    const notes  = document.getElementById('fnotes');
-    if (traits) traits.value = data.traits || '';
-    if (notes)  notes.value  = data.notes  || '';
-  }
-
-  function setVal(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.value = val || '';
-  }
-
-  // ── HP ───────────────────────────────────────────────────────────
-  function changeHP(delta) {
-    const el     = document.getElementById('hpCurrent');
-    const maxEl  = document.getElementById('fhpmax');
-    const hpMax  = parseInt(maxEl?.value) || 10;
-    const hp     = Math.max(0, Math.min(hpMax, (parseInt(el.textContent) || 0) + delta));
-    el.textContent = hp;
-    document.getElementById('hpBar').style.width = (hp / hpMax * 100) + '%';
-    window.saveSheet();
-  };
-
-  // ── DICE ─────────────────────────────────────────────────────────
-  function rollDie(sides) {
-    const result = Math.floor(Math.random() * sides) + 1;
-    const el = document.getElementById('diceResult');
-    el.className = 'dice-result'; void el.offsetWidth;
-    el.className = 'dice-result rolling';
-    el.textContent = result;
-    document.getElementById('diceLabel').textContent =
-      `d${sides} · ${result === sides ? '🎉 MAX !' : result === 1 ? '💀 MIN' : ''}`;
-  };
-
-  function rollWithMod(name, modId) {
-    const modEl = document.getElementById(modId);
-    const mod   = parseInt(modEl?.textContent) || 0;
-    const roll  = Math.floor(Math.random() * 20) + 1;
-    const total = roll + mod;
-    const el = document.getElementById('diceResult');
-    el.className = 'dice-result'; void el.offsetWidth;
-    el.className = 'dice-result rolling';
-    el.textContent = total;
-    document.getElementById('diceLabel').textContent =
-      `${name} · d20(${roll}) ${mod >= 0 ? '+' : ''}${mod}`;
-  };
-
-  // ── TOGGLES ──────────────────────────────────────────────────────
-  function toggleSave(i) {
-    document.getElementById(`savePip${i}`)?.classList.toggle('active');
-    window.saveSheet();
-  };
-
-  function toggleSkillProf(i) {
-    const pip = document.getElementById(`skillPip${i}`);
-    if (!pip) return;
-    if (!pip.classList.contains('prof') && !pip.classList.contains('expert')) pip.classList.add('prof');
-    else if (pip.classList.contains('prof')) { pip.classList.remove('prof'); pip.classList.add('expert'); }
-    else pip.classList.remove('expert');
-    window.saveSheet();
-  };
-
-  function toggleCondition(i) {
-    const el = document.getElementById(`cond${i}`);
-    el?.classList.toggle('inactive');
-    el?.classList.toggle('active');
-    window.saveSheet();
-  };
-
-  // ── SPELL SLOTS ──────────────────────────────────────────────────
-  window.renderSlots = renderSlots;
-  function renderSlots(id, count, usedCount) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.innerHTML = '';
-    for (let i = 0; i < count; i++) {
-      const div = document.createElement('div');
-      div.className = 'slot' + (i < usedCount ? ' used' : '');
-      div.onclick = () => { div.classList.toggle('used'); window.saveSheet(); };
-      el.appendChild(div);
-    }
-  }
-
-  // ── ABILITIES DATA (pour recalc mods) ───────────────────────────
-  const ABILITIES_DATA = [
-    {name:'Force',abbr:'FOR'},{name:'Dextérité',abbr:'DEX'},
-    {name:'Constitution',abbr:'CON'},{name:'Intelligence',abbr:'INT'},
-    {name:'Sagesse',abbr:'SAG'},{name:'Charisme',abbr:'CHA'},
-  ];
-  window.ABILITIES_DATA = ABILITIES_DATA;
-
-  function editAbility(i) {
-    const el    = document.getElementById(`abilityScore${i}`);
-    const mel   = document.getElementById(`abilityMod${i}`);
-    const score = parseInt(el.textContent) || 10;
-    const val   = prompt(`Score de ${ABILITIES_DATA[i].name} (1-30) :`, score);
-    if (val === null) return;
-    const ns = Math.max(1, Math.min(30, parseInt(val) || score));
-    const mod = Math.floor((ns - 10) / 2);
-    el.textContent  = ns;
-    mel.textContent = (mod >= 0 ? '+' : '') + mod;
-    window.saveSheet();
-  };
-
 </script>
 
 <style>
-  :root {
-    --parchment:#f2e8d5;--parchment-dark:#e8d9bc;--parchment-deeper:#d4c4a0;
-    --ink:#2c1a0e;--ink-light:#5c3d1e;--ink-faded:#8b6a45;
-    --crimson:#8b1a1a;--gold:#b8860b;--gold-light:#d4a017;
-    --shadow:rgba(44,26,14,0.15);--ornament:#6b4423;
-  }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:#1a0f05;background-image:radial-gradient(ellipse at 20% 50%,#2d1a08,transparent 60%),radial-gradient(ellipse at 80% 20%,#1f0d03,transparent 50%);min-height:100vh;font-family:'Crimson Pro',Georgia,serif;display:flex;flex-direction:column;align-items:center;padding:30px 20px 60px;}
-
-  /* ── AUTH SCREEN ── */
-  #authScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;width:100%;max-width:420px;gap:0;}
-  .auth-box{background:var(--parchment);border-radius:4px;padding:44px 40px 40px;box-shadow:0 20px 60px rgba(0,0,0,0.6),inset 0 0 40px rgba(180,140,80,0.08);width:100%;position:relative;}
-  .auth-box::before,.auth-box::after{content:'';position:absolute;width:50px;height:50px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M2,2 L20,2 M2,2 L2,20' stroke='%236b4423' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='4' cy='4' r='2' fill='%236b4423' opacity='0.5'/%3E%3C/svg%3E");background-repeat:no-repeat;}
-  .auth-box::before{top:12px;left:12px;}
-  .auth-box::after{bottom:12px;right:12px;transform:rotate(180deg);}
-  .auth-title{font-family:'Cinzel',serif;font-size:1.6rem;color:var(--ink);text-align:center;margin-bottom:4px;}
-  .auth-sub{font-size:0.85rem;color:var(--ink-faded);text-align:center;margin-bottom:28px;font-style:italic;}
-  .auth-label{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-faded);display:block;margin-bottom:4px;}
-  .auth-input{width:100%;border:1px solid var(--parchment-deeper);border-bottom:2px solid var(--parchment-deeper);background:rgba(255,255,255,0.4);padding:9px 12px;font-family:'Crimson Pro',serif;font-size:1rem;color:var(--ink);outline:none;margin-bottom:16px;border-radius:2px;transition:border-color .2s;}
-  .auth-input:focus{border-color:var(--gold);}
-  .auth-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
-  .btn-primary{background:linear-gradient(135deg,#2c1a0e,#1a0f05);color:var(--gold-light);font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;padding:12px;border:1px solid rgba(184,134,11,.3);border-radius:3px;cursor:pointer;transition:all .15s;}
-  .btn-primary:hover{background:linear-gradient(135deg,#3d2510,#2c1a0e);border-color:var(--gold-light);}
-  .btn-secondary{background:transparent;color:var(--ink-faded);font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;padding:12px;border:1px solid var(--parchment-deeper);border-radius:3px;cursor:pointer;transition:all .15s;}
-  .btn-secondary:hover{border-color:var(--ink-faded);color:var(--ink-light);}
-  #authError{color:var(--crimson);font-size:0.8rem;text-align:center;min-height:20px;margin-top:8px;font-style:italic;}
-
-  /* ── SHEET SCREEN ── */
-  #sheetScreen{display:none;width:100%;max-width:900px;flex-direction:column;}
-  .app-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding:0 4px;}
-  .app-logo{font-family:'Cinzel',serif;color:var(--gold-light);font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
-  .app-logo span{color:var(--parchment);opacity:.4;font-size:.7em;letter-spacing:.2em;}
-  .header-right{display:flex;align-items:center;gap:12px;}
-  .user-info{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:.12em;color:rgba(212,160,23,.6);text-transform:uppercase;}
-  .sync-badge{display:flex;align-items:center;gap:6px;background:rgba(184,134,11,.12);border:1px solid rgba(184,134,11,.3);border-radius:20px;padding:5px 12px;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;color:var(--gold-light);text-transform:uppercase;}
-  .sync-dot{width:6px;height:6px;border-radius:50%;background:#4caf50;animation:pulse 2s infinite;}
-  .logout-btn{background:transparent;border:1px solid rgba(184,134,11,.2);color:rgba(212,160,23,.5);font-family:'Cinzel',serif;font-size:.52rem;letter-spacing:.15em;text-transform:uppercase;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;}
-  .logout-btn:hover{border-color:rgba(184,134,11,.5);color:var(--gold-light);}
-  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);}}
-
-  /* ── PARCHMENT ── */
-  .sheet{width:100%;background:var(--parchment);background-image:linear-gradient(160deg,#f5ead4,#eedfc6 30%,#f0e4cc 60%,#e8d6b8);border-radius:4px;padding:48px 48px 56px;position:relative;box-shadow:0 0 0 1px rgba(44,26,14,.12),0 4px 8px var(--shadow),0 16px 40px rgba(0,0,0,.5),0 40px 80px rgba(0,0,0,.3),inset 0 0 60px rgba(180,140,80,.08);animation:sheetReveal .8s ease both;}
-  @keyframes sheetReveal{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
-  .sheet::before,.sheet::after{content:'';position:absolute;width:60px;height:60px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M2,2 L20,2 M2,2 L2,20' stroke='%236b4423' stroke-width='1.5' fill='none'/%3E%3Cpath d='M2,2 Q10,10 20,8 M2,2 Q10,10 8,20' stroke='%236b4423' stroke-width='0.5' fill='none' opacity='0.5'/%3E%3Ccircle cx='4' cy='4' r='2' fill='%236b4423' opacity='0.6'/%3E%3C/svg%3E");background-repeat:no-repeat;top:16px;left:16px;}
-  .sheet::after{top:auto;left:auto;bottom:16px;right:16px;transform:rotate(180deg);}
-  .sheet-title{text-align:center;margin-bottom:32px;}
-  .sheet-title h1{font-family:'Cinzel',serif;font-size:.75rem;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-faded);margin-bottom:8px;}
-  .divider{display:flex;align-items:center;gap:12px;color:var(--ornament);font-size:1.1rem;margin:6px 0;}
-  .divider::before,.divider::after{content:'';flex:1;height:1px;background:linear-gradient(to right,transparent,var(--parchment-deeper),transparent);}
-  .identity-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:28px;}
-  .field-group{display:flex;flex-direction:column;gap:2px;}
-  .field-label{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faded);}
-  .field-value{font-size:1.05rem;color:var(--ink);font-weight:600;border-bottom:1px solid var(--parchment-deeper);padding:2px 0 3px;min-height:28px;outline:none;background:transparent;font-family:'Crimson Pro',serif;width:100%;transition:border-color .2s;}
-  .field-value:focus{border-color:var(--gold);}
-
-  /* HP */
-  .hp-banner{background:linear-gradient(135deg,var(--crimson),#6b0000);border-radius:3px;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;position:relative;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 2px 8px rgba(0,0,0,.3);}
-  .hp-section{text-align:center;position:relative;}
-  .hp-label{font-family:'Cinzel',serif;font-size:.52rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:4px;}
-  .hp-value{font-family:'Cinzel',serif;font-size:2.4rem;font-weight:700;color:#fff;line-height:1;}
-  .hp-input{font-family:'Cinzel',serif;font-size:1.1rem;font-weight:600;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:3px;padding:4px 8px;width:70px;text-align:center;outline:none;}
-  .hp-controls{display:flex;gap:8px;align-items:center;}
-  .hp-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
-  .hp-btn:hover{background:rgba(255,255,255,.25);transform:scale(1.1);}
-  .hp-bar-track{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(0,0,0,.3);}
-  .hp-bar-fill{height:100%;background:linear-gradient(to right,#4caf50,#8bc34a);transition:width .4s ease;}
-
-  /* Grid */
-  .main-grid{display:grid;grid-template-columns:180px 1fr;gap:28px;margin-bottom:28px;}
-  .section-title{font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faded);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-  .section-title::after{content:'';flex:1;height:1px;background:var(--parchment-deeper);}
-
-  /* Abilities */
-  .abilities-grid{display:flex;flex-direction:column;gap:8px;}
-  .ability-card{background:linear-gradient(135deg,var(--parchment-dark),var(--parchment-deeper));border:1px solid rgba(107,68,35,.2);border-radius:4px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
-  .ability-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gold);transform:scaleY(0);transition:transform .2s;transform-origin:bottom;}
-  .ability-card:hover::before{transform:scaleY(1);}
-  .ability-card:hover{border-color:rgba(184,134,11,.4);box-shadow:0 2px 8px var(--shadow);}
-  .ability-name{font-family:'Cinzel',serif;font-size:.52rem;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-faded);width:60px;}
-  .ability-score{font-family:'Cinzel',serif;font-size:1.5rem;font-weight:700;color:var(--ink);text-align:center;width:36px;}
-  .ability-mod{font-family:'Cinzel',serif;font-size:.85rem;font-weight:600;color:var(--crimson);width:28px;text-align:right;}
-
-  /* Stats */
-  .stats-col{display:flex;flex-direction:column;gap:20px;}
-  .combat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
-  .stat-bubble{background:var(--parchment-dark);border:1px solid rgba(107,68,35,.2);border-radius:4px;padding:10px 8px;text-align:center;transition:all .15s;}
-  .stat-bubble:hover{border-color:rgba(184,134,11,.35);box-shadow:0 2px 6px var(--shadow);}
-  .stat-bubble .val{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;color:var(--ink);display:block;}
-  .stat-bubble .lbl{font-family:'Cinzel',serif;font-size:.48rem;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-faded);margin-top:2px;display:block;}
-  .saves-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  .save-item{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--ink-light);}
-  .save-pip{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--ink-faded);flex-shrink:0;cursor:pointer;transition:all .15s;}
-  .save-pip.active{background:var(--crimson);border-color:var(--crimson);box-shadow:0 0 4px rgba(139,26,26,.4);}
-  .save-mod{font-family:'Cinzel',serif;font-size:.7rem;color:var(--crimson);font-weight:600;margin-left:auto;}
-
-  /* Skills */
-  .skills-list{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
-  .skill-item{display:flex;align-items:center;gap:7px;font-size:.8rem;color:var(--ink-light);padding:2px 4px;border-radius:2px;cursor:pointer;transition:background .1s;}
-  .skill-item:hover{background:rgba(107,68,35,.06);}
-  .skill-pip{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--ink-faded);flex-shrink:0;}
-  .skill-pip.prof{background:var(--gold);border-color:var(--gold);}
-  .skill-pip.expert{background:var(--crimson);border-color:var(--crimson);}
-  .skill-bonus{font-family:'Cinzel',serif;font-size:.65rem;color:var(--ink-faded);margin-left:auto;}
-
-  /* Dice */
-  .dice-section{background:linear-gradient(135deg,#2c1a0e,#1a0f05);border-radius:4px;padding:20px 24px;margin-bottom:28px;position:relative;overflow:hidden;}
-  .dice-title{font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold-light);margin-bottom:14px;position:relative;}
-  .dice-row{display:flex;gap:10px;flex-wrap:wrap;position:relative;align-items:center;}
-  .die-btn{background:rgba(184,134,11,.12);border:1px solid rgba(184,134,11,.25);border-radius:6px;padding:8px 14px;font-family:'Cinzel',serif;font-size:.75rem;font-weight:600;color:var(--gold-light);cursor:pointer;transition:all .15s;letter-spacing:.05em;}
-  .die-btn:hover{background:rgba(184,134,11,.25);border-color:var(--gold-light);transform:translateY(-1px);box-shadow:0 4px 12px rgba(184,134,11,.2);}
-  .dice-result{margin-left:auto;font-family:'Cinzel',serif;font-size:2rem;font-weight:700;color:var(--gold-light);min-width:60px;text-align:right;transition:all .15s;}
-  .dice-result.rolling{animation:diceRoll .4s ease;}
-  @keyframes diceRoll{0%{transform:scale(.5) rotate(-10deg);opacity:0;}60%{transform:scale(1.2) rotate(3deg);opacity:1;}100%{transform:scale(1) rotate(0);}}
-  .dice-label{font-size:.65rem;color:rgba(184,134,11,.5);text-align:right;font-family:'Cinzel',serif;letter-spacing:.1em;margin-top:2px;}
-
-  /* Notes */
-  .notes-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
-  .notes-area{background:rgba(255,255,255,.3);border:1px solid var(--parchment-deeper);border-radius:3px;padding:12px;min-height:100px;font-family:'Crimson Pro',serif;font-size:.9rem;color:var(--ink-light);resize:none;outline:none;line-height:1.7;transition:border-color .2s;width:100%;}
-  .notes-area:focus{border-color:var(--gold);}
-
-  /* Spell slots */
-  .spell-slots{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
-  .slot{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--ink-faded);cursor:pointer;transition:all .2s;}
-  .slot.used{background:var(--ink-faded);border-color:transparent;}
-  .slot:hover{transform:scale(1.15);}
-
-  /* Conditions */
-  .conditions-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
-  .condition-tag{font-family:'Cinzel',serif;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:20px;border:1px solid;cursor:pointer;transition:all .15s;user-select:none;}
-  .condition-tag.inactive{color:var(--ink-faded);border-color:var(--parchment-deeper);background:transparent;}
-  .condition-tag.active{color:#fff;border-color:var(--crimson);background:var(--crimson);box-shadow:0 2px 8px rgba(139,26,26,.3);}
+  /* Le style que tu as déjà (extrait simplifié pour l'exemple) */
+  body { background: #1a0f05; color: #f2e8d5; font-family: 'Crimson Pro', serif; display: flex; justify-content: center; padding: 20px; }
+  #authScreen { display: flex; flex-direction: column; background: #f2e8d5; color: #2c1a0e; padding: 40px; border-radius: 4px; gap: 10px; margin-top: 50px; }
+  #sheetScreen { display: none; width: 100%; max-width: 800px; }
+  input { padding: 10px; margin-bottom: 10px; }
+  button { padding: 10px; cursor: pointer; background: #2c1a0e; color: #b8860b; border: none; }
 </style>
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
 <div id="authScreen">
-  <div class="auth-box">
-    <div class="auth-title">⚔ Grimoire</div>
-    <div class="auth-sub">Connectez-vous pour accéder à votre fiche</div>
-    <label class="auth-label">Adresse e-mail</label>
-    <input class="auth-input" id="authEmail" type="email" placeholder="joueur@exemple.com">
-    <label class="auth-label">Mot de passe</label>
-    <input class="auth-input" id="authPass" type="password" placeholder="••••••••">
-    <div class="auth-btns">
-      <button class="btn-primary" id="btnLogin">Se connecter</button>
-      <button class="btn-secondary" id="btnSignup">Créer un compte</button>
-    </div>
-    <div id="authError"></div>
-  </div>
+  <h2>⚔ Grimoire</h2>
+  <input id="authEmail" type="email" placeholder="Email">
+  <input id="authPass" type="password" placeholder="Mot de passe">
+  <button onclick="window._doLogin()">Se connecter</button>
+  <button onclick="window._doSignup()">Créer un compte</button>
 </div>
 
-<!-- SHEET SCREEN -->
 <div id="sheetScreen">
-  <header class="app-header">
-    <div class="app-logo">⚔ Grimoire <span>D&D 5e</span></div>
-    <div class="header-right">
-      <div class="user-info" id="userEmail"></div>
-      <div class="sync-badge" id="syncBadge">
-        <div class="sync-dot" id="syncDot"></div>
-        <span id="syncLabel">Connexion…</span>
-      </div>
-      <button class="logout-btn" id="btnLogout">Déconnexion</button>
+  <header style="display:flex; justify-content: space-between; align-items: center;">
+    <h3>Grimoire D&D 5e</h3>
+    <div>
+      <span id="userEmail"></span>
+      <button onclick="window._doLogout()">Déconnexion</button>
     </div>
   </header>
-
-  <div class="sheet">
-    <div class="sheet-title">
-      <h1>Fiche de Personnage · D&D 5e</h1>
-      <div class="divider">✦</div>
-    </div>
-
-    <!-- Identity -->
-    <div class="identity-row">
-      <div class="field-group"><label class="field-label">Nom du personnage</label><input class="field-value" id="fname" oninput="saveSheet()"></div>
-      <div class="field-group"><label class="field-label">Classe & Niveau</label><input class="field-value" id="fclasse" oninput="saveSheet()"></div>
-      <div class="field-group"><label class="field-label">Race · Alignement</label><input class="field-value" id="frace" oninput="saveSheet()"></div>
-      <div class="field-group"><label class="field-label">Origine</label><input class="field-value" id="fbackground" oninput="saveSheet()"></div>
-      <div class="field-group"><label class="field-label">Divinité</label><input class="field-value" id="fdeity" oninput="saveSheet()"></div>
-      <div class="field-group"><label class="field-label">Expérience</label><input class="field-value" id="fxp" oninput="saveSheet()"></div>
-    </div>
-
-    <!-- HP -->
-    <div class="hp-banner">
-      <div class="hp-section">
-        <div class="hp-label">PV Actuels</div>
-        <div class="hp-value" id="hpCurrent">—</div>
-      </div>
-      <div class="hp-controls">
-        <button class="hp-btn" id="btnHpMinus">−</button>
-        <button class="hp-btn" id="btnHpPlus">+</button>
-      </div>
-      <div class="hp-section">
-        <div class="hp-label">PV Maximum</div>
-        <input class="hp-input" id="fhpmax" type="number" min="1" max="999" oninput="saveSheet()">
-      </div>
-      <div class="hp-bar-track"><div class="hp-bar-fill" id="hpBar" style="width:100%"></div></div>
-    </div>
-
-    <!-- Main Grid -->
-    <div class="main-grid">
-      <div>
-        <div class="section-title">Caractéristiques</div>
-        <div class="abilities-grid" id="abilitiesGrid"></div>
-      </div>
-      <div class="stats-col">
-        <div>
-          <div class="section-title">Combat</div>
-          <div class="combat-row">
-            <div class="stat-bubble"><span class="val">—</span><span class="lbl">CA</span></div>
-            <div class="stat-bubble"><span class="val">—</span><span class="lbl">Initiative</span></div>
-            <div class="stat-bubble"><span class="val">—</span><span class="lbl">Vitesse</span></div>
-            <div class="stat-bubble"><span class="val">—</span><span class="lbl">Maîtrise</span></div>
-          </div>
-        </div>
-        <div>
-          <div class="section-title">Jets de Sauvegarde</div>
-          <div class="saves-grid" id="savesGrid"></div>
-        </div>
-        <div>
-          <div class="section-title">États</div>
-          <div class="conditions-row" id="conditionsRow"></div>
-        </div>
-        <div>
-          <div class="section-title">Emplacements de Sorts</div>
-          <div style="font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.12em;color:var(--ink-faded);margin-bottom:6px;">NIVEAU 1</div>
-          <div class="spell-slots" id="spellSlots1"></div>
-          <div style="font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.12em;color:var(--ink-faded);margin:8px 0 6px;">NIVEAU 2</div>
-          <div class="spell-slots" id="spellSlots2"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Skills -->
-    <div style="margin-bottom:28px;">
-      <div class="section-title">Compétences</div>
-      <div class="skills-list" id="skillsGrid"></div>
-    </div>
-
-    <!-- Dice -->
-    <div class="dice-section">
-      <div class="dice-title">✦ Lanceur de Dés</div>
-      <div class="dice-row">
-        <button class="die-btn" onclick="rollDie(4)">d4</button>
-        <button class="die-btn" onclick="rollDie(6)">d6</button>
-        <button class="die-btn" onclick="rollDie(8)">d8</button>
-        <button class="die-btn" onclick="rollDie(10)">d10</button>
-        <button class="die-btn" onclick="rollDie(12)">d12</button>
-        <button class="die-btn" onclick="rollDie(20)">d20</button>
-        <button class="die-btn" onclick="rollDie(100)">d100</button>
-        <div style="margin-left:auto;text-align:right;">
-          <div class="dice-result" id="diceResult">—</div>
-          <div class="dice-label" id="diceLabel">aucun lancer</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Notes -->
-    <div class="notes-row">
-      <div class="field-group">
-        <div class="section-title">Traits & Idéaux</div>
-        <textarea class="notes-area" id="ftraits" oninput="saveSheet()" placeholder="Traits de personnalité, idéaux, liens, défauts…"></textarea>
-      </div>
-      <div class="field-group">
-        <div class="section-title">Notes de Campagne</div>
-        <textarea class="notes-area" id="fnotes" oninput="saveSheet()" placeholder="Notes pour la session…"></textarea>
-      </div>
-    </div>
+  <div style="background: #f2e8d5; color: #2c1a0e; padding: 40px; margin-top: 20px; border-radius: 4px;">
+    <h1>Fiche de Personnage</h1>
+    <p>Bienvenue dans ton grimoire !</p>
   </div>
 </div>
-
-<script>
-  // ── Ce script classique (non-module) construit le DOM
-  // et expose les handlers via window.* pour que le module Firebase puisse les appeler
-  const ABILITIES = ['FOR','DEX','CON','INT','SAG','CHA'];
-  const SAVES     = ['FOR','DEX','CON','INT','SAG','CHA'];
-  const SKILLS    = [
-    'Acrobaties','Arcanes','Athlétisme','Discrétion','Dressage','Escamotage',
-    'Histoire','Intimidation','Investigation','Médecine','Nature','Perception',
-    'Perspicacité','Persuasion','Religion','Représentation','Survie','Tromperie'
-  ];
-  const CONDITIONS = ['Aveuglé','Charmé','Effrayé','Empoisonné','Étourdi','Inconscient','Paralysé','Prone'];
-
-  // Render abilities
-  document.getElementById('abilitiesGrid').innerHTML = ABILITIES.map((a,i) => `
-    <div class="ability-card" data-idx="${i}">
-      <span class="ability-name">${a}</span>
-      <span class="ability-score" id="abilityScore${i}">10</span>
-      <span class="ability-mod" id="abilityMod${i}">+0</span>
-    </div>
-  `).join('');
-
-  // Render saves
-  document.getElementById('savesGrid').innerHTML = SAVES.map((s,i) => `
-    <div class="save-item">
-      <div class="save-pip" id="savePip${i}" data-idx="${i}"></div>
-      <span>${s}</span>
-      <span class="save-mod" id="saveMod${i}">+0</span>
-    </div>
-  `).join('');
-
-  // Render skills
-  document.getElementById('skillsGrid').innerHTML = SKILLS.map((s,i) => `
-    <div class="skill-item" data-idx="${i}">
-      <div class="skill-pip" id="skillPip${i}"></div>
-      <span>${s}</span>
-      <span class="skill-bonus" id="skillBonus${i}">+0</span>
-    </div>
-  `).join('');
-
-  // Render conditions
-  document.getElementById('conditionsRow').innerHTML = CONDITIONS.map((c,i) => `
-    <div class="condition-tag inactive" id="cond${i}" data-idx="${i}">${c}</div>
-  `).join('');
-
-  // Render spell slots (réutilisé aussi depuis le module)
-  window._renderSlots = function(id, count, usedCount) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.innerHTML = '';
-    for (let i = 0; i < count; i++) {
-      const div = document.createElement('div');
-      div.className = 'slot' + (i < usedCount ? ' used' : '');
-      div.addEventListener('click', () => {
-        div.classList.toggle('used');
-        if (typeof window._saveSheet === 'function') window._saveSheet();
-      });
-      el.appendChild(div);
-    }
-  };
-  window._renderSlots('spellSlots1', 4, 0);
-  window._renderSlots('spellSlots2', 2, 0);
-
-  // ── Attache les listeners APRÈS que le module Firebase
-  //    ait exposé ses fonctions sur window._*
-  //    On poll toutes les 50ms jusqu'à ce qu'elles soient prêtes
-  function attachListeners() {
-    if (typeof window._doLogin !== 'function') {
-      setTimeout(attachListeners, 50); return;
-    }
-
-    // Auth
-    document.getElementById('btnLogin') .addEventListener('click', window._doLogin);
-    document.getElementById('btnSignup').addEventListener('click', window._doSignup);
-    document.getElementById('btnLogout').addEventListener('click', window._doLogout);
-    document.getElementById('authPass') .addEventListener('keydown', e => { if(e.key==='Enter') window._doLogin(); });
-
-    // HP
-    document.getElementById('btnHpMinus').addEventListener('click', () => window._changeHP(-1));
-    document.getElementById('btnHpPlus') .addEventListener('click', () => window._changeHP(+1));
-
-    // Dés
-    document.querySelectorAll('.die-btn').forEach(btn =>
-      btn.addEventListener('click', () => window._rollDie(parseInt(btn.dataset.sides)))
-    );
-
-    // Caractéristiques
-    document.querySelectorAll('.ability-card').forEach(card =>
-      card.addEventListener('click', () => window._editAbility(parseInt(card.dataset.idx)))
-    );
-
-    // Jets de sauvegarde
-    document.querySelectorAll('.save-pip').forEach(pip =>
-      pip.addEventListener('click', () => window._toggleSave(parseInt(pip.dataset.idx)))
-    );
-
-    // Compétences
-    document.querySelectorAll('.skill-item').forEach(item =>
-      item.addEventListener('click', () => window._toggleSkillProf(parseInt(item.dataset.idx)))
-    );
-
-    // États
-    document.querySelectorAll('.condition-tag').forEach(tag =>
-      tag.addEventListener('click', () => window._toggleCondition(parseInt(tag.dataset.idx)))
-    );
-
-    // Champs texte → autosave
-    ['fname','fclasse','frace','fbackground','fdeity','fxp','fhpmax','ftraits','fnotes'].forEach(id => {
-      document.getElementById(id)?.addEventListener('input', () => window._saveSheet());
-    });
-  }
-  attachListeners();
-</script>
 
 </body>
 </html>
