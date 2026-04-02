@@ -7,13 +7,36 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 
 <!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, onSnapshot, getDoc }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// ── FONCTIONS GLOBALES POUR LES BOUTONS ──────────────────────────
+  window._doSignup = async () => {
+    const email = document.getElementById('authEmail').value;
+    const pass  = document.getElementById('authPass').value;
+    try {
+      await createUserWithEmailAndPassword(auth, email, pass);
+    } catch(e) { showAuthError(e.message); }
+  };
 
+  window._doLogin = async () => {
+    const email = document.getElementById('authEmail').value;
+    const pass  = document.getElementById('authPass').value;
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch(e) { showAuthError(e.message); }
+  };
+
+  window._doLogout = async () => {
+    if (unsubscribe) unsubscribe();
+    await signOut(auth);
+  };
+
+  // On expose aussi les autres fonctions nécessaires au fonctionnement
+  window._changeHP = changeHP;
+  window._rollDie = rollDie;
+  window._editAbility = editAbility;
+  window._toggleSave = toggleSave;
+  window._toggleSkillProf = toggleSkillProf;
+  window._toggleCondition = toggleCondition;
+  window._saveSheet = saveSheet;
   // ── CONFIG FIREBASE ──────────────────────────────────────────────
   const firebaseConfig = {
     apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
