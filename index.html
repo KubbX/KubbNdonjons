@@ -27,32 +27,54 @@
         let currentUid = null;
         let activeCharId = null;
 
+        // --- DATA SYSTEM (Inspiré de RPG Companion) ---
+        const FORGE_DATA = {
+            races: {
+                "Humain": { source: "PHB", stats: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, speed: 9 },
+                "Elfe": { 
+                    source: "PHB", speed: 9, 
+                    subraces: {
+                        "Haut-Elfe": { stats: { dex: 2, int: 1 }, traits: ["Sort mineur"] },
+                        "Elfe des bois": { stats: { dex: 2, wis: 1 }, traits: ["Célérité"] }
+                    }
+                },
+                "Nain": { 
+                    source: "PHB", speed: 7.5,
+                    subraces: {
+                        "Nain des collines": { stats: { con: 2, wis: 1 }, hpBonus: 1 },
+                        "Nain des montagnes": { stats: { con: 2, str: 2 } }
+                    }
+                }
+            },
+            classes: {
+                "Guerrier": { hd: 10, saves: ["str", "con"], source: "PHB" },
+                "Magicien": { hd: 6, saves: ["int", "wis"], source: "PHB" },
+                "Voleur": { hd: 8, saves: ["dex", "int"], source: "PHB" }
+            }
+        };
+
         // --- AUTH LOGIC ---
         window._doLogin = () => {
             const e = document.getElementById('authEmail').value;
             const p = document.getElementById('authPass').value;
             signInWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
         };
-
         window._doSignup = () => {
             const e = document.getElementById('authEmail').value;
             const p = document.getElementById('authPass').value;
             createUserWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
         };
-
         window._doLogout = () => signOut(auth);
 
         onAuthStateChanged(auth, user => {
-            const authScreen = document.getElementById('authScreen');
-            const appScreen = document.getElementById('appScreen');
             if (user) {
                 currentUid = user.uid;
-                authScreen.style.display = 'none';
-                appScreen.style.display = 'block';
+                document.getElementById('authScreen').style.display = 'none';
+                document.getElementById('appScreen').style.display = 'block';
                 loadCharacterList();
             } else {
-                authScreen.style.display = 'flex';
-                appScreen.style.display = 'none';
+                document.getElementById('authScreen').style.display = 'flex';
+                document.getElementById('appScreen').style.display = 'none';
             }
         });
 
@@ -62,143 +84,29 @@
             document.getElementById(tabId).classList.add('active');
         };
 
-        // --- CHARACTER LOGIC ---
-        async function loadCharacterList() {
-            const q = query(collection(db, "characters"), where("owner", "==", currentUid));
-            onSnapshot(q, (snapshot) => {
-                const list = document.getElementById('charList');
-                list.innerHTML = '';
-                snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
-                    const btn = document.createElement('div');
-                    btn.className = 'char-card';
-                    btn.innerHTML = `<strong>${data.name || 'Sans nom'}</strong><br><small>${data.class || 'Niveau 1'}</small>`;
-                    btn.onclick = () => selectCharacter(docSnap.id);
-                    list.appendChild(btn);
-                });
-            });
-        }
-
-        window._createChar = async () => {
-            const name = prompt("Nom du héros ?");
-            if (name) {
-                await addDoc(collection(db, "characters"), {
-                    name: name,
-                    owner: currentUid,
-                    hp: 20, hpMax: 20, ac: 10,
-                    conditions: [],
-                    slots: [2, 0, 0]
-                });
-            }
+        // --- FORGE LOGIC ---
+        window._openForge = () => {
+            const raceSelect = document.getElementById('forgeRace');
+            const classSelect = document.getElementById('forgeClass');
+            raceSelect.innerHTML = Object.keys(FORGE_DATA.races).map(r => `<option value="${r}">${r}</option>`).join('');
+            classSelect.innerHTML = Object.keys(FORGE_DATA.classes).map(c => `<option value="${c}">${c}</option>`).join('');
+            window._updateSubraceList();
+            document.getElementById('forgeOverlay').style.display = 'flex';
         };
 
-        function selectCharacter(id) {
-            activeCharId = id;
-            document.getElementById('activeCharIdDisplay').textContent = id;
-            onSnapshot(doc(db, "characters", id), (docSnap) => {
-                const data = docSnap.data();
-                document.getElementById('charNameDisp').textContent = data.name;
-                document.getElementById('hpVal').textContent = `${data.hp}/${data.hpMax}`;
-                document.getElementById('acVal').textContent = data.ac;
-                // Update other fields...
-            });
-            window._showTab('tab-sheet');
-        }
+        window._closeForge = () => document.getElementById('forgeOverlay').style.display = 'none';
 
-        window._updateStat = async (field, value) => {
-            if (!activeCharId) return;
-            await updateDoc(doc(db, "characters", activeCharId), { [field]: value });
+        window._updateSubraceList = () => {
+            const raceKey = document.getElementById('forgeRace').value;
+            const raceData = FORGE_DATA.races[raceKey];
+            const container = document.getElementById('subraceContainer');
+            const subSelect = document.getElementById('forgeSubrace');
+            if (raceData.subraces) {
+                container.style.display = 'block';
+                subSelect.innerHTML = Object.keys(raceData.subraces).map(s => `<option value="${s}">${s}</option>`).join('');
+            } else { container.style.display = 'none'; }
         };
 
-        // --- GM LOGIC ---
-        window._watchChar = () => {
-            const id = document.getElementById('gmSearchId').value;
-            onSnapshot(doc(db, "characters", id), (docSnap) => {
-                if (!docSnap.exists()) return alert("Fiche introuvable");
-                const data = docSnap.data();
-                document.getElementById('gmMonitor').innerHTML = `
-                    <div class="gm-pc-card">
-                        <h4>${data.name}</h4>
-                        <p>❤️ HP: ${data.hp}/${data.hpMax} | 🛡️ CA: ${data.ac}</p>
-                        <p>✨ Slots: ${data.slots.join(' / ')}</p>
-                    </div>
-                `;
-            });
-        };
-    </script>
-
-    <style>
-        :root { --p: #f4ece1; --i: #2c1a0e; --g: #b8860b; }
-        body { background: #1a0f05; color: var(--i); font-family: 'Crimson Pro', serif; margin: 0; }
-        
-        /* Auth Screen */
-        #authScreen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(#2d1a08, #1a0f05); }
-        .auth-box { background: var(--p); padding: 30px; border-radius: 5px; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; cursor: pointer; font-family: 'Cinzel'; border: none; transition: 0.3s; }
-        .btn-gold { background: var(--g); color: white; }
-        
-        /* App Structure */
-        nav { background: var(--i); padding: 10px; display: flex; justify-content: center; gap: 15px; }
-        nav button { width: auto; background: transparent; color: var(--g); font-size: 0.8rem; }
-        .tab-content { display: none; padding: 20px; max-width: 800px; margin: auto; background: var(--p); min-height: 80vh; box-shadow: 0 0 20px rgba(0,0,0,0.3); }
-        .active { display: block; }
-        
-        /* Elements */
-        .char-card { background: rgba(0,0,0,0.05); padding: 15px; margin: 10px 0; border-left: 4px solid var(--g); cursor: pointer; }
-        .stat-circle { width: 80px; height: 80px; border: 3px solid var(--g); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px; }
-        .gm-pc-card { background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
-        .cinzel { font-family: 'Cinzel'; }
-    </style>
-</head>
-<body>
-
-<div id="authScreen">
-    <div class="auth-box">
-        <h2 class="cinzel" style="text-align:center">GRIMOIRE</h2>
-        <input id="authEmail" type="email" placeholder="Email">
-        <input id="authPass" type="password" placeholder="Mot de passe">
-        <button class="btn-gold" onclick="window._doLogin()">SE CONNECTER</button>
-        <button style="background:none; color:#666; font-size:0.7rem" onclick="window._doSignup()">Créer un compte</button>
-    </div>
-</div>
-
-<div id="appScreen" style="display:none">
-    <nav>
-        <button onclick="_showTab('tab-list')">MES FICHES</button>
-        <button onclick="_showTab('tab-sheet')">GRIMOIRE</button>
-        <button onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
-        <button onclick="_doLogout()" style="color: #8b1a1a;">QUITTER</button>
-    </nav>
-
-    <div id="tab-list" class="tab-content active">
-        <h2 class="cinzel">Vos Chroniques</h2>
-        <div id="charList"></div>
-        <button class="btn-gold" onclick="_createChar()">+ NOUVEAU HÉROS</button>
-    </div>
-
-    <div id="tab-sheet" class="tab-content">
-        <h2 id="charNameDisp" class="cinzel">Nom du Héros</h2>
-        <div style="display:flex; justify-content: space-around;">
-            <div class="stat-circle"><small>PV</small><b id="hpVal">0/0</b></div>
-            <div class="stat-circle"><small>CA</small><b id="acVal">0</b></div>
-        </div>
-        <p style="font-size: 0.7rem; color: #666; text-align: center;">ID de partage : <span id="activeCharIdDisplay"></span></p>
-        <hr>
-        <p><i>Système de dés et inventaire en cours de synchronisation...</i></p>
-    </div>
-
-    <div id="tab-gm" class="tab-content">
-        <h2 class="cinzel">Écran du Maître</h2>
-        <div style="display:flex; gap:10px">
-            <input id="gmSearchId" type="text" placeholder="Coller l'ID de la fiche">
-            <button class="btn-gold" style="width:150px" onclick="_watchChar()">SUIVRE</button>
-        </div>
-        <div id="gmMonitor" style="margin-top:20px">
-            <p>Entrez l'ID d'un joueur pour surveiller ses stats en temps réel.</p>
-        </div>
-    </div>
-</div>
-
-</body>
-</html>
+        window._forgeNext = (step) => {
+            document.getElementById('forgeStep1').style.display = step === 1 ? 'block' : 'none';
+            document.
