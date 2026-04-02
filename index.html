@@ -659,7 +659,8 @@ async function saveNewCharacter() {
     // Identité de classe/race
     race: rKey,
     subrace: srKey||'',
-    class: cKey,
+    class: cKey, // On garde l'original pour la rétrocompatibilité
+    classes: [{ id: cKey, level: 1 }], // <-- NOUVEAU : Le tableau de multiclassage
     level: 1,
     xp: 0,
     // Stats
@@ -770,11 +771,16 @@ function renderCharSheet(id, d) {
   }
   function fmtB(v) { return (v>=0?'+':'')+v; }
  
+  const classesStr = d.classes ? d.classes.map(c => `${c.id} Niv.${c.level}`).join(' / ') : `${d.class||'—'} Niv.${d.level||1}`;
+
   sheet.innerHTML = `
   <div class="sheet-header">
     <div class="sheet-name-block">
       <div class="sheet-name editable" data-field="name" data-type="text">${d.name}</div>
-      <div class="sheet-subtitle">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${d.class||'—'} · Niveau <span class="editable inline-edit" data-field="level" data-type="number">${d.level||1}</span></div>
+      <div class="sheet-subtitle">
+  ${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesStr} · Niveau total ${d.level||1}
+  <button class="btn-gold" style="padding: 2px 8px; margin-left: 10px;" onclick="window._triggerLevelUp('${id}')">EXP / LEVEL UP</button>
+</div>
     </div>
     <div class="sheet-combat-row">
       <div class="combat-box">
@@ -1055,6 +1061,48 @@ function getNestedVal(obj, path) {
 function buildNestedUpdate(field, val) {
   return { [field]: val };
 }
+
+//LEVELUP
+
+window._triggerLevelUp = async (id) => {
+  const snap = await getDoc(doc(db, "characters", id));
+  if(!snap.exists()) return;
+  const d = snap.data();
+  
+  // Demander quelle classe augmenter (simplifié avec un prompt pour le MVP)
+  const classNames = Object.keys(CLASSES).join(", ");
+  const chosenClass = prompt(`Dans quelle classe prendre un niveau ?\nClasses existantes : ${d.classes.map(c=>c.id).join(', ')}\nOu tape une nouvelle classe parmi :\n${classNames}`, d.classes[0].id);
+  
+  if(!chosenClass || !CLASSES[chosenClass]) {
+    alert("Classe invalide ou annulé.");
+    return;
+  }
+
+  let newClasses = [...(d.classes || [])];
+  let classIndex = newClasses.findIndex(c => c.id === chosenClass);
+  
+  if(classIndex > -1) {
+    newClasses[classIndex].level += 1; // Montée de niveau dans une classe existante
+  } else {
+    newClasses.push({ id: chosenClass, level: 1 }); // Multiclassage !
+  }
+
+  const newTotalLevel = (d.level || 1) + 1;
+  const clData = CLASSES[chosenClass];
+  
+  // Calcul rapide des nouveaux PV : Moyenne du dé + modificateur de Constitution
+  const conMod = Math.floor(((d.stats.con || 10) - 10) / 2);
+  const hpGain = Math.ceil((clData.hd / 2) + 1) + conMod; 
+
+  await updateDoc(doc(db, "characters", id), {
+    classes: newClasses,
+    level: newTotalLevel,
+    hpMax: d.hpMax + hpGain,
+    hp: d.hp + hpGain, // On soigne un peu le héros en passant de niveau !
+    hitDice: d.hitDice + `, 1d${clData.hd}`
+  });
+  alert(`✨ Ding ! Niveau ${newTotalLevel} atteint ! (+${hpGain} PV Max)`);
+};
  
 // ============================================================
 // ÉCRAN DU MAÎTRE
