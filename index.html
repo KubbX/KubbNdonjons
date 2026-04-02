@@ -71,79 +71,79 @@ const CLASSES = {
     skills:["Athletisme","Dressage","Intimidation","Nature","Perception","Survie"], skillCount:2,
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Hache à deux mains (ou toute arme de guerre martiale), 2 hachettes, 10 javelines, kit d'explorateur",
-    features:[{lvl:1,name:"Rage",desc:"Entrer en rage (avantage FOR, bonus dégâts +2/+3/+4, résistance physique)"},{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod CON"},{lvl:2,name:"Attaque téméraire",desc:"Avantage en attaque, mais les attaques contre vous ont aussi l'avantage"},{lvl:2,name:"Sens du danger",desc:"Avantage aux jets de sauvegarde DEX contre effets visibles"}]
+    features:[{lvl:1,name:"Rage",desc:"Entrer en rage (avantage FOR, bonus dégâts +2/+3/+4, résistance physique)"},{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod CON"},{lvl:2,name:"Attaque téméraire",desc:"Avantage en attaque, mais les attaques contre vous ont aussi l'avantage"},{lvl:2,name:"Sens du danger",desc:"Avantage aux jets de sauvegarde DEX contre effets visibles"},{lvl:3,name:"Voie primitive",desc:"Choisir une voie: Berserker ou Guerrier totem"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux caractéristiques (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},{lvl:5,name:"Déplacement rapide",desc:"+3m de vitesse"}]
   },
   "Barde": { hd:8, saves:["dex","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Tout (3 au choix)"], skillCount:3,
     armor:["Légères"], weapons:["Simples","Arbalète de poing","Épée longue","Rapière","Épée courte"],
     equipment:"Rapière (ou épée longue/toute arme simple), Étui à instruments de musique, Armure de cuir, Dague, Pack de diplomate",
-    features:[{lvl:1,name:"Lanceur de sorts",desc:"Charisme (sorts de barde)"},{lvl:1,name:"Inspiration bardique",desc:"Dé d'inspiration (d6) à un allié — bonus au jet d'attaque, compétence ou sauvegarde"},{lvl:2,name:"Touche-à-tout",desc:"Moitié du bonus de maîtrise pour les compétences sans maîtrise"}]
+    features:[{lvl:1,name:"Lanceur de sorts",desc:"Charisme (sorts de barde)"},{lvl:1,name:"Inspiration bardique",desc:"Dé d'inspiration (d6) à un allié — bonus au jet d'attaque, compétence ou sauvegarde"},{lvl:2,name:"Touche-à-tout",desc:"Moitié du bonus de maîtrise pour les compétences sans maîtrise"},{lvl:3,name:"Collège bardique",desc:"Choisir un collège: Connaissance ou Vaillance"},{lvl:3,name:"Expertise",desc:"Double bonus de maîtrise pour 2 compétences"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Inspiration bardique (d8)",desc:"Le dé d'inspiration passe à d8"},{lvl:5,name:"Source d'inspiration",desc:"Récupérer l'inspiration bardique au repos court"}]
   },
   "Clerc": { hd:8, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"wis",
     skills:["Histoire","Intuition","Médecine","Persuasion","Religion"], skillCount:2,
     armor:["Légères","Moyennes","Lourdes","Boucliers"], weapons:["Simples"],
     equipment:"Masse d'armes (ou fléau), Armure d'écailles (ou armure de cuir/de mailles), Arbalète légère + 20 carreaux (ou toute arme simple), Pack d'ecclésiastique (ou pack d'explorateur), Bouclier, Symbole sacré",
-    features:[{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de clerc)"},{lvl:1,name:"Domaine divin",desc:"Choisir un domaine (Connaissance, Vie, Lumière, Nature, Tempête, Tromperie, Guerre)"},{lvl:2,name:"Conduit divin",desc:"Renvoi des morts-vivants"}]
+    features:[{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de clerc)"},{lvl:1,name:"Domaine divin",desc:"Choisir un domaine (Connaissance, Vie, Lumière, Nature, Tempête, Tromperie, Guerre)"},{lvl:2,name:"Conduit divin",desc:"Renvoi des morts-vivants"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Destruction des morts-vivants",desc:"RC 1/2 détruit automatiquement"}]
   },
   "Druide": { hd:8, saves:["int","wis"], source:"PHB", spellcaster:true, spellAbility:"wis",
     skills:["Arcanes","Dressage","Intuition","Médecine","Nature","Perception","Religion","Survie"], skillCount:2,
     armor:["Légères","Moyennes","Boucliers (pas métalliques)"], weapons:["Massue","Dague","Fléchette","Javeline","Gourdin","Serpe","Lance","Bâton","Cimeterre","Fronde","Trident"],
     equipment:"Bouclier de bois (ou toute arme simple), Cimeterre (ou toute arme de corps à corps simple), Armure de cuir, Pack d'explorateur, Focalisateur druidique",
-    features:[{lvl:1,name:"Druidique",desc:"Langue secrète des druides"},{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de druide)"},{lvl:2,name:"Forme sauvage",desc:"Se transformer en bête (RC 1/4 — puis évolue)"}]
+    features:[{lvl:1,name:"Druidique",desc:"Langue secrète des druides"},{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de druide)"},{lvl:2,name:"Forme sauvage",desc:"Se transformer en bête (RC 1/4 — puis évolue)"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
   },
   "Guerrier": { hd:10, saves:["str","con"], source:"PHB", spellcaster:false,
     skills:["Acrobaties","Athletisme","Histoire","Intuition","Intimidation","Perception","Survie"], skillCount:2,
     armor:["Toutes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Cotte de mailles (ou armure de cuir, arc long, 20 flèches), Arme martiale + bouclier (ou 2 armes martiales), Arbalète légère + 20 carreaux (ou 2 hachettes), Pack de donjonneur (ou pack d'explorateur)",
-    features:[{lvl:1,name:"Style de combat",desc:"Archerie, Combat à deux armes, Défense, Duel, Grands coups, Protection"},{lvl:1,name:"Second souffle",desc:"Récupérer 1d10+niveau PV (repos court)"},{lvl:2,name:"Fougue",desc:"Action supplémentaire une fois par repos court/long"}]
+    features:[{lvl:1,name:"Style de combat",desc:"Archerie, Combat à deux armes, Défense, Duel, Grands coups, Protection"},{lvl:1,name:"Second souffle",desc:"Récupérer 1d10+niveau PV (repos court)"},{lvl:2,name:"Fougue",desc:"Action supplémentaire une fois par repos court/long"},{lvl:3,name:"Archétype martial",desc:"Choisir: Champion, Maître de guerre ou Chevalier occulte"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"}]
   },
   "Magicien": { hd:6, saves:["int","wis"], source:"PHB", spellcaster:true, spellAbility:"int",
     skills:["Arcanes","Histoire","Intuition","Investigation","Médecine","Religion"], skillCount:2,
     armor:[], weapons:["Dague","Fléchette","Fronde","Bâton","Arbalète légère"],
     equipment:"Bâton de mage (ou dague), Sacoche à composantes (ou focalisateur arcanique), Pack d'érudit (ou pack d'explorateur), Grimoire",
-    features:[{lvl:1,name:"Incantation",desc:"Intelligence (sorts de magicien) — Grimoire avec 6 sorts de niveau 1"},{lvl:1,name:"Récupération arcanique",desc:"Récupérer des emplacements de sorts épuisés lors d'un repos court"},{lvl:2,name:"Tradition arcanique",desc:"École de magie (Abjuration, Conjuration, Divination, Enchantement, Évocation, Illusion, Nécromancie, Transmutation)"}]
+    features:[{lvl:1,name:"Incantation",desc:"Intelligence (sorts de magicien) — Grimoire avec 6 sorts de niveau 1"},{lvl:1,name:"Récupération arcanique",desc:"Récupérer des emplacements de sorts épuisés lors d'un repos court"},{lvl:2,name:"Tradition arcanique",desc:"École de magie (Abjuration, Conjuration, Divination, Enchantement, Évocation, Illusion, Nécromancie, Transmutation)"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
   },
   "Moine": { hd:8, saves:["str","dex"], source:"PHB", spellcaster:false,
     skills:["Acrobaties","Athletisme","Histoire","Intuition","Religion","Discrétion"], skillCount:2,
     armor:[], weapons:["Simples","Épée courte"],
     equipment:"Épée courte (ou toute arme simple), Pack de donjonneur (ou pack d'explorateur), 10 fléchettes",
-    features:[{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod SAG"},{lvl:1,name:"Arts martiaux",desc:"Dés martiaux (d4→d10), attaques sans arme DEX ou FOR"},{lvl:2,name:"Ki",desc:"Points de ki pour Tempête de coups, Défense patiente, Pas du vent"},{lvl:2,name:"Déplacement sans armure",desc:"+3m de déplacement"}]
+    features:[{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod SAG"},{lvl:1,name:"Arts martiaux",desc:"Dés martiaux (d4→d10), attaques sans arme DEX ou FOR"},{lvl:2,name:"Ki",desc:"Points de ki pour Tempête de coups, Défense patiente, Pas du vent"},{lvl:2,name:"Déplacement sans armure",desc:"+3m de déplacement"},{lvl:3,name:"Tradition monastique",desc:"Choisir: Voie de la Main ouverte, de l'Ombre ou des Quatre éléments"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},{lvl:5,name:"Parade de projectiles",desc:"Réduire les dégâts de projectiles"}]
   },
   "Paladin": { hd:10, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Athletisme","Intuition","Intimidation","Médecine","Persuasion","Religion"], skillCount:2,
     armor:["Toutes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Arme martiale + bouclier (ou 2 armes martiales), 5 javelines (ou toute arme de corps à corps simple), Pack de prêtre (ou pack d'explorateur), Cotte de mailles, Symbole sacré",
-    features:[{lvl:1,name:"Sens divin",desc:"Détecter les célestes, fiélons et morts-vivants dans un rayon de 18m"},{lvl:1,name:"Imposition des mains",desc:"Pool de PV = niveau x 5, soigner les blessures et maladies"},{lvl:2,name:"Style de combat",desc:"Défense, Duel, Grande épée, Protection"},{lvl:2,name:"Incantation",desc:"Charisme (sorts de paladin)"},{lvl:2,name:"Châtiment divin",desc:"2d8 dégâts radiants supplémentaires en dépensant un emplacement"}]
+    features:[{lvl:1,name:"Sens divin",desc:"Détecter les célestes, fiélons et morts-vivants dans un rayon de 18m"},{lvl:1,name:"Imposition des mains",desc:"Pool de PV = niveau x 5, soigner les blessures et maladies"},{lvl:2,name:"Style de combat",desc:"Défense, Duel, Grande épée, Protection"},{lvl:2,name:"Incantation",desc:"Charisme (sorts de paladin)"},{lvl:2,name:"Châtiment divin",desc:"2d8 dégâts radiants supplémentaires en dépensant un emplacement"},{lvl:3,name:"Serment sacré",desc:"Choisir: Dévotion, Anciens ou Vengeance"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"}]
   },
   "Rôdeur": { hd:10, saves:["str","dex"], source:"PHB", spellcaster:true, spellAbility:"wis",
     skills:["Athletisme","Dressage","Discrétion","Investigation","Nature","Perception","Survie"], skillCount:3,
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Armure d'écailles (ou armure de cuir), 2 épées courtes (ou 2 armes simples de corps à corps), Pack de donjonneur (ou pack d'explorateur), Arc long + 20 flèches",
-    features:[{lvl:1,name:"Ennemi juré",desc:"Avantage aux jets de Sagesse contre les créatures de type choisi"},{lvl:1,name:"Explorateur-né",desc:"Maîtrise dans 2 compétences + avantages en terrain de prédilection"},{lvl:2,name:"Style de combat",desc:"Archerie, Défense, Duel, Combat à deux armes"},{lvl:2,name:"Incantation",desc:"Sagesse (sorts de rôdeur)"}]
+    features:[{lvl:1,name:"Ennemi juré",desc:"Avantage aux jets de Sagesse contre les créatures de type choisi"},{lvl:1,name:"Explorateur-né",desc:"Maîtrise dans 2 compétences + avantages en terrain de prédilection"},{lvl:2,name:"Style de combat",desc:"Archerie, Défense, Duel, Combat à deux armes"},{lvl:2,name:"Incantation",desc:"Sagesse (sorts de rôdeur)"},{lvl:3,name:"Archétype de rôdeur",desc:"Choisir: Chasseur ou Maître des bêtes"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"}]
   },
   "Roublard": { hd:8, saves:["dex","int"], source:"PHB", spellcaster:false,
     skills:["Acrobaties","Athletisme","Discrétion","Escamotage","Intimidation","Investigation","Perception","Performance","Persuasion","Tromperie"], skillCount:4,
     armor:["Légères"], weapons:["Simples","Arbalète de poing","Épée longue","Rapière","Épée courte"],
     equipment:"Rapière (ou épée courte), Arc court + 20 flèches (ou épée courte), Pack de cambrioleur (ou pack d'explorateur ou pack de donjonneur), Armure de cuir, 2 dagues, Outils de voleur",
-    features:[{lvl:1,name:"Expertise",desc:"Double bonus de maîtrise pour 2 compétences choisies"},{lvl:1,name:"Attaque sournoise",desc:"1d6 dégâts bonus quand avantage ou allié adjacent à la cible"},{lvl:1,name:"Jargon des voleurs",desc:"Argot secret des roublards"},{lvl:2,name:"Action rusée",desc:"Bonus action: Foncer, Se désengager ou Se cacher"}]
+    features:[{lvl:1,name:"Expertise",desc:"Double bonus de maîtrise pour 2 compétences choisies"},{lvl:1,name:"Attaque sournoise",desc:"1d6 dégâts bonus quand avantage ou allié adjacent à la cible"},{lvl:1,name:"Jargon des voleurs",desc:"Argot secret des roublards"},{lvl:2,name:"Action rusée",desc:"Bonus action: Foncer, Se désengager ou Se cacher"},{lvl:3,name:"Archétype de roublard",desc:"Choisir: Voleur, Assassin ou Escroc arcanique"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Esquive instinctive",desc:"Réduire de moitié les dégâts d'une attaque visible"}]
   },
   "Ensorceleur": { hd:6, saves:["con","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Arcanes","Intimidation","Perspicacité","Persuasion","Religion","Tromperie"], skillCount:2,
     armor:[], weapons:["Dague","Fléchette","Fronde","Bâton","Arbalète légère"],
     equipment:"Arbalète légère + 20 carreaux (ou toute arme simple), Sacoche à composantes (ou focalisateur arcanique), Pack de donjonneur (ou pack d'explorateur), 2 dagues",
-    features:[{lvl:1,name:"Incantation",desc:"Charisme (sorts d'ensorceleur)"},{lvl:1,name:"Origine magique",desc:"Âme draconique ou Magie sauvage"},{lvl:2,name:"Points de sorcellerie",desc:"Créer des emplacements de sorts supplémentaires ou effets méta-magiques"}]
+    features:[{lvl:1,name:"Incantation",desc:"Charisme (sorts d'ensorceleur)"},{lvl:1,name:"Origine magique",desc:"Âme draconique ou Magie sauvage"},{lvl:2,name:"Points de sorcellerie",desc:"Créer des emplacements de sorts supplémentaires ou effets méta-magiques"},{lvl:3,name:"Métamagie",desc:"Choisir 2 options de métamagie"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
   },
   "Occultiste": { hd:8, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Arcanes","Duperie","Histoire","Intimidation","Investigation","Nature","Religion"], skillCount:2,
     armor:["Légères"], weapons:["Simples"],
     equipment:"Arbalète légère + 10 carreaux (ou toute arme simple), Sacoche à composantes (ou focalisateur arcanique), Pack d'érudit (ou pack de donjonneur), Armure de cuir, toute arme simple, 2 dagues",
-    features:[{lvl:1,name:"Protecteur d'au-delà",desc:"Choisir son patron (l'Archifée, le Fiélon, le Grand Ancien)"},{lvl:1,name:"Magie de pacte",desc:"Charisme — emplacements récupérés au repos court"},{lvl:2,name:"Invocations occultes",desc:"Pouvoirs occultes permanents (yeux du gardien des runes, etc.)"}]
+    features:[{lvl:1,name:"Protecteur d'au-delà",desc:"Choisir son patron (l'Archifée, le Fiélon, le Grand Ancien)"},{lvl:1,name:"Magie de pacte",desc:"Charisme — emplacements récupérés au repos court"},{lvl:2,name:"Invocations occultes",desc:"Pouvoirs occultes permanents (yeux du gardien des runes, etc.)"},{lvl:3,name:"Pacte",desc:"Choisir: Pacte de la Chaîne, de la Lame ou du Grimoire"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
   },
   "Artificier": { hd:8, saves:["con","int"], source:"TCoE", spellcaster:true, spellAbility:"int",
     skills:["Arcanes","Histoire","Investigation","Médecine","Nature","Perception","Discrétion"], skillCount:2,
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples"],
     equipment:"2 pistolets + 20 projectiles, Pack de donjonneur, Armure d'écailles, Outils de voleur, Outils de bricoleur",
-    features:[{lvl:1,name:"Maîtrise des outils magiques",desc:"Utiliser les outils d'artisan comme focalisateur arcanique"},{lvl:1,name:"Infusions",desc:"Imprégner des objets magiques non-magiques"},{lvl:1,name:"Utilisation des armes à feu",desc:"Maîtrise des armes à feu si variante"}]
+    features:[{lvl:1,name:"Maîtrise des outils magiques",desc:"Utiliser les outils d'artisan comme focalisateur arcanique"},{lvl:1,name:"Infusions",desc:"Imprégner des objets magiques non-magiques"},{lvl:1,name:"Utilisation des armes à feu",desc:"Maîtrise des armes à feu si variante"},{lvl:3,name:"Spécialité d'artificier",desc:"Choisir: Alchimiste, Armurier, Artilleur ou Forgeur de bataille"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
   }
 };
  
@@ -173,6 +173,37 @@ const SKILLS_LIST = [
 ];
 const PROF_BONUS = [2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,6];
  
+// ============================================================
+// HELPERS MULTICLASSE
+// ============================================================
+function getClasses(d) {
+  if (d.classes && d.classes.length) return d.classes;
+  if (d.class) return [{ name: d.class, level: d.level || 1 }];
+  return [];
+}
+function totalLevel(d) {
+  return getClasses(d).reduce((sum, c) => sum + c.level, 0) || d.level || 1;
+}
+function classesDisplay(d) {
+  const cls = getClasses(d);
+  if (cls.length === 0) return d.class || '—';
+  if (cls.length === 1) return cls[0].name;
+  return cls.map(c => `${c.name} ${c.level}`).join(' / ');
+}
+function classesDisplayFull(d) {
+  const cls = getClasses(d);
+  if (cls.length === 0) return (d.class || '—') + ' Niv.' + (d.level || 1);
+  return cls.map(c => `${c.name} ${c.level}`).join(' / ');
+}
+function buildHitDiceStr(d) {
+  const cls = getClasses(d);
+  if (cls.length === 0) return d.hitDice || '1d8';
+  return cls.map(c => {
+    const clData = CLASSES[c.name];
+    return `${c.level}d${clData ? clData.hd : 8}`;
+  }).join(' + ');
+}
+
 // ============================================================
 // AUTH
 // ============================================================
@@ -227,6 +258,7 @@ const WIZARD_STEPS = 5;
 window._openForge = () => {
   wizardData = { stats:{str:8,dex:8,con:8,int:8,wis:8,cha:8}, skills:{}, pointsLeft:27, hitDice:[], hpMax:0 };
   wizardStep = 1;
+  document.getElementById('forgeNext').style.display = '';
   renderWizardStep();
   document.getElementById('forgeOverlay').style.display = 'flex';
 };
@@ -397,7 +429,7 @@ window._updateClassDetails = () => {
     <br><strong>Armures:</strong> ${cl.armor.length?cl.armor.join(', '):'Aucune'}
     <br><strong>Armes:</strong> ${cl.weapons.join(', ')}
     <br><strong>Équipement de départ:</strong> ${cl.equipment}
-    <br><strong>Aptitudes (niv.1-2):</strong> ${cl.features.map(f=>`<em>${f.name}</em>: ${f.desc}`).join('<br>')}`;
+    <br><strong>Aptitudes (niv.1-2):</strong> ${cl.features.filter(f=>f.lvl<=2).map(f=>`<em>${f.name}</em>: ${f.desc}`).join('<br>')}`;
  
   const skillsAvail = cl.skills[0]==="Tout (3 au choix)" ? SKILLS_LIST.map(s=>s.name) : cl.skills;
   const count = cl.skillCount;
@@ -518,7 +550,7 @@ function renderStep5(c) {
  
   const conMod = mod(finalStats.con);
   const hpMax = clData ? clData.hd + conMod + (srData?.hpBonus||0) : 8;
-  const profBonus = 2;
+  const profBonusVal = 2;
   const acBase = 10 + mod(finalStats.dex);
  
   c.innerHTML = `
@@ -544,7 +576,7 @@ function renderStep5(c) {
       </div>
       <div class="summary-section">
         <h4>Valeurs combat</h4>
-        <p>PV max: <strong>${hpMax}</strong> | CA: <strong>${acBase}</strong> | Bonus maîtrise: <strong>+${profBonus}</strong></p>
+        <p>PV max: <strong>${hpMax}</strong> | CA: <strong>${acBase}</strong> | Bonus maîtrise: <strong>+${profBonusVal}</strong></p>
         <p>Vitesse: <strong>${rData?.speed||9}m</strong></p>
         <p>Saves: <strong>${clData?.saves.map(s=>s.toUpperCase()).join(', ')||'—'}</strong></p>
       </div>
@@ -629,7 +661,7 @@ async function saveNewCharacter() {
  
   const conMod = mod(finalStats.con);
   const hpMax = clData.hd + conMod + (srData?.hpBonus||0);
-  const profBonus = 2;
+  const profBonusVal = 2;
  
   // Skills proficiencies
   const allSkillProf = [...(wizardData.classSkills||[])];
@@ -659,8 +691,8 @@ async function saveNewCharacter() {
     // Identité de classe/race
     race: rKey,
     subrace: srKey||'',
-    class: cKey, // On garde l'original pour la rétrocompatibilité
-    classes: [{ id: cKey, level: 1 }], // <-- NOUVEAU : Le tableau de multiclassage
+    class: cKey,
+    classes: [{ name: cKey, level: 1 }],
     level: 1,
     xp: 0,
     // Stats
@@ -671,7 +703,7 @@ async function saveNewCharacter() {
     ac: 10 + mod(finalStats.dex),
     speed: rData.speed||9,
     initiative: mod(finalStats.dex),
-    profBonus,
+    profBonus: profBonusVal,
     hitDice: `1d${clData.hd}`,
     deathSaves: { success:0, fail:0 },
     // Sauvegardes
@@ -686,11 +718,11 @@ async function saveNewCharacter() {
     // Sorts
     spellcaster: clData.spellcaster||false,
     spellAbility: clData.spellAbility||'',
-    spellAttackBonus: clData.spellcaster ? (profBonus + mod(finalStats[clData.spellAbility]||8)) : 0,
-    spellSaveDC: clData.spellcaster ? (8 + profBonus + mod(finalStats[clData.spellAbility]||8)) : 0,
+    spellAttackBonus: clData.spellcaster ? (profBonusVal + mod(finalStats[clData.spellAbility]||8)) : 0,
+    spellSaveDC: clData.spellcaster ? (8 + profBonusVal + mod(finalStats[clData.spellAbility]||8)) : 0,
     spells: {},
     // Traits
-    features: (clData.features||[]).map(f=>({name:f.name,desc:f.desc})),
+    features: (clData.features||[]).filter(f=>f.lvl<=1).map(f=>({name:f.name,desc:f.desc})),
     traits: [...(rData.traits||[]),...(srData?.traits||[])],
     // Méta
     inspiration: false,
@@ -716,12 +748,13 @@ async function loadCharacterList() {
     }
     snapshot.forEach(docSnap => {
       const d = docSnap.data();
+      const tLvl = totalLevel(d);
       const card = document.createElement('div');
       card.className = 'char-card';
       card.innerHTML = `
         <div class="char-card-main" onclick="window._selectChar('${docSnap.id}')">
           <div class="char-card-name">${d.name}</div>
-          <div class="char-card-info">${d.subrace?d.subrace+' ':''} ${d.race||'—'} · ${d.class||'—'} Niv.${d.level||1}</div>
+          <div class="char-card-info">${d.subrace?d.subrace+' ':''} ${d.race||'—'} · ${classesDisplayFull(d)} (Niv.${tLvl})</div>
           <div class="char-card-stats">❤️ ${d.hp}/${d.hpMax} · 🛡 CA ${d.ac} · ${d.alignment||'—'}</div>
         </div>
         <div class="char-card-id">
@@ -751,7 +784,8 @@ function fmtMod(score) { const m = mod(score); return (m>=0?'+':'')+m; }
 function profBonus(level) { return PROF_BONUS[(level||1)-1] || 2; }
  
 function renderCharSheet(id, d) {
-  const pb = profBonus(d.level);
+  const tLvl = totalLevel(d);
+  const pb = profBonus(tLvl);
   const stats = d.stats || {str:10,dex:10,con:10,int:10,wis:10,cha:10};
   const sheet = document.getElementById('tab-sheet');
  
@@ -771,16 +805,14 @@ function renderCharSheet(id, d) {
   }
   function fmtB(v) { return (v>=0?'+':'')+v; }
  
-  const classesStr = d.classes ? d.classes.map(c => `${c.id} Niv.${c.level}`).join(' / ') : `${d.class||'—'} Niv.${d.level||1}`;
-
   sheet.innerHTML = `
   <div class="sheet-header">
     <div class="sheet-name-block">
       <div class="sheet-name editable" data-field="name" data-type="text">${d.name}</div>
-      <div class="sheet-subtitle">
-  ${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesStr} · Niveau total ${d.level||1}
-  <button class="btn-gold" style="padding: 2px 8px; margin-left: 10px;" onclick="window._triggerLevelUp('${id}')">EXP / LEVEL UP</button>
-</div>
+      <div class="sheet-subtitle">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesDisplayFull(d)} · Niveau total ${tLvl}</div>
+    </div>
+    <div class="sheet-levelup-row">
+      <button class="btn-levelup" onclick="window._openLevelUp('${id}')">⬆ MONTER DE NIVEAU</button>
     </div>
     <div class="sheet-combat-row">
       <div class="combat-box">
@@ -872,7 +904,7 @@ function renderCharSheet(id, d) {
       <div class="sheet-section">
         <div class="section-title">Dés de vie & Jets de mort</div>
         <div class="hd-row">
-          <div><div class="combat-label">Dés de vie total</div><div class="editable" data-field="hitDice" data-type="text">${d.hitDice||'1d8'}</div></div>
+          <div><div class="combat-label">Dés de vie total</div><div class="editable" data-field="hitDice" data-type="text">${d.hitDice || buildHitDiceStr(d)}</div></div>
           <div>
             <div class="combat-label">Jets de mort</div>
             <div class="death-saves">
@@ -1061,49 +1093,219 @@ function getNestedVal(obj, path) {
 function buildNestedUpdate(field, val) {
   return { [field]: val };
 }
-
-//LEVELUP
-
-window._triggerLevelUp = async (id) => {
-  const snap = await getDoc(doc(db, "characters", id));
-  if(!snap.exists()) return;
+ 
+// ============================================================
+// MONTÉE DE NIVEAU / MULTICLASSAGE
+// ============================================================
+window._openLevelUp = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
   const d = snap.data();
-  
-  // Demander quelle classe augmenter (simplifié avec un prompt pour le MVP)
-  const classNames = Object.keys(CLASSES).join(", ");
-  const chosenClass = prompt(`Dans quelle classe prendre un niveau ?\nClasses existantes : ${d.classes.map(c=>c.id).join(', ')}\nOu tape une nouvelle classe parmi :\n${classNames}`, d.classes[0].id);
-  
-  if(!chosenClass || !CLASSES[chosenClass]) {
-    alert("Classe invalide ou annulé.");
-    return;
-  }
-
-  let newClasses = [...(d.classes || [])];
-  let classIndex = newClasses.findIndex(c => c.id === chosenClass);
-  
-  if(classIndex > -1) {
-    newClasses[classIndex].level += 1; // Montée de niveau dans une classe existante
-  } else {
-    newClasses.push({ id: chosenClass, level: 1 }); // Multiclassage !
-  }
-
-  const newTotalLevel = (d.level || 1) + 1;
-  const clData = CLASSES[chosenClass];
-  
-  // Calcul rapide des nouveaux PV : Moyenne du dé + modificateur de Constitution
-  const conMod = Math.floor(((d.stats.con || 10) - 10) / 2);
-  const hpGain = Math.ceil((clData.hd / 2) + 1) + conMod; 
-
-  await updateDoc(doc(db, "characters", id), {
-    classes: newClasses,
-    level: newTotalLevel,
-    hpMax: d.hpMax + hpGain,
-    hp: d.hp + hpGain, // On soigne un peu le héros en passant de niveau !
-    hitDice: d.hitDice + `, 1d${clData.hd}`
+  const classes = getClasses(d);
+  const tLvl = totalLevel(d);
+ 
+  const content = document.getElementById('forgeContent');
+  const progressEl = document.getElementById('forgeProgress');
+  progressEl.innerHTML = '<div class="progress-step active">⬆</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+ 
+  let html = `<h3 class="step-title">⬆ Montée de niveau</h3>`;
+  html += `<div class="info-box" style="margin-bottom:14px">
+    <strong>${d.name}</strong> — Niveau total actuel : <strong>${tLvl}</strong><br>
+    Classes : <strong>${classesDisplayFull(d)}</strong>
+  </div>`;
+ 
+  // Choix de la classe
+  html += `<div class="field-group"><label>Dans quelle classe monter de niveau ?</label>`;
+  html += `<select id="lvlup_class" onchange="window._previewLevelUp()">`;
+  // Classes existantes
+  classes.forEach(c => {
+    html += `<option value="${c.name}" data-existing="true">${c.name} (niv.${c.level} → ${c.level+1})</option>`;
   });
-  alert(`✨ Ding ! Niveau ${newTotalLevel} atteint ! (+${hpGain} PV Max)`);
+  // Nouvelles classes (multiclassage)
+  Object.keys(CLASSES).forEach(cl => {
+    if (!classes.find(c => c.name === cl)) {
+      html += `<option value="${cl}" data-existing="false">⚔ MULTICLASSAGE : ${cl}</option>`;
+    }
+  });
+  html += `</select></div>`;
+ 
+  // Méthode PV
+  html += `<div class="field-group"><label>Méthode de calcul des PV gagnés</label>
+    <select id="lvlup_hp_mode" onchange="window._previewLevelUp()">
+      <option value="average">Moyenne (recommandé)</option>
+      <option value="max">Maximum du dé</option>
+      <option value="roll">Lancer de dé (aléatoire)</option>
+    </select></div>`;
+ 
+  // Prévisualisation
+  html += `<div id="lvlup_preview" class="info-box" style="margin-top:12px"></div>`;
+ 
+  // Boutons
+  html += `<div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn-gold" onclick="window._confirmLevelUp('${charId}')">✓ CONFIRMER LA MONTÉE</button>
+    <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+  </div>`;
+ 
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+ 
+  // Store data for preview
+  window._lvlupCharData = d;
+  window._lvlupCharId = charId;
+  window._previewLevelUp();
 };
  
+window._previewLevelUp = () => {
+  const d = window._lvlupCharData;
+  if (!d) return;
+  const chosenClass = document.getElementById('lvlup_class')?.value;
+  const hpMode = document.getElementById('lvlup_hp_mode')?.value || 'average';
+  const clData = CLASSES[chosenClass];
+  if (!clData) return;
+ 
+  const classes = getClasses(d);
+  const existing = classes.find(c => c.name === chosenClass);
+  const newClassLevel = existing ? existing.level + 1 : 1;
+  const newTotalLevel = totalLevel(d) + 1;
+  const newPB = PROF_BONUS[newTotalLevel - 1] || 2;
+  const conMod = mod(d.stats?.con || 10);
+ 
+  let hpGainText = '';
+  if (hpMode === 'average') {
+    const avg = Math.ceil(clData.hd / 2) + 1;
+    hpGainText = `${avg} + ${conMod} (CON) = <strong>${avg + conMod}</strong> PV`;
+  } else if (hpMode === 'max') {
+    hpGainText = `${clData.hd} + ${conMod} (CON) = <strong>${clData.hd + conMod}</strong> PV`;
+  } else {
+    hpGainText = `1d${clData.hd} + ${conMod} (CON) = <strong>aléatoire (${1+conMod}–${clData.hd+conMod})</strong> PV`;
+  }
+ 
+  // Features gained
+  const newFeatures = (clData.features || []).filter(f => f.lvl === newClassLevel);
+  let featuresHtml = newFeatures.length
+    ? newFeatures.map(f => `<div style="margin:3px 0"><strong>${f.name}:</strong> ${f.desc}</div>`).join('')
+    : '<em>Aucune nouvelle aptitude automatique pour ce niveau</em>';
+ 
+  const isMulticlass = !existing;
+ 
+  const preview = document.getElementById('lvlup_preview');
+  preview.innerHTML = `
+    <strong>Prévisualisation :</strong><br>
+    ${isMulticlass ? `<span style="color:var(--gold)">⚔ Nouveau multiclassage en ${chosenClass} !</span><br>` : ''}
+    Niveau total : ${totalLevel(d)} → <strong>${newTotalLevel}</strong><br>
+    ${chosenClass} : niv.${existing ? existing.level : 0} → <strong>${newClassLevel}</strong><br>
+    Bonus de maîtrise : +${profBonus(totalLevel(d))} → <strong>+${newPB}</strong><br>
+    PV gagnés : ${hpGainText}<br>
+    Dé de vie : d${clData.hd}<br>
+    ${isMulticlass ? `<br><strong>Sauvegardes :</strong> ${clData.saves.map(s=>s.toUpperCase()).join(', ')}<br>` : ''}
+    <br><strong>Aptitudes obtenues :</strong><br>
+    ${featuresHtml}`;
+};
+ 
+window._confirmLevelUp = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const classes = getClasses(d);
+ 
+  const chosenClass = document.getElementById('lvlup_class').value;
+  const hpMode = document.getElementById('lvlup_hp_mode').value;
+  const clData = CLASSES[chosenClass];
+  if (!clData) return;
+ 
+  // Update classes array
+  const newClasses = classes.map(c => ({...c}));
+  const existing = newClasses.find(c => c.name === chosenClass);
+  let newClassLevel;
+  if (existing) {
+    existing.level += 1;
+    newClassLevel = existing.level;
+  } else {
+    newClasses.push({ name: chosenClass, level: 1 });
+    newClassLevel = 1;
+  }
+ 
+  const newTotalLevel = newClasses.reduce((s, c) => s + c.level, 0);
+  const newPB = PROF_BONUS[newTotalLevel - 1] || 2;
+ 
+  // Calculate HP gain
+  const conMod = mod(d.stats?.con || 10);
+  let hpGain = 0;
+  if (hpMode === 'average') {
+    hpGain = Math.ceil(clData.hd / 2) + 1 + conMod;
+  } else if (hpMode === 'max') {
+    hpGain = clData.hd + conMod;
+  } else {
+    hpGain = Math.floor(Math.random() * clData.hd) + 1 + conMod;
+  }
+  hpGain = Math.max(1, hpGain);
+ 
+  // New features for this class level
+  const newFeatures = (clData.features || [])
+    .filter(f => f.lvl === newClassLevel)
+    .map(f => ({ name: `${f.name} (${chosenClass})`, desc: f.desc }));
+ 
+  // Rebuild hit dice string
+  const hitDiceStr = newClasses.map(c => {
+    const cd = CLASSES[c.name];
+    return `${c.level}d${cd ? cd.hd : 8}`;
+  }).join(' + ');
+ 
+  // Build update for saves if multiclassing into new class
+  const newSaves = {...(d.saveProficiencies || {})};
+  if (!existing) {
+    // Multiclassing doesn't give new save proficiencies in 5e
+    // but we keep existing ones
+  }
+ 
+  // Determine spellcaster info (use highest-level caster class)
+  let spellUpdate = {};
+  const casterClasses = newClasses.filter(c => CLASSES[c.name]?.spellcaster);
+  if (casterClasses.length > 0) {
+    // Use the primary (first) caster class for spell ability
+    const primaryCaster = casterClasses[0];
+    const pcData = CLASSES[primaryCaster.name];
+    spellUpdate = {
+      spellcaster: true,
+      spellAbility: pcData.spellAbility,
+      spellAttackBonus: newPB + mod(d.stats?.[pcData.spellAbility] || 10),
+      spellSaveDC: 8 + newPB + mod(d.stats?.[pcData.spellAbility] || 10),
+    };
+  }
+ 
+  // Update the class field for backward compat display
+  const classDisplayStr = newClasses.length === 1 ? newClasses[0].name : newClasses.map(c=>`${c.name} ${c.level}`).join(' / ');
+ 
+  const update = {
+    classes: newClasses,
+    class: classDisplayStr,
+    level: newTotalLevel,
+    hpMax: (d.hpMax || 0) + hpGain,
+    hp: (d.hp || 0) + hpGain,
+    profBonus: newPB,
+    hitDice: hitDiceStr,
+    features: [...(d.features || []), ...newFeatures],
+    ...spellUpdate,
+  };
+ 
+  await updateDoc(doc(db, "characters", charId), update);
+ 
+  // Show result
+  const content = document.getElementById('forgeContent');
+  content.innerHTML = `
+    <h3 class="step-title">✓ Niveau augmenté !</h3>
+    <div class="info-box">
+      <strong>${d.name}</strong> est maintenant <strong>${classDisplayStr}</strong> — Niveau total <strong>${newTotalLevel}</strong><br>
+      PV gagnés : <strong>+${hpGain}</strong> (nouveau max : ${(d.hpMax||0)+hpGain})<br>
+      ${newFeatures.length ? `<br><strong>Nouvelles aptitudes :</strong><br>${newFeatures.map(f=>`• <strong>${f.name}:</strong> ${f.desc}`).join('<br>')}` : ''}
+    </div>
+    <button class="btn-gold" style="margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">FERMER</button>`;
+ 
+  window._lvlupCharData = null;
+};
+
 // ============================================================
 // ÉCRAN DU MAÎTRE
 // ============================================================
@@ -1136,16 +1338,17 @@ function renderGMCard(id, d) {
     card.className = 'gm-card';
     monitor.appendChild(card);
   }
+  const tLvl = totalLevel(d);
   const hpPct = Math.max(0, Math.min(100, Math.round((d.hp/d.hpMax)*100)));
   const hpColor = hpPct>60?'#4caf50':hpPct>30?'#ff9800':'#f44336';
-  const pb = profBonus(d.level);
+  const pb = profBonus(tLvl);
   const stats = d.stats||{str:10,dex:10,con:10,int:10,wis:10,cha:10};
  
   card.innerHTML = `
     <div class="gm-card-header">
       <div>
         <div class="gm-card-name">${d.name}</div>
-        <div class="gm-card-sub">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${d.class||'—'} Niv.${d.level||1} · ${d.alignment||'—'}</div>
+        <div class="gm-card-sub">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesDisplayFull(d)} (Niv.${tLvl}) · ${d.alignment||'—'}</div>
       </div>
       <button class="btn-remove" onclick="window._removeGMWatch('${id}')">✕</button>
     </div>
@@ -1262,6 +1465,12 @@ nav button:last-child { color:#884444; }
 .btn-gold:hover { background:linear-gradient(135deg, var(--gold-light), var(--gold)); transform:translateY(-1px); box-shadow:0 4px 12px rgba(184,134,11,0.4); }
 .btn-copy { background:transparent; border:1px solid var(--gold); color:var(--gold); padding:4px 10px; font-size:0.72rem;
   cursor:pointer; border-radius:2px; font-family:'Cinzel'; letter-spacing:1px; }
+ 
+/* ── LEVEL UP BUTTON ── */
+.btn-levelup { background:linear-gradient(135deg, #2a6e2a, #1a4e1a); color:#fff; padding:8px 18px; border:none; cursor:pointer;
+  font-family:'Cinzel'; font-size:0.72rem; letter-spacing:2px; border-radius:3px; transition:all 0.2s; }
+.btn-levelup:hover { background:linear-gradient(135deg, #3a8e3a, #2a6e2a); transform:translateY(-1px); box-shadow:0 4px 12px rgba(42,110,42,0.5); }
+.sheet-levelup-row { margin-top:10px; }
  
 /* ── LIST TAB ── */
 #tab-list { background:var(--parch); min-height:100vh; padding:30px 20px; max-width:700px; margin:auto; }
@@ -1383,7 +1592,7 @@ nav button:last-child { color:#884444; }
  
 .rp-block { padding:6px 10px; }
 .rp-block label { font-size:0.65rem; font-family:'Cinzel'; color:var(--gold); display:block; margin-bottom:2px; letter-spacing:1px; }
-.features-list { padding:6px 10px; max-height:160px; overflow-y:auto; }
+.features-list { padding:6px 10px; max-height:260px; overflow-y:auto; }
 .feature-item { font-size:0.82rem; margin:4px 0; color:#444; line-height:1.4; }
 .info-grid { padding:6px 10px; }
 .info-row { display:flex; justify-content:space-between; font-size:0.82rem; padding:3px 0; border-bottom:1px solid #f0e8d8; }
