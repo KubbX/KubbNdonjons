@@ -550,6 +550,7 @@ onAuthStateChanged(auth, user => {
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'block';
     loadCharacterList();
+    loadCompendium();
   } else {
     document.getElementById('authScreen').style.display = 'flex';
     document.getElementById('appScreen').style.display = 'none';
@@ -563,8 +564,15 @@ window._showTab = (tabId) => {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('nav-active'));
-  const map = {'tab-list':'navList','tab-sheet':'navSheet','tab-gm':'navGM'};
+  const map = {'tab-list':'navList','tab-sheet':'navSheet','tab-gm':'navGM','tab-compendium':'navCompendium'};
   if(map[tabId]) document.getElementById(map[tabId]).classList.add('nav-active');
+  if(tabId === 'tab-compendium') {
+    const catsEl = document.getElementById('compCats');
+    if (catsEl && !catsEl.children.length) {
+      catsEl.innerHTML = COMPENDIUM_CATEGORIES.map(c => `<button class="comp-cat-btn ${c.id==='armor'?'comp-cat-active':''}" data-cat="${c.id}" onclick="window._showCompendium('${c.id}')">${c.icon} ${c.name}</button>`).join('');
+      window._showCompendium('armor');
+    }
+  }
 };
  
 // ============================================================
@@ -1753,6 +1761,371 @@ window._saveGMNotes = async (id) => {
 // Wizard nav
 window._wizardPrev = window._wizardPrev || function(){};
 window._wizardNext = window._wizardNext || function(){};
+
+// ============================================================
+// COMPENDIUM — DONNÉES DE BASE (SRD / PHB)
+// ============================================================
+const COMPENDIUM_CATEGORIES = [
+  {id:'armor', name:'Armures', icon:'🛡'},
+  {id:'weapon', name:'Armes', icon:'⚔'},
+  {id:'item', name:'Objets', icon:'🎒'},
+  {id:'feat', name:'Dons', icon:'⭐'},
+  {id:'monster', name:'Monstres', icon:'🐉'},
+  {id:'background', name:'Historiques', icon:'📜'}
+];
+
+const COMPENDIUM_DATA = {
+  armor: [
+    {name:"Matelassée",type:"Légère",ac:"11 + mod DEX",strength:"",stealth:"Désavantage",cost:"5 po",weight:"4 kg",source:"PHB"},
+    {name:"Cuir",type:"Légère",ac:"11 + mod DEX",strength:"",stealth:"",cost:"10 po",weight:"5 kg",source:"PHB"},
+    {name:"Cuir clouté",type:"Légère",ac:"12 + mod DEX",strength:"",stealth:"",cost:"45 po",weight:"6.5 kg",source:"PHB"},
+    {name:"Peaux",type:"Moyenne",ac:"12 + mod DEX (max 2)",strength:"",stealth:"",cost:"10 po",weight:"6 kg",source:"PHB"},
+    {name:"Chemise de mailles",type:"Moyenne",ac:"13 + mod DEX (max 2)",strength:"",stealth:"",cost:"50 po",weight:"10 kg",source:"PHB"},
+    {name:"Écailles",type:"Moyenne",ac:"14 + mod DEX (max 2)",strength:"",stealth:"Désavantage",cost:"50 po",weight:"22.5 kg",source:"PHB"},
+    {name:"Cuirasse",type:"Moyenne",ac:"14 + mod DEX (max 2)",strength:"",stealth:"",cost:"400 po",weight:"10 kg",source:"PHB"},
+    {name:"Demi-plate",type:"Moyenne",ac:"15 + mod DEX (max 2)",strength:"",stealth:"Désavantage",cost:"750 po",weight:"20 kg",source:"PHB"},
+    {name:"Anneau",type:"Lourde",ac:"14",strength:"",stealth:"Désavantage",cost:"30 po",weight:"20 kg",source:"PHB"},
+    {name:"Cotte de mailles",type:"Lourde",ac:"16",strength:"FOR 13",stealth:"Désavantage",cost:"75 po",weight:"27.5 kg",source:"PHB"},
+    {name:"Éclisses",type:"Lourde",ac:"17",strength:"FOR 15",stealth:"Désavantage",cost:"200 po",weight:"30 kg",source:"PHB"},
+    {name:"Harnois",type:"Lourde",ac:"18",strength:"FOR 15",stealth:"Désavantage",cost:"1500 po",weight:"32.5 kg",source:"PHB"},
+    {name:"Bouclier",type:"Bouclier",ac:"+2",strength:"",stealth:"",cost:"10 po",weight:"3 kg",source:"PHB"}
+  ],
+  weapon: [
+    {name:"Massue",type:"Simple mêlée",damage:"1d4 contondant",properties:"Légère",cost:"1 pa",weight:"1 kg",source:"PHB"},
+    {name:"Dague",type:"Simple mêlée",damage:"1d4 perçant",properties:"Finesse, légère, lancer (6/18)",cost:"2 po",weight:"0.5 kg",source:"PHB"},
+    {name:"Gourdin",type:"Simple mêlée",damage:"1d8 contondant",properties:"Polyvalente (1d10)",cost:"2 pa",weight:"5 kg",source:"PHB"},
+    {name:"Hachette",type:"Simple mêlée",damage:"1d6 tranchant",properties:"Légère, lancer (6/18)",cost:"5 po",weight:"1 kg",source:"PHB"},
+    {name:"Javeline",type:"Simple mêlée",damage:"1d6 perçant",properties:"Lancer (9/36)",cost:"5 pa",weight:"1 kg",source:"PHB"},
+    {name:"Marteau léger",type:"Simple mêlée",damage:"1d4 contondant",properties:"Légère, lancer (6/18)",cost:"2 po",weight:"1 kg",source:"PHB"},
+    {name:"Lance",type:"Simple mêlée",damage:"1d6 perçant",properties:"Polyvalente (1d8), lancer (6/18)",cost:"1 po",weight:"1.5 kg",source:"PHB"},
+    {name:"Bâton",type:"Simple mêlée",damage:"1d6 contondant",properties:"Polyvalente (1d8)",cost:"2 pa",weight:"2 kg",source:"PHB"},
+    {name:"Arc court",type:"Simple distance",damage:"1d6 perçant",properties:"Munitions (24/96), deux mains",cost:"25 po",weight:"1 kg",source:"PHB"},
+    {name:"Arbalète légère",type:"Simple distance",damage:"1d8 perçant",properties:"Munitions (24/96), chargement, deux mains",cost:"25 po",weight:"2.5 kg",source:"PHB"},
+    {name:"Rapière",type:"Martiale mêlée",damage:"1d8 perçant",properties:"Finesse",cost:"25 po",weight:"1 kg",source:"PHB"},
+    {name:"Épée longue",type:"Martiale mêlée",damage:"1d8 tranchant",properties:"Polyvalente (1d10)",cost:"15 po",weight:"1.5 kg",source:"PHB"},
+    {name:"Épée courte",type:"Martiale mêlée",damage:"1d6 perçant",properties:"Finesse, légère",cost:"10 po",weight:"1 kg",source:"PHB"},
+    {name:"Hache à deux mains",type:"Martiale mêlée",damage:"1d12 tranchant",properties:"Lourde, deux mains",cost:"30 po",weight:"3.5 kg",source:"PHB"},
+    {name:"Épée à deux mains",type:"Martiale mêlée",damage:"2d6 tranchant",properties:"Lourde, deux mains",cost:"50 po",weight:"3 kg",source:"PHB"},
+    {name:"Hallebarde",type:"Martiale mêlée",damage:"1d10 tranchant",properties:"Lourde, allonge, deux mains",cost:"20 po",weight:"3 kg",source:"PHB"},
+    {name:"Marteau de guerre",type:"Martiale mêlée",damage:"1d8 contondant",properties:"Polyvalente (1d10)",cost:"15 po",weight:"1 kg",source:"PHB"},
+    {name:"Arc long",type:"Martiale distance",damage:"1d8 perçant",properties:"Munitions (45/180), lourde, deux mains",cost:"50 po",weight:"1 kg",source:"PHB"},
+    {name:"Arbalète lourde",type:"Martiale distance",damage:"1d10 perçant",properties:"Munitions (30/120), chargement, lourde, deux mains",cost:"50 po",weight:"9 kg",source:"PHB"}
+  ],
+  item: [
+    {name:"Potion de soins",type:"Potion",desc:"Récupérer 2d4+2 PV",cost:"50 po",rarity:"Courant",source:"PHB"},
+    {name:"Potion de soins supérieure",type:"Potion",desc:"Récupérer 4d4+4 PV",cost:"100 po",rarity:"Peu courant",source:"DMG"},
+    {name:"Corde en soie (15m)",type:"Aventurier",desc:"2 PV, peut être coupée (CA 11)",cost:"10 po",rarity:"—",source:"PHB"},
+    {name:"Torche",type:"Aventurier",desc:"Lumière vive 6m, faible 6m de plus, dure 1h",cost:"1 pc",rarity:"—",source:"PHB"},
+    {name:"Rations (1 jour)",type:"Aventurier",desc:"Nourriture séchée pour une journée",cost:"5 pa",rarity:"—",source:"PHB"},
+    {name:"Sacoche à composantes",type:"Aventurier",desc:"Contient les composantes matérielles pour les sorts",cost:"25 po",rarity:"—",source:"PHB"},
+    {name:"Outils de voleur",type:"Outils",desc:"Crocheter serrures, désamorcer pièges",cost:"25 po",rarity:"—",source:"PHB"},
+    {name:"Kit d'herboriste",type:"Outils",desc:"Identifier plantes, préparer remèdes",cost:"5 po",rarity:"—",source:"PHB"},
+    {name:"Cape de protection",type:"Objet magique",desc:"+1 CA et jets de sauvegarde",cost:"—",rarity:"Peu courant",source:"DMG"},
+    {name:"Sac sans fond",type:"Objet magique",desc:"Contient jusqu'à 250 kg dans un espace extra-dimensionnel",cost:"—",rarity:"Peu courant",source:"DMG"},
+    {name:"Bottes de rapidité",type:"Objet magique",desc:"Action bonus: Foncer. 10 charges/jour.",cost:"—",rarity:"Rare",source:"DMG"},
+    {name:"Anneau de protection",type:"Objet magique",desc:"+1 CA et jets de sauvegarde (attunement)",cost:"—",rarity:"Rare",source:"DMG"}
+  ],
+  feat: [
+    {name:"Alerte",desc:"+5 initiative, ne peut être surpris si conscient, pas de désavantage d'attaquants invisibles",prereq:"—",source:"PHB"},
+    {name:"Athlète",desc:"+1 FOR ou DEX, se relever ne coûte que 1.5m, escalade sans coût supplémentaire, saut en longueur avec 1.5m d'élan",prereq:"—",source:"PHB"},
+    {name:"Chanceux",desc:"3 points de chance/jour: relancer un d20 (attaque, compétence, sauvegarde) et choisir",prereq:"—",source:"PHB"},
+    {name:"Dur à cuire",desc:"+1 CON, si réduit à 0 PV rester à 1 PV (1/repos long), avantage JdS CON quand 0 PV",prereq:"—",source:"PHB"},
+    {name:"Endurant",desc:"+1 CON, +PV = niveau actuel +1/niveau futur, dé de vie récupère min = 2×mod CON",prereq:"—",source:"PHB"},
+    {name:"Initié à la magie",desc:"2 sorts mineurs + 1 sort de niv.1 (1/repos long) d'une classe au choix",prereq:"—",source:"PHB"},
+    {name:"Mage de guerre",desc:"Avantage concentration quand touché, sorts avec composantes somatiques en tenant arme+bouclier, attaque d'opportunité avec un sort mineur",prereq:"Lancer sorts",source:"PHB"},
+    {name:"Observateur",desc:"+1 INT ou SAG, lire sur les lèvres, +5 Perception passive et Investigation passive",prereq:"—",source:"PHB"},
+    {name:"Robuste",desc:"+1 CON, PV max = utiliser le max du dé de vie (comme si max roll)",prereq:"—",source:"PHB"},
+    {name:"Sentinelle",desc:"Attaque d'opportunité réduit vitesse à 0, attaque même si Désengagement, réaction pour attaquer quand un allié est ciblé",prereq:"—",source:"PHB"},
+    {name:"Tireur d'élite",desc:"Pas de désavantage à longue portée, ignorer couvert 1/2 et 3/4, −5 attaque pour +10 dégâts à distance",prereq:"—",source:"PHB"},
+    {name:"Maître des armes d'hast",desc:"Attaque bonus action (1d4), réaction si créature entre dans l'allonge",prereq:"—",source:"PHB"},
+    {name:"Grande arme",desc:"Relancer 1-2 sur dés de dégâts des armes lourdes, −5 attaque pour +10 dégâts",prereq:"—",source:"PHB"},
+    {name:"Combattant à deux armes",desc:"+1 CA si deux armes, dégainer/rengainer 2 armes, +mod dégâts à la 2e attaque",prereq:"—",source:"PHB"},
+    {name:"Bouclier maître",desc:"Action bonus: bousculer avec bouclier (+2 CA en réaction si JdS DEX)",prereq:"—",source:"PHB"}
+  ],
+  monster: [
+    {name:"Gobelin",cr:"1/4",type:"Humanoïde",size:"P",hp:"7 (2d6)",ac:"15 (armure de cuir, bouclier)",speed:"9m",abilities:{str:8,dex:14,con:10,int:10,wis:8,cha:8},attacks:"Cimeterre: +4, 1d6+2 tranchant / Arc court: +4, 1d6+2 perçant",traits:"Fuite agile, Discrétion (+6)",source:"MM"},
+    {name:"Squelette",cr:"1/4",type:"Mort-vivant",size:"M",hp:"13 (2d8+4)",ac:"13 (débris d'armure)",speed:"9m",abilities:{str:10,dex:14,con:15,int:6,wis:8,cha:5},attacks:"Épée courte: +4, 1d6+2 perçant / Arc court: +4, 1d6+2 perçant",traits:"Vulnérabilité contondant, immunité poison",source:"MM"},
+    {name:"Loup",cr:"1/4",type:"Bête",size:"M",hp:"11 (2d8+2)",ac:"13 (naturelle)",speed:"12m",abilities:{str:12,dex:15,con:12,int:3,wis:12,cha:6},attacks:"Morsure: +4, 2d4+2 perçant (mettre à terre JdS FOR DD 11)",traits:"Perception odorat (avantage), Tactique de meute",source:"MM"},
+    {name:"Zombie",cr:"1/4",type:"Mort-vivant",size:"M",hp:"22 (3d8+9)",ac:"8",speed:"6m",abilities:{str:13,dex:6,con:16,int:3,wis:6,cha:5},attacks:"Coup: +3, 1d6+1 contondant",traits:"Robustesse morbide (JdS CON si 0 PV), immunité poison",source:"MM"},
+    {name:"Bandit",cr:"1/8",type:"Humanoïde",size:"M",hp:"11 (2d8+2)",ac:"12 (armure de cuir)",speed:"9m",abilities:{str:11,dex:12,con:12,int:10,wis:10,cha:10},attacks:"Cimeterre: +3, 1d6+1 tranchant / Arbalète légère: +3, 1d8+1 perçant",traits:"—",source:"MM"},
+    {name:"Ogre",cr:"2",type:"Géant",size:"G",hp:"59 (7d10+21)",ac:"11 (peaux)",speed:"12m",abilities:{str:19,dex:8,con:16,int:5,wis:7,cha:7},attacks:"Massue: +6, 2d8+4 contondant / Javeline: +6, 2d6+4 perçant",traits:"Vision dans le noir 18m",source:"MM"},
+    {name:"Ours-hibou",cr:"3",type:"Monstruosité",size:"G",hp:"59 (7d10+21)",ac:"13 (naturelle)",speed:"12m",abilities:{str:20,dex:12,con:17,int:3,wis:12,cha:7},attacks:"Bec: +7, 1d10+5 perçant / Griffes: +7, 2d8+5 tranchant",traits:"Perception odorat/vue (avantage), multiattaque",source:"MM"},
+    {name:"Minotaure",cr:"3",type:"Monstruosité",size:"G",hp:"76 (9d10+27)",ac:"14 (naturelle)",speed:"12m",abilities:{str:18,dex:11,con:16,int:6,wis:16,cha:9},attacks:"Hache: +6, 2d12+4 tranchant / Charge encornée: +6, 2d8+4 perçant",traits:"Charge (bonus 2d8 si mouvement 3m+ en ligne droite), Mémoire labyrinthique",source:"MM"},
+    {name:"Dragon rouge adulte",cr:"17",type:"Dragon",size:"TG",hp:"256 (19d12+133)",ac:"19 (naturelle)",speed:"12m, vol 24m",abilities:{str:27,dex:10,con:25,int:16,wis:13,cha:21},attacks:"Multiattaque (3): Morsure +14, 2d10+8 perçant + 2d6 feu / Griffes +14, 2d6+8 tranchant",traits:"Souffle de feu (18m cône, 18d6 feu JdS DEX DD 21), résistances légendaires",source:"MM"},
+    {name:"Rat géant",cr:"1/8",type:"Bête",size:"P",hp:"7 (2d6)",ac:"12",speed:"9m",abilities:{str:7,dex:15,con:11,int:2,wis:10,cha:4},attacks:"Morsure: +4, 1d4+2 perçant",traits:"Perception odorat, Tactique de meute",source:"MM"}
+  ],
+  background: [
+    {name:"Acolyte",skills:"Intuition, Religion",languages:2,tools:"—",equipment:"Symbole sacré, livre de prières, 5 bâtonnets d'encens, vêtements d'apparat, 15 po",feature:"Abri des fidèles: hébergement gratuit dans les temples",source:"PHB"},
+    {name:"Criminel",skills:"Tromperie, Discrétion",languages:0,tools:"Outils de voleur, Jeu d'un type",equipment:"Pied-de-biche, vêtements sombres à capuchon, 15 po",feature:"Contact criminel: réseau de contacts dans le monde criminel",source:"PHB"},
+    {name:"Héros du peuple",skills:"Dressage, Survie",languages:0,tools:"Outils d'artisan, Véhicules terrestres",equipment:"Outils d'artisan, pelle, pot en fer, vêtements de paysan, 10 po",feature:"Hospitalité rustique: les gens du peuple vous hébergent",source:"PHB"},
+    {name:"Noble",skills:"Histoire, Persuasion",languages:1,tools:"Jeu d'un type",equipment:"Tenue de belle facture, bague à armoiries, lettre de recommandation, 25 po",feature:"Privilège de position: accueil dans la haute société",source:"PHB"},
+    {name:"Sage",skills:"Arcanes, Histoire",languages:2,tools:"—",equipment:"Bouteille d'encre, plume, petit couteau, lettre d'un défunt collègue, 10 po",feature:"Chercheur: savoir où trouver l'information",source:"PHB"},
+    {name:"Soldat",skills:"Athlétisme, Intimidation",languages:0,tools:"Jeu d'un type, Véhicules terrestres",equipment:"Insigne militaire, trophée, ossements à jouer, 10 po",feature:"Statut militaire: rang reconnu, accès aux forts",source:"PHB"},
+    {name:"Charlatan",skills:"Tromperie, Escamotage",languages:0,tools:"Kit de déguisement, Kit de faux-semblants",equipment:"Tenue de bonne facture, fiole de colle, 15 po",feature:"Fausse identité: identité alternative crédible",source:"PHB"},
+    {name:"Artiste",skills:"Acrobaties, Performance",languages:0,tools:"Déguisement, Un instrument",equipment:"Instrument de musique, cadeau d'un admirateur, costume, 15 po",feature:"Par acclamation populaire: logement gratuit dans les auberges en échange de spectacles",source:"PHB"},
+    {name:"Marin",skills:"Athlétisme, Perception",languages:0,tools:"Outils de navigateur, Véhicules nautiques",equipment:"Gourdin, 15m de corde de soie, porte-bonheur, 10 po",feature:"Passage gratuit sur un navire",source:"PHB"},
+    {name:"Ermite",skills:"Médecine, Religion",languages:1,tools:"Kit d'herboriste",equipment:"Étui à parchemins, couverture hivernale, kit d'herboriste, 5 po",feature:"Découverte: une vérité unique révélée pendant l'isolement",source:"PHB"},
+    {name:"Vagabond",skills:"Athlétisme, Survie",languages:0,tools:"Un instrument de musique",equipment:"Bâton, piège à mâchoires, trophée de chasse, vêtements de voyage, 10 po",feature:"Marcheur des chemins: mémoire des cartes et de la géographie",source:"PHB"}
+  ]
+};
+
+// ============================================================
+// COMPENDIUM — FIRESTORE CRUD
+// ============================================================
+let compendiumUnsubscribe = null;
+let compendiumCustomResources = [];
+
+function loadCompendium() {
+  if (compendiumUnsubscribe) compendiumUnsubscribe();
+  const q = query(collection(db, "resources"), where("owner", "in", [currentUid, "system"]));
+  compendiumUnsubscribe = onSnapshot(q, (snapshot) => {
+    compendiumCustomResources = [];
+    snapshot.forEach(docSnap => {
+      compendiumCustomResources.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    // Re-render if compendium tab is active
+    if (document.getElementById('tab-compendium')?.classList.contains('active')) {
+      renderCompendiumList(window._currentCompCategory || 'armor');
+    }
+  });
+}
+
+async function addCustomResource(category, data) {
+  const resource = { type: category, owner: currentUid, ...data, createdAt: new Date().toISOString() };
+  await addDoc(collection(db, "resources"), resource);
+}
+
+async function deleteCustomResource(docId) {
+  if (!confirm("Supprimer cette ressource personnalisée ?")) return;
+  await deleteDoc(doc(db, "resources", docId));
+}
+
+// ============================================================
+// COMPENDIUM — RENDU UI
+// ============================================================
+window._currentCompCategory = 'armor';
+window._compSearchQuery = '';
+
+window._showCompendium = (catId) => {
+  window._currentCompCategory = catId || 'armor';
+  window._compSearchQuery = '';
+  const searchEl = document.getElementById('compSearch');
+  if (searchEl) searchEl.value = '';
+  renderCompendiumList(window._currentCompCategory);
+  // Update active category button
+  document.querySelectorAll('.comp-cat-btn').forEach(b => b.classList.remove('comp-cat-active'));
+  const activeBtn = document.querySelector(`.comp-cat-btn[data-cat="${catId}"]`);
+  if (activeBtn) activeBtn.classList.add('comp-cat-active');
+};
+
+window._compFilter = () => {
+  window._compSearchQuery = (document.getElementById('compSearch')?.value || '').toLowerCase();
+  renderCompendiumList(window._currentCompCategory);
+};
+
+function getAllResourcesForCategory(catId) {
+  const builtIn = (COMPENDIUM_DATA[catId] || []).map(r => ({ ...r, _source: 'builtin' }));
+  const custom = compendiumCustomResources.filter(r => r.type === catId).map(r => ({ ...r, _source: 'custom', _docId: r.id }));
+  return [...builtIn, ...custom];
+}
+
+function renderCompendiumList(catId) {
+  const listEl = document.getElementById('compList');
+  if (!listEl) return;
+  const allRes = getAllResourcesForCategory(catId);
+  const q = window._compSearchQuery;
+  const filtered = q ? allRes.filter(r => r.name.toLowerCase().includes(q)) : allRes;
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<p style="color:#888;text-align:center;margin-top:30px;font-style:italic">Aucune ressource trouvée${q ? ' pour "' + q + '"' : ''}.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map((r, i) => {
+    const isCustom = r._source === 'custom';
+    return `<div class="comp-card" onclick="window._showResourceDetail('${catId}',${i},${isCustom?`'${r._docId}'`:'null'})">
+      <div class="comp-card-main">
+        <div class="comp-card-name">${r.name} ${isCustom ? '<span class="comp-homebrew">Homebrew</span>' : ''}</div>
+        <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
+      </div>
+      ${isCustom ? `<button class="btn-remove" onclick="event.stopPropagation();deleteCustomResource('${r._docId}')">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function getResourceSubtitle(catId, r) {
+  switch (catId) {
+    case 'armor': return `${r.type||''} · CA ${r.ac||'—'} · ${r.cost||''}`;
+    case 'weapon': return `${r.type||''} · ${r.damage||''} · ${r.cost||''}`;
+    case 'item': return `${r.type||''} · ${r.rarity||'—'} · ${r.cost||''}`;
+    case 'feat': return `${r.prereq ? 'Prérequis: '+r.prereq : 'Aucun prérequis'}`;
+    case 'monster': return `RC ${r.cr||'?'} · ${r.type||''} · ${r.size||''}`;
+    case 'background': return `Compétences: ${r.skills||'—'}`;
+    default: return r.source || '';
+  }
+}
+
+window._showResourceDetail = (catId, index, customDocId) => {
+  const allRes = getAllResourcesForCategory(catId);
+  const r = customDocId ? allRes.find(x => x._docId === customDocId) : allRes[index];
+  if (!r) return;
+
+  const content = document.getElementById('forgeContent');
+  const progressEl = document.getElementById('forgeProgress');
+  progressEl.innerHTML = `<div class="progress-step active">${COMPENDIUM_CATEGORIES.find(c=>c.id===catId)?.icon||'📋'}</div>`;
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  let html = `<h3 class="step-title">${r.name}</h3>`;
+  html += `<div class="comp-detail">`;
+  html += renderResourceDetail(catId, r);
+  html += `</div>`;
+
+  // Add to character button
+  if (activeCharId) {
+    html += `<div style="margin-top:14px"><button class="btn-gold" onclick="window._addResourceToChar('${catId}',\`${encodeURIComponent(JSON.stringify({name:r.name,type:r.type||'',detail:getResourceSubtitle(catId,r)}))}\`)">+ Ajouter à la fiche active</button></div>`;
+  }
+
+  html += `<button class="btn-prev" style="margin-top:10px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+function renderResourceDetail(catId, r) {
+  let html = '<div class="comp-detail-grid">';
+  const skip = ['_source','_docId','id','owner','createdAt','type'];
+  const labelMap = {name:'Nom',ac:'Classe d\'armure',type:'Type',strength:'Force requise',stealth:'Discrétion',cost:'Coût',weight:'Poids',source:'Source',damage:'Dégâts',properties:'Propriétés',desc:'Description',prereq:'Prérequis',rarity:'Rareté',cr:'Rang de dangerosité',size:'Taille',hp:'Points de vie',speed:'Vitesse',attacks:'Attaques',traits:'Traits',abilities:'Caractéristiques',skills:'Compétences',languages:'Langues',tools:'Outils',equipment:'Équipement',feature:'Aptitude'};
+
+  for (const [key, val] of Object.entries(r)) {
+    if (skip.includes(key) || val === '' || val === '—' || val === 0 || val === null || val === undefined) continue;
+    const label = labelMap[key] || key;
+    let display = val;
+    if (typeof val === 'object' && !Array.isArray(val)) {
+      display = Object.entries(val).map(([k,v])=>`${k.toUpperCase()}: ${v}`).join(', ');
+    }
+    html += `<div class="comp-detail-row"><span class="comp-detail-label">${label}</span><span class="comp-detail-val">${display}</span></div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+window._addResourceToChar = async (catId, encodedData) => {
+  if (!activeCharId) { alert("Sélectionnez d'abord un personnage."); return; }
+  const data = JSON.parse(decodeURIComponent(encodedData));
+  const snap = await getDoc(doc(db, "characters", activeCharId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+
+  // Add to the character's equipment or features field depending on category
+  let update = {};
+  if (catId === 'armor' || catId === 'weapon' || catId === 'item') {
+    const current = d.equipment || '';
+    const addition = `${data.name} (${data.detail})`;
+    update.equipment = current ? current + '\\n' + addition : addition;
+  } else if (catId === 'feat') {
+    const feats = d.features || [];
+    feats.push({ name: 'Don: ' + data.name, desc: data.detail, src: 'Compendium' });
+    update.features = feats;
+  } else if (catId === 'background') {
+    update.background = data.name;
+  }
+  // monsters are not added to characters
+
+  if (Object.keys(update).length) {
+    await updateDoc(doc(db, "characters", activeCharId), update);
+    alert(`${data.name} ajouté à la fiche !`);
+  }
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+
+// ── Ajout de ressource personnalisée ──
+window._openAddResource = () => {
+  const catId = window._currentCompCategory;
+  const cat = COMPENDIUM_CATEGORIES.find(c => c.id === catId);
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = `<div class="progress-step active">+</div>`;
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  let fields = '';
+  if (catId === 'armor') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text" placeholder="Ex: Armure magique"></div>
+      <div class="field-row"><div class="field-group"><label>Type</label><select id="nr_type"><option>Légère</option><option>Moyenne</option><option>Lourde</option><option>Bouclier</option></select></div>
+      <div class="field-group"><label>CA</label><input id="nr_ac" type="text" placeholder="Ex: 15 + mod DEX (max 2)"></div></div>
+      <div class="field-row"><div class="field-group"><label>Coût</label><input id="nr_cost" type="text" placeholder="Ex: 500 po"></div>
+      <div class="field-group"><label>Poids</label><input id="nr_weight" type="text" placeholder="Ex: 20 kg"></div></div>
+      <div class="field-group"><label>Force requise</label><input id="nr_strength" type="text" placeholder="Ex: FOR 15"></div>
+      <div class="field-group"><label>Discrétion</label><input id="nr_stealth" type="text" placeholder="Ex: Désavantage"></div>`;
+  } else if (catId === 'weapon') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text" placeholder="Ex: Épée de feu"></div>
+      <div class="field-row"><div class="field-group"><label>Type</label><select id="nr_type"><option>Simple mêlée</option><option>Simple distance</option><option>Martiale mêlée</option><option>Martiale distance</option></select></div>
+      <div class="field-group"><label>Dégâts</label><input id="nr_damage" type="text" placeholder="Ex: 1d8+2 feu"></div></div>
+      <div class="field-group"><label>Propriétés</label><input id="nr_properties" type="text" placeholder="Ex: Finesse, légère"></div>
+      <div class="field-row"><div class="field-group"><label>Coût</label><input id="nr_cost" type="text"></div>
+      <div class="field-group"><label>Poids</label><input id="nr_weight" type="text"></div></div>`;
+  } else if (catId === 'item') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-row"><div class="field-group"><label>Type</label><select id="nr_type"><option>Aventurier</option><option>Outils</option><option>Potion</option><option>Objet magique</option></select></div>
+      <div class="field-group"><label>Rareté</label><select id="nr_rarity"><option>Courant</option><option>Peu courant</option><option>Rare</option><option>Très rare</option><option>Légendaire</option></select></div></div>
+      <div class="field-group"><label>Description</label><textarea id="nr_desc" rows="2"></textarea></div>
+      <div class="field-group"><label>Coût</label><input id="nr_cost" type="text"></div>`;
+  } else if (catId === 'feat') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-group"><label>Description</label><textarea id="nr_desc" rows="3"></textarea></div>
+      <div class="field-group"><label>Prérequis</label><input id="nr_prereq" type="text" placeholder="Ex: Lanceur de sorts, FOR 13..."></div>`;
+  } else if (catId === 'monster') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-row"><div class="field-group"><label>RC</label><input id="nr_cr" type="text" placeholder="Ex: 3"></div>
+      <div class="field-group"><label>Type</label><input id="nr_type" type="text" placeholder="Ex: Mort-vivant"></div></div>
+      <div class="field-row"><div class="field-group"><label>Taille</label><select id="nr_size"><option>TP</option><option>P</option><option>M</option><option>G</option><option>TG</option><option>Gig</option></select></div>
+      <div class="field-group"><label>CA</label><input id="nr_ac" type="text" placeholder="Ex: 15 (naturelle)"></div></div>
+      <div class="field-row"><div class="field-group"><label>PV</label><input id="nr_hp" type="text" placeholder="Ex: 52 (7d10+14)"></div>
+      <div class="field-group"><label>Vitesse</label><input id="nr_speed" type="text" placeholder="Ex: 9m, vol 18m"></div></div>
+      <div class="field-group"><label>Attaques</label><textarea id="nr_attacks" rows="2"></textarea></div>
+      <div class="field-group"><label>Traits</label><textarea id="nr_traits" rows="2"></textarea></div>`;
+  } else if (catId === 'background') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-group"><label>Compétences</label><input id="nr_skills" type="text" placeholder="Ex: Perception, Survie"></div>
+      <div class="field-row"><div class="field-group"><label>Langues</label><input id="nr_languages" type="number" value="0"></div>
+      <div class="field-group"><label>Outils</label><input id="nr_tools" type="text"></div></div>
+      <div class="field-group"><label>Équipement</label><textarea id="nr_equipment" rows="2"></textarea></div>
+      <div class="field-group"><label>Aptitude</label><textarea id="nr_feature" rows="2"></textarea></div>`;
+  }
+
+  content.innerHTML = `<h3 class="step-title">+ Nouvelle ${cat?.name?.slice(0,-1) || 'ressource'}</h3>
+    ${fields}
+    <div class="field-group"><label>Source</label><input id="nr_source" type="text" value="Homebrew"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-gold" onclick="window._saveNewResource('${catId}')">CRÉER</button>
+      <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+    </div>`;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._saveNewResource = async (catId) => {
+  const name = document.getElementById('nr_name')?.value?.trim();
+  if (!name) { alert("Le nom est obligatoire."); return; }
+  const data = { name, source: document.getElementById('nr_source')?.value || 'Homebrew' };
+
+  // Collect all nr_ fields
+  document.querySelectorAll('[id^="nr_"]').forEach(el => {
+    const key = el.id.replace('nr_', '');
+    if (key === 'name' || key === 'source') return;
+    const val = el.tagName === 'SELECT' ? el.value : (el.type === 'number' ? parseInt(el.value)||0 : el.value.trim());
+    if (val !== '' && val !== 0) data[key] = val;
+  });
+
+  await addCustomResource(catId, data);
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
 </script>
  
 <style>
@@ -1995,6 +2368,33 @@ nav button:last-child { color:#884444; }
 .gm-notes summary { cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; }
 .gm-notes-area { width:100%; margin-top:6px; }
  
+/* ── COMPENDIUM ── */
+#tab-compendium { background:var(--parch); min-height:100vh; }
+.comp-container { max-width:800px; margin:auto; padding:24px 20px; }
+.comp-container h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:16px; letter-spacing:3px; }
+.comp-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.comp-cat-btn { background:#fff; border:1px solid #d4c4a0; color:var(--ink); padding:8px 14px; cursor:pointer;
+  font-family:'Cinzel'; font-size:0.7rem; letter-spacing:1px; border-radius:3px; transition:all 0.2s; }
+.comp-cat-btn:hover { border-color:var(--gold); color:var(--gold); }
+.comp-cat-btn.comp-cat-active { background:var(--ink); color:var(--gold); border-color:var(--gold); }
+.comp-toolbar { display:flex; gap:8px; margin-bottom:16px; }
+.comp-toolbar input { flex:1; }
+.comp-list { display:flex; flex-direction:column; gap:6px; }
+.comp-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); border-radius:3px;
+  display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:box-shadow 0.2s; }
+.comp-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.12); }
+.comp-card-main { padding:12px 16px; flex:1; }
+.comp-card-name { font-family:'Cinzel'; font-size:0.92rem; color:var(--ink); }
+.comp-card-sub { color:#888; font-size:0.78rem; margin-top:2px; }
+.comp-homebrew { background:var(--gold); color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
+  font-family:'Cinzel'; letter-spacing:1px; vertical-align:middle; margin-left:6px; }
+.comp-detail { margin:12px 0; }
+.comp-detail-grid { display:flex; flex-direction:column; gap:1px; }
+.comp-detail-row { display:flex; justify-content:space-between; padding:7px 10px; background:#fff8ee;
+  border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
+.comp-detail-label { font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; min-width:120px; }
+.comp-detail-val { color:var(--ink); text-align:right; flex:1; }
+
 /* Responsive */
 @media(max-width:900px) {
   .sheet-body { grid-template-columns:1fr; }
@@ -2027,6 +2427,7 @@ nav button:last-child { color:#884444; }
   <nav>
     <button id="navList" class="nav-active" onclick="_showTab('tab-list')">MES HÉROS</button>
     <button id="navSheet" onclick="_showTab('tab-sheet')">FICHE</button>
+    <button id="navCompendium" onclick="_showTab('tab-compendium')">COMPENDIUM</button>
     <button id="navGM" onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
     <button onclick="_doLogout()">QUITTER</button>
   </nav>
@@ -2042,6 +2443,19 @@ nav button:last-child { color:#884444; }
   <div id="tab-sheet" class="tab-content">
     <div style="padding:40px;text-align:center;color:#888;font-style:italic">
       Sélectionne un personnage pour voir sa fiche
+    </div>
+  </div>
+ 
+  <!-- Compendium -->
+  <div id="tab-compendium" class="tab-content">
+    <div class="comp-container">
+      <h2>Compendium</h2>
+      <div class="comp-cats" id="compCats"></div>
+      <div class="comp-toolbar">
+        <input id="compSearch" type="text" placeholder="Rechercher..." oninput="window._compFilter()">
+        <button class="btn-gold" onclick="window._openAddResource()">+ AJOUTER</button>
+      </div>
+      <div id="compList" class="comp-list"></div>
     </div>
   </div>
  
