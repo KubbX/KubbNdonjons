@@ -1244,19 +1244,18 @@ function renderCharSheet(id, d) {
  
       <!-- Armes & Attaques -->
       <div class="sheet-section">
-        <div class="section-title">Armes & Attaques</div>
+        <div class="section-title">Armes & Attaques <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','weapon')">+ Compendium</button></div>
         <table class="weapon-table">
-          <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th></tr></thead>
+          <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th><th></th></tr></thead>
           <tbody>
-            <tr><td class="editable" data-field="weapon1_name" data-type="text">${d.weapon1_name||'—'}</td>
-                <td class="editable" data-field="weapon1_atk" data-type="text">${d.weapon1_atk||'—'}</td>
-                <td class="editable" data-field="weapon1_dmg" data-type="text">${d.weapon1_dmg||'—'}</td></tr>
-            <tr><td class="editable" data-field="weapon2_name" data-type="text">${d.weapon2_name||'—'}</td>
-                <td class="editable" data-field="weapon2_atk" data-type="text">${d.weapon2_atk||'—'}</td>
-                <td class="editable" data-field="weapon2_dmg" data-type="text">${d.weapon2_dmg||'—'}</td></tr>
-            <tr><td class="editable" data-field="weapon3_name" data-type="text">${d.weapon3_name||'—'}</td>
-                <td class="editable" data-field="weapon3_atk" data-type="text">${d.weapon3_atk||'—'}</td>
-                <td class="editable" data-field="weapon3_dmg" data-type="text">${d.weapon3_dmg||'—'}</td></tr>
+            ${(d.inventory_weapons||[]).map((w,i)=>`
+            <tr>
+              <td>${w.name||'—'}</td>
+              <td>${w.atk||'—'}</td>
+              <td>${w.dmg||'—'}</td>
+              <td><button class="inv-remove-btn" onclick="window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
+            </tr>`).join('')}
+            ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — utilisez le Compendium pour en ajouter</td></tr>' : ''}
           </tbody>
         </table>
       </div>
@@ -1271,10 +1270,35 @@ function renderCharSheet(id, d) {
             <div class="coin-val editable" data-field="${c}" data-type="number">${d[c]||0}</div>
           </div>`).join('')}
         </div>
-        <div class="field-group" style="margin-top:8px">
-          <label>Équipement</label>
-          <div class="editable block-edit" data-field="equipment" data-type="textarea">${d.equipment||'—'}</div>
+        <!-- Armure équipée -->
+        <div style="padding:8px 10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Armure équipée</label>
+            <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','armor')">+ Compendium</button>
+          </div>
+          ${d.equipped_armor ? `
+            <div class="inv-item">
+              <div class="inv-item-main"><strong>${d.equipped_armor.name}</strong> <span style="color:#888">— CA ${d.equipped_armor.ac||'?'}</span></div>
+              <button class="inv-remove-btn" onclick="window._unequipArmor('${id}')">✕</button>
+            </div>` : `<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune armure</div>`}
         </div>
+        <!-- Inventaire objets -->
+        <div style="padding:4px 10px 10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Objets & Équipement</label>
+            <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','item')">+ Compendium</button>
+          </div>
+          <div class="inv-list">
+            ${(d.inventory_items||[]).map((it,i)=>`
+            <div class="inv-item">
+              <div class="inv-item-main"><strong>${it.name}</strong>${it.qty>1?` ×${it.qty}`:''} ${it.detail?`<span style="color:#888;font-size:0.78rem">— ${it.detail}</span>`:''}</div>
+              <button class="inv-remove-btn" onclick="window._removeInventoryItem('${id}','inventory_items',${i})">✕</button>
+            </div>`).join('')}
+            ${!(d.inventory_items||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Inventaire vide</div>' : ''}
+          </div>
+        </div>
+        <!-- Legacy text equipment (kept for backward compat) -->
+        ${d.equipment ? `<div class="field-group" style="margin:0 10px 10px"><label>Équipement (texte libre)</label><div class="editable block-edit" data-field="equipment" data-type="textarea">${d.equipment||'—'}</div></div>` : ''}
       </div>
  
       <!-- Sorts (si lanceur) -->
@@ -1337,10 +1361,14 @@ function renderCharSheet(id, d) {
  
       <!-- Aptitudes & Traits -->
       <div class="sheet-section">
-        <div class="section-title">Aptitudes & Traits raciaux</div>
+        <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
         <div class="features-list">
           ${(d.traits||[]).map(t=>`<div class="feature-item">• ${t}</div>`).join('')}
-          ${(d.features||[]).map(f=>`<div class="feature-item"><strong>${f.name}:</strong> ${f.desc}</div>`).join('')}
+          ${(d.features||[]).map((f,i)=>`
+          <div class="feature-item feature-item-removable">
+            <div><strong>${f.name}${f.src?' <small style="color:#999">('+f.src+')</small>':''}:</strong> ${f.desc}</div>
+            ${f.src==='Compendium'||f.src==='Don'?`<button class="inv-remove-btn" onclick="window._removeFeature('${id}',${i})">✕</button>`:''}
+          </div>`).join('')}
         </div>
         <div class="field-group" style="margin-top:8px">
           <label>Autres aptitudes</label>
@@ -2011,32 +2039,151 @@ function renderResourceDetail(catId, r) {
 
 window._addResourceToChar = async (catId, encodedData) => {
   if (!activeCharId) { alert("Sélectionnez d'abord un personnage."); return; }
-  const data = JSON.parse(decodeURIComponent(encodedData));
-  const snap = await getDoc(doc(db, "characters", activeCharId));
+  // Redirect to the picker which handles structured adding
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+  window._pickFromCompendium(activeCharId, catId);
+};
+
+// ============================================================
+// FICHE ↔ COMPENDIUM — PICKER & INVENTAIRE
+// ============================================================
+
+// Open a compendium picker scoped to a category, from within the character sheet
+window._pickFromCompendium = (charId, catId) => {
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = `<div class="progress-step active">${COMPENDIUM_CATEGORIES.find(c=>c.id===catId)?.icon||'📋'}</div>`;
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  const allRes = getAllResourcesForCategory(catId);
+
+  let html = `<h3 class="step-title">Choisir: ${COMPENDIUM_CATEGORIES.find(c=>c.id===catId)?.name||catId}</h3>`;
+  html += `<div class="field-group"><input id="picker_search" type="text" placeholder="Rechercher..." oninput="window._filterPicker('${charId}','${catId}')"></div>`;
+  html += `<div id="picker_list" class="comp-list" style="max-height:50vh;overflow-y:auto">`;
+  html += allRes.map((r,i) => `
+    <div class="comp-card" onclick="window._pickResource('${charId}','${catId}',${i})">
+      <div class="comp-card-main">
+        <div class="comp-card-name">${r.name} ${r._source==='custom'?'<span class="comp-homebrew">HB</span>':''}</div>
+        <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
+      </div>
+    </div>`).join('');
+  html += `</div>`;
+  html += `<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>`;
+
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._filterPicker = (charId, catId) => {
+  const q = (document.getElementById('picker_search')?.value||'').toLowerCase();
+  const allRes = getAllResourcesForCategory(catId);
+  const filtered = q ? allRes.filter(r => r.name.toLowerCase().includes(q)) : allRes;
+  const list = document.getElementById('picker_list');
+  list.innerHTML = filtered.map((r,i) => {
+    const origIdx = allRes.indexOf(r);
+    return `<div class="comp-card" onclick="window._pickResource('${charId}','${catId}',${origIdx})">
+      <div class="comp-card-main">
+        <div class="comp-card-name">${r.name}</div>
+        <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:#888;text-align:center;margin:20px;font-style:italic">Aucun résultat</p>';
+};
+
+window._pickResource = async (charId, catId, index) => {
+  const allRes = getAllResourcesForCategory(catId);
+  const r = allRes[index];
+  if (!r) return;
+
+  const snap = await getDoc(doc(db, "characters", charId));
   if (!snap.exists()) return;
   const d = snap.data();
-
-  // Add to the character's equipment or features field depending on category
+  const stats = d.stats||{str:10,dex:10,con:10,int:10,wis:10,cha:10};
+  const pb = profBonus(totalLevel(d));
   let update = {};
-  if (catId === 'armor' || catId === 'weapon' || catId === 'item') {
-    const current = d.equipment || '';
-    const addition = `${data.name} (${data.detail})`;
-    update.equipment = current ? current + '\\n' + addition : addition;
-  } else if (catId === 'feat') {
-    const feats = d.features || [];
-    feats.push({ name: 'Don: ' + data.name, desc: data.detail, src: 'Compendium' });
-    update.features = feats;
-  } else if (catId === 'background') {
-    update.background = data.name;
+
+  if (catId === 'weapon') {
+    // Compute attack bonus and damage
+    const isFinesse = (r.properties||'').toLowerCase().includes('finesse');
+    const isRanged = (r.type||'').toLowerCase().includes('distance');
+    const statMod = isRanged ? mod(stats.dex) : (isFinesse ? Math.max(mod(stats.str), mod(stats.dex)) : mod(stats.str));
+    const atkBonus = statMod + pb;
+    const dmgBonus = statMod;
+    const atk = `+${atkBonus}`;
+    const dmg = `${r.damage||'?'}${dmgBonus>=0?'+':''}${dmgBonus}`;
+    const weapons = [...(d.inventory_weapons||[])];
+    weapons.push({ name: r.name, atk, dmg, properties: r.properties||'', type: r.type||'' });
+    update.inventory_weapons = weapons;
   }
-  // monsters are not added to characters
+  else if (catId === 'armor') {
+    update.equipped_armor = { name: r.name, ac: r.ac||'?', type: r.type||'', stealth: r.stealth||'' };
+    // Recalculate AC
+    const acStr = r.ac||'10';
+    let newAc = 10;
+    const dexMod = mod(stats.dex);
+    if (r.type === 'Bouclier') {
+      newAc = (d.ac||10) + 2;
+    } else if (acStr.includes('mod DEX')) {
+      const baseAc = parseInt(acStr)||10;
+      if (acStr.includes('max 2')) newAc = baseAc + Math.min(dexMod, 2);
+      else newAc = baseAc + dexMod;
+    } else {
+      newAc = parseInt(acStr)||10;
+    }
+    update.ac = newAc;
+  }
+  else if (catId === 'item') {
+    const items = [...(d.inventory_items||[])];
+    // Check if item already exists, increment qty
+    const existing = items.find(it => it.name === r.name);
+    if (existing) { existing.qty = (existing.qty||1) + 1; }
+    else { items.push({ name: r.name, detail: r.desc||r.type||'', qty: 1, rarity: r.rarity||'' }); }
+    update.inventory_items = items;
+  }
+  else if (catId === 'feat') {
+    const feats = [...(d.features||[])];
+    feats.push({ name: `Don: ${r.name}`, desc: r.desc||r.prereq||'', src: 'Compendium' });
+    update.features = feats;
+  }
+  else if (catId === 'background') {
+    update.background = r.name;
+  }
 
   if (Object.keys(update).length) {
-    await updateDoc(doc(db, "characters", activeCharId), update);
-    alert(`${data.name} ajouté à la fiche !`);
+    await updateDoc(doc(db, "characters", charId), update);
   }
   window._closeForge();
   document.getElementById('forgeNext').style.display = '';
+};
+
+// Remove an item from an inventory array field
+window._removeInventoryItem = async (charId, field, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const arr = [...(d[field]||[])];
+  arr.splice(index, 1);
+  await updateDoc(doc(db, "characters", charId), { [field]: arr });
+};
+
+// Unequip armor
+window._unequipArmor = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const dexMod = mod((d.stats?.dex)||10);
+  await updateDoc(doc(db, "characters", charId), { equipped_armor: null, ac: 10 + dexMod });
+};
+
+// Remove a feature by index
+window._removeFeature = async (charId, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const feats = [...(d.features||[])];
+  feats.splice(index, 1);
+  await updateDoc(doc(db, "characters", charId), { features: feats });
 };
 
 // ── Ajout de ressource personnalisée ──
@@ -2302,7 +2449,8 @@ nav button:last-child { color:#884444; }
  
 .weapon-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
 .weapon-table th { background:var(--ink); color:var(--gold); font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; padding:5px 8px; }
-.weapon-table td { padding:6px 8px; border-bottom:1px solid #f0e8d8; cursor:pointer; }
+.weapon-table th:last-child { width:30px; }
+.weapon-table td { padding:6px 8px; border-bottom:1px solid #f0e8d8; }
 .weapon-table td:hover { background:#fffbf0; }
  
 .coin-row { display:flex; gap:4px; padding:8px; }
@@ -2370,6 +2518,20 @@ nav button:last-child { color:#884444; }
  
 /* ── COMPENDIUM ── */
 #tab-compendium { background:var(--parch); min-height:100vh; }
+
+/* Inventory items on character sheet */
+.section-add-btn { float:right; background:transparent; border:1px solid rgba(184,134,11,0.5); color:var(--gold);
+  padding:1px 8px; font-family:'Cinzel'; font-size:0.55rem; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
+.section-add-btn:hover { background:var(--gold); color:#fff; }
+.inv-list { display:flex; flex-direction:column; gap:3px; }
+.inv-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:#fff8ee;
+  border-left:3px solid var(--gold); border-radius:2px; font-size:0.82rem; }
+.inv-item-main { flex:1; }
+.inv-remove-btn { background:transparent; border:1px solid #cc4444; color:#cc4444; width:20px; height:20px;
+  font-size:0.65rem; cursor:pointer; border-radius:2px; flex-shrink:0; padding:0; line-height:18px; text-align:center; }
+.inv-remove-btn:hover { background:#cc4444; color:#fff; }
+.feature-item-removable { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+.feature-item-removable > div { flex:1; }
 .comp-container { max-width:800px; margin:auto; padding:24px 20px; }
 .comp-container h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:16px; letter-spacing:3px; }
 .comp-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
