@@ -1,309 +1,1468 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grimoire — RPG Companion</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-    
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
-            authDomain: "kubbndonjons.firebaseapp.com",
-            projectId: "kubbndonjons",
-            storageBucket: "kubbndonjons.firebasestorage.app",
-            messagingSenderId: "875521195069",
-            appId: "1:875521195069:web:550930281db865a35c7e54"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        let currentUid = null;
-        let activeCharId = null;
-
-        // --- DATA ESTRUCTURE (Extensible) ---
-        const FORGE_DATA = {
-            races: {
-                "Humain": { source: "PHB", stats: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, speed: 9 },
-                "Elfe": { 
-                    source: "PHB", speed: 9, 
-                    subraces: {
-                        "Haut-Elfe": { stats: { dex: 2, int: 1 }, traits: ["Sort mineur supplémentaire"] },
-                        "Elfe des bois": { stats: { dex: 2, wis: 1 }, traits: ["Cachette naturelle"] },
-                        "Drow": { stats: { dex: 2, cha: 1 }, traits: ["Vision dans le noir supérieure"] }
-                    }
-                },
-                "Nain": { 
-                    source: "PHB", speed: 7.5,
-                    subraces: {
-                        "Nain des collines": { stats: { con: 2, wis: 1 }, hpBonus: 1 },
-                        "Nain des montagnes": { stats: { con: 2, str: 2 } }
-                    }
-                },
-                "Githyanki": { source: "MotM", stats: { int: 2, str: 1 }, traits: ["Psionique Gith"] }
-            },
-            classes: {
-                "Guerrier": { hd: 10, saves: ["str", "con"], skills: 2, source: "PHB" },
-                "Magicien": { hd: 6, saves: ["int", "wis"], skills: 2, source: "PHB" },
-                "Artificier": { hd: 8, saves: ["con", "int"], skills: 2, source: "TCoE" }
-            }
-        };
-
-        // --- AUTH LOGIC ---
-        window._doLogin = () => {
-            const e = document.getElementById('authEmail').value;
-            const p = document.getElementById('authPass').value;
-            signInWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
-        };
-
-        window._doSignup = () => {
-            const e = document.getElementById('authEmail').value;
-            const p = document.getElementById('authPass').value;
-            createUserWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
-        };
-
-        window._doLogout = () => signOut(auth);
-
-        onAuthStateChanged(auth, user => {
-            const authScreen = document.getElementById('authScreen');
-            const appScreen = document.getElementById('appScreen');
-            if (user) {
-                currentUid = user.uid;
-                authScreen.style.display = 'none';
-                appScreen.style.display = 'block';
-                loadCharacterList();
-            } else {
-                authScreen.style.display = 'flex';
-                appScreen.style.display = 'none';
-            }
-        });
-
-        // --- NAVIGATION ---
-        window._showTab = (tabId) => {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-        };
-
-        // --- FORGE ENGINE ---
-        window._openForge = () => {
-            const raceSelect = document.getElementById('forgeRace');
-            const classSelect = document.getElementById('forgeClass');
-            
-            raceSelect.innerHTML = Object.keys(FORGE_DATA.races).map(r => 
-                `<option value="${r}">${r} (${FORGE_DATA.races[r].source})</option>`
-            ).join('');
-
-            classSelect.innerHTML = Object.keys(FORGE_DATA.classes).map(c => 
-                `<option value="${c}">${c} (${FORGE_DATA.classes[c].source})</option>`
-            ).join('');
-
-            window._updateSubraceList();
-            document.getElementById('forgeOverlay').style.display = 'flex';
-        };
-
-        window._closeForge = () => {
-            document.getElementById('forgeOverlay').style.display = 'none';
-        };
-
-        window._updateSubraceList = () => {
-            const raceKey = document.getElementById('forgeRace').value;
-            const raceData = FORGE_DATA.races[raceKey];
-            const container = document.getElementById('subraceContainer');
-            const subSelect = document.getElementById('forgeSubrace');
-
-            if (raceData.subraces) {
-                container.style.display = 'block';
-                subSelect.innerHTML = Object.keys(raceData.subraces).map(s => 
-                    `<option value="${s}">${s}</option>`
-                ).join('');
-            } else {
-                container.style.display = 'none';
-                subSelect.innerHTML = '';
-            }
-        };
-
-        window._finishForge = async () => {
-            const name = document.getElementById('forgeName').value;
-            if (!name) return alert("Ton héros a besoin d'un nom !");
-
-            const rKey = document.getElementById('forgeRace').value;
-            const srKey = document.getElementById('forgeSubrace').value;
-            const cKey = document.getElementById('forgeClass').value;
-            
-            const raceBase = FORGE_DATA.races[rKey];
-            const subraceData = srKey ? raceBase.subraces[srKey] : null;
-            const classData = FORGE_DATA.classes[cKey];
-
-            const finalStats = subraceData?.stats || raceBase.stats;
-            const hpTotal = classData.hd + (subraceData?.hpBonus || 0);
-
-            const newChar = {
-                owner: currentUid,
-                name: name,
-                race: srKey ? `${srKey} (${rKey})` : rKey,
-                class: cKey,
-                level: 1,
-                hp: hpTotal,
-                hpMax: hpTotal,
-                ac: 10 + (finalStats.dex || 0),
-                stats: finalStats,
-                createdAt: new Date().toISOString()
-            };
-
-            await addDoc(collection(db, "characters"), newChar);
-            window._closeForge();
-        };
-
-        // --- CHARACTER LIST ---
-        async function loadCharacterList() {
-            const q = query(collection(db, "characters"), where("owner", "==", currentUid));
-            onSnapshot(q, (snapshot) => {
-                const list = document.getElementById('charList');
-                list.innerHTML = '';
-                snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
-                    const btn = document.createElement('div');
-                    btn.className = 'char-card';
-                    btn.innerHTML = `<strong>${data.name}</strong><br><small>${data.race} - ${data.class} Niv.${data.level}</small>`;
-                    btn.onclick = () => selectCharacter(docSnap.id);
-                    list.appendChild(btn);
-                });
-            });
-        }
-
-        function selectCharacter(id) {
-            activeCharId = id;
-            document.getElementById('activeCharIdDisplay').textContent = id;
-            onSnapshot(doc(db, "characters", id), (docSnap) => {
-                if (!docSnap.exists()) return;
-                const data = docSnap.data();
-                document.getElementById('charNameDisp').textContent = data.name;
-                document.getElementById('hpVal').textContent = `${data.hp}/${data.hpMax}`;
-                document.getElementById('acVal').textContent = data.ac;
-            });
-            window._showTab('tab-sheet');
-        }
-
-        // --- GM LOGIC ---
-        window._watchChar = () => {
-            const id = document.getElementById('gmSearchId').value;
-            onSnapshot(doc(db, "characters", id), (docSnap) => {
-                if (!docSnap.exists()) return alert("Fiche introuvable");
-                const data = docSnap.data();
-                document.getElementById('gmMonitor').innerHTML = `
-                    <div class="gm-pc-card">
-                        <h4>${data.name}</h4>
-                        <p>❤️ HP: ${data.hp}/${data.hpMax} | 🛡️ CA: ${data.ac}</p>
-                        <p>🎭 ${data.race} | ⚔️ ${data.class}</p>
-                    </div>
-                `;
-            });
-        };
-    </script>
-
-    <style>
-        :root { --p: #f4ece1; --i: #2c1a0e; --g: #b8860b; --accent: #8b0000; }
-        body { background: #1a0f05; color: var(--i); font-family: 'Crimson Pro', serif; margin: 0; }
-        
-        /* Auth */
-        #authScreen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(#2d1a08, #1a0f05); }
-        .auth-box { background: var(--p); padding: 30px; border-radius: 5px; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; font-family: 'Crimson Pro'; }
-        
-        /* App */
-        nav { background: var(--i); padding: 10px; display: flex; justify-content: center; gap: 15px; position: sticky; top:0; z-index:100; }
-        nav button { background: transparent; color: var(--g); border:none; cursor:pointer; font-family: 'Cinzel'; font-size: 0.8rem; }
-        .tab-content { display: none; padding: 20px; max-width: 800px; margin: auto; background: var(--p); min-height: 90vh; }
-        .active { display: block; }
-        
-        /* Elements */
-        .btn-gold { background: var(--g); color: white; padding: 12px; border:none; cursor:pointer; font-family: 'Cinzel'; width: 100%; }
-        .char-card { background: rgba(0,0,0,0.05); padding: 15px; margin: 10px 0; border-left: 4px solid var(--g); cursor: pointer; }
-        .stat-circle { width: 80px; height: 80px; border: 3px solid var(--g); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px; background: white; }
-        .gm-pc-card { background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
-        .cinzel { font-family: 'Cinzel'; }
-
-        /* Forge Overlay */
-        #forgeOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); z-index:1000; align-items: center; justify-content: center; }
-        .forge-window { background: var(--p); padding: 30px; border-radius: 8px; width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grimoire — RPG Companion</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+ 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+ 
+const firebaseConfig = {
+  apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
+  authDomain: "kubbndonjons.firebaseapp.com",
+  projectId: "kubbndonjons",
+  storageBucket: "kubbndonjons.firebasestorage.app",
+  messagingSenderId: "875521195069",
+  appId: "1:875521195069:web:550930281db865a35c7e54"
+};
+ 
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+ 
+let currentUid = null;
+let activeCharId = null;
+let activeCharUnsubscribe = null;
+ 
+// ============================================================
+// DONNÉES D&D 5E
+// ============================================================
+const RACES = {
+  "Humain": { source:"PHB", stats:{str:1,dex:1,con:1,int:1,wis:1,cha:1}, speed:9, traits:["Polyvalent: +1 à toutes les caractéristiques","Langues supplémentaires"] },
+  "Elfe": { source:"PHB", speed:9, traits:["Ascendance féerique","Transe","Maîtrise des armes elfiques"],
+    subraces:{
+      "Haut-Elfe":{ stats:{dex:2,int:1}, traits:["Sort mineur supplémentaire","Maîtrise des armes elfiques"] },
+      "Elfe des bois":{ stats:{dex:2,wis:1}, traits:["Cachette naturelle","Foulée rapide (vitesse 10.5m)"] },
+      "Drow":{ stats:{dex:2,cha:1}, traits:["Vision dans le noir supérieure (36m)","Sensibilité à la lumière solaire","Magie des drows"] }
+    }
+  },
+  "Nain": { source:"PHB", speed:7.5, traits:["Vision dans le noir (18m)","Résistance naine","Formation aux armes naines","Connaissance de la pierre"],
+    subraces:{
+      "Nain des collines":{ stats:{con:2,wis:1}, hpBonus:1, traits:["Robustesse naine: +1 PV max par niveau"] },
+      "Nain des montagnes":{ stats:{con:2,str:2}, traits:["Formation à l'armure de guerre naine"] }
+    }
+  },
+  "Halfelin": { source:"PHB", speed:7.5, traits:["Chanceux","Brave","Agilité halfeline","Discret"],
+    subraces:{
+      "Halfelin pied-léger":{ stats:{dex:2,cha:1}, traits:["Discrétion naturelle"] },
+      "Halfelin robuste":{ stats:{dex:2,con:1}, traits:["Robustesse halfeline: résistance au poison"] }
+    }
+  },
+  "Gnome": { source:"PHB", speed:7.5, traits:["Vision dans le noir (18m)","Ruse gnome (avantage INT, SAG, CHA vs magie)"],
+    subraces:{
+      "Gnome des forêts":{ stats:{int:2,dex:1}, traits:["Illusionniste naturel","Communication avec les petits animaux"] },
+      "Gnome des roches":{ stats:{int:2,con:1}, traits:["Connaissances artificielles","Mémoire artificielle"] }
+    }
+  },
+  "Semi-Elfe": { source:"PHB", stats:{cha:2}, bonusStats:2, speed:9, traits:["Vision dans le noir (18m)","Ascendance féerique","Polyvalent: +1 à 2 caractéristiques au choix","2 maîtrises de compétences supplémentaires"] },
+  "Semi-Orque": { source:"PHB", stats:{str:2,con:1}, speed:9, traits:["Vision dans le noir (18m)","Menaçant","Endurance implacable","Attaques sauvages"] },
+  "Tieffelin": { source:"PHB", stats:{int:1,cha:2}, speed:9, traits:["Vision dans le noir (18m)","Résistance infernale","Héritage infernal (sorts)"] },
+  "Dragonné": { source:"PHB", stats:{str:2,cha:1}, speed:9, traits:["Ascendance draconique (choisir un type de dragon)","Souffle","Résistance aux dégâts"] },
+  "Githyanki": { source:"MotM", stats:{int:2,str:1}, speed:9, traits:["Psionique Gith","Télékinesie psionique","Saut psionique"] },
+  "Féral Tieffelin": { source:"MTF", stats:{int:2,dex:1}, speed:9, traits:["Vision dans le noir (18m)","Résistance infernale","Magie infernale férale"] }
+};
+ 
+const CLASSES = {
+  "Barbare": { hd:12, saves:["str","con"], source:"PHB", spellcaster:false,
+    skills:["Athletisme","Dressage","Intimidation","Nature","Perception","Survie"], skillCount:2,
+    armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
+    equipment:"Hache à deux mains (ou toute arme de guerre martiale), 2 hachettes, 10 javelines, kit d'explorateur",
+    features:[{lvl:1,name:"Rage",desc:"Entrer en rage (avantage FOR, bonus dégâts +2/+3/+4, résistance physique)"},{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod CON"},{lvl:2,name:"Attaque téméraire",desc:"Avantage en attaque, mais les attaques contre vous ont aussi l'avantage"},{lvl:2,name:"Sens du danger",desc:"Avantage aux jets de sauvegarde DEX contre effets visibles"}]
+  },
+  "Barde": { hd:8, saves:["dex","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
+    skills:["Tout (3 au choix)"], skillCount:3,
+    armor:["Légères"], weapons:["Simples","Arbalète de poing","Épée longue","Rapière","Épée courte"],
+    equipment:"Rapière (ou épée longue/toute arme simple), Étui à instruments de musique, Armure de cuir, Dague, Pack de diplomate",
+    features:[{lvl:1,name:"Lanceur de sorts",desc:"Charisme (sorts de barde)"},{lvl:1,name:"Inspiration bardique",desc:"Dé d'inspiration (d6) à un allié — bonus au jet d'attaque, compétence ou sauvegarde"},{lvl:2,name:"Touche-à-tout",desc:"Moitié du bonus de maîtrise pour les compétences sans maîtrise"}]
+  },
+  "Clerc": { hd:8, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"wis",
+    skills:["Histoire","Intuition","Médecine","Persuasion","Religion"], skillCount:2,
+    armor:["Légères","Moyennes","Lourdes","Boucliers"], weapons:["Simples"],
+    equipment:"Masse d'armes (ou fléau), Armure d'écailles (ou armure de cuir/de mailles), Arbalète légère + 20 carreaux (ou toute arme simple), Pack d'ecclésiastique (ou pack d'explorateur), Bouclier, Symbole sacré",
+    features:[{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de clerc)"},{lvl:1,name:"Domaine divin",desc:"Choisir un domaine (Connaissance, Vie, Lumière, Nature, Tempête, Tromperie, Guerre)"},{lvl:2,name:"Conduit divin",desc:"Renvoi des morts-vivants"}]
+  },
+  "Druide": { hd:8, saves:["int","wis"], source:"PHB", spellcaster:true, spellAbility:"wis",
+    skills:["Arcanes","Dressage","Intuition","Médecine","Nature","Perception","Religion","Survie"], skillCount:2,
+    armor:["Légères","Moyennes","Boucliers (pas métalliques)"], weapons:["Massue","Dague","Fléchette","Javeline","Gourdin","Serpe","Lance","Bâton","Cimeterre","Fronde","Trident"],
+    equipment:"Bouclier de bois (ou toute arme simple), Cimeterre (ou toute arme de corps à corps simple), Armure de cuir, Pack d'explorateur, Focalisateur druidique",
+    features:[{lvl:1,name:"Druidique",desc:"Langue secrète des druides"},{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de druide)"},{lvl:2,name:"Forme sauvage",desc:"Se transformer en bête (RC 1/4 — puis évolue)"}]
+  },
+  "Guerrier": { hd:10, saves:["str","con"], source:"PHB", spellcaster:false,
+    skills:["Acrobaties","Athletisme","Histoire","Intuition","Intimidation","Perception","Survie"], skillCount:2,
+    armor:["Toutes","Boucliers"], weapons:["Simples","Martiales"],
+    equipment:"Cotte de mailles (ou armure de cuir, arc long, 20 flèches), Arme martiale + bouclier (ou 2 armes martiales), Arbalète légère + 20 carreaux (ou 2 hachettes), Pack de donjonneur (ou pack d'explorateur)",
+    features:[{lvl:1,name:"Style de combat",desc:"Archerie, Combat à deux armes, Défense, Duel, Grands coups, Protection"},{lvl:1,name:"Second souffle",desc:"Récupérer 1d10+niveau PV (repos court)"},{lvl:2,name:"Fougue",desc:"Action supplémentaire une fois par repos court/long"}]
+  },
+  "Magicien": { hd:6, saves:["int","wis"], source:"PHB", spellcaster:true, spellAbility:"int",
+    skills:["Arcanes","Histoire","Intuition","Investigation","Médecine","Religion"], skillCount:2,
+    armor:[], weapons:["Dague","Fléchette","Fronde","Bâton","Arbalète légère"],
+    equipment:"Bâton de mage (ou dague), Sacoche à composantes (ou focalisateur arcanique), Pack d'érudit (ou pack d'explorateur), Grimoire",
+    features:[{lvl:1,name:"Incantation",desc:"Intelligence (sorts de magicien) — Grimoire avec 6 sorts de niveau 1"},{lvl:1,name:"Récupération arcanique",desc:"Récupérer des emplacements de sorts épuisés lors d'un repos court"},{lvl:2,name:"Tradition arcanique",desc:"École de magie (Abjuration, Conjuration, Divination, Enchantement, Évocation, Illusion, Nécromancie, Transmutation)"}]
+  },
+  "Moine": { hd:8, saves:["str","dex"], source:"PHB", spellcaster:false,
+    skills:["Acrobaties","Athletisme","Histoire","Intuition","Religion","Discrétion"], skillCount:2,
+    armor:[], weapons:["Simples","Épée courte"],
+    equipment:"Épée courte (ou toute arme simple), Pack de donjonneur (ou pack d'explorateur), 10 fléchettes",
+    features:[{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod SAG"},{lvl:1,name:"Arts martiaux",desc:"Dés martiaux (d4→d10), attaques sans arme DEX ou FOR"},{lvl:2,name:"Ki",desc:"Points de ki pour Tempête de coups, Défense patiente, Pas du vent"},{lvl:2,name:"Déplacement sans armure",desc:"+3m de déplacement"}]
+  },
+  "Paladin": { hd:10, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
+    skills:["Athletisme","Intuition","Intimidation","Médecine","Persuasion","Religion"], skillCount:2,
+    armor:["Toutes","Boucliers"], weapons:["Simples","Martiales"],
+    equipment:"Arme martiale + bouclier (ou 2 armes martiales), 5 javelines (ou toute arme de corps à corps simple), Pack de prêtre (ou pack d'explorateur), Cotte de mailles, Symbole sacré",
+    features:[{lvl:1,name:"Sens divin",desc:"Détecter les célestes, fiélons et morts-vivants dans un rayon de 18m"},{lvl:1,name:"Imposition des mains",desc:"Pool de PV = niveau x 5, soigner les blessures et maladies"},{lvl:2,name:"Style de combat",desc:"Défense, Duel, Grande épée, Protection"},{lvl:2,name:"Incantation",desc:"Charisme (sorts de paladin)"},{lvl:2,name:"Châtiment divin",desc:"2d8 dégâts radiants supplémentaires en dépensant un emplacement"}]
+  },
+  "Rôdeur": { hd:10, saves:["str","dex"], source:"PHB", spellcaster:true, spellAbility:"wis",
+    skills:["Athletisme","Dressage","Discrétion","Investigation","Nature","Perception","Survie"], skillCount:3,
+    armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
+    equipment:"Armure d'écailles (ou armure de cuir), 2 épées courtes (ou 2 armes simples de corps à corps), Pack de donjonneur (ou pack d'explorateur), Arc long + 20 flèches",
+    features:[{lvl:1,name:"Ennemi juré",desc:"Avantage aux jets de Sagesse contre les créatures de type choisi"},{lvl:1,name:"Explorateur-né",desc:"Maîtrise dans 2 compétences + avantages en terrain de prédilection"},{lvl:2,name:"Style de combat",desc:"Archerie, Défense, Duel, Combat à deux armes"},{lvl:2,name:"Incantation",desc:"Sagesse (sorts de rôdeur)"}]
+  },
+  "Roublard": { hd:8, saves:["dex","int"], source:"PHB", spellcaster:false,
+    skills:["Acrobaties","Athletisme","Discrétion","Escamotage","Intimidation","Investigation","Perception","Performance","Persuasion","Tromperie"], skillCount:4,
+    armor:["Légères"], weapons:["Simples","Arbalète de poing","Épée longue","Rapière","Épée courte"],
+    equipment:"Rapière (ou épée courte), Arc court + 20 flèches (ou épée courte), Pack de cambrioleur (ou pack d'explorateur ou pack de donjonneur), Armure de cuir, 2 dagues, Outils de voleur",
+    features:[{lvl:1,name:"Expertise",desc:"Double bonus de maîtrise pour 2 compétences choisies"},{lvl:1,name:"Attaque sournoise",desc:"1d6 dégâts bonus quand avantage ou allié adjacent à la cible"},{lvl:1,name:"Jargon des voleurs",desc:"Argot secret des roublards"},{lvl:2,name:"Action rusée",desc:"Bonus action: Foncer, Se désengager ou Se cacher"}]
+  },
+  "Ensorceleur": { hd:6, saves:["con","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
+    skills:["Arcanes","Intimidation","Perspicacité","Persuasion","Religion","Tromperie"], skillCount:2,
+    armor:[], weapons:["Dague","Fléchette","Fronde","Bâton","Arbalète légère"],
+    equipment:"Arbalète légère + 20 carreaux (ou toute arme simple), Sacoche à composantes (ou focalisateur arcanique), Pack de donjonneur (ou pack d'explorateur), 2 dagues",
+    features:[{lvl:1,name:"Incantation",desc:"Charisme (sorts d'ensorceleur)"},{lvl:1,name:"Origine magique",desc:"Âme draconique ou Magie sauvage"},{lvl:2,name:"Points de sorcellerie",desc:"Créer des emplacements de sorts supplémentaires ou effets méta-magiques"}]
+  },
+  "Occultiste": { hd:8, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
+    skills:["Arcanes","Duperie","Histoire","Intimidation","Investigation","Nature","Religion"], skillCount:2,
+    armor:["Légères"], weapons:["Simples"],
+    equipment:"Arbalète légère + 10 carreaux (ou toute arme simple), Sacoche à composantes (ou focalisateur arcanique), Pack d'érudit (ou pack de donjonneur), Armure de cuir, toute arme simple, 2 dagues",
+    features:[{lvl:1,name:"Protecteur d'au-delà",desc:"Choisir son patron (l'Archifée, le Fiélon, le Grand Ancien)"},{lvl:1,name:"Magie de pacte",desc:"Charisme — emplacements récupérés au repos court"},{lvl:2,name:"Invocations occultes",desc:"Pouvoirs occultes permanents (yeux du gardien des runes, etc.)"}]
+  },
+  "Artificier": { hd:8, saves:["con","int"], source:"TCoE", spellcaster:true, spellAbility:"int",
+    skills:["Arcanes","Histoire","Investigation","Médecine","Nature","Perception","Discrétion"], skillCount:2,
+    armor:["Légères","Moyennes","Boucliers"], weapons:["Simples"],
+    equipment:"2 pistolets + 20 projectiles, Pack de donjonneur, Armure d'écailles, Outils de voleur, Outils de bricoleur",
+    features:[{lvl:1,name:"Maîtrise des outils magiques",desc:"Utiliser les outils d'artisan comme focalisateur arcanique"},{lvl:1,name:"Infusions",desc:"Imprégner des objets magiques non-magiques"},{lvl:1,name:"Utilisation des armes à feu",desc:"Maîtrise des armes à feu si variante"}]
+  }
+};
+ 
+const BACKGROUNDS = {
+  "Acolyte":{ skills:["Intuition","Religion"], lang:2, equipment:"Symbole sacré, livre de prières, 5 bâtonnets d'encens, vêtements d'apparat, 15po", feature:"Abri des fidèles" },
+  "Criminel":{ skills:["Tromperie","Discrétion"], tools:["Outils de voleur","Jeu d'un type"], equipment:"Pied-de-biche, vêtements sombres à capuchon, 15po", feature:"Contact avec le milieu criminel" },
+  "Héros du Peuple":{ skills:["Dressage","Survie"], tools:["Outils d'artisan","Véhicules terrestres"], equipment:"Outils d'artisan, pelle, pot en fer, vêtements de paysan, 10po", feature:"Hospitalité rustique" },
+  "Noble":{ skills:["Histoire","Persuasion"], tools:["Jeu d'un type"], lang:1, equipment:"Tenue de belle facture, bague à armoiries, lettre de recommandation, 25po", feature:"Privilège de position" },
+  "Sage":{ skills:["Arcanes","Histoire"], lang:2, equipment:"Bouteille d'encre noire, plume, petit couteau, lettre d'un défunt collègue, vêtements d'érudit, 10po", feature:"Chercheur" },
+  "Soldat":{ skills:["Athletisme","Intimidation"], tools:["Jeu d'un type","Véhicules terrestres"], equipment:"Insigne militaire, trophée d'un ennemi vaincu, ossements à jouer, vêtements communs, 10po", feature:"Statut militaire" },
+  "Vagabond":{ skills:["Athletisme","Survie"], lang:2, equipment:"Bâton, piège à machoires, trophées de chasse, vêtements de voyage, 10po", feature:"Marcheur des chemins" },
+  "Charlatan":{ skills:["Tromperie","Escamotage"], tools:["Kit de déguisement","Kit de faux-semblants"], equipment:"Tenue de bonne facture, fiole de colle, 15po", feature:"Fausse identité" },
+  "Artiste":{ skills:["Acrobaties","Performance"], tools:["Déguisement","Un instrument de musique"], equipment:"Instrument de musique, cadeau d'un admirateur, costume, 15po", feature:"Par acclamation populaire" },
+  "Marin":{ skills:["Athletisme","Perception"], tools:["Outils de navigateur","Véhicules nautiques"], equipment:"Gourdin, 50 pieds de corde de soie, porte-bonheur, vêtements communs, 10po", feature:"Passage gratuit sur un navire" },
+  "Étranger":{ skills:["Intuition","Religion"], lang:2, equipment:"Habit exotique, 10 gemmes de valeur, 5 po", feature:"Connaissance de la terre d'origine" }
+};
+ 
+const ALIGNMENTS = ["Loyal Bon","Neutre Bon","Chaotique Bon","Loyal Neutre","Neutre","Chaotique Neutre","Loyal Mauvais","Neutre Mauvais","Chaotique Mauvais"];
+const SKILLS_LIST = [
+  {name:"Acrobaties",stat:"dex"},{name:"Arcanes",stat:"int"},{name:"Athletisme",stat:"str"},
+  {name:"Discrétion",stat:"dex"},{name:"Dressage",stat:"wis"},{name:"Escamotage",stat:"dex"},
+  {name:"Histoire",stat:"int"},{name:"Intimidation",stat:"cha"},{name:"Investigation",stat:"int"},
+  {name:"Intuition",stat:"wis"},{name:"Médecine",stat:"wis"},{name:"Nature",stat:"int"},
+  {name:"Perception",stat:"wis"},{name:"Performance",stat:"cha"},{name:"Persuasion",stat:"cha"},
+  {name:"Religion",stat:"int"},{name:"Représentation",stat:"cha"},{name:"Survie",stat:"wis"},
+  {name:"Tromperie",stat:"cha"}
+];
+const PROF_BONUS = [2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,6];
+ 
+// ============================================================
+// AUTH
+// ============================================================
+window._doLogin = () => {
+  const e = document.getElementById('authEmail').value;
+  const p = document.getElementById('authPass').value;
+  signInWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.message));
+};
+window._doSignup = () => {
+  const e = document.getElementById('authEmail').value;
+  const p = document.getElementById('authPass').value;
+  createUserWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.message));
+};
+window._doLogout = () => signOut(auth);
+ 
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+ 
+onAuthStateChanged(auth, user => {
+  if (user) {
+    currentUid = user.uid;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    loadCharacterList();
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+  }
+});
+ 
+// ============================================================
+// NAVIGATION
+// ============================================================
+window._showTab = (tabId) => {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('nav-active'));
+  const map = {'tab-list':'navList','tab-sheet':'navSheet','tab-gm':'navGM'};
+  if(map[tabId]) document.getElementById(map[tabId]).classList.add('nav-active');
+};
+ 
+// ============================================================
+// WIZARD DE CRÉATION — 5 ÉTAPES
+// ============================================================
+let wizardData = {};
+let wizardStep = 1;
+const WIZARD_STEPS = 5;
+ 
+window._openForge = () => {
+  wizardData = { stats:{str:8,dex:8,con:8,int:8,wis:8,cha:8}, skills:{}, pointsLeft:27, hitDice:[], hpMax:0 };
+  wizardStep = 1;
+  renderWizardStep();
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+window._closeForge = () => { document.getElementById('forgeOverlay').style.display = 'none'; };
+ 
+function renderWizardStep() {
+  const win = document.getElementById('forgeWindow');
+  const progressEl = document.getElementById('forgeProgress');
+  const labels = ['Identité','Race','Classe','Caractéristiques','Finalisation'];
+  progressEl.innerHTML = labels.map((l,i) => `<div class="progress-step ${i+1===wizardStep?'active':i+1<wizardStep?'done':''}">${i+1<wizardStep?'✓':i+1}</div>`).join('<div class="progress-line"></div>');
+ 
+  const content = document.getElementById('forgeContent');
+  content.innerHTML = '';
+ 
+  if (wizardStep === 1) renderStep1(content);
+  else if (wizardStep === 2) renderStep2(content);
+  else if (wizardStep === 3) renderStep3(content);
+  else if (wizardStep === 4) renderStep4(content);
+  else if (wizardStep === 5) renderStep5(content);
+ 
+  document.getElementById('forgePrev').style.visibility = wizardStep > 1 ? 'visible' : 'hidden';
+  document.getElementById('forgeNext').textContent = wizardStep === WIZARD_STEPS ? '⚔ DONNER VIE' : 'SUIVANT →';
+}
+ 
+function renderStep1(c) {
+  c.innerHTML = `
+    <h3 class="step-title">Identité du Héros</h3>
+    <div class="field-group">
+      <label>Nom du personnage *</label>
+      <input id="w_name" type="text" value="${wizardData.name||''}" placeholder="Ex: Aragorn fils d'Arathorn">
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label>Âge</label>
+        <input id="w_age" type="text" value="${wizardData.age||''}" placeholder="Ex: 25">
+      </div>
+      <div class="field-group">
+        <label>Genre</label>
+        <input id="w_gender" type="text" value="${wizardData.gender||''}" placeholder="Ex: Masculin">
+      </div>
+    </div>
+    <div class="field-group">
+      <label>Alignement</label>
+      <select id="w_alignment">
+        <option value="">— Choisir —</option>
+        ${ALIGNMENTS.map(a=>`<option value="${a}" ${wizardData.alignment===a?'selected':''}>${a}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field-group">
+      <label>Historique (Background)</label>
+      <select id="w_background" onchange="window._updateBgDetails()">
+        <option value="">— Choisir —</option>
+        ${Object.keys(BACKGROUNDS).map(b=>`<option value="${b}" ${wizardData.background===b?'selected':''}>${b}</option>`).join('')}
+      </select>
+    </div>
+    <div id="bgDetails" class="info-box" style="display:${wizardData.background?'block':'none'}"></div>
+    <div class="field-group">
+      <label>Idéaux</label>
+      <input id="w_ideals" type="text" value="${wizardData.ideals||''}" placeholder="Ex: La justice doit triompher">
+    </div>
+    <div class="field-group">
+      <label>Liens</label>
+      <input id="w_bonds" type="text" value="${wizardData.bonds||''}" placeholder="Ex: Protéger ma famille coûte que coûte">
+    </div>
+    <div class="field-group">
+      <label>Défauts</label>
+      <input id="w_flaws" type="text" value="${wizardData.flaws||''}" placeholder="Ex: Mon orgueil me perdra">
+    </div>
+    <div class="field-group">
+      <label>Traits de personnalité</label>
+      <textarea id="w_personality" rows="2" placeholder="Décrivez la personnalité...">${wizardData.personality||''}</textarea>
+    </div>`;
+  if(wizardData.background) setTimeout(window._updateBgDetails, 50);
+}
+ 
+window._updateBgDetails = () => {
+  const sel = document.getElementById('w_background');
+  if(!sel) return;
+  const bg = BACKGROUNDS[sel.value];
+  const el = document.getElementById('bgDetails');
+  if(!bg){ el.style.display='none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `<strong>Compétences:</strong> ${bg.skills.join(', ')}<br>
+    ${bg.tools?`<strong>Outils:</strong> ${bg.tools.join(', ')}<br>`:''}
+    ${bg.lang?`<strong>Langues:</strong> +${bg.lang}<br>`:''}
+    <strong>Équipement:</strong> ${bg.equipment}<br>
+    <strong>Aptitude:</strong> ${bg.feature}`;
+};
+ 
+function renderStep2(c) {
+  c.innerHTML = `
+    <h3 class="step-title">Peuple & Origine</h3>
+    <div class="field-group">
+      <label>Race</label>
+      <select id="w_race" onchange="window._updateSubraceW()">
+        <option value="">— Choisir —</option>
+        ${Object.keys(RACES).map(r=>`<option value="${r}" ${wizardData.race===r?'selected':''}>${r} (${RACES[r].source})</option>`).join('')}
+      </select>
+    </div>
+    <div id="subraceWrap" style="display:none">
+      <div class="field-group">
+        <label>Sous-race / Origine</label>
+        <select id="w_subrace" onchange="window._cacheSubrace()"></select>
+      </div>
+    </div>
+    <div id="raceDetails" class="info-box" style="margin-top:12px;display:${wizardData.race?'block':'none'}"></div>`;
+  if(wizardData.race) { setTimeout(()=>{ window._updateSubraceW(); }, 50); }
+}
+ 
+window._updateSubraceW = () => {
+  const rKey = document.getElementById('w_race')?.value;
+  if(!rKey) return;
+  wizardData.race = rKey;
+  const rData = RACES[rKey];
+  const wrap = document.getElementById('subraceWrap');
+  const subSel = document.getElementById('w_subrace');
+  if(rData.subraces) {
+    wrap.style.display = 'block';
+    subSel.innerHTML = Object.keys(rData.subraces).map(s=>`<option value="${s}" ${wizardData.subrace===s?'selected':''}>${s}</option>`).join('');
+    wizardData.subrace = wizardData.subrace || Object.keys(rData.subraces)[0];
+  } else {
+    wrap.style.display = 'none';
+    wizardData.subrace = null;
+  }
+  const det = document.getElementById('raceDetails');
+  const sr = wizardData.subrace ? rData.subraces[wizardData.subrace] : null;
+  const stats = sr?.stats || rData.stats || {};
+  const traits = [...(rData.traits||[]),...(sr?.traits||[])];
+  det.style.display = 'block';
+  det.innerHTML = `<strong>Vitesse:</strong> ${rData.speed}m | <strong>Bonus:</strong> ${Object.entries(stats).map(([k,v])=>`${k.toUpperCase()} +${v}`).join(', ')||'Variable'}
+    <br><strong>Traits:</strong> ${traits.join('; ')||'—'}`;
+};
+window._cacheSubrace = () => {
+  const s = document.getElementById('w_subrace')?.value;
+  if(s) { wizardData.subrace = s; window._updateSubraceW(); }
+};
+ 
+function renderStep3(c) {
+  c.innerHTML = `
+    <h3 class="step-title">Vocation & Classe</h3>
+    <div class="field-group">
+      <label>Classe</label>
+      <select id="w_class" onchange="window._updateClassDetails()">
+        <option value="">— Choisir —</option>
+        ${Object.keys(CLASSES).map(cl=>`<option value="${cl}" ${wizardData.class===cl?'selected':''}>${cl} (${CLASSES[cl].source})</option>`).join('')}
+      </select>
+    </div>
+    <div id="classDetails" style="display:${wizardData.class?'block':'none'}">
+      <div id="classInfoBox" class="info-box"></div>
+      <div class="field-group" style="margin-top:12px">
+        <label>Compétences maîtrisées (choisir parmi la liste)</label>
+        <div id="classSkills"></div>
+      </div>
+    </div>`;
+  if(wizardData.class) setTimeout(window._updateClassDetails, 50);
+}
+ 
+window._updateClassDetails = () => {
+  const cKey = document.getElementById('w_class')?.value;
+  if(!cKey) return;
+  wizardData.class = cKey;
+  const cl = CLASSES[cKey];
+  const det = document.getElementById('classDetails');
+  det.style.display = 'block';
+  document.getElementById('classInfoBox').innerHTML =
+    `<strong>Dé de vie:</strong> d${cl.hd} | <strong>Sauvegardes:</strong> ${cl.saves.map(s=>s.toUpperCase()).join(', ')}
+    ${cl.spellcaster?`<br><strong>Sorts:</strong> ${cl.spellAbility.toUpperCase()}`:''}
+    <br><strong>Armures:</strong> ${cl.armor.length?cl.armor.join(', '):'Aucune'}
+    <br><strong>Armes:</strong> ${cl.weapons.join(', ')}
+    <br><strong>Équipement de départ:</strong> ${cl.equipment}
+    <br><strong>Aptitudes (niv.1-2):</strong> ${cl.features.map(f=>`<em>${f.name}</em>: ${f.desc}`).join('<br>')}`;
+ 
+  const skillsAvail = cl.skills[0]==="Tout (3 au choix)" ? SKILLS_LIST.map(s=>s.name) : cl.skills;
+  const count = cl.skillCount;
+  const skillsDiv = document.getElementById('classSkills');
+  skillsDiv.innerHTML = `<p style="font-size:0.8em;color:#666">Choisir ${count} compétences parmi:</p>
+    <div class="skill-check-grid">${skillsAvail.map(s=>`
+      <label class="skill-check">
+        <input type="checkbox" value="${s}" ${(wizardData.classSkills||[]).includes(s)?'checked':''} onchange="window._toggleClassSkill(this,'${s}',${count})">
+        <span>${s}</span>
+      </label>`).join('')}
+    </div>`;
+};
+ 
+window._toggleClassSkill = (el, skill, max) => {
+  if(!wizardData.classSkills) wizardData.classSkills = [];
+  if(el.checked) {
+    if(wizardData.classSkills.length >= max) { el.checked = false; return; }
+    wizardData.classSkills.push(skill);
+  } else {
+    wizardData.classSkills = wizardData.classSkills.filter(s=>s!==skill);
+  }
+};
+ 
+function renderStep4(c) {
+  c.innerHTML = `
+    <h3 class="step-title">Caractéristiques</h3>
+    <div class="field-group">
+      <label>Méthode de génération</label>
+      <select id="w_statMethod" onchange="window._changeStatMethod()">
+        <option value="pointbuy" ${wizardData.statMethod==='pointbuy'?'selected':''}>Achat de points (27 pts)</option>
+        <option value="standard" ${wizardData.statMethod==='standard'?'selected':''}>Tableau standard (15,14,13,12,10,8)</option>
+        <option value="manual" ${wizardData.statMethod==='manual'?'selected':''}>Saisie manuelle</option>
+      </select>
+    </div>
+    <div id="statMethodContent"></div>
+    <div id="statPreview" class="stat-preview-grid"></div>
+    <p style="font-size:0.78em;color:#888;margin-top:8px">Les bonus raciaux seront appliqués automatiquement à la création.</p>`;
+  wizardData.statMethod = wizardData.statMethod || 'pointbuy';
+  document.getElementById('w_statMethod').value = wizardData.statMethod;
+  window._changeStatMethod();
+}
+ 
+window._changeStatMethod = () => {
+  const m = document.getElementById('w_statMethod')?.value || 'pointbuy';
+  wizardData.statMethod = m;
+  const cont = document.getElementById('statMethodContent');
+  if(!cont) return;
+ 
+  if(m === 'pointbuy') {
+    const costs = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+    const spent = Object.values(wizardData.stats).reduce((sum,v)=>sum+(costs[v]||0),0);
+    wizardData.pointsLeft = 27 - spent;
+    cont.innerHTML = `<div class="pb-header"><span>Points disponibles: <strong id="pbLeft">${wizardData.pointsLeft}</strong>/27</span></div>
+      <div class="pb-grid">${['str','dex','con','int','wis','cha'].map(s=>`
+        <div class="pb-row">
+          <span class="pb-label">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]}</span>
+          <button class="pb-btn" onclick="window._pbAdjust('${s}',-1)">−</button>
+          <span class="pb-val" id="pb_${s}">${wizardData.stats[s]}</span>
+          <button class="pb-btn" onclick="window._pbAdjust('${s}',1)">+</button>
+          <span class="pb-mod">(mod: ${mod(wizardData.stats[s])>=0?'+':''}${mod(wizardData.stats[s])})</span>
+        </div>`).join('')}
+      </div>`;
+  } else if(m === 'standard') {
+    if(!wizardData.standardAssign) wizardData.standardAssign = {str:15,dex:14,con:13,int:12,wis:10,cha:8};
+    const opts = [15,14,13,12,10,8];
+    cont.innerHTML = `<p style="font-size:0.82em;color:#666">Assigner les valeurs standard à chaque caractéristique:</p>
+      <div class="pb-grid">${['str','dex','con','int','wis','cha'].map(s=>`
+        <div class="pb-row">
+          <span class="pb-label">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]}</span>
+          <select onchange="window._assignStandard('${s}',this.value)">
+            ${opts.map(v=>`<option value="${v}" ${wizardData.standardAssign[s]==v?'selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+      </div>`;
+    wizardData.stats = {...wizardData.standardAssign};
+  } else {
+    cont.innerHTML = `<div class="pb-grid">${['str','dex','con','int','wis','cha'].map(s=>`
+      <div class="pb-row">
+        <span class="pb-label">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]}</span>
+        <input type="number" min="1" max="20" value="${wizardData.stats[s]}" style="width:60px;text-align:center"
+          onchange="window._manualStat('${s}',this.value)">
+        <span class="pb-mod">(mod: ${mod(wizardData.stats[s])>=0?'+':''}${mod(wizardData.stats[s])})</span>
+      </div>`).join('')}
+    </div>`;
+  }
+};
+ 
+window._pbAdjust = (stat, delta) => {
+  const costs = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+  const cur = wizardData.stats[stat];
+  const nv = Math.max(8, Math.min(15, cur + delta));
+  const diff = (costs[nv]||0) - (costs[cur]||0);
+  if(diff > 0 && wizardData.pointsLeft < diff) return;
+  wizardData.stats[stat] = nv;
+  wizardData.pointsLeft -= diff;
+  document.getElementById(`pb_${stat}`).textContent = nv;
+  document.getElementById('pbLeft').textContent = wizardData.pointsLeft;
+};
+window._assignStandard = (stat, val) => {
+  wizardData.standardAssign[stat] = parseInt(val);
+  wizardData.stats = {...wizardData.standardAssign};
+};
+window._manualStat = (stat, val) => { wizardData.stats[stat] = parseInt(val)||8; };
+ 
+function renderStep5(c) {
+  const rKey = wizardData.race;
+  const srKey = wizardData.subrace;
+  const cKey = wizardData.class;
+  const rData = rKey ? RACES[rKey] : null;
+  const srData = srKey && rData?.subraces ? rData.subraces[srKey] : null;
+  const clData = cKey ? CLASSES[cKey] : null;
+ 
+  const raceBonuses = srData?.stats || rData?.stats || {};
+  const finalStats = {};
+  ['str','dex','con','int','wis','cha'].forEach(s => {
+    finalStats[s] = (wizardData.stats[s]||8) + (raceBonuses[s]||0) + (wizardData.bonusStats?.[s]||0);
+  });
+ 
+  const conMod = mod(finalStats.con);
+  const hpMax = clData ? clData.hd + conMod + (srData?.hpBonus||0) : 8;
+  const profBonus = 2;
+  const acBase = 10 + mod(finalStats.dex);
+ 
+  c.innerHTML = `
+    <h3 class="step-title">Récapitulatif Final</h3>
+    <div class="summary-grid">
+      <div class="summary-section">
+        <h4>Identité</h4>
+        <p><strong>${wizardData.name||'(sans nom)'}</strong></p>
+        <p>${srKey?srKey+' ':''}${rKey||'—'} · ${cKey||'—'} Niv.1</p>
+        <p>Historique: ${wizardData.background||'—'}</p>
+        <p>Alignement: ${wizardData.alignment||'—'}</p>
+      </div>
+      <div class="summary-section">
+        <h4>Stats finales (avec bonus racial)</h4>
+        <div class="stat-mini-grid">
+          ${['str','dex','con','int','wis','cha'].map(s=>`
+            <div class="stat-mini">
+              <span class="stat-mini-name">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]}</span>
+              <span class="stat-mini-val">${finalStats[s]}</span>
+              <span class="stat-mini-mod">${mod(finalStats[s])>=0?'+':''}${mod(finalStats[s])}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="summary-section">
+        <h4>Valeurs combat</h4>
+        <p>PV max: <strong>${hpMax}</strong> | CA: <strong>${acBase}</strong> | Bonus maîtrise: <strong>+${profBonus}</strong></p>
+        <p>Vitesse: <strong>${rData?.speed||9}m</strong></p>
+        <p>Saves: <strong>${clData?.saves.map(s=>s.toUpperCase()).join(', ')||'—'}</strong></p>
+      </div>
+      <div class="summary-section">
+        <h4>Compétences maîtrisées</h4>
+        <p>${(wizardData.classSkills||[]).join(', ')||'Aucune sélectionnée'}</p>
+        ${wizardData.background?`<p>Background (${wizardData.background}): ${BACKGROUNDS[wizardData.background].skills.join(', ')}</p>`:''}
+      </div>
+    </div>
+    <div class="field-group" style="margin-top:12px">
+      <label>Apparence physique</label>
+      <textarea id="w_appearance" rows="2" placeholder="Taille, poids, yeux, cheveux, marques distinctives...">${wizardData.appearance||''}</textarea>
+    </div>
+    <div class="field-group">
+      <label>Histoire du personnage</label>
+      <textarea id="w_backstory" rows="3" placeholder="D'où vient-il ? Qu'est-ce qui le motive ?">${wizardData.backstory||''}</textarea>
+    </div>`;
+ 
+  // Store computed values
+  wizardData._finalStats = finalStats;
+  wizardData._hpMax = hpMax;
+  wizardData._acBase = acBase;
+}
+ 
+window._wizardPrev = () => {
+  collectCurrentStep();
+  wizardStep--;
+  renderWizardStep();
+};
+ 
+window._wizardNext = async () => {
+  collectCurrentStep();
+  if(wizardStep === 1 && !wizardData.name) { alert("Donne un nom à ton héros !"); return; }
+  if(wizardStep === 2 && !wizardData.race) { alert("Choisis une race !"); return; }
+  if(wizardStep === 3 && !wizardData.class) { alert("Choisis une classe !"); return; }
+ 
+  if(wizardStep < WIZARD_STEPS) {
+    wizardStep++;
+    renderWizardStep();
+  } else {
+    await saveNewCharacter();
+  }
+};
+ 
+function collectCurrentStep() {
+  if(wizardStep === 1) {
+    wizardData.name = document.getElementById('w_name')?.value || '';
+    wizardData.age = document.getElementById('w_age')?.value || '';
+    wizardData.gender = document.getElementById('w_gender')?.value || '';
+    wizardData.alignment = document.getElementById('w_alignment')?.value || '';
+    wizardData.background = document.getElementById('w_background')?.value || '';
+    wizardData.ideals = document.getElementById('w_ideals')?.value || '';
+    wizardData.bonds = document.getElementById('w_bonds')?.value || '';
+    wizardData.flaws = document.getElementById('w_flaws')?.value || '';
+    wizardData.personality = document.getElementById('w_personality')?.value || '';
+  } else if(wizardStep === 2) {
+    wizardData.race = document.getElementById('w_race')?.value || '';
+    wizardData.subrace = document.getElementById('w_subrace')?.value || '';
+  } else if(wizardStep === 3) {
+    wizardData.class = document.getElementById('w_class')?.value || '';
+  } else if(wizardStep === 4) {
+    wizardData.statMethod = document.getElementById('w_statMethod')?.value || 'pointbuy';
+  } else if(wizardStep === 5) {
+    wizardData.appearance = document.getElementById('w_appearance')?.value || '';
+    wizardData.backstory = document.getElementById('w_backstory')?.value || '';
+  }
+}
+ 
+async function saveNewCharacter() {
+  const rKey = wizardData.race;
+  const srKey = wizardData.subrace;
+  const cKey = wizardData.class;
+  const rData = RACES[rKey] || {};
+  const srData = srKey && rData.subraces ? rData.subraces[srKey] : null;
+  const clData = CLASSES[cKey] || { hd:8, saves:[], skills:[] };
+ 
+  const raceBonuses = srData?.stats || rData.stats || {};
+  const finalStats = {};
+  ['str','dex','con','int','wis','cha'].forEach(s => {
+    finalStats[s] = (wizardData.stats[s]||8) + (raceBonuses[s]||0);
+  });
+ 
+  const conMod = mod(finalStats.con);
+  const hpMax = clData.hd + conMod + (srData?.hpBonus||0);
+  const profBonus = 2;
+ 
+  // Skills proficiencies
+  const allSkillProf = [...(wizardData.classSkills||[])];
+  if(wizardData.background && BACKGROUNDS[wizardData.background]) {
+    BACKGROUNDS[wizardData.background].skills.forEach(s => { if(!allSkillProf.includes(s)) allSkillProf.push(s); });
+  }
+  const skillProf = {};
+  allSkillProf.forEach(s => skillProf[s] = 'prof');
+ 
+  const saves = {};
+  clData.saves.forEach(s => saves[s] = true);
+ 
+  const newChar = {
+    owner: currentUid,
+    // Identité
+    name: wizardData.name,
+    age: wizardData.age||'',
+    gender: wizardData.gender||'',
+    alignment: wizardData.alignment||'',
+    background: wizardData.background||'',
+    ideals: wizardData.ideals||'',
+    bonds: wizardData.bonds||'',
+    flaws: wizardData.flaws||'',
+    personality: wizardData.personality||'',
+    appearance: wizardData.appearance||'',
+    backstory: wizardData.backstory||'',
+    // Identité de classe/race
+    race: rKey,
+    subrace: srKey||'',
+    class: cKey,
+    level: 1,
+    xp: 0,
+    // Stats
+    stats: finalStats,
+    // Combat
+    hp: hpMax, hpMax,
+    tmpHp: 0,
+    ac: 10 + mod(finalStats.dex),
+    speed: rData.speed||9,
+    initiative: mod(finalStats.dex),
+    profBonus,
+    hitDice: `1d${clData.hd}`,
+    deathSaves: { success:0, fail:0 },
+    // Sauvegardes
+    saveProficiencies: saves,
+    // Compétences
+    skillProficiencies: skillProf,
+    // Inventaire
+    cp:0, sp:0, ep:0, gp:10, pp:0,
+    equipment: clData.equipment||'',
+    weapons: '',
+    armor: '',
+    // Sorts
+    spellcaster: clData.spellcaster||false,
+    spellAbility: clData.spellAbility||'',
+    spellAttackBonus: clData.spellcaster ? (profBonus + mod(finalStats[clData.spellAbility]||8)) : 0,
+    spellSaveDC: clData.spellcaster ? (8 + profBonus + mod(finalStats[clData.spellAbility]||8)) : 0,
+    spells: {},
+    // Traits
+    features: (clData.features||[]).map(f=>({name:f.name,desc:f.desc})),
+    traits: [...(rData.traits||[]),...(srData?.traits||[])],
+    // Méta
+    inspiration: false,
+    notes: '',
+    createdAt: new Date().toISOString()
+  };
+ 
+  await addDoc(collection(db, "characters"), newChar);
+  window._closeForge();
+}
+ 
+// ============================================================
+// LISTE DES PERSONNAGES
+// ============================================================
+async function loadCharacterList() {
+  const q = query(collection(db, "characters"), where("owner", "==", currentUid));
+  onSnapshot(q, (snapshot) => {
+    const list = document.getElementById('charList');
+    list.innerHTML = '';
+    if(snapshot.empty) {
+      list.innerHTML = '<p style="color:#888;text-align:center;margin-top:30px">Aucun personnage. Crée ton premier héros !</p>';
+      return;
+    }
+    snapshot.forEach(docSnap => {
+      const d = docSnap.data();
+      const card = document.createElement('div');
+      card.className = 'char-card';
+      card.innerHTML = `
+        <div class="char-card-main" onclick="window._selectChar('${docSnap.id}')">
+          <div class="char-card-name">${d.name}</div>
+          <div class="char-card-info">${d.subrace?d.subrace+' ':''} ${d.race||'—'} · ${d.class||'—'} Niv.${d.level||1}</div>
+          <div class="char-card-stats">❤️ ${d.hp}/${d.hpMax} · 🛡 CA ${d.ac} · ${d.alignment||'—'}</div>
+        </div>
+        <div class="char-card-id">
+          <small>ID : ${docSnap.id}</small>
+          <button class="btn-copy" onclick="navigator.clipboard.writeText('${docSnap.id}');this.textContent='✓ Copié'">Copier ID</button>
+        </div>`;
+      list.appendChild(card);
+    });
+  });
+}
+ 
+window._selectChar = (id) => {
+  activeCharId = id;
+  if(activeCharUnsubscribe) activeCharUnsubscribe();
+  activeCharUnsubscribe = onSnapshot(doc(db, "characters", id), (snap) => {
+    if(!snap.exists()) return;
+    renderCharSheet(snap.id, snap.data());
+  });
+  window._showTab('tab-sheet');
+};
+ 
+// ============================================================
+// FICHE DE PERSONNAGE COMPLÈTE
+// ============================================================
+function mod(score) { return Math.floor((score - 10) / 2); }
+function fmtMod(score) { const m = mod(score); return (m>=0?'+':'')+m; }
+function profBonus(level) { return PROF_BONUS[(level||1)-1] || 2; }
+ 
+function renderCharSheet(id, d) {
+  const pb = profBonus(d.level);
+  const stats = d.stats || {str:10,dex:10,con:10,int:10,wis:10,cha:10};
+  const sheet = document.getElementById('tab-sheet');
+ 
+  // Skill bonus
+  function skillBonus(skill) {
+    const s = SKILLS_LIST.find(x=>x.name===skill);
+    if(!s) return 0;
+    const base = mod(stats[s.stat]||10);
+    const prof = d.skillProficiencies?.[skill];
+    if(prof==='expert') return base + pb*2;
+    if(prof==='prof') return base + pb;
+    return base;
+  }
+  function saveBonus(stat) {
+    const base = mod(stats[stat]||10);
+    return d.saveProficiencies?.[stat] ? base + pb : base;
+  }
+  function fmtB(v) { return (v>=0?'+':'')+v; }
+ 
+  sheet.innerHTML = `
+  <div class="sheet-header">
+    <div class="sheet-name-block">
+      <div class="sheet-name editable" data-field="name" data-type="text">${d.name}</div>
+      <div class="sheet-subtitle">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${d.class||'—'} · Niveau <span class="editable inline-edit" data-field="level" data-type="number">${d.level||1}</span></div>
+    </div>
+    <div class="sheet-combat-row">
+      <div class="combat-box">
+        <div class="combat-label">PV</div>
+        <div class="combat-val editable" data-field="hp" data-type="number">${d.hp}</div>
+        <div class="combat-sub">/ <span class="editable inline-edit" data-field="hpMax" data-type="number">${d.hpMax}</span></div>
+      </div>
+      <div class="combat-box">
+        <div class="combat-label">PV Temporaires</div>
+        <div class="combat-val editable" data-field="tmpHp" data-type="number">${d.tmpHp||0}</div>
+      </div>
+      <div class="combat-box">
+        <div class="combat-label">CA</div>
+        <div class="combat-val editable" data-field="ac" data-type="number">${d.ac}</div>
+      </div>
+      <div class="combat-box">
+        <div class="combat-label">Initiative</div>
+        <div class="combat-val">${fmtMod(stats.dex)}</div>
+      </div>
+      <div class="combat-box">
+        <div class="combat-label">Vitesse</div>
+        <div class="combat-val editable" data-field="speed" data-type="number">${d.speed||9}</div><div class="combat-sub">m</div>
+      </div>
+      <div class="combat-box">
+        <div class="combat-label">Bonus Maîtrise</div>
+        <div class="combat-val">+${pb}</div>
+      </div>
+      <div class="combat-box ${d.inspiration?'inspired':''}">
+        <div class="combat-label">Inspiration</div>
+        <div class="combat-val editable" data-field="inspiration" data-type="bool">${d.inspiration?'★':'☆'}</div>
+      </div>
+    </div>
+  </div>
+ 
+  <div class="sheet-body">
+    <!-- COLONNE GAUCHE -->
+    <div class="sheet-col-left">
+      <!-- Caractéristiques -->
+      <div class="sheet-section">
+        <div class="section-title">Caractéristiques</div>
+        <div class="stats-grid">
+          ${['str','dex','con','int','wis','cha'].map(s=>`
+          <div class="stat-box">
+            <div class="stat-label">${{str:'FORCE',dex:'DEXTÉRITÉ',con:'CONSTITUTION',int:'INTELLIGENCE',wis:'SAGESSE',cha:'CHARISME'}[s]}</div>
+            <div class="stat-mod">${fmtMod(stats[s]||10)}</div>
+            <div class="stat-val editable" data-field="stats.${s}" data-type="number">${stats[s]||10}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+ 
+      <!-- Sauvegardes -->
+      <div class="sheet-section">
+        <div class="section-title">Jets de sauvegarde</div>
+        <div class="save-list">
+          ${['str','dex','con','int','wis','cha'].map(s=>`
+          <div class="save-row">
+            <span class="prof-dot ${d.saveProficiencies?.[s]?'filled':''}"></span>
+            <span class="save-val">${fmtB(saveBonus(s))}</span>
+            <span class="save-name">${{str:'Force',dex:'Dextérité',con:'Constitution',int:'Intelligence',wis:'Sagesse',cha:'Charisme'}[s]}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+ 
+      <!-- Compétences -->
+      <div class="sheet-section">
+        <div class="section-title">Compétences</div>
+        <div class="skill-list">
+          ${SKILLS_LIST.map(sk=>`
+          <div class="skill-row">
+            <span class="prof-dot ${d.skillProficiencies?.[sk.name]?'filled':''}"></span>
+            <span class="skill-val">${fmtB(skillBonus(sk.name))}</span>
+            <span class="skill-name">${sk.name} <small>(${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[sk.stat]})</small></span>
+          </div>`).join('')}
+        </div>
+      </div>
+ 
+      <!-- Perceptions passives -->
+      <div class="sheet-section">
+        <div class="section-title">Sens passifs</div>
+        <div class="passive-row"><span>Perception passive</span><strong>${10 + skillBonus('Perception')}</strong></div>
+        <div class="passive-row"><span>Investigation passive</span><strong>${10 + skillBonus('Investigation')}</strong></div>
+        <div class="passive-row"><span>Intuition passive</span><strong>${10 + skillBonus('Intuition')}</strong></div>
+      </div>
+    </div>
+ 
+    <!-- COLONNE CENTRALE -->
+    <div class="sheet-col-center">
+      <!-- Dés de vie & Morts -->
+      <div class="sheet-section">
+        <div class="section-title">Dés de vie & Jets de mort</div>
+        <div class="hd-row">
+          <div><div class="combat-label">Dés de vie total</div><div class="editable" data-field="hitDice" data-type="text">${d.hitDice||'1d8'}</div></div>
+          <div>
+            <div class="combat-label">Jets de mort</div>
+            <div class="death-saves">
+              <div class="ds-row">✓ Succès: ${[1,2,3].map(i=>`<span class="ds-dot ${(d.deathSaves?.success||0)>=i?'success':''}"></span>`).join('')}</div>
+              <div class="ds-row">✗ Échecs: ${[1,2,3].map(i=>`<span class="ds-dot ${(d.deathSaves?.fail||0)>=i?'fail':''}"></span>`).join('')}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+ 
+      <!-- Armes & Attaques -->
+      <div class="sheet-section">
+        <div class="section-title">Armes & Attaques</div>
+        <table class="weapon-table">
+          <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th></tr></thead>
+          <tbody>
+            <tr><td class="editable" data-field="weapon1_name" data-type="text">${d.weapon1_name||'—'}</td>
+                <td class="editable" data-field="weapon1_atk" data-type="text">${d.weapon1_atk||'—'}</td>
+                <td class="editable" data-field="weapon1_dmg" data-type="text">${d.weapon1_dmg||'—'}</td></tr>
+            <tr><td class="editable" data-field="weapon2_name" data-type="text">${d.weapon2_name||'—'}</td>
+                <td class="editable" data-field="weapon2_atk" data-type="text">${d.weapon2_atk||'—'}</td>
+                <td class="editable" data-field="weapon2_dmg" data-type="text">${d.weapon2_dmg||'—'}</td></tr>
+            <tr><td class="editable" data-field="weapon3_name" data-type="text">${d.weapon3_name||'—'}</td>
+                <td class="editable" data-field="weapon3_atk" data-type="text">${d.weapon3_atk||'—'}</td>
+                <td class="editable" data-field="weapon3_dmg" data-type="text">${d.weapon3_dmg||'—'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+ 
+      <!-- Équipement & Monnaie -->
+      <div class="sheet-section">
+        <div class="section-title">Équipement & Monnaie</div>
+        <div class="coin-row">
+          ${['cp','sp','ep','gp','pp'].map(c=>`
+          <div class="coin-box">
+            <div class="coin-label">${c.toUpperCase()}</div>
+            <div class="coin-val editable" data-field="${c}" data-type="number">${d[c]||0}</div>
+          </div>`).join('')}
+        </div>
+        <div class="field-group" style="margin-top:8px">
+          <label>Équipement</label>
+          <div class="editable block-edit" data-field="equipment" data-type="textarea">${d.equipment||'—'}</div>
+        </div>
+      </div>
+ 
+      <!-- Sorts (si lanceur) -->
+      ${d.spellcaster?`
+      <div class="sheet-section">
+        <div class="section-title">Sorts</div>
+        <div class="spell-stats">
+          <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${(d.spellAbility||'').toUpperCase()}</div></div>
+          <div class="spell-stat-box"><div class="combat-label">DC Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
+          <div class="spell-stat-box"><div class="combat-label">Bonus Attaque</div><div>${fmtB(d.spellAttackBonus||0)}</div></div>
+        </div>
+        <div class="spell-slots">
+          ${[1,2,3,4,5,6,7,8,9].map(lvl=>`
+          <div class="spell-level">
+            <span class="spell-lvl-num">Niv.${lvl}</span>
+            <span class="editable inline-edit" data-field="spellSlots${lvl}" data-type="text">${d['spellSlots'+lvl]||'—/—'}</span>
+          </div>`).join('')}
+        </div>
+        <div class="field-group" style="margin-top:8px">
+          <label>Sorts préparés / connus</label>
+          <div class="editable block-edit" data-field="spellList" data-type="textarea">${d.spellList||'—'}</div>
+        </div>
+      </div>`:''}
+    </div>
+ 
+    <!-- COLONNE DROITE -->
+    <div class="sheet-col-right">
+      <!-- Informations générales -->
+      <div class="sheet-section">
+        <div class="section-title">Informations</div>
+        <div class="info-grid">
+          <div class="info-row"><span>Âge</span><span class="editable inline-edit" data-field="age" data-type="text">${d.age||'—'}</span></div>
+          <div class="info-row"><span>Genre</span><span class="editable inline-edit" data-field="gender" data-type="text">${d.gender||'—'}</span></div>
+          <div class="info-row"><span>Alignement</span><span class="editable inline-edit" data-field="alignment" data-type="text">${d.alignment||'—'}</span></div>
+          <div class="info-row"><span>XP</span><span class="editable inline-edit" data-field="xp" data-type="number">${d.xp||0}</span></div>
+          <div class="info-row"><span>Historique</span><span>${d.background||'—'}</span></div>
+        </div>
+      </div>
+ 
+      <!-- Personnalité -->
+      <div class="sheet-section">
+        <div class="section-title">Personnalité</div>
+        <div class="rp-block">
+          <label>Traits de personnalité</label>
+          <div class="editable block-edit" data-field="personality" data-type="textarea">${d.personality||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Idéaux</label>
+          <div class="editable block-edit" data-field="ideals" data-type="textarea">${d.ideals||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Liens</label>
+          <div class="editable block-edit" data-field="bonds" data-type="textarea">${d.bonds||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Défauts</label>
+          <div class="editable block-edit" data-field="flaws" data-type="textarea">${d.flaws||'—'}</div>
+        </div>
+      </div>
+ 
+      <!-- Aptitudes & Traits -->
+      <div class="sheet-section">
+        <div class="section-title">Aptitudes & Traits raciaux</div>
+        <div class="features-list">
+          ${(d.traits||[]).map(t=>`<div class="feature-item">• ${t}</div>`).join('')}
+          ${(d.features||[]).map(f=>`<div class="feature-item"><strong>${f.name}:</strong> ${f.desc}</div>`).join('')}
+        </div>
+        <div class="field-group" style="margin-top:8px">
+          <label>Autres aptitudes</label>
+          <div class="editable block-edit" data-field="extraFeatures" data-type="textarea">${d.extraFeatures||'—'}</div>
+        </div>
+      </div>
+ 
+      <!-- Maîtrises & Langues -->
+      <div class="sheet-section">
+        <div class="section-title">Maîtrises & Langues</div>
+        <div class="editable block-edit" data-field="profLang" data-type="textarea">${d.profLang||'Commun'}</div>
+      </div>
+ 
+      <!-- Apparence & Histoire -->
+      <div class="sheet-section">
+        <div class="section-title">Apparence & Histoire</div>
+        <div class="rp-block">
+          <label>Apparence physique</label>
+          <div class="editable block-edit" data-field="appearance" data-type="textarea">${d.appearance||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Histoire du personnage</label>
+          <div class="editable block-edit" data-field="backstory" data-type="textarea">${d.backstory||'—'}</div>
+        </div>
+      </div>
+ 
+      <!-- Notes -->
+      <div class="sheet-section">
+        <div class="section-title">Notes libres</div>
+        <div class="editable block-edit" data-field="notes" data-type="textarea">${d.notes||'—'}</div>
+      </div>
+    </div>
+  </div>`;
+ 
+  // Attach inline edit listeners
+  sheet.querySelectorAll('.editable').forEach(el => {
+    el.addEventListener('click', () => startInlineEdit(el, id, d));
+  });
+}
+ 
+async function startInlineEdit(el, charId, charData) {
+  if(el.querySelector('input,textarea')) return;
+  const field = el.dataset.field;
+  const type = el.dataset.type;
+  const currentVal = getNestedVal(charData, field);
+ 
+  let input;
+  if(type === 'textarea') {
+    input = document.createElement('textarea');
+    input.rows = 3;
+  } else {
+    input = document.createElement('input');
+    input.type = type==='number'?'number':'text';
+  }
+  input.value = type==='bool' ? (currentVal?'true':'false') : (currentVal||'');
+  input.className = 'inline-input';
+  const orig = el.innerHTML;
+  el.innerHTML = '';
+  el.appendChild(input);
+  input.focus();
+ 
+  const save = async () => {
+    let val = input.value;
+    if(type==='number') val = parseFloat(val)||0;
+    if(type==='bool') val = (val==='true'||val==='★'||val===true);
+    const update = buildNestedUpdate(field, val);
+    try { await updateDoc(doc(db, "characters", charId), update); } catch(e) { el.innerHTML = orig; }
+  };
+ 
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => { if(e.key==='Enter' && type!=='textarea') { e.preventDefault(); input.blur(); } if(e.key==='Escape') { el.innerHTML = orig; } });
+}
+ 
+function getNestedVal(obj, path) {
+  return path.split('.').reduce((o,k) => o?.[k], obj);
+}
+function buildNestedUpdate(field, val) {
+  return { [field]: val };
+}
+ 
+// ============================================================
+// ÉCRAN DU MAÎTRE
+// ============================================================
+let gmWatches = {};
+ 
+window._watchChar = () => {
+  const id = document.getElementById('gmSearchId').value.trim();
+  if(!id) return;
+  if(gmWatches[id]) return;
+ 
+  const unsub = onSnapshot(doc(db, "characters", id), (snap) => {
+    if(!snap.exists()) { alert("Fiche introuvable"); return; }
+    renderGMCard(snap.id, snap.data());
+  });
+  gmWatches[id] = unsub;
+};
+ 
+window._removeGMWatch = (id) => {
+  if(gmWatches[id]) { gmWatches[id](); delete gmWatches[id]; }
+  const card = document.getElementById(`gm_${id}`);
+  if(card) card.remove();
+};
+ 
+function renderGMCard(id, d) {
+  const monitor = document.getElementById('gmMonitor');
+  let card = document.getElementById(`gm_${id}`);
+  if(!card) {
+    card = document.createElement('div');
+    card.id = `gm_${id}`;
+    card.className = 'gm-card';
+    monitor.appendChild(card);
+  }
+  const hpPct = Math.max(0, Math.min(100, Math.round((d.hp/d.hpMax)*100)));
+  const hpColor = hpPct>60?'#4caf50':hpPct>30?'#ff9800':'#f44336';
+  const pb = profBonus(d.level);
+  const stats = d.stats||{str:10,dex:10,con:10,int:10,wis:10,cha:10};
+ 
+  card.innerHTML = `
+    <div class="gm-card-header">
+      <div>
+        <div class="gm-card-name">${d.name}</div>
+        <div class="gm-card-sub">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${d.class||'—'} Niv.${d.level||1} · ${d.alignment||'—'}</div>
+      </div>
+      <button class="btn-remove" onclick="window._removeGMWatch('${id}')">✕</button>
+    </div>
+    <div class="gm-hp-bar-wrap">
+      <div class="gm-hp-bar" style="width:${hpPct}%;background:${hpColor}"></div>
+    </div>
+    <div class="gm-stats-row">
+      <div class="gm-stat"><span class="gm-stat-label">PV</span><span class="gm-stat-val" style="color:${hpColor}">${d.hp}/${d.hpMax}</span></div>
+      <div class="gm-stat"><span class="gm-stat-label">PV tmp</span><span class="gm-stat-val">${d.tmpHp||0}</span></div>
+      <div class="gm-stat"><span class="gm-stat-label">CA</span><span class="gm-stat-val">${d.ac}</span></div>
+      <div class="gm-stat"><span class="gm-stat-label">Vit.</span><span class="gm-stat-val">${d.speed||9}m</span></div>
+      <div class="gm-stat"><span class="gm-stat-label">Init.</span><span class="gm-stat-val">${fmtMod(stats.dex)}</span></div>
+      <div class="gm-stat"><span class="gm-stat-label">BM</span><span class="gm-stat-val">+${pb}</span></div>
+    </div>
+    <div class="gm-chars-row">
+      ${['str','dex','con','int','wis','cha'].map(s=>`
+        <div class="gm-char"><div class="gm-char-lbl">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]}</div>
+        <div class="gm-char-val">${stats[s]||10}</div>
+        <div class="gm-char-mod">${fmtMod(stats[s]||10)}</div></div>`).join('')}
+    </div>
+    <div class="gm-ds-row">
+      <span>Mort: </span>
+      ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.success||0)>=i?'success':''}">✓</span>`).join('')}
+      ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.fail||0)>=i?'fail':''}">✗</span>`).join('')}
+      <span style="margin-left:10px">Inspiration: ${d.inspiration?'★':'☆'}</span>
+    </div>
+    <div class="gm-actions">
+      <label class="gm-action-label">Modifier PV:</label>
+      <input id="gmhp_${id}" type="number" class="gm-input" placeholder="±">
+      <button class="btn-gm-action heal" onclick="window._gmHeal('${id}')">Soigner</button>
+      <button class="btn-gm-action dmg" onclick="window._gmDamage('${id}')">Blessure</button>
+    </div>
+    <details class="gm-notes">
+      <summary>Notes MJ</summary>
+      <textarea class="gm-notes-area" id="gmnotes_${id}" placeholder="Notes sur ce personnage...">${d.gmNotes||''}</textarea>
+      <button class="btn-gm-action" onclick="window._saveGMNotes('${id}')">Sauvegarder</button>
+    </details>`;
+}
+ 
+window._gmHeal = async (id) => {
+  const val = parseInt(document.getElementById(`gmhp_${id}`)?.value)||0;
+  const snap = await getDoc(doc(db, "characters", id));
+  if(!snap.exists()) return;
+  const d = snap.data();
+  const newHp = Math.min(d.hpMax, (d.hp||0) + Math.abs(val));
+  await updateDoc(doc(db, "characters", id), {hp: newHp});
+};
+window._gmDamage = async (id) => {
+  const val = parseInt(document.getElementById(`gmhp_${id}`)?.value)||0;
+  const snap = await getDoc(doc(db, "characters", id));
+  if(!snap.exists()) return;
+  const d = snap.data();
+  const newHp = Math.max(0, (d.hp||0) - Math.abs(val));
+  await updateDoc(doc(db, "characters", id), {hp: newHp});
+};
+window._saveGMNotes = async (id) => {
+  const notes = document.getElementById(`gmnotes_${id}`)?.value||'';
+  await updateDoc(doc(db, "characters", id), {gmNotes: notes});
+};
+ 
+// Wizard nav
+window._wizardPrev = window._wizardPrev || function(){};
+window._wizardNext = window._wizardNext || function(){};
+</script>
+ 
+<style>
+:root {
+  --parch: #f4ece1;
+  --parch2: #ede0c8;
+  --ink: #2c1a0e;
+  --gold: #b8860b;
+  --gold-light: #d4a017;
+  --red: #8b0000;
+  --red-light: #a52020;
+  --bg: #1a0f05;
+  --bg2: #231508;
+  --border: rgba(184,134,11,0.3);
+  --shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+ 
+* { box-sizing: border-box; margin:0; padding:0; }
+body { background: var(--bg); color: var(--ink); font-family: 'Crimson Pro', serif; font-size: 15px; }
+ 
+/* ── AUTH ── */
+#authScreen { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background: radial-gradient(ellipse at 50% 30%, #3d1f06 0%, var(--bg) 70%); }
+.auth-box { background: var(--parch); padding:40px 36px; border-radius:4px; width:320px;
+  box-shadow: var(--shadow); border: 1px solid var(--gold); position:relative; }
+.auth-box::before { content:''; position:absolute; inset:4px; border:1px solid rgba(184,134,11,0.2); border-radius:2px; pointer-events:none; }
+.auth-title { font-family:'Cinzel'; font-size:1.8rem; text-align:center; color:var(--gold); margin-bottom:6px; letter-spacing:4px; }
+.auth-sub { font-family:'Crimson Pro'; font-style:italic; text-align:center; color:#888; font-size:0.9rem; margin-bottom:20px; }
+#authError { background:#ffeaea; color:var(--red); padding:8px; border-radius:3px; font-size:0.82rem; display:none; margin-bottom:10px; }
+input, select, textarea { width:100%; padding:9px 12px; margin:6px 0; border:1px solid #c9b99a; border-radius:3px;
+  background:#fffdf8; font-family:'Crimson Pro'; font-size:0.95rem; color:var(--ink); outline:none; transition:border 0.2s; }
+input:focus, select:focus, textarea:focus { border-color:var(--gold); box-shadow:0 0 0 2px rgba(184,134,11,0.15); }
+textarea { resize:vertical; }
+ 
+/* ── APP ── */
+#appScreen { min-height:100vh; }
+nav { background: var(--bg2); padding:0 20px; display:flex; justify-content:center; gap:4px; position:sticky; top:0; z-index:100;
+  border-bottom: 2px solid var(--gold); box-shadow:0 2px 12px rgba(0,0,0,0.5); }
+nav button { background:transparent; color:#a89060; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem;
+  padding:14px 18px; letter-spacing:2px; transition:all 0.2s; border-bottom:3px solid transparent; }
+nav button:hover { color:var(--gold-light); }
+nav button.nav-active { color:var(--gold); border-bottom:3px solid var(--gold); }
+nav button:last-child { color:#884444; }
+ 
+.tab-content { display:none; }
+.active { display:block; }
+ 
+/* ── BUTTONS ── */
+.btn-gold { background:linear-gradient(135deg, var(--gold), #8b6509); color:#fff; padding:12px 20px; border:none; cursor:pointer;
+  font-family:'Cinzel'; font-size:0.78rem; letter-spacing:2px; border-radius:3px; transition:all 0.2s; }
+.btn-gold:hover { background:linear-gradient(135deg, var(--gold-light), var(--gold)); transform:translateY(-1px); box-shadow:0 4px 12px rgba(184,134,11,0.4); }
+.btn-copy { background:transparent; border:1px solid var(--gold); color:var(--gold); padding:4px 10px; font-size:0.72rem;
+  cursor:pointer; border-radius:2px; font-family:'Cinzel'; letter-spacing:1px; }
+ 
+/* ── LIST TAB ── */
+#tab-list { background:var(--parch); min-height:100vh; padding:30px 20px; max-width:700px; margin:auto; }
+#tab-list h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:20px; letter-spacing:3px; }
+.char-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); margin:10px 0;
+  border-radius:3px; overflow:hidden; transition:box-shadow 0.2s; }
+.char-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.15); }
+.char-card-main { padding:15px 18px; cursor:pointer; }
+.char-card-main:hover { background:#fffbf4; }
+.char-card-name { font-family:'Cinzel'; font-size:1.05rem; color:var(--ink); }
+.char-card-info { color:#666; font-size:0.88rem; margin:3px 0; }
+.char-card-stats { color:#888; font-size:0.82rem; }
+.char-card-id { padding:8px 18px; background:#f9f4ea; border-top:1px solid #e8d8b8; display:flex; align-items:center; justify-content:space-between; }
+.char-card-id small { color:#999; font-size:0.72rem; font-family:monospace; }
+ 
+/* ── WIZARD ── */
+#forgeOverlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.88); z-index:1000; align-items:center; justify-content:center; }
+.forge-window { background:var(--parch); border-radius:5px; width:92%; max-width:580px; max-height:92vh;
+  overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.7); border:1px solid var(--gold); }
+.forge-top { background:linear-gradient(135deg, var(--ink), #3d1f06); padding:18px 24px; }
+.forge-top h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.2rem; letter-spacing:3px; }
+.forge-progress { display:flex; align-items:center; margin-top:14px; }
+.progress-step { width:28px; height:28px; border-radius:50%; border:2px solid #666; color:#666; display:flex;
+  align-items:center; justify-content:center; font-size:0.75rem; font-family:'Cinzel'; transition:all 0.3s; flex-shrink:0; }
+.progress-step.active { border-color:var(--gold); color:var(--gold); box-shadow:0 0 10px rgba(184,134,11,0.5); }
+.progress-step.done { border-color:var(--gold); background:var(--gold); color:#fff; }
+.progress-line { flex:1; height:2px; background:#444; }
+.progress-line.done { background:var(--gold); }
+#forgeContent { flex:1; overflow-y:auto; padding:20px 24px; }
+.step-title { font-family:'Cinzel'; color:var(--gold); font-size:1rem; margin-bottom:16px; letter-spacing:2px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.field-group { margin:12px 0; }
+.field-group label { display:block; font-size:0.78rem; font-family:'Cinzel'; letter-spacing:1px; color:#666; margin-bottom:4px; }
+.field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.info-box { background:#fff8ee; border:1px solid #e0c880; padding:10px 14px; border-radius:3px; font-size:0.82rem;
+  line-height:1.6; color:#555; }
+.pb-header { margin:8px 0; color:var(--gold); font-family:'Cinzel'; font-size:0.82rem; }
+.pb-grid { display:flex; flex-direction:column; gap:6px; }
+.pb-row { display:flex; align-items:center; gap:10px; }
+.pb-label { font-family:'Cinzel'; font-size:0.75rem; width:36px; color:var(--gold); }
+.pb-btn { width:26px; height:26px; border:1px solid var(--gold); background:transparent; color:var(--gold);
+  cursor:pointer; border-radius:3px; font-size:1rem; line-height:1; transition:all 0.15s; }
+.pb-btn:hover { background:var(--gold); color:#fff; }
+.pb-val { min-width:28px; text-align:center; font-size:1.05rem; font-weight:600; }
+.pb-mod { color:#888; font-size:0.82rem; }
+.skill-check-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; }
+.skill-check { display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer; padding:3px; border-radius:2px; }
+.skill-check:hover { background:#f0e8d8; }
+.skill-check input { width:auto; }
+.summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.summary-section { background:#fff8ee; border:1px solid #e0c880; padding:12px; border-radius:3px; }
+.summary-section h4 { font-family:'Cinzel'; font-size:0.78rem; color:var(--gold); margin-bottom:8px; }
+.summary-section p { font-size:0.85rem; margin:3px 0; }
+.stat-mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.stat-mini { background:white; border:1px solid #d4c4a0; border-radius:3px; padding:4px; text-align:center; }
+.stat-mini-name { font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); display:block; }
+.stat-mini-val { font-size:1rem; font-weight:600; display:block; }
+.stat-mini-mod { font-size:0.78rem; color:#666; display:block; }
+.forge-footer { padding:14px 24px; background:#f0e8d8; border-top:1px solid #d4c4a0; display:flex; justify-content:space-between; align-items:center; }
+.btn-prev { background:transparent; border:1px solid #aaa; color:#666; padding:10px 20px; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem; border-radius:3px; }
+.btn-prev:hover { border-color:var(--ink); color:var(--ink); }
+ 
+/* ── CHARACTER SHEET ── */
+#tab-sheet { background:var(--parch); min-height:100vh; }
+.sheet-header { background:linear-gradient(135deg, var(--ink) 0%, #3d2010 100%); padding:18px 24px; border-bottom:3px solid var(--gold); }
+.sheet-name { font-family:'Cinzel'; font-size:1.6rem; color:var(--gold); margin-bottom:4px; }
+.sheet-subtitle { color:#c9a860; font-size:0.9rem; }
+.sheet-combat-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.combat-box { background:rgba(255,255,255,0.08); border:1px solid rgba(184,134,11,0.4); border-radius:4px;
+  padding:6px 12px; text-align:center; min-width:70px; }
+.combat-box.inspired { background:rgba(184,134,11,0.2); }
+.combat-label { font-size:0.6rem; font-family:'Cinzel'; color:#a89060; letter-spacing:1px; display:block; }
+.combat-val { font-size:1.3rem; color:#fff; font-weight:600; cursor:pointer; }
+.combat-sub { font-size:0.78rem; color:#a89060; }
+ 
+.sheet-body { display:grid; grid-template-columns:200px 1fr 260px; gap:0; }
+.sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid #d4c4a0; }
+.sheet-col-right { border-right:none; }
+.sheet-section { margin-bottom:14px; background:#fff; border:1px solid #ddd; border-radius:3px; overflow:hidden; }
+.section-title { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
+  font-size:0.65rem; letter-spacing:2px; padding:5px 10px; }
+.stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#eee; padding:1px; }
+.stat-box { background:#fff; padding:8px 4px; text-align:center; }
+.stat-label { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); letter-spacing:1px; display:block; }
+.stat-mod { font-size:1.1rem; font-weight:700; color:var(--ink); }
+.stat-val { font-size:0.9rem; color:#666; cursor:pointer; border-bottom:1px dashed #ccc; }
+.save-list, .skill-list { padding:6px 10px; }
+.save-row, .skill-row { display:flex; align-items:center; gap:6px; padding:2px 0; font-size:0.82rem; }
+.prof-dot { width:9px; height:9px; border-radius:50%; border:1px solid #aaa; flex-shrink:0; }
+.prof-dot.filled { background:var(--gold); border-color:var(--gold); }
+.save-val, .skill-val { min-width:28px; font-weight:600; font-size:0.82rem; text-align:right; }
+.save-name, .skill-name { color:#444; }
+.skill-name small { color:#999; }
+.passive-row { display:flex; justify-content:space-between; padding:5px 10px; font-size:0.85rem; }
+.passive-row:not(:last-child) { border-bottom:1px solid #f0e8d8; }
+ 
+.hd-row { display:flex; gap:16px; padding:10px; }
+.death-saves { font-size:0.82rem; }
+.ds-row { margin:3px 0; display:flex; align-items:center; gap:4px; }
+.ds-dot { width:12px; height:12px; border-radius:50%; border:2px solid #ccc; display:inline-block; }
+.ds-dot.success { background:#4caf50; border-color:#4caf50; }
+.ds-dot.fail { background:#f44336; border-color:#f44336; }
+ 
+.weapon-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.weapon-table th { background:var(--ink); color:var(--gold); font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; padding:5px 8px; }
+.weapon-table td { padding:6px 8px; border-bottom:1px solid #f0e8d8; cursor:pointer; }
+.weapon-table td:hover { background:#fffbf0; }
+ 
+.coin-row { display:flex; gap:4px; padding:8px; }
+.coin-box { flex:1; background:#fff8ee; border:1px solid #e0c880; border-radius:3px; text-align:center; padding:6px 2px; }
+.coin-label { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); display:block; }
+.coin-val { font-size:0.95rem; font-weight:600; cursor:pointer; }
+ 
+.spell-stats { display:flex; gap:8px; padding:8px; }
+.spell-stat-box { flex:1; text-align:center; }
+.spell-slots { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:0 8px 8px; font-size:0.8rem; }
+.spell-level { background:#f9f4ea; border:1px solid #e0d0b0; border-radius:2px; padding:3px 5px; }
+.spell-lvl-num { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); display:block; }
+ 
+.rp-block { padding:6px 10px; }
+.rp-block label { font-size:0.65rem; font-family:'Cinzel'; color:var(--gold); display:block; margin-bottom:2px; letter-spacing:1px; }
+.features-list { padding:6px 10px; max-height:160px; overflow-y:auto; }
+.feature-item { font-size:0.82rem; margin:4px 0; color:#444; line-height:1.4; }
+.info-grid { padding:6px 10px; }
+.info-row { display:flex; justify-content:space-between; font-size:0.82rem; padding:3px 0; border-bottom:1px solid #f0e8d8; }
+ 
+/* Inline edit */
+.editable { cursor:pointer; border-radius:2px; transition:background 0.15s; }
+.editable:hover { background:rgba(184,134,11,0.1); }
+.inline-input { border:1px solid var(--gold)!important; margin:0!important; padding:2px 6px!important; font-size:inherit; width:100%; }
+.block-edit { padding:4px 10px; font-size:0.85rem; min-height:24px; white-space:pre-wrap; word-break:break-word; line-height:1.5; }
+ 
+/* ── GM TAB ── */
+#tab-gm { background:var(--bg); min-height:100vh; padding:20px; }
+#tab-gm h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.3rem; margin-bottom:16px; letter-spacing:3px; }
+.gm-search { display:flex; gap:8px; margin-bottom:20px; }
+.gm-search input { background:#2a1a0a; border-color:#555; color:#ddd; max-width:420px; }
+#gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+.gm-card { background:var(--parch); border:1px solid var(--gold); border-radius:4px; overflow:hidden; }
+.gm-card-header { padding:12px 14px; background:linear-gradient(135deg, var(--ink), #3d2010);
+  display:flex; justify-content:space-between; align-items:flex-start; }
+.gm-card-name { font-family:'Cinzel'; color:var(--gold); font-size:1rem; }
+.gm-card-sub { color:#a89060; font-size:0.78rem; margin-top:2px; }
+.btn-remove { background:transparent; border:1px solid #884444; color:#cc4444; padding:3px 8px;
+  cursor:pointer; border-radius:2px; font-size:0.75rem; }
+.gm-hp-bar-wrap { height:8px; background:#eee; }
+.gm-hp-bar { height:100%; transition:width 0.5s ease, background 0.5s; }
+.gm-stats-row { display:flex; gap:8px; padding:10px 14px; background:#f9f4ea; }
+.gm-stat { flex:1; text-align:center; }
+.gm-stat-label { display:block; font-family:'Cinzel'; font-size:0.58rem; color:var(--gold); }
+.gm-stat-val { font-size:1rem; font-weight:700; }
+.gm-chars-row { display:flex; padding:8px 14px; gap:4px; }
+.gm-char { flex:1; text-align:center; background:#fff; border:1px solid #e0d0b0; border-radius:3px; padding:4px 2px; }
+.gm-char-lbl { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); display:block; }
+.gm-char-val { font-size:0.95rem; font-weight:600; }
+.gm-char-mod { font-size:0.72rem; color:#888; }
+.gm-ds-row { padding:6px 14px; font-size:0.82rem; display:flex; align-items:center; gap:4px; background:#f0e8d8; }
+.gm-ds { display:inline-flex; width:18px; height:18px; border-radius:50%; border:1px solid #ccc; align-items:center; justify-content:center; font-size:0.7rem; }
+.gm-ds.success { background:#4caf50; color:#fff; border-color:#4caf50; }
+.gm-ds.fail { background:#f44336; color:#fff; border-color:#f44336; }
+.gm-actions { padding:10px 14px; display:flex; align-items:center; gap:6px; }
+.gm-action-label { font-size:0.78rem; font-family:'Cinzel'; color:#666; }
+.gm-input { width:60px!important; padding:5px 8px!important; margin:0!important; text-align:center; }
+.btn-gm-action { padding:6px 12px; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.68rem; border-radius:3px; }
+.btn-gm-action.heal { background:#3a7a3a; color:#fff; }
+.btn-gm-action.dmg { background:var(--red); color:#fff; }
+.btn-gm-action:not(.heal):not(.dmg) { background:var(--gold); color:#fff; }
+.gm-notes { padding:8px 14px; }
+.gm-notes summary { cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; }
+.gm-notes-area { width:100%; margin-top:6px; }
+ 
+/* Responsive */
+@media(max-width:900px) {
+  .sheet-body { grid-template-columns:1fr; }
+  .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid #d4c4a0; }
+  .summary-grid { grid-template-columns:1fr; }
+}
+@media(max-width:600px) {
+  .sheet-combat-row { gap:5px; }
+  .combat-box { min-width:55px; padding:5px 8px; }
+}
+</style>
 </head>
 <body>
-
+ 
+<!-- AUTH -->
 <div id="authScreen">
-    <div class="auth-box">
-        <h2 class="cinzel" style="text-align:center">GRIMOIRE</h2>
-        <input id="authEmail" type="email" placeholder="Email">
-        <input id="authPass" type="password" placeholder="Mot de passe">
-        <button class="btn-gold" onclick="window._doLogin()">SE CONNECTER</button>
-        <button style="background:none; border:none; width:100%; color:#666; font-size:0.7rem; margin-top:10px; cursor:pointer" onclick="window._doSignup()">Créer un compte</button>
-    </div>
+  <div class="auth-box">
+    <div class="auth-title">GRIMOIRE</div>
+    <div class="auth-sub">Compagnon de Campagne D&D 5e</div>
+    <div id="authError"></div>
+    <input id="authEmail" type="email" placeholder="Email">
+    <input id="authPass" type="password" placeholder="Mot de passe">
+    <button class="btn-gold" style="width:100%;margin-top:8px" onclick="window._doLogin()">SE CONNECTER</button>
+    <button style="background:none;border:none;width:100%;color:#888;font-size:0.78rem;margin-top:10px;cursor:pointer;font-family:'Crimson Pro'" onclick="window._doSignup()">Pas encore de compte ? Créer un accès</button>
+  </div>
 </div>
-
+ 
+<!-- APP -->
 <div id="appScreen" style="display:none">
-    <nav>
-        <button onclick="_showTab('tab-list')">MES FICHES</button>
-        <button onclick="_showTab('tab-sheet')">GRIMOIRE</button>
-        <button onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
-        <button onclick="_doLogout()" style="color: #ff4444;">QUITTER</button>
-    </nav>
-
-    <div id="tab-list" class="tab-content active">
-        <h2 class="cinzel">Vos Chroniques</h2>
-        <div id="charList"></div>
-        <button class="btn-gold" style="margin-top:20px" onclick="window._openForge()">+ NOUVEAU HÉROS</button>
+  <nav>
+    <button id="navList" class="nav-active" onclick="_showTab('tab-list')">MES HÉROS</button>
+    <button id="navSheet" onclick="_showTab('tab-sheet')">FICHE</button>
+    <button id="navGM" onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
+    <button onclick="_doLogout()">QUITTER</button>
+  </nav>
+ 
+  <!-- Liste -->
+  <div id="tab-list" class="tab-content active">
+    <h2>Vos Chroniques</h2>
+    <div id="charList"></div>
+    <button class="btn-gold" style="margin-top:24px;width:100%;max-width:700px;display:block;margin-left:auto;margin-right:auto" onclick="window._openForge()">+ FORGER UN NOUVEAU HÉROS</button>
+  </div>
+ 
+  <!-- Fiche -->
+  <div id="tab-sheet" class="tab-content">
+    <div style="padding:40px;text-align:center;color:#888;font-style:italic">
+      Sélectionne un personnage pour voir sa fiche
     </div>
-
-    <div id="tab-sheet" class="tab-content">
-        <h2 id="charNameDisp" class="cinzel" style="text-align:center">Nom du Héros</h2>
-        <div style="display:flex; justify-content: space-around;">
-            <div class="stat-circle"><small>PV</small><b id="hpVal">0/0</b></div>
-            <div class="stat-circle"><small>CA</small><b id="acVal">0</b></div>
-        </div>
-        <p style="font-size: 0.7rem; color: #666; text-align: center; margin-top:30px">ID de partage : <span id="activeCharIdDisplay"></span></p>
+  </div>
+ 
+  <!-- GM -->
+  <div id="tab-gm" class="tab-content">
+    <h2>Écran du Maître</h2>
+    <div class="gm-search">
+      <input id="gmSearchId" type="text" placeholder="Coller l'ID du personnage à surveiller">
+      <button class="btn-gold" onclick="window._watchChar()">AJOUTER</button>
     </div>
-
-    <div id="tab-gm" class="tab-content">
-        <h2 class="cinzel">Écran du Maître</h2>
-        <div style="display:flex; gap:10px">
-            <input id="gmSearchId" type="text" placeholder="Coller l'ID de la fiche">
-            <button class="btn-gold" style="width:150px" onclick="window._watchChar()">SUIVRE</button>
-        </div>
-        <div id="gmMonitor" style="margin-top:20px">
-            <p>Entrez l'ID d'un joueur pour surveiller ses stats en temps réel.</p>
-        </div>
+    <div id="gmMonitor">
+      <p style="color:#666;font-style:italic">Collez l'ID d'une fiche pour la surveiller en temps réel. Plusieurs personnages peuvent être affichés simultanément.</p>
     </div>
+  </div>
 </div>
-
+ 
+<!-- WIZARD FORGE -->
 <div id="forgeOverlay">
-    <div class="forge-window">
-        <h2 class="cinzel" style="margin-top:0">La Forge</h2>
-        <div id="forgeStep1">
-            <label class="cinzel" style="font-size:0.7rem">Identité</label>
-            <input id="forgeName" type="text" placeholder="Nom du héros">
-            
-            <label class="cinzel" style="font-size:0.7rem">Peuple</label>
-            <select id="forgeRace" onchange="window._updateSubraceList()"></select>
-            
-            <div id="subraceContainer" style="display:none;">
-                <label class="cinzel" style="font-size:0.7rem">Origine / Sous-race</label>
-                <select id="forgeSubrace"></select>
-            </div>
-
-            <label class="cinzel" style="font-size:0.7rem; margin-top:10px; display:block">Vocation</label>
-            <select id="forgeClass"></select>
-            
-            <button class="btn-gold" style="margin-top:20px" onclick="window._finishForge()">DONNER VIE</button>
-            <button style="background:none; border:none; width:100%; color:var(--accent); font-size:0.8rem; margin-top:15px; cursor:pointer" onclick="window._closeForge()">Annuler</button>
-        </div>
+  <div class="forge-window">
+    <div class="forge-top">
+      <h2>⚔ La Forge du Héros</h2>
+      <div id="forgeProgress" class="forge-progress"></div>
     </div>
+    <div id="forgeContent"></div>
+    <div class="forge-footer">
+      <button id="forgePrev" class="btn-prev" onclick="window._wizardPrev()">← Précédent</button>
+      <span id="forgeStepLabel" style="font-family:'Cinzel';font-size:0.7rem;color:#888;letter-spacing:1px"></span>
+      <button id="forgeNext" class="btn-gold" onclick="window._wizardNext()">SUIVANT →</button>
+    </div>
+  </div>
 </div>
-
+ 
 </body>
 </html>
