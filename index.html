@@ -24,36 +24,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        let currentUid = null;
-        let activeCharId = null;
-
-        // --- DATA SYSTEM (Inspiré de RPG Companion) ---
-        const FORGE_DATA = {
-            races: {
-                "Humain": { source: "PHB", stats: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, speed: 9 },
-                "Elfe": { 
-                    source: "PHB", speed: 9, 
-                    subraces: {
-                        "Haut-Elfe": { stats: { dex: 2, int: 1 }, traits: ["Sort mineur"] },
-                        "Elfe des bois": { stats: { dex: 2, wis: 1 }, traits: ["Célérité"] }
-                    }
-                },
-                "Nain": { 
-                    source: "PHB", speed: 7.5,
-                    subraces: {
-                        "Nain des collines": { stats: { con: 2, wis: 1 }, hpBonus: 1 },
-                        "Nain des montagnes": { stats: { con: 2, str: 2 } }
-                    }
-                }
-            },
-            classes: {
-                "Guerrier": { hd: 10, saves: ["str", "con"], source: "PHB" },
-                "Magicien": { hd: 6, saves: ["int", "wis"], source: "PHB" },
-                "Voleur": { hd: 8, saves: ["dex", "int"], source: "PHB" }
-            }
-        };
-
-        // --- AUTH LOGIC ---
+        // --- AUTH ---
         window._doLogin = () => {
             const e = document.getElementById('authEmail').value;
             const p = document.getElementById('authPass').value;
@@ -68,10 +39,9 @@
 
         onAuthStateChanged(auth, user => {
             if (user) {
-                currentUid = user.uid;
                 document.getElementById('authScreen').style.display = 'none';
                 document.getElementById('appScreen').style.display = 'block';
-                loadCharacterList();
+                loadCharacterList(user.uid);
             } else {
                 document.getElementById('authScreen').style.display = 'flex';
                 document.getElementById('appScreen').style.display = 'none';
@@ -79,34 +49,175 @@
         });
 
         // --- NAVIGATION ---
-        window._showTab = (tabId) => {
+        window._showTab = (id) => {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
+            document.getElementById(id).classList.add('active');
         };
 
-        // --- FORGE LOGIC ---
+        // --- CHARACTERS ---
+        async function loadCharacterList(uid) {
+            const q = query(collection(db, "characters"), where("owner", "==", uid));
+            onSnapshot(q, (snap) => {
+                const list = document.getElementById('charList');
+                list.innerHTML = '';
+                snap.forEach(d => {
+                    const data = d.data();
+                    const div = document.createElement('div');
+                    div.className = 'char-card';
+                    div.innerHTML = `<strong>${data.name}</strong><br><small>${data.race} - ${data.class}</small>`;
+                    div.onclick = () => selectCharacter(d.id);
+                    list.appendChild(div);
+                });
+            });
+        }
+
+        function selectCharacter(id) {
+            document.getElementById('activeCharIdDisplay').textContent = id;
+            onSnapshot(doc(db, "characters", id), (d) => {
+                const data = d.data();
+                document.getElementById('charNameDisp').textContent = data.name;
+                document.getElementById('hpVal').textContent = `${data.hp}/${data.hpMax}`;
+                document.getElementById('acVal').textContent = data.ac;
+            });
+            window._showTab('tab-sheet');
+        }
+        
+        // --- FORGE DATA ---
+        const FORGE_DATA = {
+            races: {
+                "Humain": { stats: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 } },
+                "Elfe": { subraces: { "Haut-Elfe": { stats: { dex: 2, int: 1 } }, "Elfe des bois": { stats: { dex: 2, wis: 1 } } } },
+                "Nain": { subraces: { "Nain des collines": { stats: { con: 2, wis: 1 } }, "Nain des montagnes": { stats: { con: 2, str: 2 } } } }
+            },
+            classes: {
+                "Guerrier": { hd: 10 }, "Magicien": { hd: 6 }, "Voleur": { hd: 8 }
+            }
+        };
+
         window._openForge = () => {
-            const raceSelect = document.getElementById('forgeRace');
-            const classSelect = document.getElementById('forgeClass');
-            raceSelect.innerHTML = Object.keys(FORGE_DATA.races).map(r => `<option value="${r}">${r}</option>`).join('');
-            classSelect.innerHTML = Object.keys(FORGE_DATA.classes).map(c => `<option value="${c}">${c}</option>`).join('');
+            const r = document.getElementById('forgeRace');
+            r.innerHTML = Object.keys(FORGE_DATA.races).map(k => `<option value="${k}">${k}</option>`).join('');
+            const c = document.getElementById('forgeClass');
+            c.innerHTML = Object.keys(FORGE_DATA.classes).map(k => `<option value="${k}">${k}</option>`).join('');
             window._updateSubraceList();
             document.getElementById('forgeOverlay').style.display = 'flex';
         };
-
         window._closeForge = () => document.getElementById('forgeOverlay').style.display = 'none';
-
         window._updateSubraceList = () => {
-            const raceKey = document.getElementById('forgeRace').value;
-            const raceData = FORGE_DATA.races[raceKey];
-            const container = document.getElementById('subraceContainer');
-            const subSelect = document.getElementById('forgeSubrace');
-            if (raceData.subraces) {
-                container.style.display = 'block';
-                subSelect.innerHTML = Object.keys(raceData.subraces).map(s => `<option value="${s}">${s}</option>`).join('');
-            } else { container.style.display = 'none'; }
+            const r = document.getElementById('forgeRace').value;
+            const sub = FORGE_DATA.races[r].subraces;
+            const cont = document.getElementById('subraceContainer');
+            if(sub) {
+                cont.style.display = 'block';
+                document.getElementById('forgeSubrace').innerHTML = Object.keys(sub).map(k => `<option value="${k}">${k}</option>`).join('');
+            } else { cont.style.display = 'none'; }
         };
+        window._forgeNext = (s) => {
+            document.getElementById('forgeStep1').style.display = s===1 ? 'block' : 'none';
+            document.getElementById('forgeStep2').style.display = s===2 ? 'block' : 'none';
+        };
+        window._finishForge = async () => {
+            const n = document.getElementById('forgeName').value;
+            const r = document.getElementById('forgeRace').value;
+            const sr = document.getElementById('forgeSubrace').value;
+            const c = document.getElementById('forgeClass').value;
+            const rb = FORGE_DATA.races[r];
+            const stats = sr ? rb.subraces[sr].stats : rb.stats;
+            await addDoc(collection(db, "characters"), {
+                owner: auth.currentUser.uid,
+                name: n || "Héros sans nom",
+                race: sr ? `${sr} (${r})` : r,
+                class: c,
+                hp: FORGE_DATA.classes[c].hd, hpMax: FORGE_DATA.classes[c].hd,
+                ac: 10 + (stats.dex || 0), stats: stats
+            });
+            window._closeForge();
+        };
+        window._watchChar = () => {
+            const id = document.getElementById('gmSearchId').value;
+            onSnapshot(doc(db, "characters", id), (d) => {
+                if(!d.exists()) return alert("Fiche introuvable");
+                document.getElementById('gmMonitor').innerHTML = `<div class="gm-pc-card"><h4>${d.data().name}</h4><p>❤️ HP: ${d.data().hp}/${d.data().hpMax} | 🛡️ CA: ${d.data().ac}</p></div>`;
+            });
+        };
+    </script>
 
-        window._forgeNext = (step) => {
-            document.getElementById('forgeStep1').style.display = step === 1 ? 'block' : 'none';
-            document.
+    <style>
+        :root { --p: #f4ece1; --i: #2c1a0e; --g: #b8860b; }
+        body { background: #1a0f05; color: var(--i); font-family: 'Crimson Pro', serif; margin: 0; }
+        #authScreen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(#2d1a08, #1a0f05); }
+        .auth-box { background: var(--p); padding: 30px; border-radius: 5px; width: 280px; text-align: center; }
+        input, select { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; cursor: pointer; font-family: 'Cinzel'; border: none; margin-top: 5px; background: var(--g); color: white; }
+        nav { background: var(--i); padding: 10px; display: flex; justify-content: center; gap: 10px; position: sticky; top: 0; z-index: 10; }
+        nav button { width: auto; background: transparent; color: var(--g); font-size: 0.7rem; }
+        .tab-content { display: none; padding: 20px; max-width: 500px; margin: 20px auto; background: var(--p); min-height: 70vh; }
+        .active { display: block; }
+        .char-card { background: rgba(0,0,0,0.05); padding: 10px; margin: 5px 0; cursor: pointer; border-left: 3px solid var(--g); }
+        #forgeOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center; }
+        .forge-box { background: var(--p); padding: 20px; width: 300px; }
+        .cinzel { font-family: 'Cinzel'; }
+    </style>
+</head>
+<body>
+
+<div id="authScreen">
+    <div class="auth-box">
+        <h2 class="cinzel">GRIMOIRE</h2>
+        <input id="authEmail" type="email" placeholder="Email">
+        <input id="authPass" type="password" placeholder="Mot de passe">
+        <button onclick="_doLogin()">ENTRER</button>
+        <button style="background:none; color:#666; font-size:0.6rem;" onclick="_doSignup()">Créer un compte</button>
+    </div>
+</div>
+
+<div id="appScreen" style="display:none">
+    <nav>
+        <button onclick="_showTab('tab-list')">HÉROS</button>
+        <button onclick="_showTab('tab-sheet')">FICHE</button>
+        <button onclick="_showTab('tab-gm')">MJ</button>
+        <button onclick="_doLogout()" style="color:red">X</button>
+    </nav>
+    <div id="tab-list" class="tab-content active">
+        <h2 class="cinzel">Mes Chroniques</h2>
+        <div id="charList"></div>
+        <button onclick="_openForge()">+ NOUVEAU</button>
+    </div>
+    <div id="tab-sheet" class="tab-content">
+        <h2 id="charNameDisp" class="cinzel" style="text-align:center">---</h2>
+        <div style="display:flex; justify-content: space-around; font-weight: bold;">
+            <div>PV: <span id="hpVal">0/0</span></div>
+            <div>CA: <span id="acVal">0</span></div>
+        </div>
+        <p style="font-size:0.6rem; text-align:center; margin-top:20px;">CODE : <span id="activeCharIdDisplay"></span></p>
+    </div>
+    <div id="tab-gm" class="tab-content">
+        <h2 class="cinzel">MJ</h2>
+        <input id="gmSearchId" type="text" placeholder="CODE JOUEUR">
+        <button onclick="_watchChar()">SUIVRE</button>
+        <div id="gmMonitor"></div>
+    </div>
+</div>
+
+<div id="forgeOverlay">
+    <div class="forge-box">
+        <h3 class="cinzel">La Forge</h3>
+        <div id="forgeStep1">
+            <input id="forgeName" type="text" placeholder="Nom">
+            <select id="forgeRace" onchange="_updateSubraceList()"></select>
+            <div id="subraceContainer" style="display:none">
+                <select id="forgeSubrace"></select>
+            </div>
+            <button onclick="_forgeNext(2)">Suivant</button>
+        </div>
+        <div id="forgeStep2" style="display:none">
+            <select id="forgeClass"></select>
+            <button onclick="_finishForge()">Forger</button>
+            <button style="background:none; color:black;" onclick="_forgeNext(1)">Retour</button>
+        </div>
+        <button style="background:none; color:red; font-size:0.7rem;" onclick="_closeForge()">ANNULER</button>
+    </div>
+</div>
+
+</body>
+</html>
