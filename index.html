@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grimoire — RPG Companion</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
@@ -24,64 +24,285 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- EXPORT DES FONCTIONS VERS LE BOUTONS HTML ---
+        let currentUid = null;
+        let activeCharId = null;
+
+        // --- DATA ESTRUCTURE (Extensible) ---
+        const FORGE_DATA = {
+            races: {
+                "Humain": { source: "PHB", stats: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, speed: 9 },
+                "Elfe": { 
+                    source: "PHB", speed: 9, 
+                    subraces: {
+                        "Haut-Elfe": { stats: { dex: 2, int: 1 }, traits: ["Sort mineur supplémentaire"] },
+                        "Elfe des bois": { stats: { dex: 2, wis: 1 }, traits: ["Cachette naturelle"] },
+                        "Drow": { stats: { dex: 2, cha: 1 }, traits: ["Vision dans le noir supérieure"] }
+                    }
+                },
+                "Nain": { 
+                    source: "PHB", speed: 7.5,
+                    subraces: {
+                        "Nain des collines": { stats: { con: 2, wis: 1 }, hpBonus: 1 },
+                        "Nain des montagnes": { stats: { con: 2, str: 2 } }
+                    }
+                },
+                "Githyanki": { source: "MotM", stats: { int: 2, str: 1 }, traits: ["Psionique Gith"] }
+            },
+            classes: {
+                "Guerrier": { hd: 10, saves: ["str", "con"], skills: 2, source: "PHB" },
+                "Magicien": { hd: 6, saves: ["int", "wis"], skills: 2, source: "PHB" },
+                "Artificier": { hd: 8, saves: ["con", "int"], skills: 2, source: "TCoE" }
+            }
+        };
+
+        // --- AUTH LOGIC ---
         window._doLogin = () => {
             const e = document.getElementById('authEmail').value;
             const p = document.getElementById('authPass').value;
-            signInWithEmailAndPassword(auth, e, p).catch(err => alert("Erreur : " + err.message));
+            signInWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
         };
 
         window._doSignup = () => {
             const e = document.getElementById('authEmail').value;
             const p = document.getElementById('authPass').value;
-            createUserWithEmailAndPassword(auth, e, p).catch(err => alert("Erreur : " + err.message));
+            createUserWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
         };
 
         window._doLogout = () => signOut(auth);
 
-        // --- GESTION DE L'AFFICHAGE ---
         onAuthStateChanged(auth, user => {
-            const authSc = document.getElementById('authScreen');
-            const appSc = document.getElementById('appScreen');
+            const authScreen = document.getElementById('authScreen');
+            const appScreen = document.getElementById('appScreen');
             if (user) {
-                authSc.style.display = 'none';
-                appSc.style.display = 'block';
-                console.log("Connecté en tant que :", user.email);
+                currentUid = user.uid;
+                authScreen.style.display = 'none';
+                appScreen.style.display = 'block';
+                loadCharacterList();
             } else {
-                authSc.style.display = 'flex';
-                appSc.style.display = 'none';
+                authScreen.style.display = 'flex';
+                appScreen.style.display = 'none';
             }
         });
+
+        // --- NAVIGATION ---
+        window._showTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        };
+
+        // --- FORGE ENGINE ---
+        window._openForge = () => {
+            const raceSelect = document.getElementById('forgeRace');
+            const classSelect = document.getElementById('forgeClass');
+            
+            raceSelect.innerHTML = Object.keys(FORGE_DATA.races).map(r => 
+                `<option value="${r}">${r} (${FORGE_DATA.races[r].source})</option>`
+            ).join('');
+
+            classSelect.innerHTML = Object.keys(FORGE_DATA.classes).map(c => 
+                `<option value="${c}">${c} (${FORGE_DATA.classes[c].source})</option>`
+            ).join('');
+
+            window._updateSubraceList();
+            document.getElementById('forgeOverlay').style.display = 'flex';
+        };
+
+        window._closeForge = () => {
+            document.getElementById('forgeOverlay').style.display = 'none';
+        };
+
+        window._updateSubraceList = () => {
+            const raceKey = document.getElementById('forgeRace').value;
+            const raceData = FORGE_DATA.races[raceKey];
+            const container = document.getElementById('subraceContainer');
+            const subSelect = document.getElementById('forgeSubrace');
+
+            if (raceData.subraces) {
+                container.style.display = 'block';
+                subSelect.innerHTML = Object.keys(raceData.subraces).map(s => 
+                    `<option value="${s}">${s}</option>`
+                ).join('');
+            } else {
+                container.style.display = 'none';
+                subSelect.innerHTML = '';
+            }
+        };
+
+        window._finishForge = async () => {
+            const name = document.getElementById('forgeName').value;
+            if (!name) return alert("Ton héros a besoin d'un nom !");
+
+            const rKey = document.getElementById('forgeRace').value;
+            const srKey = document.getElementById('forgeSubrace').value;
+            const cKey = document.getElementById('forgeClass').value;
+            
+            const raceBase = FORGE_DATA.races[rKey];
+            const subraceData = srKey ? raceBase.subraces[srKey] : null;
+            const classData = FORGE_DATA.classes[cKey];
+
+            const finalStats = subraceData?.stats || raceBase.stats;
+            const hpTotal = classData.hd + (subraceData?.hpBonus || 0);
+
+            const newChar = {
+                owner: currentUid,
+                name: name,
+                race: srKey ? `${srKey} (${rKey})` : rKey,
+                class: cKey,
+                level: 1,
+                hp: hpTotal,
+                hpMax: hpTotal,
+                ac: 10 + (finalStats.dex || 0),
+                stats: finalStats,
+                createdAt: new Date().toISOString()
+            };
+
+            await addDoc(collection(db, "characters"), newChar);
+            window._closeForge();
+        };
+
+        // --- CHARACTER LIST ---
+        async function loadCharacterList() {
+            const q = query(collection(db, "characters"), where("owner", "==", currentUid));
+            onSnapshot(q, (snapshot) => {
+                const list = document.getElementById('charList');
+                list.innerHTML = '';
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const btn = document.createElement('div');
+                    btn.className = 'char-card';
+                    btn.innerHTML = `<strong>${data.name}</strong><br><small>${data.race} - ${data.class} Niv.${data.level}</small>`;
+                    btn.onclick = () => selectCharacter(docSnap.id);
+                    list.appendChild(btn);
+                });
+            });
+        }
+
+        function selectCharacter(id) {
+            activeCharId = id;
+            document.getElementById('activeCharIdDisplay').textContent = id;
+            onSnapshot(doc(db, "characters", id), (docSnap) => {
+                if (!docSnap.exists()) return;
+                const data = docSnap.data();
+                document.getElementById('charNameDisp').textContent = data.name;
+                document.getElementById('hpVal').textContent = `${data.hp}/${data.hpMax}`;
+                document.getElementById('acVal').textContent = data.ac;
+            });
+            window._showTab('tab-sheet');
+        }
+
+        // --- GM LOGIC ---
+        window._watchChar = () => {
+            const id = document.getElementById('gmSearchId').value;
+            onSnapshot(doc(db, "characters", id), (docSnap) => {
+                if (!docSnap.exists()) return alert("Fiche introuvable");
+                const data = docSnap.data();
+                document.getElementById('gmMonitor').innerHTML = `
+                    <div class="gm-pc-card">
+                        <h4>${data.name}</h4>
+                        <p>❤️ HP: ${data.hp}/${data.hpMax} | 🛡️ CA: ${data.ac}</p>
+                        <p>🎭 ${data.race} | ⚔️ ${data.class}</p>
+                    </div>
+                `;
+            });
+        };
     </script>
 
     <style>
-        :root { --p: #f2e8d5; --i: #2c1a0e; --g: #b8860b; --c: #8b1a1a; }
-        body { background: #1a0f05; color: var(--i); font-family: 'Crimson Pro', serif; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        #authScreen { display: flex; flex-direction: column; align-items: center; width: 100%; }
-        .auth-box { background: var(--p); padding: 40px; border-radius: 4px; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; }
-        h1 { font-family: 'Cinzel'; font-size: 1.5rem; margin-bottom: 20px; color: var(--i); }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: var(--i); color: var(--g); border: none; font-family: 'Cinzel'; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        button:hover { background: #3d2514; }
-        #appScreen { background: var(--p); padding: 40px; border-radius: 4px; width: 90%; max-width: 600px; display: none; }
+        :root { --p: #f4ece1; --i: #2c1a0e; --g: #b8860b; --accent: #8b0000; }
+        body { background: #1a0f05; color: var(--i); font-family: 'Crimson Pro', serif; margin: 0; }
+        
+        /* Auth */
+        #authScreen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(#2d1a08, #1a0f05); }
+        .auth-box { background: var(--p); padding: 30px; border-radius: 5px; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; font-family: 'Crimson Pro'; }
+        
+        /* App */
+        nav { background: var(--i); padding: 10px; display: flex; justify-content: center; gap: 15px; position: sticky; top:0; z-index:100; }
+        nav button { background: transparent; color: var(--g); border:none; cursor:pointer; font-family: 'Cinzel'; font-size: 0.8rem; }
+        .tab-content { display: none; padding: 20px; max-width: 800px; margin: auto; background: var(--p); min-height: 90vh; }
+        .active { display: block; }
+        
+        /* Elements */
+        .btn-gold { background: var(--g); color: white; padding: 12px; border:none; cursor:pointer; font-family: 'Cinzel'; width: 100%; }
+        .char-card { background: rgba(0,0,0,0.05); padding: 15px; margin: 10px 0; border-left: 4px solid var(--g); cursor: pointer; }
+        .stat-circle { width: 80px; height: 80px; border: 3px solid var(--g); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px; background: white; }
+        .gm-pc-card { background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+        .cinzel { font-family: 'Cinzel'; }
+
+        /* Forge Overlay */
+        #forgeOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); z-index:1000; align-items: center; justify-content: center; }
+        .forge-window { background: var(--p); padding: 30px; border-radius: 8px; width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
     </style>
 </head>
 <body>
 
 <div id="authScreen">
     <div class="auth-box">
-        <h1>⚔ GRIMOIRE</h1>
+        <h2 class="cinzel" style="text-align:center">GRIMOIRE</h2>
         <input id="authEmail" type="email" placeholder="Email">
         <input id="authPass" type="password" placeholder="Mot de passe">
-        <button onclick="_doLogin()">ENTRER</button>
-        <button onclick="_doSignup()" style="background:none; color:var(--i); font-size:0.7rem; border:1px solid var(--i)">CRÉER UN COMPTE</button>
+        <button class="btn-gold" onclick="window._doLogin()">SE CONNECTER</button>
+        <button style="background:none; border:none; width:100%; color:#666; font-size:0.7rem; margin-top:10px; cursor:pointer" onclick="window._doSignup()">Créer un compte</button>
     </div>
 </div>
 
-<div id="appScreen">
-    <h1 style="text-align: center;">BIENVENUE DANS TON GRIMOIRE</h1>
-    <p style="text-align: center;">Ta session est active.</p>
-    <button onclick="_doLogout()" style="background:var(--c); color:white;">SE DÉCONNECTER</button>
+<div id="appScreen" style="display:none">
+    <nav>
+        <button onclick="_showTab('tab-list')">MES FICHES</button>
+        <button onclick="_showTab('tab-sheet')">GRIMOIRE</button>
+        <button onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
+        <button onclick="_doLogout()" style="color: #ff4444;">QUITTER</button>
+    </nav>
+
+    <div id="tab-list" class="tab-content active">
+        <h2 class="cinzel">Vos Chroniques</h2>
+        <div id="charList"></div>
+        <button class="btn-gold" style="margin-top:20px" onclick="window._openForge()">+ NOUVEAU HÉROS</button>
+    </div>
+
+    <div id="tab-sheet" class="tab-content">
+        <h2 id="charNameDisp" class="cinzel" style="text-align:center">Nom du Héros</h2>
+        <div style="display:flex; justify-content: space-around;">
+            <div class="stat-circle"><small>PV</small><b id="hpVal">0/0</b></div>
+            <div class="stat-circle"><small>CA</small><b id="acVal">0</b></div>
+        </div>
+        <p style="font-size: 0.7rem; color: #666; text-align: center; margin-top:30px">ID de partage : <span id="activeCharIdDisplay"></span></p>
+    </div>
+
+    <div id="tab-gm" class="tab-content">
+        <h2 class="cinzel">Écran du Maître</h2>
+        <div style="display:flex; gap:10px">
+            <input id="gmSearchId" type="text" placeholder="Coller l'ID de la fiche">
+            <button class="btn-gold" style="width:150px" onclick="window._watchChar()">SUIVRE</button>
+        </div>
+        <div id="gmMonitor" style="margin-top:20px">
+            <p>Entrez l'ID d'un joueur pour surveiller ses stats en temps réel.</p>
+        </div>
+    </div>
+</div>
+
+<div id="forgeOverlay">
+    <div class="forge-window">
+        <h2 class="cinzel" style="margin-top:0">La Forge</h2>
+        <div id="forgeStep1">
+            <label class="cinzel" style="font-size:0.7rem">Identité</label>
+            <input id="forgeName" type="text" placeholder="Nom du héros">
+            
+            <label class="cinzel" style="font-size:0.7rem">Peuple</label>
+            <select id="forgeRace" onchange="window._updateSubraceList()"></select>
+            
+            <div id="subraceContainer" style="display:none;">
+                <label class="cinzel" style="font-size:0.7rem">Origine / Sous-race</label>
+                <select id="forgeSubrace"></select>
+            </div>
+
+            <label class="cinzel" style="font-size:0.7rem; margin-top:10px; display:block">Vocation</label>
+            <select id="forgeClass"></select>
+            
+            <button class="btn-gold" style="margin-top:20px" onclick="window._finishForge()">DONNER VIE</button>
+            <button style="background:none; border:none; width:100%; color:var(--accent); font-size:0.8rem; margin-top:15px; cursor:pointer" onclick="window._closeForge()">Annuler</button>
+        </div>
+    </div>
 </div>
 
 </body>
