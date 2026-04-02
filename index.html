@@ -66,86 +66,405 @@ const RACES = {
   "Féral Tieffelin": { source:"MTF", stats:{int:2,dex:1}, speed:9, traits:["Vision dans le noir (18m)","Résistance infernale","Magie infernale férale"] }
 };
  
+// ASI_LEVELS par classe — niveaux où on gagne ASI/Don
+const ASI_LEVELS = {
+  default: [4,8,12,16,19],
+  "Guerrier": [4,6,8,12,14,16,19],
+  "Roublard": [4,8,10,12,16,19]
+};
+function getAsiLevels(className) { return ASI_LEVELS[className] || ASI_LEVELS.default; }
+
+// Sous-classes par classe
+const SUBCLASSES = {
+  "Barbare": {
+    level: 3, label: "Voie primitive",
+    options: {
+      "Berserker": {features:[{lvl:3,name:"Frénésie",desc:"En rage: attaque supplémentaire en action bonus (1 niveau d'épuisement après)"},{lvl:6,name:"Rage aveugle",desc:"Immunité aux effets de charme et de terreur en rage"},{lvl:10,name:"Présence intimidante",desc:"Terrifier les créatures autour (SAG DD 8+BM+mod CHA)"},{lvl:14,name:"Représailles",desc:"Réaction: attaque de mêlée quand touché par une créature à portée"}]},
+      "Guerrier totem": {features:[{lvl:3,name:"Esprit totem",desc:"Choisir Ours (résistance tous dégâts sauf psychiques en rage), Aigle (désavantage des attaques d'opportunité, Foncer en action bonus) ou Loup (avantage aux alliés adjacents)"},{lvl:6,name:"Aspect de la bête",desc:"Capacité utilitaire selon totem choisi"},{lvl:10,name:"Marcheur spirituel",desc:"Communion avec les esprits (Communion avec la nature rituel)"},{lvl:14,name:"Totem de combat",desc:"Capacité de combat avancée selon totem"}]}
+    }
+  },
+  "Barde": {
+    level: 3, label: "Collège bardique",
+    options: {
+      "Collège du Savoir": {features:[{lvl:3,name:"Maîtrises supplémentaires",desc:"3 compétences au choix"},{lvl:3,name:"Mots cinglants",desc:"Réaction: soustraire le dé d'inspiration d'un jet adverse"},{lvl:6,name:"Secrets magiques supplémentaires",desc:"2 sorts de n'importe quelle classe"},{lvl:14,name:"Maîtrise inégalée",desc:"Ajouter dé d'inspiration aux jets de compétence sans maîtrise"}]},
+      "Collège de la Vaillance": {features:[{lvl:3,name:"Maîtrises supplémentaires",desc:"Armures moyennes, boucliers, armes martiales"},{lvl:3,name:"Inspiration de combat",desc:"Le bénéficiaire peut ajouter le dé aux dégâts ou à la CA"},{lvl:6,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},{lvl:14,name:"Inspiration de guerre",desc:"Action bonus: un allié inspiré peut attaquer en réaction"}]}
+    }
+  },
+  "Clerc": {
+    level: 1, label: "Domaine divin",
+    options: {
+      "Vie": {features:[{lvl:1,name:"Maîtrise des armures lourdes",desc:"Armures lourdes"},{lvl:1,name:"Disciple de la vie",desc:"+2+niveau du sort PV soignés"},{lvl:2,name:"Conduit: Préserver la vie",desc:"Pool de 5×niveau clerc PV distribués"},{lvl:6,name:"Guérisseur béni",desc:"Les sorts de soin s'appliquent aussi à soi"},{lvl:8,name:"Frappe divine",desc:"+1d8 dégâts radiants 1/tour"},{lvl:17,name:"Guérison suprême",desc:"Maximum de PV soignés (pas de jet)"}]},
+      "Lumière": {features:[{lvl:1,name:"Sort mineur supplémentaire: Lumière",desc:"Sort mineur Lumière"},{lvl:1,name:"Lueur protectrice",desc:"Réaction: désavantage sur attaque entrante"},{lvl:2,name:"Conduit: Radiance de l'aube",desc:"Zone de dégâts radiants (2d10+niv)"},{lvl:6,name:"Lueur améliorée",desc:"Lueur protectrice sur allié visible"},{lvl:8,name:"Frappe divine (radiant)",desc:"+1d8 dégâts radiants 1/tour"},{lvl:17,name:"Couronne de lumière",desc:"Lumière aveuglante, dégâts radiants continus"}]},
+      "Guerre": {features:[{lvl:1,name:"Maîtrise des armes martiales et armures lourdes",desc:"Armes martiales et armures lourdes"},{lvl:1,name:"Prêtre de guerre",desc:"Action bonus: attaque supplémentaire (mod SAG/repos long)"},{lvl:2,name:"Conduit: Frappe guidée",desc:"+10 à un jet d'attaque après résultat"},{lvl:6,name:"Conduit: Bénédiction du dieu de la guerre",desc:"+10 au jet d'attaque d'un allié"},{lvl:8,name:"Frappe divine",desc:"+1d8 dégâts du type de l'arme 1/tour"},{lvl:17,name:"Avatar de bataille",desc:"Résistance contondant/perçant/tranchant non-magiques"}]},
+      "Connaissance": {features:[{lvl:1,name:"Bénédictions du savoir",desc:"2 langues + 2 compétences (double maîtrise)"},{lvl:2,name:"Conduit: Savoir des âges",desc:"Maîtrise d'une compétence/outil pendant 10 min"},{lvl:6,name:"Conduit: Lecture des pensées",desc:"Lire les pensées superficielles"},{lvl:8,name:"Frappe divine (force)",desc:"+1d8 dégâts de force"},{lvl:17,name:"Visions du passé",desc:"Méditer pour voir le passé d'un lieu/objet"}]},
+      "Tempête": {features:[{lvl:1,name:"Maîtrise des armes martiales et armures lourdes",desc:"Armes martiales, armures lourdes"},{lvl:1,name:"Courroux de la tempête",desc:"Réaction: 2d8 foudre/tonnerre quand touché en mêlée"},{lvl:2,name:"Conduit: Courroux destructeur",desc:"Dégâts max sur sort foudre/tonnerre"},{lvl:6,name:"Conduit: Tonnerre du tonnerre de dieu",desc:"Repousser créatures de taille G ou moins"},{lvl:8,name:"Frappe divine (tonnerre)",desc:"+1d8 dégâts de tonnerre"},{lvl:17,name:"Né de la tempête",desc:"Vol 18m en extérieur"}]},
+      "Tromperie": {features:[{lvl:1,name:"Bénédiction du filou",desc:"Avantage Discrétion ou Tromperie à un allié"},{lvl:2,name:"Conduit: Duplicité invocatoire",desc:"Créer un double illusoire"},{lvl:6,name:"Conduit: Cape d'ombre",desc:"Invisibilité (concentration) pendant 1 tour"},{lvl:8,name:"Frappe divine (poison)",desc:"+1d8 dégâts de poison"},{lvl:17,name:"Alter ego amélioré",desc:"Le double peut lancer des sorts"}]}
+    }
+  },
+  "Druide": {
+    level: 2, label: "Cercle druidique",
+    options: {
+      "Cercle de la Terre": {features:[{lvl:2,name:"Sort mineur bonus",desc:"1 sort mineur de druide supplémentaire"},{lvl:2,name:"Récupération naturelle",desc:"Récupérer emplacements au repos court (total ≤ moitié du niveau)"},{lvl:3,name:"Sorts de cercle",desc:"Sorts supplémentaires selon terrain choisi"},{lvl:6,name:"Foulée de la terre",desc:"Le terrain difficile non-magique ne ralentit plus"},{lvl:10,name:"Protégé de la nature",desc:"Immunité au poison et aux maladies, immunité charme fées/élémentaires"},{lvl:14,name:"Sanctuaire naturel",desc:"Bêtes et végétaux doivent sauver SAG pour attaquer"}]},
+      "Cercle de la Lune": {features:[{lvl:2,name:"Forme sauvage de combat",desc:"Forme sauvage en action bonus, RC 1 max"},{lvl:6,name:"Frappe primale",desc:"Attaques en forme sauvage = magiques"},{lvl:10,name:"Forme sauvage élémentaire",desc:"Se transformer en élémentaire (2 utilisations)"},{lvl:14,name:"Mille formes",desc:"Modifier son apparence à volonté (Modification d'apparence)"}]}
+    }
+  },
+  "Guerrier": {
+    level: 3, label: "Archétype martial",
+    options: {
+      "Champion": {features:[{lvl:3,name:"Critique amélioré",desc:"Critique sur 19-20 (au lieu de 20)"},{lvl:7,name:"Athlète remarquable",desc:"Ajouter moitié BM aux jets FOR/DEX/CON sans maîtrise"},{lvl:10,name:"Style de combat supplémentaire",desc:"Choisir un 2e style de combat"},{lvl:15,name:"Critique supérieur",desc:"Critique sur 18-20"},{lvl:18,name:"Survivant",desc:"Régénérer 5+mod CON PV/tour si < moitié PV max"}]},
+      "Maître de guerre": {features:[{lvl:3,name:"Supériorité martiale",desc:"4 dés de supériorité (d8) + 3 manœuvres"},{lvl:7,name:"Savoir son ennemi",desc:"Étudier une créature (1 min) pour connaître ses capacités"},{lvl:10,name:"Dés de supériorité améliorés (d10)",desc:"Les dés passent à d10"},{lvl:15,name:"Implacable",desc:"Récupérer 1 dé de supériorité si aucun dé restant à l'initiative"},{lvl:18,name:"Dés de supériorité améliorés (d12)",desc:"Les dés passent à d12"}]},
+      "Chevalier occulte": {features:[{lvl:3,name:"Sorts de chevalier occulte",desc:"INT — 3 sorts de niv.1 (Abjuration/Évocation) + 2 sorts mineurs"},{lvl:7,name:"Magie de guerre",desc:"Lancer un sort mineur puis attaque en action bonus"},{lvl:10,name:"Frappe occulte",desc:"+dégâts de force sur attaque après un sort"},{lvl:15,name:"Magie de guerre liée",desc:"Téléportation 9m avant/après action Attaquer"},{lvl:18,name:"Magie de guerre améliorée",desc:"Lancer sort niv.1-2 puis attaque en action bonus"}]}
+    }
+  },
+  "Magicien": {
+    level: 2, label: "Tradition arcanique",
+    options: {
+      "Évocation": {features:[{lvl:2,name:"Façonneur de sorts",desc:"Créer des poches de sécurité dans les sorts de zone (alliés protégés)"},{lvl:6,name:"Sort mineur puissant",desc:"Les sorts mineurs infligent des dégâts même sur sauvegarde réussie"},{lvl:10,name:"Évocation renforcée",desc:"+mod INT aux dégâts d'un sort d'évocation"},{lvl:14,name:"Surpuissance",desc:"Dégâts max sur sorts d'évocation de niv.1-5 (1 emplacement niv.5)"}]},
+      "Abjuration": {features:[{lvl:2,name:"Protecteur arcanique",desc:"Bouclier de PV temporaires (2×niv magicien+mod INT) rechargeable"},{lvl:6,name:"Protecteur projeté",desc:"Transférer le bouclier sur un allié adjacent"},{lvl:10,name:"Abjuration améliorée",desc:"Avantage aux JdS vs sorts, résistance aux dégâts des sorts"},{lvl:14,name:"Résistance aux sorts",desc:"Avantage à tous les JdS contre les sorts"}]},
+      "Divination": {features:[{lvl:2,name:"Présage",desc:"Lancer 2d20 au repos long; remplacer n'importe quel jet plus tard"},{lvl:6,name:"Vision de l'expert",desc:"Sorts de divination ne consomment pas d'emplacement si niv.2+"},{lvl:10,name:"Le troisième œil",desc:"Vision dans le noir 36m, éthéré, lire toutes langues, ou invisibilité"},{lvl:14,name:"Présage supérieur",desc:"3 dés de présage au lieu de 2"}]},
+      "Nécromancie": {features:[{lvl:2,name:"Moisson macabre",desc:"Regagner PV en tuant avec sorts niv.1+ (2+niv sort, ou 3× si nécromancie)"},{lvl:6,name:"Serviteurs morts-vivants",desc:"Animation des morts crée un zombi/squelette supplémentaire gratuit"},{lvl:10,name:"Accoutumance à la mort",desc:"Résistance aux dégâts nécrotiques, PV max ne peut être réduit"},{lvl:14,name:"Commandement des morts-vivants",desc:"Prendre le contrôle de morts-vivants (SAG DD)"}]}
+    }
+  },
+  "Moine": {
+    level: 3, label: "Tradition monastique",
+    options: {
+      "Main ouverte": {features:[{lvl:3,name:"Technique de la main ouverte",desc:"Tempête de coups: repousser 4.5m, mettre à terre, ou empêcher réaction"},{lvl:6,name:"Intégrité physique",desc:"Se soigner de 3×niveau moine PV (1/repos long)"},{lvl:11,name:"Tranquillité",desc:"Effet de Sanctuaire sur soi au début du tour"},{lvl:17,name:"Paume frémissante",desc:"Vibrations mortelles: cible fait JdS CON ou tombe à 0 PV"}]},
+      "Voie de l'Ombre": {features:[{lvl:3,name:"Arts de l'ombre",desc:"Lancer Ténèbres, Vision dans le noir, Passage sans trace ou Silence (2 ki)"},{lvl:6,name:"Pas de l'ombre",desc:"Téléportation 18m d'ombre en ombre (action bonus)"},{lvl:11,name:"Cape d'ombres",desc:"Invisibilité dans les zones d'ombre (pas d'action)"},{lvl:17,name:"Opportuniste",desc:"Attaque de mêlée en réaction quand un allié touche une cible adjacente"}]},
+      "Quatre éléments": {features:[{lvl:3,name:"Disciplines élémentaires",desc:"Choisir des disciplines élémentaires alimentées par le ki"},{lvl:6,name:"Discipline supplémentaire",desc:"1 discipline élémentaire supplémentaire"},{lvl:11,name:"Discipline supplémentaire",desc:"1 discipline supplémentaire + accès niv.3"},{lvl:17,name:"Discipline supplémentaire",desc:"1 discipline supplémentaire + accès niv.4"}]}
+    }
+  },
+  "Paladin": {
+    level: 3, label: "Serment sacré",
+    options: {
+      "Dévotion": {features:[{lvl:3,name:"Conduit: Arme sacrée",desc:"+mod CHA à l'attaque pendant 1 min, arme lumineuse"},{lvl:3,name:"Conduit: Renvoi des impies",desc:"Fiélons et morts-vivants en fuite pendant 1 min"},{lvl:7,name:"Aura de dévotion",desc:"Immunité au charme à 3m (6m au niv.18)"},{lvl:15,name:"Pureté d'esprit",desc:"Toujours sous Protection contre le bien et le mal"},{lvl:20,name:"Nimbe sacré",desc:"Transformation: lumière, 10 dégâts radiants ennemis à 9m"}]},
+      "Anciens": {features:[{lvl:3,name:"Conduit: Colère de la nature",desc:"Vignes qui immobilisent dans une zone 3m"},{lvl:3,name:"Conduit: Renvoi des infidèles",desc:"Fées et fiélons en fuite"},{lvl:7,name:"Aura de protection",desc:"Résistance aux dégâts de sorts à 3m"},{lvl:15,name:"Sentinelle immuable",desc:"Ne peut pas être vieilli magiquement"},{lvl:20,name:"Champion de la nature",desc:"Transformation: régénération 10 PV/tour, sorts de druide en action bonus"}]},
+      "Vengeance": {features:[{lvl:3,name:"Conduit: Vœu d'inimitié",desc:"Avantage aux attaques contre une cible pendant 1 min"},{lvl:3,name:"Conduit: Renvoi par abjuration",desc:"Fées et fiélons terrifiés et immobilisés"},{lvl:7,name:"Pourchasseur implacable",desc:"Attaque d'opportunité si cible se téléporte à 9m"},{lvl:15,name:"Âme vengeresse",desc:"Résistance aux dégâts de la cible du Vœu"},{lvl:20,name:"Ange vengeur",desc:"Transformation: ailes (vol 18m), aura de terreur 9m"}]}
+    }
+  },
+  "Rôdeur": {
+    level: 3, label: "Archétype de rôdeur",
+    options: {
+      "Chasseur": {features:[{lvl:3,name:"Proie du chasseur",desc:"Choisir: Tueur de colosses (+1d8 1/tour), Tueur de géants (riposte si touché) ou Tueur de hordes (+dégâts si 2+ ennemis adjacents)"},{lvl:7,name:"Tactiques défensives",desc:"Choisir: Échapper à la horde, Défense multiattaque ou Volonté d'acier"},{lvl:11,name:"Multiattaque",desc:"Choisir: Volée (attaquer chaque créature à 3m d'un point) ou Attaque tourbillonnante (mêlée chaque adjacent)"},{lvl:15,name:"Défense du chasseur supérieure",desc:"Choisir: Évasion, Se mettre à couvert ou Esquive instinctive"}]},
+      "Maître des bêtes": {features:[{lvl:3,name:"Compagnon du rôdeur",desc:"Bête de compagnie (RC 1/4 max), agit à votre tour"},{lvl:7,name:"Entraînement exceptionnel",desc:"Le compagnon peut Foncer/Esquiver/Se désengager en action bonus"},{lvl:11,name:"Furie bestiale",desc:"Le compagnon attaque 2 fois"},{lvl:15,name:"Partager les sorts",desc:"Sorts ciblant soi s'appliquent aussi au compagnon"}]}
+    }
+  },
+  "Roublard": {
+    level: 3, label: "Archétype de roublard",
+    options: {
+      "Voleur": {features:[{lvl:3,name:"Mains lestes",desc:"Action bonus: Escamotage, outils de voleur, Utiliser un objet"},{lvl:3,name:"Monte-en-l'air",desc:"Escalade à vitesse normale, saut avec élan +mod DEX (×30cm)"},{lvl:9,name:"Furtivité suprême",desc:"Avantage Discrétion si mouvement ≤ moitié vitesse"},{lvl:13,name:"Utilisation d'objets magiques",desc:"Ignorer les prérequis de classe/race/niveau pour objets magiques"},{lvl:17,name:"Réflexes de voleur",desc:"2 tours au premier round de combat"}]},
+      "Assassin": {features:[{lvl:3,name:"Maîtrise supplémentaire",desc:"Kit de déguisement + kit d'empoisonneur"},{lvl:3,name:"Assassinat",desc:"Avantage vs créatures n'ayant pas agi, critique auto si surprise"},{lvl:9,name:"Infiltration experte",desc:"Créer une fausse identité en 7 jours"},{lvl:13,name:"Imposteur",desc:"Copier parfaitement la voix/l'écriture/l'apparence"},{lvl:17,name:"Frappe mortelle",desc:"Double dégâts si surprise (JdS CON DD 8+mod DEX+BM ou 0 PV)"}]},
+      "Escroc arcanique": {features:[{lvl:3,name:"Sorts d'escroc arcanique",desc:"INT — Enchantement et Illusion + Main de mage invisible"},{lvl:9,name:"Embuscade magique",desc:"Avantage à l'attaque si invisible ou caché quand sort lancé"},{lvl:13,name:"Escroc versatile",desc:"Action bonus: Main de mage peut voler/placer objets discrètement"},{lvl:17,name:"Voleur de sorts",desc:"Voler la connaissance d'un sort adverse (réaction, 1/repos long)"}]}
+    }
+  },
+  "Ensorceleur": {
+    level: 1, label: "Origine magique",
+    options: {
+      "Âme draconique": {features:[{lvl:1,name:"Ancêtre draconique",desc:"Choisir type de dragon: parler draconique, PV max +1/niveau"},{lvl:6,name:"Résilience élémentaire",desc:"Résistance au type de dégât de l'ancêtre"},{lvl:14,name:"Ailes de dragon",desc:"Ailes: vitesse de vol = vitesse de marche"},{lvl:18,name:"Présence draconique",desc:"Aura 18m: terreur ou charme (5 points de sorcellerie)"}]},
+      "Magie sauvage": {features:[{lvl:1,name:"Sursaut de magie sauvage",desc:"Après un sort niv.1+, le MJ peut demander un jet sur la table de magie sauvage"},{lvl:6,name:"Pli de la chance",desc:"Réaction: modifier un jet de 1d4+ ou 1d4− (flexible)"},{lvl:14,name:"Chaos contrôlé",desc:"Lancer 2 fois sur la table de magie sauvage, choisir le résultat"},{lvl:18,name:"Bombardement de sorts",desc:"1/tour, relancer les dés de dégâts d'un sort (1 point de sorcellerie)"}]}
+    }
+  },
+  "Occultiste": {
+    level: 1, label: "Patron d'Outre-monde",
+    options: {
+      "Archifée": {features:[{lvl:1,name:"Présence féerique",desc:"Charmer ou terrifier les créatures dans un cube de 3m (1/repos court)"},{lvl:6,name:"Repli brumeux",desc:"Réaction si touché: devenir invisible et se téléporter à 18m"},{lvl:10,name:"Résistance au charme",desc:"Immunité au charme, réflexion sur le charmeur"},{lvl:14,name:"Sombre délire",desc:"Charmer ou terrifier (jusqu'à 1 min) créature à portée"}]},
+      "Fiélon": {features:[{lvl:1,name:"Bénédiction du ténébreux",desc:"Regagner PV = mod CHA + niveau occultiste quand un ennemi tombe à 0"},{lvl:6,name:"Chance du ténébreux",desc:"Ajouter d10 à un jet de compétence ou sauvegarde (1/repos court)"},{lvl:10,name:"Résistance fiélonne",desc:"Choisir 1 type de dégât: résistance (changeable au repos court)"},{lvl:14,name:"Traversée des enfers",desc:"Envoyer une cible frappée dans un plan inférieur (1/repos long)"}]},
+      "Grand Ancien": {features:[{lvl:1,name:"Esprit éveillé",desc:"Télépathie 9m avec toute créature, aucune langue requise"},{lvl:6,name:"Bouclier entropique",desc:"Réaction: désavantage sur attaque entrante; si raté, avantage à votre prochaine attaque"},{lvl:10,name:"Bouclier de pensées",desc:"Résistance dégâts psychiques, réflexion psychique"},{lvl:14,name:"Créer un vassal",desc:"Charmer un humanoïde incapacité (pas de limite de durée)"}]}
+    }
+  },
+  "Artificier": {
+    level: 3, label: "Spécialité d'artificier",
+    options: {
+      "Alchimiste": {features:[{lvl:3,name:"Élixir expérimental",desc:"Créer un élixir aléatoire au repos long (soins, vitesse, résilience, audace, vol, transformation)"},{lvl:5,name:"Sorts d'alchimiste",desc:"Restauration inférieure, Rayon ardent, Restauration supérieure, etc."},{lvl:9,name:"Alchimie régénératrice",desc:"Lancer Restauration inférieure gratuitement"},{lvl:15,name:"Maîtrise chimique",desc:"2 élixirs gratuits + résistance acide/poison"}]},
+      "Artilleur": {features:[{lvl:3,name:"Canon occulte",desc:"Invoquer un canon (lance-flammes, baliste ou protecteur)"},{lvl:5,name:"Sorts d'artilleur",desc:"Mur de vent, Sphère de feu, etc."},{lvl:9,name:"Canon arcanique",desc:"Le canon inflige +1d8 dégâts"},{lvl:15,name:"Canon fortifié",desc:"2 canons simultanés"}]},
+      "Forgeur de bataille": {features:[{lvl:3,name:"Armure arcanique",desc:"Infuser une armure: PV bonus, gantelet (dégâts tonnerre), propulseurs (vol), etc."},{lvl:5,name:"Sorts de forgeur",desc:"Bouclier de feu, Hâte, etc."},{lvl:9,name:"Modification d'armure",desc:"2 améliorations supplémentaires"},{lvl:15,name:"Armure perfectionnée",desc:"Attaque supplémentaire si pas d'Attaque supplémentaire"}]}
+    }
+  }
+};
+
+// Features de base par classe, niveaux 1-20 (hors sous-classe et ASI)
 const CLASSES = {
   "Barbare": { hd:12, saves:["str","con"], source:"PHB", spellcaster:false,
     skills:["Athletisme","Dressage","Intimidation","Nature","Perception","Survie"], skillCount:2,
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Hache à deux mains (ou toute arme de guerre martiale), 2 hachettes, 10 javelines, kit d'explorateur",
-    features:[{lvl:1,name:"Rage",desc:"Entrer en rage (avantage FOR, bonus dégâts +2/+3/+4, résistance physique)"},{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod CON"},{lvl:2,name:"Attaque téméraire",desc:"Avantage en attaque, mais les attaques contre vous ont aussi l'avantage"},{lvl:2,name:"Sens du danger",desc:"Avantage aux jets de sauvegarde DEX contre effets visibles"},{lvl:3,name:"Voie primitive",desc:"Choisir une voie: Berserker ou Guerrier totem"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux caractéristiques (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},{lvl:5,name:"Déplacement rapide",desc:"+3m de vitesse"}]
+    features:[
+      {lvl:1,name:"Rage",desc:"2 rages/jour, bonus dégâts +2, résistance physique"},
+      {lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod CON"},
+      {lvl:2,name:"Attaque téméraire",desc:"Avantage en attaque, mais les attaques contre vous ont aussi l'avantage"},
+      {lvl:2,name:"Sens du danger",desc:"Avantage aux JdS DEX contre effets visibles"},
+      {lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
+      {lvl:5,name:"Déplacement rapide",desc:"+3m de vitesse"},
+      {lvl:7,name:"Instinct sauvage",desc:"Avantage à l'initiative, agir normalement si surpris (si rage)"},
+      {lvl:9,name:"Critique brutal (1 dé)",desc:"+1 dé de dégâts sur critique"},
+      {lvl:11,name:"Rage implacable",desc:"Si réduit à 0 PV en rage, JdS CON DD 10 pour rester à 1 PV"},
+      {lvl:13,name:"Critique brutal (2 dés)",desc:"+2 dés de dégâts sur critique"},
+      {lvl:15,name:"Rage persistante",desc:"La rage ne se termine que si inconscient ou choix volontaire"},
+      {lvl:17,name:"Critique brutal (3 dés)",desc:"+3 dés de dégâts sur critique"},
+      {lvl:18,name:"Force indomptable",desc:"Si total de FOR < score, utiliser le score à la place"},
+      {lvl:20,name:"Champion primal",desc:"FOR et CON augmentent de 4 (max 24)"}
+    ]
   },
   "Barde": { hd:8, saves:["dex","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Tout (3 au choix)"], skillCount:3,
     armor:["Légères"], weapons:["Simples","Arbalète de poing","Épée longue","Rapière","Épée courte"],
     equipment:"Rapière (ou épée longue/toute arme simple), Étui à instruments de musique, Armure de cuir, Dague, Pack de diplomate",
-    features:[{lvl:1,name:"Lanceur de sorts",desc:"Charisme (sorts de barde)"},{lvl:1,name:"Inspiration bardique",desc:"Dé d'inspiration (d6) à un allié — bonus au jet d'attaque, compétence ou sauvegarde"},{lvl:2,name:"Touche-à-tout",desc:"Moitié du bonus de maîtrise pour les compétences sans maîtrise"},{lvl:3,name:"Collège bardique",desc:"Choisir un collège: Connaissance ou Vaillance"},{lvl:3,name:"Expertise",desc:"Double bonus de maîtrise pour 2 compétences"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Inspiration bardique (d8)",desc:"Le dé d'inspiration passe à d8"},{lvl:5,name:"Source d'inspiration",desc:"Récupérer l'inspiration bardique au repos court"}]
+    features:[
+      {lvl:1,name:"Lanceur de sorts",desc:"Charisme (sorts de barde)"},
+      {lvl:1,name:"Inspiration bardique (d6)",desc:"Dé d'inspiration à un allié (mod CHA/repos long)"},
+      {lvl:2,name:"Touche-à-tout",desc:"Moitié du BM pour les compétences sans maîtrise"},
+      {lvl:2,name:"Chant de repos (d6)",desc:"Allié récupère 1d6 PV supplémentaires au repos court"},
+      {lvl:3,name:"Expertise",desc:"Double BM pour 2 compétences"},
+      {lvl:5,name:"Inspiration bardique (d8)",desc:"Le dé d'inspiration passe à d8"},
+      {lvl:5,name:"Source d'inspiration",desc:"Récupérer inspiration bardique au repos court"},
+      {lvl:6,name:"Contre-charme",desc:"Avantage JdS vs charme/terreur pour alliés à 9m"},
+      {lvl:9,name:"Chant de repos (d8)",desc:"Le dé de repos passe à d8"},
+      {lvl:10,name:"Expertise supplémentaire",desc:"Double BM pour 2 compétences de plus"},
+      {lvl:10,name:"Secrets magiques",desc:"2 sorts de n'importe quelle classe"},
+      {lvl:10,name:"Inspiration bardique (d10)",desc:"Le dé passe à d10"},
+      {lvl:13,name:"Chant de repos (d10)",desc:"Le dé de repos passe à d10"},
+      {lvl:14,name:"Secrets magiques supplémentaires",desc:"2 sorts de plus de n'importe quelle classe"},
+      {lvl:15,name:"Inspiration bardique (d12)",desc:"Le dé passe à d12"},
+      {lvl:17,name:"Chant de repos (d12)",desc:"Le dé de repos passe à d12"},
+      {lvl:18,name:"Secrets magiques supplémentaires",desc:"2 sorts de plus de n'importe quelle classe"},
+      {lvl:20,name:"Inspiration supérieure",desc:"Récupérer 1 inspiration bardique si 0 restante à l'initiative"}
+    ]
   },
   "Clerc": { hd:8, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"wis",
     skills:["Histoire","Intuition","Médecine","Persuasion","Religion"], skillCount:2,
     armor:["Légères","Moyennes","Lourdes","Boucliers"], weapons:["Simples"],
-    equipment:"Masse d'armes (ou fléau), Armure d'écailles (ou armure de cuir/de mailles), Arbalète légère + 20 carreaux (ou toute arme simple), Pack d'ecclésiastique (ou pack d'explorateur), Bouclier, Symbole sacré",
-    features:[{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de clerc)"},{lvl:1,name:"Domaine divin",desc:"Choisir un domaine (Connaissance, Vie, Lumière, Nature, Tempête, Tromperie, Guerre)"},{lvl:2,name:"Conduit divin",desc:"Renvoi des morts-vivants"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Destruction des morts-vivants",desc:"RC 1/2 détruit automatiquement"}]
+    equipment:"Masse d'armes, Armure d'écailles, Arbalète légère + 20 carreaux, Pack d'ecclésiastique, Bouclier, Symbole sacré",
+    features:[
+      {lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de clerc)"},
+      {lvl:2,name:"Conduit divin (1/repos)",desc:"Renvoi des morts-vivants + aptitude de domaine"},
+      {lvl:5,name:"Destruction des morts-vivants (RC 1/2)",desc:"Morts-vivants RC 1/2 détruits par Renvoi"},
+      {lvl:6,name:"Conduit divin (2/repos)",desc:"2 utilisations de Conduit divin"},
+      {lvl:8,name:"Destruction des morts-vivants (RC 1)",desc:"RC 1 détruits"},
+      {lvl:10,name:"Intervention divine",desc:"Implorer le dieu (chance % ≤ niveau)"},
+      {lvl:11,name:"Destruction des morts-vivants (RC 2)",desc:"RC 2 détruits"},
+      {lvl:14,name:"Destruction des morts-vivants (RC 3)",desc:"RC 3 détruits"},
+      {lvl:17,name:"Destruction des morts-vivants (RC 4)",desc:"RC 4 détruits"},
+      {lvl:18,name:"Conduit divin (3/repos)",desc:"3 utilisations"},
+      {lvl:20,name:"Intervention divine améliorée",desc:"Intervention divine automatique"}
+    ]
   },
   "Druide": { hd:8, saves:["int","wis"], source:"PHB", spellcaster:true, spellAbility:"wis",
     skills:["Arcanes","Dressage","Intuition","Médecine","Nature","Perception","Religion","Survie"], skillCount:2,
-    armor:["Légères","Moyennes","Boucliers (pas métalliques)"], weapons:["Massue","Dague","Fléchette","Javeline","Gourdin","Serpe","Lance","Bâton","Cimeterre","Fronde","Trident"],
-    equipment:"Bouclier de bois (ou toute arme simple), Cimeterre (ou toute arme de corps à corps simple), Armure de cuir, Pack d'explorateur, Focalisateur druidique",
-    features:[{lvl:1,name:"Druidique",desc:"Langue secrète des druides"},{lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de druide)"},{lvl:2,name:"Forme sauvage",desc:"Se transformer en bête (RC 1/4 — puis évolue)"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
+    armor:["Légères","Moyennes","Boucliers (pas métal)"], weapons:["Massue","Dague","Fléchette","Javeline","Gourdin","Serpe","Lance","Bâton","Cimeterre","Fronde","Trident"],
+    equipment:"Bouclier de bois, Cimeterre, Armure de cuir, Pack d'explorateur, Focalisateur druidique",
+    features:[
+      {lvl:1,name:"Druidique",desc:"Langue secrète des druides"},
+      {lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de druide)"},
+      {lvl:2,name:"Forme sauvage",desc:"Se transformer en bête (RC 1/4, 2/repos court)"},
+      {lvl:8,name:"Forme sauvage améliorée (RC 1)",desc:"RC max 1"},
+      {lvl:18,name:"Incantation bestiale",desc:"Lancer des sorts en forme sauvage"},
+      {lvl:18,name:"Corps éternel",desc:"Ne plus subir les effets du vieillissement"},
+      {lvl:20,name:"Archidruide",desc:"Forme sauvage illimitée, ignorer composantes VS de sorts"}
+    ]
   },
   "Guerrier": { hd:10, saves:["str","con"], source:"PHB", spellcaster:false,
     skills:["Acrobaties","Athletisme","Histoire","Intuition","Intimidation","Perception","Survie"], skillCount:2,
     armor:["Toutes","Boucliers"], weapons:["Simples","Martiales"],
-    equipment:"Cotte de mailles (ou armure de cuir, arc long, 20 flèches), Arme martiale + bouclier (ou 2 armes martiales), Arbalète légère + 20 carreaux (ou 2 hachettes), Pack de donjonneur (ou pack d'explorateur)",
-    features:[{lvl:1,name:"Style de combat",desc:"Archerie, Combat à deux armes, Défense, Duel, Grands coups, Protection"},{lvl:1,name:"Second souffle",desc:"Récupérer 1d10+niveau PV (repos court)"},{lvl:2,name:"Fougue",desc:"Action supplémentaire une fois par repos court/long"},{lvl:3,name:"Archétype martial",desc:"Choisir: Champion, Maître de guerre ou Chevalier occulte"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"}]
+    equipment:"Cotte de mailles, Arme martiale + bouclier, Arbalète légère + 20 carreaux, Pack de donjonneur",
+    features:[
+      {lvl:1,name:"Second souffle",desc:"Récupérer 1d10+niveau PV (1/repos court)",choice:"style_combat"},
+      {lvl:2,name:"Fougue (1)",desc:"Action supplémentaire (1/repos court)"},
+      {lvl:5,name:"Attaque supplémentaire (1)",desc:"Deux attaques par action Attaquer"},
+      {lvl:9,name:"Indomptable (1)",desc:"Relancer 1 JdS raté (1/repos long)"},
+      {lvl:11,name:"Attaque supplémentaire (2)",desc:"Trois attaques par action Attaquer"},
+      {lvl:13,name:"Indomptable (2)",desc:"2 relances de JdS/repos long"},
+      {lvl:17,name:"Fougue (2)",desc:"2 utilisations de Fougue/repos court"},
+      {lvl:17,name:"Indomptable (3)",desc:"3 relances de JdS/repos long"},
+      {lvl:20,name:"Attaque supplémentaire (3)",desc:"Quatre attaques par action Attaquer"}
+    ]
   },
   "Magicien": { hd:6, saves:["int","wis"], source:"PHB", spellcaster:true, spellAbility:"int",
     skills:["Arcanes","Histoire","Intuition","Investigation","Médecine","Religion"], skillCount:2,
     armor:[], weapons:["Dague","Fléchette","Fronde","Bâton","Arbalète légère"],
-    equipment:"Bâton de mage (ou dague), Sacoche à composantes (ou focalisateur arcanique), Pack d'érudit (ou pack d'explorateur), Grimoire",
-    features:[{lvl:1,name:"Incantation",desc:"Intelligence (sorts de magicien) — Grimoire avec 6 sorts de niveau 1"},{lvl:1,name:"Récupération arcanique",desc:"Récupérer des emplacements de sorts épuisés lors d'un repos court"},{lvl:2,name:"Tradition arcanique",desc:"École de magie (Abjuration, Conjuration, Divination, Enchantement, Évocation, Illusion, Nécromancie, Transmutation)"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
+    equipment:"Bâton de mage, Sacoche à composantes, Pack d'érudit, Grimoire",
+    features:[
+      {lvl:1,name:"Incantation",desc:"INT — Grimoire avec 6 sorts de niveau 1"},
+      {lvl:1,name:"Récupération arcanique",desc:"Récupérer emplacements au repos court (total ≤ moitié niv, arrondi sup)"},
+      {lvl:18,name:"Maîtrise des sorts",desc:"2 sorts de niv.1 et 2 à volonté"},
+      {lvl:20,name:"Sorts de prédilection",desc:"2 sorts de niv.3 une fois gratuits chacun/repos court"}
+    ]
   },
   "Moine": { hd:8, saves:["str","dex"], source:"PHB", spellcaster:false,
     skills:["Acrobaties","Athletisme","Histoire","Intuition","Religion","Discrétion"], skillCount:2,
     armor:[], weapons:["Simples","Épée courte"],
-    equipment:"Épée courte (ou toute arme simple), Pack de donjonneur (ou pack d'explorateur), 10 fléchettes",
-    features:[{lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod SAG"},{lvl:1,name:"Arts martiaux",desc:"Dés martiaux (d4→d10), attaques sans arme DEX ou FOR"},{lvl:2,name:"Ki",desc:"Points de ki pour Tempête de coups, Défense patiente, Pas du vent"},{lvl:2,name:"Déplacement sans armure",desc:"+3m de déplacement"},{lvl:3,name:"Tradition monastique",desc:"Choisir: Voie de la Main ouverte, de l'Ombre ou des Quatre éléments"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},{lvl:5,name:"Parade de projectiles",desc:"Réduire les dégâts de projectiles"}]
+    equipment:"Épée courte, Pack de donjonneur, 10 fléchettes",
+    features:[
+      {lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod SAG"},
+      {lvl:1,name:"Arts martiaux",desc:"Dé martial d4, attaque sans arme en action bonus"},
+      {lvl:2,name:"Ki",desc:"Points de ki = niveau moine"},
+      {lvl:2,name:"Déplacement sans armure",desc:"+3m de vitesse (augmente avec le niveau)"},
+      {lvl:3,name:"Parade de projectiles",desc:"Réduire dégâts de projectiles de 1d10+mod DEX+niveau"},
+      {lvl:4,name:"Chute ralentie",desc:"Réduire dégâts de chute de 5×niveau moine"},
+      {lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
+      {lvl:5,name:"Frappe étourdissante",desc:"Dépenser 1 ki: cible fait JdS CON ou étourdie"},
+      {lvl:6,name:"Frappe de ki",desc:"Les attaques à mains nues comptent comme magiques"},
+      {lvl:7,name:"Évasion",desc:"JdS DEX réussi = 0 dégâts, raté = moitié"},
+      {lvl:7,name:"Sérénité",desc:"Action: mettre fin à un effet de charme ou terreur"},
+      {lvl:10,name:"Pureté du corps",desc:"Immunité aux maladies et au poison"},
+      {lvl:13,name:"Langue du soleil et de la lune",desc:"Comprendre toutes les langues parlées"},
+      {lvl:14,name:"Âme de diamant",desc:"Maîtrise de tous les JdS + dépenser 1 ki pour relancer"},
+      {lvl:15,name:"Corps éternel",desc:"Plus besoin de nourriture ni d'eau"},
+      {lvl:18,name:"Corps vide",desc:"Devenir invisible 1 min (4 ki), résistance tous dégâts sauf force"},
+      {lvl:20,name:"Perfection intérieure",desc:"Si initiative et 0 ki, récupérer 4 ki"}
+    ]
   },
   "Paladin": { hd:10, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Athletisme","Intuition","Intimidation","Médecine","Persuasion","Religion"], skillCount:2,
     armor:["Toutes","Boucliers"], weapons:["Simples","Martiales"],
-    equipment:"Arme martiale + bouclier (ou 2 armes martiales), 5 javelines (ou toute arme de corps à corps simple), Pack de prêtre (ou pack d'explorateur), Cotte de mailles, Symbole sacré",
-    features:[{lvl:1,name:"Sens divin",desc:"Détecter les célestes, fiélons et morts-vivants dans un rayon de 18m"},{lvl:1,name:"Imposition des mains",desc:"Pool de PV = niveau x 5, soigner les blessures et maladies"},{lvl:2,name:"Style de combat",desc:"Défense, Duel, Grande épée, Protection"},{lvl:2,name:"Incantation",desc:"Charisme (sorts de paladin)"},{lvl:2,name:"Châtiment divin",desc:"2d8 dégâts radiants supplémentaires en dépensant un emplacement"},{lvl:3,name:"Serment sacré",desc:"Choisir: Dévotion, Anciens ou Vengeance"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"}]
+    equipment:"Arme martiale + bouclier, 5 javelines, Pack de prêtre, Cotte de mailles, Symbole sacré",
+    features:[
+      {lvl:1,name:"Sens divin",desc:"Détecter célestes/fiélons/morts-vivants à 18m (1+mod CHA/repos long)"},
+      {lvl:1,name:"Imposition des mains",desc:"Pool PV = niveau×5, soigner/guérir maladies"},
+      {lvl:2,name:"Châtiment divin",desc:"2d8 radiants (+1d8/emplacement supérieur, +1d8 vs mort-vivant)"},
+      {lvl:2,name:"Incantation",desc:"CHA — sorts de paladin",choice:"style_combat_paladin"},
+      {lvl:3,name:"Santé divine",desc:"Immunité aux maladies"},
+      {lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
+      {lvl:6,name:"Aura de protection (3m)",desc:"Bonus de +mod CHA aux JdS pour alliés à 3m"},
+      {lvl:10,name:"Aura de courage",desc:"Immunité à la terreur pour alliés dans l'aura"},
+      {lvl:11,name:"Châtiment divin amélioré",desc:"+1d8 dégâts radiants à chaque attaque de mêlée"},
+      {lvl:14,name:"Contact purificateur",desc:"Utiliser Imposition des mains pour dissiper un sort (5 PV du pool)"},
+      {lvl:18,name:"Aura de protection étendue (9m)",desc:"Aura passe à 9m"}
+    ]
   },
   "Rôdeur": { hd:10, saves:["str","dex"], source:"PHB", spellcaster:true, spellAbility:"wis",
     skills:["Athletisme","Dressage","Discrétion","Investigation","Nature","Perception","Survie"], skillCount:3,
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
-    equipment:"Armure d'écailles (ou armure de cuir), 2 épées courtes (ou 2 armes simples de corps à corps), Pack de donjonneur (ou pack d'explorateur), Arc long + 20 flèches",
-    features:[{lvl:1,name:"Ennemi juré",desc:"Avantage aux jets de Sagesse contre les créatures de type choisi"},{lvl:1,name:"Explorateur-né",desc:"Maîtrise dans 2 compétences + avantages en terrain de prédilection"},{lvl:2,name:"Style de combat",desc:"Archerie, Défense, Duel, Combat à deux armes"},{lvl:2,name:"Incantation",desc:"Sagesse (sorts de rôdeur)"},{lvl:3,name:"Archétype de rôdeur",desc:"Choisir: Chasseur ou Maître des bêtes"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"}]
+    equipment:"Armure d'écailles, 2 épées courtes, Pack de donjonneur, Arc long + 20 flèches",
+    features:[
+      {lvl:1,name:"Ennemi juré",desc:"1 type de créature: avantage Survie pour pister, INT pour se rappeler"},
+      {lvl:1,name:"Explorateur-né",desc:"1 terrain de prédilection: avantages exploration"},
+      {lvl:2,name:"Incantation",desc:"SAG — sorts de rôdeur",choice:"style_combat_rodeur"},
+      {lvl:3,name:"Vigilance primitive",desc:"Sorts sans composantes, capacités en terrain difficile améliorées"},
+      {lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
+      {lvl:6,name:"Ennemi juré supplémentaire",desc:"+1 type d'ennemi juré"},
+      {lvl:6,name:"Terrain de prédilection supplémentaire",desc:"+1 terrain de prédilection"},
+      {lvl:8,name:"Foulée terrestre",desc:"Le terrain difficile non-magique ne ralentit plus"},
+      {lvl:10,name:"Camouflage naturel",desc:"Se cacher dans un terrain de prédilection (1 min préparation)"},
+      {lvl:10,name:"Ennemi juré supplémentaire",desc:"+1 type d'ennemi juré"},
+      {lvl:10,name:"Terrain de prédilection supplémentaire",desc:"+1 terrain"},
+      {lvl:14,name:"Disparition",desc:"Action bonus: Se cacher"},
+      {lvl:18,name:"Sens sauvages",desc:"Pas de désavantage aux attaques contre créatures invisibles à 9m"},
+      {lvl:20,name:"Tueur d'ennemis",desc:"+mod SAG aux dégâts contre ennemis jurés, 1/tour"}
+    ]
   },
   "Roublard": { hd:8, saves:["dex","int"], source:"PHB", spellcaster:false,
     skills:["Acrobaties","Athletisme","Discrétion","Escamotage","Intimidation","Investigation","Perception","Performance","Persuasion","Tromperie"], skillCount:4,
     armor:["Légères"], weapons:["Simples","Arbalète de poing","Épée longue","Rapière","Épée courte"],
-    equipment:"Rapière (ou épée courte), Arc court + 20 flèches (ou épée courte), Pack de cambrioleur (ou pack d'explorateur ou pack de donjonneur), Armure de cuir, 2 dagues, Outils de voleur",
-    features:[{lvl:1,name:"Expertise",desc:"Double bonus de maîtrise pour 2 compétences choisies"},{lvl:1,name:"Attaque sournoise",desc:"1d6 dégâts bonus quand avantage ou allié adjacent à la cible"},{lvl:1,name:"Jargon des voleurs",desc:"Argot secret des roublards"},{lvl:2,name:"Action rusée",desc:"Bonus action: Foncer, Se désengager ou Se cacher"},{lvl:3,name:"Archétype de roublard",desc:"Choisir: Voleur, Assassin ou Escroc arcanique"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"},{lvl:5,name:"Esquive instinctive",desc:"Réduire de moitié les dégâts d'une attaque visible"}]
+    equipment:"Rapière, Arc court + 20 flèches, Pack de cambrioleur, Armure de cuir, 2 dagues, Outils de voleur",
+    features:[
+      {lvl:1,name:"Expertise",desc:"Double BM pour 2 compétences"},
+      {lvl:1,name:"Attaque sournoise (1d6)",desc:"1d6 bonus si avantage ou allié adjacent"},
+      {lvl:1,name:"Jargon des voleurs",desc:"Argot secret des roublards"},
+      {lvl:2,name:"Action rusée",desc:"Action bonus: Foncer, Se désengager ou Se cacher"},
+      {lvl:5,name:"Esquive instinctive",desc:"Réaction: moitié dégâts d'une attaque visible"},
+      {lvl:6,name:"Expertise supplémentaire",desc:"Double BM pour 2 compétences de plus"},
+      {lvl:7,name:"Évasion",desc:"JdS DEX réussi = 0 dégâts, raté = moitié"},
+      {lvl:11,name:"Talent fiable",desc:"Minimum 10 aux jets de compétence maîtrisée"},
+      {lvl:14,name:"Sens aveugle",desc:"Détecter créatures invisibles ou cachées à 3m"},
+      {lvl:15,name:"Esprit fuyant",desc:"Maîtrise des JdS de Sagesse"},
+      {lvl:18,name:"Insaisissable",desc:"Les attaques n'ont jamais l'avantage contre vous"},
+      {lvl:20,name:"Coup de chance",desc:"Si attaque rate, la transformer en coup; si JdS raté, le rendre réussi (1/repos court)"}
+    ]
   },
   "Ensorceleur": { hd:6, saves:["con","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Arcanes","Intimidation","Perspicacité","Persuasion","Religion","Tromperie"], skillCount:2,
     armor:[], weapons:["Dague","Fléchette","Fronde","Bâton","Arbalète légère"],
-    equipment:"Arbalète légère + 20 carreaux (ou toute arme simple), Sacoche à composantes (ou focalisateur arcanique), Pack de donjonneur (ou pack d'explorateur), 2 dagues",
-    features:[{lvl:1,name:"Incantation",desc:"Charisme (sorts d'ensorceleur)"},{lvl:1,name:"Origine magique",desc:"Âme draconique ou Magie sauvage"},{lvl:2,name:"Points de sorcellerie",desc:"Créer des emplacements de sorts supplémentaires ou effets méta-magiques"},{lvl:3,name:"Métamagie",desc:"Choisir 2 options de métamagie"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
+    equipment:"Arbalète légère + 20 carreaux, Sacoche à composantes, Pack de donjonneur, 2 dagues",
+    features:[
+      {lvl:1,name:"Incantation",desc:"CHA — sorts d'ensorceleur"},
+      {lvl:2,name:"Points de sorcellerie",desc:"2 points (= niveau ensorceleur), métamagie"},
+      {lvl:3,name:"Métamagie (2 options)",desc:"Choisir 2 options parmi: Sort accéléré, Sort étendu, Sort jumeau, Sort subtil, Sort puissant, etc."},
+      {lvl:10,name:"Métamagie supplémentaire",desc:"+1 option de métamagie"},
+      {lvl:17,name:"Métamagie supplémentaire",desc:"+1 option de métamagie"},
+      {lvl:20,name:"Restauration ensorcelée",desc:"Récupérer 4 points de sorcellerie au repos court"}
+    ]
   },
   "Occultiste": { hd:8, saves:["wis","cha"], source:"PHB", spellcaster:true, spellAbility:"cha",
     skills:["Arcanes","Duperie","Histoire","Intimidation","Investigation","Nature","Religion"], skillCount:2,
     armor:["Légères"], weapons:["Simples"],
-    equipment:"Arbalète légère + 10 carreaux (ou toute arme simple), Sacoche à composantes (ou focalisateur arcanique), Pack d'érudit (ou pack de donjonneur), Armure de cuir, toute arme simple, 2 dagues",
-    features:[{lvl:1,name:"Protecteur d'au-delà",desc:"Choisir son patron (l'Archifée, le Fiélon, le Grand Ancien)"},{lvl:1,name:"Magie de pacte",desc:"Charisme — emplacements récupérés au repos court"},{lvl:2,name:"Invocations occultes",desc:"Pouvoirs occultes permanents (yeux du gardien des runes, etc.)"},{lvl:3,name:"Pacte",desc:"Choisir: Pacte de la Chaîne, de la Lame ou du Grimoire"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
+    equipment:"Arbalète légère + 10 carreaux, Sacoche à composantes, Pack d'érudit, Armure de cuir, 2 dagues",
+    features:[
+      {lvl:1,name:"Magie de pacte",desc:"CHA — emplacements récupérés au repos court (niv.1: 1 empl.)"},
+      {lvl:2,name:"Invocations occultes (2)",desc:"2 invocations occultes permanentes"},
+      {lvl:3,name:"Pacte (Chaîne/Lame/Grimoire)",desc:"Choisir un pacte: familier, arme de pacte ou livre des ombres"},
+      {lvl:5,name:"Invocations occultes (3)",desc:"3 invocations"},
+      {lvl:7,name:"Invocations occultes (4)",desc:"4 invocations"},
+      {lvl:9,name:"Invocations occultes (5)",desc:"5 invocations"},
+      {lvl:11,name:"Arcanum mystique (niv.6)",desc:"1 sort de niv.6 (1/repos long)"},
+      {lvl:12,name:"Invocations occultes (6)",desc:"6 invocations"},
+      {lvl:13,name:"Arcanum mystique (niv.7)",desc:"1 sort de niv.7 (1/repos long)"},
+      {lvl:15,name:"Arcanum mystique (niv.8)",desc:"1 sort de niv.8 (1/repos long)"},
+      {lvl:15,name:"Invocations occultes (7)",desc:"7 invocations"},
+      {lvl:17,name:"Arcanum mystique (niv.9)",desc:"1 sort de niv.9 (1/repos long)"},
+      {lvl:18,name:"Invocations occultes (8)",desc:"8 invocations"},
+      {lvl:20,name:"Maître occulte",desc:"Récupérer tous les emplacements de Magie de pacte en 1 min (1/repos long)"}
+    ]
   },
   "Artificier": { hd:8, saves:["con","int"], source:"TCoE", spellcaster:true, spellAbility:"int",
     skills:["Arcanes","Histoire","Investigation","Médecine","Nature","Perception","Discrétion"], skillCount:2,
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples"],
     equipment:"2 pistolets + 20 projectiles, Pack de donjonneur, Armure d'écailles, Outils de voleur, Outils de bricoleur",
-    features:[{lvl:1,name:"Maîtrise des outils magiques",desc:"Utiliser les outils d'artisan comme focalisateur arcanique"},{lvl:1,name:"Infusions",desc:"Imprégner des objets magiques non-magiques"},{lvl:1,name:"Utilisation des armes à feu",desc:"Maîtrise des armes à feu si variante"},{lvl:3,name:"Spécialité d'artificier",desc:"Choisir: Alchimiste, Armurier, Artilleur ou Forgeur de bataille"},{lvl:4,name:"Amélioration de caractéristique",desc:"+2 à une caractéristique ou +1 à deux (ou don)"}]
+    features:[
+      {lvl:1,name:"Incantation",desc:"INT — sorts d'artificier via outils"},
+      {lvl:1,name:"Bricolage magique",desc:"Imprégner un objet non-magique de magie mineure"},
+      {lvl:2,name:"Infusions (4 connues, 2 infusées)",desc:"Choisir des infusions pour imprégner objets"},
+      {lvl:6,name:"Expertise des outils",desc:"Double BM avec les outils maîtrisés"},
+      {lvl:6,name:"Infusions supplémentaires (6/3)",desc:"6 connues, 3 infusées"},
+      {lvl:7,name:"Éclat de génie",desc:"Réaction: +mod INT à un jet d'un allié à 9m"},
+      {lvl:10,name:"Adepte magique",desc:"4 sorts mineurs d'artificier + infusions (8/4)"},
+      {lvl:11,name:"Sort stocké dans un objet",desc:"Stocker un sort dans un objet (utilisation par non-lanceur)"},
+      {lvl:14,name:"Savant magique",desc:"Infusions (12/5)"},
+      {lvl:18,name:"Maître des infusions",desc:"Infusions (14/6)"},
+      {lvl:20,name:"Âme d'artifice",desc:"+1 à tous les JdS par objet magique attuné (max 6)"}
+    ]
   }
 };
+
+// Choix sélectionnables lors du level up
+const LEVEL_CHOICES = {
+  "style_combat": {
+    label: "Style de combat",
+    options: ["Archerie (+2 attaque à distance)","Combat à deux armes (mod dégâts à 2e arme)","Défense (+1 CA en armure)","Duel (+2 dégâts arme à 1 main seule)","Arme à deux mains (relancer 1-2 dégâts)","Protection (désavantage attaque ennemie sur allié adjacent)"]
+  },
+  "style_combat_paladin": {
+    label: "Style de combat",
+    options: ["Défense (+1 CA en armure)","Duel (+2 dégâts arme à 1 main seule)","Arme à deux mains (relancer 1-2 dégâts)","Protection (désavantage attaque ennemie)"]
+  },
+  "style_combat_rodeur": {
+    label: "Style de combat",
+    options: ["Archerie (+2 attaque à distance)","Défense (+1 CA en armure)","Duel (+2 dégâts arme à 1 main seule)","Combat à deux armes (mod dégâts à 2e arme)"]
+  },
+  "metamagie": {
+    label: "Options de métamagie",
+    multi: true, count: 2,
+    options: ["Sort accéléré (3 pts: action bonus)","Sort étendu (1 pt: durée ×2)","Sort intensifié (3 pts: désavantage JdS)","Sort jumeau (pts=niv: 2e cible)","Sort subtil (1 pt: pas de composantes VS)","Sort puissant (1 pt: relancer dégâts ≤ mod CHA)","Sort distant (1 pt: portée ×2)","Sort prolongé (1 pt: concentration 24h max)"]
+  }
+};
+
+// Table des emplacements de sorts par niveau de lanceur complet
+const SPELL_SLOTS_FULL = {
+  1:[2,0,0,0,0,0,0,0,0],2:[3,0,0,0,0,0,0,0,0],3:[4,2,0,0,0,0,0,0,0],4:[4,3,0,0,0,0,0,0,0],
+  5:[4,3,2,0,0,0,0,0,0],6:[4,3,3,0,0,0,0,0,0],7:[4,3,3,1,0,0,0,0,0],8:[4,3,3,2,0,0,0,0,0],
+  9:[4,3,3,3,1,0,0,0,0],10:[4,3,3,3,2,0,0,0,0],11:[4,3,3,3,2,1,0,0,0],12:[4,3,3,3,2,1,0,0,0],
+  13:[4,3,3,3,2,1,1,0,0],14:[4,3,3,3,2,1,1,0,0],15:[4,3,3,3,2,1,1,1,0],16:[4,3,3,3,2,1,1,1,0],
+  17:[4,3,3,3,2,1,1,1,1],18:[4,3,3,3,3,1,1,1,1],19:[4,3,3,3,3,2,1,1,1],20:[4,3,3,3,3,2,2,1,1]
+};
+const SPELL_SLOTS_HALF = {
+  2:[2,0,0,0,0],3:[3,0,0,0,0],4:[3,0,0,0,0],5:[4,2,0,0,0],6:[4,2,0,0,0],7:[4,3,0,0,0],8:[4,3,0,0,0],
+  9:[4,3,2,0,0],10:[4,3,2,0,0],11:[4,3,3,0,0],12:[4,3,3,0,0],13:[4,3,3,1,0],14:[4,3,3,1,0],
+  15:[4,3,3,2,0],16:[4,3,3,2,0],17:[4,3,3,3,1],18:[4,3,3,3,1],19:[4,3,3,3,2],20:[4,3,3,3,2]
+};
+const SPELL_SLOTS_WARLOCK = {
+  1:[1,1],2:[2,1],3:[2,2],4:[2,2],5:[2,3],6:[2,3],7:[2,4],8:[2,4],9:[2,5],10:[2,5],
+  11:[3,5],12:[3,5],13:[3,5],14:[3,5],15:[3,5],16:[3,5],17:[4,5],18:[4,5],19:[4,5],20:[4,5]
+};
+
+// XP thresholds par niveau
+const XP_THRESHOLDS = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,100000,120000,140000,165000,195000,225000,265000,305000,355000];
  
 const BACKGROUNDS = {
   "Acolyte":{ skills:["Intuition","Religion"], lang:2, equipment:"Symbole sacré, livre de prières, 5 bâtonnets d'encens, vêtements d'apparat, 15po", feature:"Abri des fidèles" },
@@ -1097,212 +1416,234 @@ function buildNestedUpdate(field, val) {
 // ============================================================
 // MONTÉE DE NIVEAU / MULTICLASSAGE
 // ============================================================
+
+function gatherLevelUpInfo(className, newClassLevel, charData) {
+  const clData = CLASSES[className];
+  if (!clData) return { baseFeatures:[], subclassFeatures:[], isAsiLevel:false, subclassLevel:false, subclassData:null };
+  const baseFeatures = (clData.features||[]).filter(f => f.lvl === newClassLevel);
+  const asiLevels = getAsiLevels(className);
+  const isAsiLevel = asiLevels.includes(newClassLevel);
+  const sc = SUBCLASSES[className];
+  const subclassLevel = sc && newClassLevel === sc.level;
+  const chosenSubclass = charData?.subclasses?.[className];
+  let subclassFeatures = [];
+  if (sc && chosenSubclass && sc.options[chosenSubclass]) {
+    subclassFeatures = sc.options[chosenSubclass].features.filter(f => f.lvl === newClassLevel);
+  }
+  return { baseFeatures, subclassFeatures, isAsiLevel, subclassLevel, subclassData: sc };
+}
+
 window._openLevelUp = async (charId) => {
   const snap = await getDoc(doc(db, "characters", charId));
   if (!snap.exists()) return;
   const d = snap.data();
   const classes = getClasses(d);
   const tLvl = totalLevel(d);
- 
   const content = document.getElementById('forgeContent');
-  const progressEl = document.getElementById('forgeProgress');
-  progressEl.innerHTML = '<div class="progress-step active">⬆</div>';
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">\u2B06</div>';
   document.getElementById('forgePrev').style.visibility = 'hidden';
   document.getElementById('forgeNext').style.display = 'none';
- 
-  let html = `<h3 class="step-title">⬆ Montée de niveau</h3>`;
-  html += `<div class="info-box" style="margin-bottom:14px">
-    <strong>${d.name}</strong> — Niveau total actuel : <strong>${tLvl}</strong><br>
-    Classes : <strong>${classesDisplayFull(d)}</strong>
-  </div>`;
- 
-  // Choix de la classe
-  html += `<div class="field-group"><label>Dans quelle classe monter de niveau ?</label>`;
-  html += `<select id="lvlup_class" onchange="window._previewLevelUp()">`;
-  // Classes existantes
-  classes.forEach(c => {
-    html += `<option value="${c.name}" data-existing="true">${c.name} (niv.${c.level} → ${c.level+1})</option>`;
-  });
-  // Nouvelles classes (multiclassage)
-  Object.keys(CLASSES).forEach(cl => {
-    if (!classes.find(c => c.name === cl)) {
-      html += `<option value="${cl}" data-existing="false">⚔ MULTICLASSAGE : ${cl}</option>`;
-    }
-  });
-  html += `</select></div>`;
- 
-  // Méthode PV
-  html += `<div class="field-group"><label>Méthode de calcul des PV gagnés</label>
-    <select id="lvlup_hp_mode" onchange="window._previewLevelUp()">
-      <option value="average">Moyenne (recommandé)</option>
-      <option value="max">Maximum du dé</option>
-      <option value="roll">Lancer de dé (aléatoire)</option>
-    </select></div>`;
- 
-  // Prévisualisation
-  html += `<div id="lvlup_preview" class="info-box" style="margin-top:12px"></div>`;
- 
-  // Boutons
-  html += `<div style="display:flex;gap:10px;margin-top:16px">
-    <button class="btn-gold" onclick="window._confirmLevelUp('${charId}')">✓ CONFIRMER LA MONTÉE</button>
-    <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
-  </div>`;
- 
-  content.innerHTML = html;
-  document.getElementById('forgeOverlay').style.display = 'flex';
- 
-  // Store data for preview
   window._lvlupCharData = d;
   window._lvlupCharId = charId;
-  window._previewLevelUp();
+
+  let html = `<h3 class="step-title">\u2B06 Montée de niveau</h3>`;
+  html += `<div class="info-box" style="margin-bottom:14px"><strong>${d.name}</strong> — Niveau total : <strong>${tLvl}</strong><br>Classes : <strong>${classesDisplayFull(d)}</strong>${d.xp !== undefined ? `<br>XP : ${d.xp||0} / ${XP_THRESHOLDS[tLvl]||'—'}` : ''}</div>`;
+  html += `<div class="field-group"><label>Dans quelle classe monter ?</label><select id="lvlup_class" onchange="window._renderLevelUpDetails()">`;
+  classes.forEach(c => { html += `<option value="${c.name}">${c.name} (niv.${c.level} \u2192 ${c.level+1})</option>`; });
+  Object.keys(CLASSES).forEach(cl => { if (!classes.find(c => c.name === cl)) html += `<option value="${cl}">\u2694 MULTICLASSAGE : ${cl}</option>`; });
+  html += `</select></div>`;
+  html += `<div class="field-group"><label>Méthode PV</label><select id="lvlup_hp_mode" onchange="window._renderLevelUpDetails()"><option value="average">Moyenne</option><option value="max">Maximum</option><option value="roll">Lancer de dé</option></select></div>`;
+  html += `<div id="lvlup_details"></div>`;
+  html += `<div style="display:flex;gap:10px;margin-top:16px"><button class="btn-gold" onclick="window._confirmLevelUp('${charId}')">\u2713 CONFIRMER</button><button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button></div>`;
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+  window._renderLevelUpDetails();
 };
- 
-window._previewLevelUp = () => {
-  const d = window._lvlupCharData;
-  if (!d) return;
+
+window._renderLevelUpDetails = () => {
+  const d = window._lvlupCharData; if (!d) return;
   const chosenClass = document.getElementById('lvlup_class')?.value;
   const hpMode = document.getElementById('lvlup_hp_mode')?.value || 'average';
-  const clData = CLASSES[chosenClass];
-  if (!clData) return;
- 
+  const clData = CLASSES[chosenClass]; if (!clData) return;
   const classes = getClasses(d);
   const existing = classes.find(c => c.name === chosenClass);
   const newClassLevel = existing ? existing.level + 1 : 1;
   const newTotalLevel = totalLevel(d) + 1;
   const newPB = PROF_BONUS[newTotalLevel - 1] || 2;
   const conMod = mod(d.stats?.con || 10);
- 
-  let hpGainText = '';
-  if (hpMode === 'average') {
-    const avg = Math.ceil(clData.hd / 2) + 1;
-    hpGainText = `${avg} + ${conMod} (CON) = <strong>${avg + conMod}</strong> PV`;
-  } else if (hpMode === 'max') {
-    hpGainText = `${clData.hd} + ${conMod} (CON) = <strong>${clData.hd + conMod}</strong> PV`;
-  } else {
-    hpGainText = `1d${clData.hd} + ${conMod} (CON) = <strong>aléatoire (${1+conMod}–${clData.hd+conMod})</strong> PV`;
-  }
- 
-  // Features gained
-  const newFeatures = (clData.features || []).filter(f => f.lvl === newClassLevel);
-  let featuresHtml = newFeatures.length
-    ? newFeatures.map(f => `<div style="margin:3px 0"><strong>${f.name}:</strong> ${f.desc}</div>`).join('')
-    : '<em>Aucune nouvelle aptitude automatique pour ce niveau</em>';
- 
   const isMulticlass = !existing;
- 
-  const preview = document.getElementById('lvlup_preview');
-  preview.innerHTML = `
-    <strong>Prévisualisation :</strong><br>
-    ${isMulticlass ? `<span style="color:var(--gold)">⚔ Nouveau multiclassage en ${chosenClass} !</span><br>` : ''}
-    Niveau total : ${totalLevel(d)} → <strong>${newTotalLevel}</strong><br>
-    ${chosenClass} : niv.${existing ? existing.level : 0} → <strong>${newClassLevel}</strong><br>
-    Bonus de maîtrise : +${profBonus(totalLevel(d))} → <strong>+${newPB}</strong><br>
-    PV gagnés : ${hpGainText}<br>
-    Dé de vie : d${clData.hd}<br>
-    ${isMulticlass ? `<br><strong>Sauvegardes :</strong> ${clData.saves.map(s=>s.toUpperCase()).join(', ')}<br>` : ''}
-    <br><strong>Aptitudes obtenues :</strong><br>
-    ${featuresHtml}`;
+  const info = gatherLevelUpInfo(chosenClass, newClassLevel, d);
+  const sc = SUBCLASSES[chosenClass];
+
+  let hpGain, hpText;
+  if (hpMode === 'average') { hpGain = Math.ceil(clData.hd/2)+1+conMod; hpText = `${Math.ceil(clData.hd/2)+1}+${conMod}(CON) = <strong>${hpGain}</strong>`; }
+  else if (hpMode === 'max') { hpGain = clData.hd+conMod; hpText = `${clData.hd}+${conMod}(CON) = <strong>${hpGain}</strong>`; }
+  else { hpText = `1d${clData.hd}+${conMod}(CON) = <strong>aléatoire</strong>`; hpGain = null; }
+
+  let html = `<div class="lvlup-section"><div class="lvlup-header">\uD83D\uDCCA Résumé</div><div class="lvlup-body">`;
+  if (isMulticlass) html += `<div style="color:var(--gold);font-weight:600;margin-bottom:6px">\u2694 Nouveau multiclassage en ${chosenClass}</div>`;
+  html += `<div class="lvlup-row"><span>Niveau total</span><strong>${totalLevel(d)} \u2192 ${newTotalLevel}</strong></div>`;
+  html += `<div class="lvlup-row"><span>${chosenClass}</span><strong>Niv.${existing?existing.level:0} \u2192 ${newClassLevel}</strong></div>`;
+  html += `<div class="lvlup-row"><span>Bonus maîtrise</span><strong>+${profBonus(totalLevel(d))} \u2192 +${newPB}</strong></div>`;
+  html += `<div class="lvlup-row"><span>PV gagnés</span>${hpText}</div>`;
+  html += `<div class="lvlup-row"><span>Dé de vie</span><strong>+1d${clData.hd}</strong></div></div></div>`;
+
+  // Subclass selection
+  if (info.subclassLevel && sc) {
+    const already = d.subclasses?.[chosenClass];
+    if (!already) {
+      html += `<div class="lvlup-section"><div class="lvlup-header">\uD83C\uDFF0 ${sc.label}</div><div class="lvlup-body">`;
+      html += `<p style="font-size:0.85rem;color:#666;margin-bottom:8px">Choisissez votre ${sc.label.toLowerCase()} :</p>`;
+      html += `<select id="lvlup_subclass" onchange="window._updateSubclassPreview()"><option value="">— Choisir —</option>`;
+      Object.keys(sc.options).forEach(o => { html += `<option value="${o}">${o}</option>`; });
+      html += `</select><div id="subclass_preview" style="margin-top:8px"></div></div></div>`;
+    }
+  }
+  // Existing subclass features for this level
+  if (sc && d.subclasses?.[chosenClass] && !info.subclassLevel) {
+    const subName = d.subclasses[chosenClass];
+    const subFeats = sc.options[subName]?.features?.filter(f => f.lvl === newClassLevel) || [];
+    if (subFeats.length) {
+      html += `<div class="lvlup-section"><div class="lvlup-header">\uD83C\uDFF0 ${subName}</div><div class="lvlup-body">`;
+      subFeats.forEach(f => { html += `<div class="lvlup-feature"><strong>${f.name}</strong><div class="lvlup-feature-desc">${f.desc}</div></div>`; });
+      html += `</div></div>`;
+    }
+  }
+
+  // Base class features
+  if (info.baseFeatures.length) {
+    html += `<div class="lvlup-section"><div class="lvlup-header">\u2694 Aptitudes de classe</div><div class="lvlup-body">`;
+    info.baseFeatures.forEach(f => { html += `<div class="lvlup-feature"><strong>${f.name}</strong><div class="lvlup-feature-desc">${f.desc}</div></div>`; });
+    html += `</div></div>`;
+  }
+
+  // ASI / Feat
+  if (info.isAsiLevel) {
+    html += `<div class="lvlup-section"><div class="lvlup-header">\u2B50 Amélioration / Don</div><div class="lvlup-body">`;
+    html += `<select id="lvlup_asi_mode" onchange="window._toggleAsiMode()"><option value="asi">+2 à une carac. ou +1 à deux</option><option value="feat">Choisir un don</option></select>`;
+    html += `<div id="asi_details" style="margin-top:10px"><div class="field-row">`;
+    html += `<div class="field-group"><label>Caractéristique 1</label><select id="lvlup_asi_stat1"><option value="">—</option>`;
+    ['str','dex','con','int','wis','cha'].forEach(s => { html += `<option value="${s}">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]} (${d.stats?.[s]||10})</option>`; });
+    html += `</select></div><div class="field-group"><label>Bonus</label><select id="lvlup_asi_val1" onchange="document.getElementById('asi_row2').style.display=this.value==='1'?'grid':'none'"><option value="2" selected>+2</option><option value="1">+1 (et +1 autre)</option></select></div></div>`;
+    html += `<div class="field-row" id="asi_row2" style="display:none"><div class="field-group"><label>Caractéristique 2</label><select id="lvlup_asi_stat2"><option value="">—</option>`;
+    ['str','dex','con','int','wis','cha'].forEach(s => { html += `<option value="${s}">${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[s]} (${d.stats?.[s]||10})</option>`; });
+    html += `</select></div><div class="field-group"><label>&nbsp;</label><span style="padding-top:6px;display:block">+1</span></div></div></div>`;
+    html += `<div id="feat_details" style="display:none;margin-top:10px"><div class="field-group"><label>Nom du don</label><input id="lvlup_feat_name" type="text" placeholder="Ex: Sentinelle, Alerte..."></div><div class="field-group"><label>Description</label><textarea id="lvlup_feat_desc" rows="2" placeholder="Effets du don..."></textarea></div></div>`;
+    html += `</div></div>`;
+  }
+
+  if (!info.baseFeatures.length && !info.subclassFeatures.length && !info.isAsiLevel && !info.subclassLevel) {
+    html += `<div class="lvlup-section"><div class="lvlup-header">\uD83D\uDCCB Aptitudes</div><div class="lvlup-body"><em style="color:#888">Pas de nouvelle aptitude à ce niveau (vérifiez les emplacements de sorts).</em></div></div>`;
+  }
+
+  document.getElementById('lvlup_details').innerHTML = html;
 };
- 
+
+window._updateSubclassPreview = () => {
+  const chosen = document.getElementById('lvlup_subclass')?.value;
+  const prev = document.getElementById('subclass_preview');
+  if (!prev) return;
+  const chosenClass = document.getElementById('lvlup_class')?.value;
+  const sc = SUBCLASSES[chosenClass];
+  if (!chosen || !sc?.options[chosen]) { prev.innerHTML = ''; return; }
+  const classes = getClasses(window._lvlupCharData);
+  const existing = classes.find(c => c.name === chosenClass);
+  const newClassLevel = existing ? existing.level + 1 : 1;
+  const feats = sc.options[chosen].features.filter(f => f.lvl === newClassLevel);
+  const allFeats = sc.options[chosen].features;
+  let html = '';
+  if (feats.length) {
+    html += feats.map(f => `<div class="lvlup-feature"><strong>${f.name}</strong><div class="lvlup-feature-desc">${f.desc}</div></div>`).join('');
+  }
+  html += `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:0.78rem;color:var(--gold)">Voir toutes les aptitudes futures</summary>`;
+  html += allFeats.filter(f=>f.lvl>newClassLevel).map(f => `<div style="font-size:0.8rem;margin:3px 0;color:#888"><strong>Niv.${f.lvl} — ${f.name}:</strong> ${f.desc}</div>`).join('');
+  html += `</details>`;
+  prev.innerHTML = html;
+};
+
+window._toggleAsiMode = () => {
+  const mode = document.getElementById('lvlup_asi_mode')?.value;
+  document.getElementById('asi_details').style.display = mode === 'asi' ? 'block' : 'none';
+  document.getElementById('feat_details').style.display = mode === 'feat' ? 'block' : 'none';
+};
+
 window._confirmLevelUp = async (charId) => {
   const snap = await getDoc(doc(db, "characters", charId));
   if (!snap.exists()) return;
   const d = snap.data();
   const classes = getClasses(d);
- 
   const chosenClass = document.getElementById('lvlup_class').value;
   const hpMode = document.getElementById('lvlup_hp_mode').value;
-  const clData = CLASSES[chosenClass];
-  if (!clData) return;
- 
-  // Update classes array
+  const clData = CLASSES[chosenClass]; if (!clData) return;
+
   const newClasses = classes.map(c => ({...c}));
   const existing = newClasses.find(c => c.name === chosenClass);
   let newClassLevel;
-  if (existing) {
-    existing.level += 1;
-    newClassLevel = existing.level;
-  } else {
-    newClasses.push({ name: chosenClass, level: 1 });
-    newClassLevel = 1;
-  }
- 
+  if (existing) { existing.level += 1; newClassLevel = existing.level; }
+  else { newClasses.push({ name: chosenClass, level: 1 }); newClassLevel = 1; }
   const newTotalLevel = newClasses.reduce((s, c) => s + c.level, 0);
   const newPB = PROF_BONUS[newTotalLevel - 1] || 2;
- 
-  // Calculate HP gain
+
   const conMod = mod(d.stats?.con || 10);
-  let hpGain = 0;
-  if (hpMode === 'average') {
-    hpGain = Math.ceil(clData.hd / 2) + 1 + conMod;
-  } else if (hpMode === 'max') {
-    hpGain = clData.hd + conMod;
-  } else {
-    hpGain = Math.floor(Math.random() * clData.hd) + 1 + conMod;
-  }
+  let hpGain;
+  if (hpMode === 'average') hpGain = Math.ceil(clData.hd/2)+1+conMod;
+  else if (hpMode === 'max') hpGain = clData.hd+conMod;
+  else hpGain = Math.floor(Math.random()*clData.hd)+1+conMod;
   hpGain = Math.max(1, hpGain);
- 
-  // New features for this class level
-  const newFeatures = (clData.features || [])
-    .filter(f => f.lvl === newClassLevel)
-    .map(f => ({ name: `${f.name} (${chosenClass})`, desc: f.desc }));
- 
-  // Rebuild hit dice string
-  const hitDiceStr = newClasses.map(c => {
-    const cd = CLASSES[c.name];
-    return `${c.level}d${cd ? cd.hd : 8}`;
-  }).join(' + ');
- 
-  // Build update for saves if multiclassing into new class
-  const newSaves = {...(d.saveProficiencies || {})};
-  if (!existing) {
-    // Multiclassing doesn't give new save proficiencies in 5e
-    // but we keep existing ones
+
+  const info = gatherLevelUpInfo(chosenClass, newClassLevel, d);
+  let newFeatures = info.baseFeatures.map(f => ({name:f.name, desc:f.desc, src:chosenClass, lvl:newClassLevel}));
+
+  const newSubclasses = {...(d.subclasses || {})};
+  const sc = SUBCLASSES[chosenClass];
+  const subSel = document.getElementById('lvlup_subclass');
+  if (subSel && subSel.value) {
+    newSubclasses[chosenClass] = subSel.value;
+    const subFeats = sc.options[subSel.value]?.features?.filter(f=>f.lvl===newClassLevel) || [];
+    newFeatures.push(...subFeats.map(f=>({name:`${f.name} (${subSel.value})`,desc:f.desc,src:chosenClass,lvl:newClassLevel})));
+  } else if (d.subclasses?.[chosenClass] && sc) {
+    const subName = d.subclasses[chosenClass];
+    const subFeats = sc.options[subName]?.features?.filter(f=>f.lvl===newClassLevel) || [];
+    newFeatures.push(...subFeats.map(f=>({name:`${f.name} (${subName})`,desc:f.desc,src:chosenClass,lvl:newClassLevel})));
   }
- 
-  // Determine spellcaster info (use highest-level caster class)
+
+  const newStats = {...(d.stats || {})};
+  if (info.isAsiLevel) {
+    const asiMode = document.getElementById('lvlup_asi_mode')?.value;
+    if (asiMode === 'feat') {
+      const fn = document.getElementById('lvlup_feat_name')?.value||'Don';
+      const fd = document.getElementById('lvlup_feat_desc')?.value||'';
+      newFeatures.push({name:`Don: ${fn}`,desc:fd,src:chosenClass,lvl:newClassLevel});
+    } else {
+      const s1 = document.getElementById('lvlup_asi_stat1')?.value;
+      const v1 = parseInt(document.getElementById('lvlup_asi_val1')?.value)||2;
+      if (s1) { newStats[s1] = Math.min(20,(newStats[s1]||10)+v1);
+        if (v1===1) { const s2=document.getElementById('lvlup_asi_stat2')?.value; if(s2) newStats[s2]=Math.min(20,(newStats[s2]||10)+1); }
+      }
+      const desc = s1 ? `${s1.toUpperCase()} +${v1}${v1===1&&document.getElementById('lvlup_asi_stat2')?.value?', '+document.getElementById('lvlup_asi_stat2').value.toUpperCase()+' +1':''}` : 'Amélioration';
+      newFeatures.push({name:'Amélioration de caractéristique',desc,src:chosenClass,lvl:newClassLevel});
+    }
+  }
+
+  const hitDiceStr = newClasses.map(c=>`${c.level}d${(CLASSES[c.name]||{hd:8}).hd}`).join(' + ');
+  const classDisplayStr = newClasses.length===1 ? newClasses[0].name : newClasses.map(c=>`${c.name} ${c.level}`).join(' / ');
   let spellUpdate = {};
-  const casterClasses = newClasses.filter(c => CLASSES[c.name]?.spellcaster);
-  if (casterClasses.length > 0) {
-    // Use the primary (first) caster class for spell ability
-    const primaryCaster = casterClasses[0];
-    const pcData = CLASSES[primaryCaster.name];
-    spellUpdate = {
-      spellcaster: true,
-      spellAbility: pcData.spellAbility,
-      spellAttackBonus: newPB + mod(d.stats?.[pcData.spellAbility] || 10),
-      spellSaveDC: 8 + newPB + mod(d.stats?.[pcData.spellAbility] || 10),
-    };
+  const casterClasses = newClasses.filter(c=>CLASSES[c.name]?.spellcaster);
+  if (casterClasses.length>0) { const pc=casterClasses[0]; const pcD=CLASSES[pc.name];
+    spellUpdate={spellcaster:true,spellAbility:pcD.spellAbility,spellAttackBonus:newPB+mod(newStats[pcD.spellAbility]||10),spellSaveDC:8+newPB+mod(newStats[pcD.spellAbility]||10)};
   }
- 
-  // Update the class field for backward compat display
-  const classDisplayStr = newClasses.length === 1 ? newClasses[0].name : newClasses.map(c=>`${c.name} ${c.level}`).join(' / ');
- 
-  const update = {
-    classes: newClasses,
-    class: classDisplayStr,
-    level: newTotalLevel,
-    hpMax: (d.hpMax || 0) + hpGain,
-    hp: (d.hp || 0) + hpGain,
-    profBonus: newPB,
-    hitDice: hitDiceStr,
-    features: [...(d.features || []), ...newFeatures],
-    ...spellUpdate,
-  };
- 
-  await updateDoc(doc(db, "characters", charId), update);
- 
-  // Show result
+
+  const update = {classes:newClasses,class:classDisplayStr,level:newTotalLevel,stats:newStats,
+    hpMax:(d.hpMax||0)+hpGain,hp:(d.hp||0)+hpGain,profBonus:newPB,hitDice:hitDiceStr,
+    features:[...(d.features||[]),...newFeatures],subclasses:newSubclasses,...spellUpdate};
+  await updateDoc(doc(db,"characters",charId),update);
+
   const content = document.getElementById('forgeContent');
-  content.innerHTML = `
-    <h3 class="step-title">✓ Niveau augmenté !</h3>
-    <div class="info-box">
-      <strong>${d.name}</strong> est maintenant <strong>${classDisplayStr}</strong> — Niveau total <strong>${newTotalLevel}</strong><br>
-      PV gagnés : <strong>+${hpGain}</strong> (nouveau max : ${(d.hpMax||0)+hpGain})<br>
-      ${newFeatures.length ? `<br><strong>Nouvelles aptitudes :</strong><br>${newFeatures.map(f=>`• <strong>${f.name}:</strong> ${f.desc}`).join('<br>')}` : ''}
-    </div>
-    <button class="btn-gold" style="margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">FERMER</button>`;
- 
+  content.innerHTML = `<h3 class="step-title">\u2713 Niveau augmenté !</h3><div class="info-box">
+    <strong>${d.name}</strong> \u2192 <strong>${classDisplayStr}</strong> — Niv.${newTotalLevel}<br>
+    PV: <strong>+${hpGain}</strong> (max: ${(d.hpMax||0)+hpGain})
+    ${newFeatures.length?`<br><br><strong>Nouvelles aptitudes :</strong>${newFeatures.map(f=>`<div class="lvlup-feature" style="margin:4px 0"><strong>${f.name}:</strong> ${f.desc}</div>`).join('')}`:''}
+  </div><button class="btn-gold" style="margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">FERMER</button>`;
   window._lvlupCharData = null;
 };
 
@@ -1471,6 +1812,18 @@ nav button:last-child { color:#884444; }
   font-family:'Cinzel'; font-size:0.72rem; letter-spacing:2px; border-radius:3px; transition:all 0.2s; }
 .btn-levelup:hover { background:linear-gradient(135deg, #3a8e3a, #2a6e2a); transform:translateY(-1px); box-shadow:0 4px 12px rgba(42,110,42,0.5); }
 .sheet-levelup-row { margin-top:10px; }
+
+/* ── LEVEL UP DETAILS ── */
+.lvlup-section { background:#fff; border:1px solid #d4c4a0; border-radius:4px; margin:12px 0; overflow:hidden; }
+.lvlup-header { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
+  font-size:0.72rem; letter-spacing:1.5px; padding:7px 12px; }
+.lvlup-body { padding:10px 14px; }
+.lvlup-row { display:flex; justify-content:space-between; padding:4px 0; font-size:0.88rem; border-bottom:1px solid #f0e8d8; }
+.lvlup-row:last-child { border-bottom:none; }
+.lvlup-feature { margin:6px 0; padding:6px 10px; background:#fff8ee; border-left:3px solid var(--gold); border-radius:2px; }
+.lvlup-feature strong { color:var(--ink); font-size:0.88rem; }
+.lvlup-feature-desc { font-size:0.82rem; color:#555; margin-top:2px; line-height:1.4; }
+.lvlup-select { width:100%; }
  
 /* ── LIST TAB ── */
 #tab-list { background:var(--parch); min-height:100vh; padding:30px 20px; max-width:700px; margin:auto; }
