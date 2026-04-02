@@ -1,171 +1,203 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — D&D 5e</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grimoire — RPG Companion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
+            authDomain: "kubbndonjons.firebaseapp.com",
+            projectId: "kubbndonjons",
+            storageBucket: "kubbndonjons.firebasestorage.app",
+            messagingSenderId: "875521195069",
+            appId: "1:875521195069:web:550930281db865a35c7e54"
+        };
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
-    authDomain: "kubbndonjons.firebaseapp.com",
-    projectId: "kubbndonjons",
-    storageBucket: "kubbndonjons.firebasestorage.app",
-    messagingSenderId: "875521195069",
-    appId: "1:875521195069:web:550930281db865a35c7e54"
-  };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+        let currentUid = null;
+        let activeCharId = null;
 
-  window._doSignup = async () => {
-    const email = document.getElementById('authEmail').value;
-    const pass = document.getElementById('authPass').value;
-    try { await createUserWithEmailAndPassword(auth, email, pass); } 
-    catch(e) { document.getElementById('authError').textContent = "Erreur : " + e.message; }
-  };
+        // --- AUTH LOGIC ---
+        window._doLogin = () => {
+            const e = document.getElementById('authEmail').value;
+            const p = document.getElementById('authPass').value;
+            signInWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
+        };
 
-  window._doLogin = async () => {
-    const email = document.getElementById('authEmail').value;
-    const pass = document.getElementById('authPass').value;
-    try { await signInWithEmailAndPassword(auth, email, pass); } 
-    catch(e) { document.getElementById('authError').textContent = "Identifiants incorrects."; }
-  };
+        window._doSignup = () => {
+            const e = document.getElementById('authEmail').value;
+            const p = document.getElementById('authPass').value;
+            createUserWithEmailAndPassword(auth, e, p).catch(err => alert(err.message));
+        };
 
-  window._doLogout = () => signOut(auth);
+        window._doLogout = () => signOut(auth);
 
-  onAuthStateChanged(auth, user => {
-    document.getElementById('authScreen').style.display = user ? 'none' : 'flex';
-    document.getElementById('sheetScreen').style.display = user ? 'block' : 'none';
-    if(user) document.getElementById('userEmail').textContent = user.email;
-  });
-</script>
+        onAuthStateChanged(auth, user => {
+            const authScreen = document.getElementById('authScreen');
+            const appScreen = document.getElementById('appScreen');
+            if (user) {
+                currentUid = user.uid;
+                authScreen.style.display = 'none';
+                appScreen.style.display = 'block';
+                loadCharacterList();
+            } else {
+                authScreen.style.display = 'flex';
+                appScreen.style.display = 'none';
+            }
+        });
 
-<style>
-  :root {
-    --parchment: #f2e8d5;
-    --ink: #2c1a0e;
-    --ink-faded: #8b6a45;
-    --gold: #b8860b;
-    --gold-light: #d4a017;
-    --crimson: #8b1a1a;
-  }
+        // --- NAVIGATION ---
+        window._showTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        };
 
-  body {
-    background: #b39d89;
-    background-image: radial-gradient(ellipse at 20% 50%, #2d1a08, transparent 60%);
-    min-height: 100vh;
-    font-family: 'Crimson Pro', serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 0;
-  }
+        // --- CHARACTER LOGIC ---
+        async function loadCharacterList() {
+            const q = query(collection(db, "characters"), where("owner", "==", currentUid));
+            onSnapshot(q, (snapshot) => {
+                const list = document.getElementById('charList');
+                list.innerHTML = '';
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const btn = document.createElement('div');
+                    btn.className = 'char-card';
+                    btn.innerHTML = `<strong>${data.name || 'Sans nom'}</strong><br><small>${data.class || 'Niveau 1'}</small>`;
+                    btn.onclick = () => selectCharacter(docSnap.id);
+                    list.appendChild(btn);
+                });
+            });
+        }
 
-  /* Style de la boîte de connexion (Style Grimoire) */
-  #authScreen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 400px;
-    padding: 40px;
-    background: var(--parchment);
-    border-radius: 4px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 40px rgba(180,140,80,0.1);
-    position: relative;
-  }
+        window._createChar = async () => {
+            const name = prompt("Nom du héros ?");
+            if (name) {
+                await addDoc(collection(db, "characters"), {
+                    name: name,
+                    owner: currentUid,
+                    hp: 20, hpMax: 20, ac: 10,
+                    conditions: [],
+                    slots: [2, 0, 0]
+                });
+            }
+        };
 
-  /* Ornements de coins */
-  #authScreen::before, #authScreen::after {
-    content: '';
-    position: absolute;
-    width: 50px;
-    height: 50px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M2,2 L20,2 M2,2 L2,20' stroke='%236b4423' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-  }
-  #authScreen::before { top: 15px; left: 15px; }
-  #authScreen::after { bottom: 15px; right: 15px; transform: rotate(180deg); }
+        function selectCharacter(id) {
+            activeCharId = id;
+            document.getElementById('activeCharIdDisplay').textContent = id;
+            onSnapshot(doc(db, "characters", id), (docSnap) => {
+                const data = docSnap.data();
+                document.getElementById('charNameDisp').textContent = data.name;
+                document.getElementById('hpVal').textContent = `${data.hp}/${data.hpMax}`;
+                document.getElementById('acVal').textContent = data.ac;
+                // Update other fields...
+            });
+            window._showTab('tab-sheet');
+        }
 
-  h2 { font-family: 'Cinzel', serif; color: var(--ink); margin-bottom: 5px; letter-spacing: 2px; }
-  p.subtitle { font-size: 0.8rem; color: var(--ink-faded); font-style: italic; margin-bottom: 25px; }
+        window._updateStat = async (field, value) => {
+            if (!activeCharId) return;
+            await updateDoc(doc(db, "characters", activeCharId), { [field]: value });
+        };
 
-  .input-group { width: 100%; display: flex; flex-direction: column; margin-bottom: 15px; }
-  label { font-family: 'Cinzel', serif; font-size: 0.6rem; text-transform: uppercase; color: var(--ink-faded); margin-bottom: 5px; }
-  
-  input {
-    background: rgba(255,255,255,0.3);
-    border: 1px solid #d4c4a0;
-    border-bottom: 2px solid #d4c4a0;
-    padding: 10px;
-    font-family: 'Crimson Pro', serif;
-    font-size: 1rem;
-    outline: none;
-  }
-  input:focus { border-color: var(--gold); }
+        // --- GM LOGIC ---
+        window._watchChar = () => {
+            const id = document.getElementById('gmSearchId').value;
+            onSnapshot(doc(db, "characters", id), (docSnap) => {
+                if (!docSnap.exists()) return alert("Fiche introuvable");
+                const data = docSnap.data();
+                document.getElementById('gmMonitor').innerHTML = `
+                    <div class="gm-pc-card">
+                        <h4>${data.name}</h4>
+                        <p>❤️ HP: ${data.hp}/${data.hpMax} | 🛡️ CA: ${data.ac}</p>
+                        <p>✨ Slots: ${data.slots.join(' / ')}</p>
+                    </div>
+                `;
+            });
+        };
+    </script>
 
-  .btn-primary {
-    background: linear-gradient(135deg, #2c1a0e, #1a0f05);
-    color: var(--gold-light);
-    font-family: 'Cinzel', serif;
-    font-size: 0.7rem;
-    padding: 12px;
-    border: 1px solid var(--gold);
-    cursor: pointer;
-    width: 100%;
-    margin-top: 10px;
-    letter-spacing: 1px;
-  }
-  
-  .btn-secondary {
-    background: transparent;
-    color: var(--ink-faded);
-    border: 1px solid #d4c4a0;
-    font-family: 'Cinzel', serif;
-    font-size: 0.6rem;
-    padding: 8px;
-    cursor: pointer;
-    width: 100%;
-    margin-top: 10px;
-  }
-
-  #authError { color: var(--crimson); font-size: 0.8rem; margin-top: 15px; text-align: center; }
-
-  /* Style de la page après connexion */
-  #sheetScreen { display: none; color: white; text-align: center; }
-</style>
+    <style>
+        :root { --p: #f4ece1; --i: #2c1a0e; --g: #b8860b; }
+        body { background: #1a0f05; color: var(--i); font-family: 'Crimson Pro', serif; margin: 0; }
+        
+        /* Auth Screen */
+        #authScreen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(#2d1a08, #1a0f05); }
+        .auth-box { background: var(--p); padding: 30px; border-radius: 5px; width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; cursor: pointer; font-family: 'Cinzel'; border: none; transition: 0.3s; }
+        .btn-gold { background: var(--g); color: white; }
+        
+        /* App Structure */
+        nav { background: var(--i); padding: 10px; display: flex; justify-content: center; gap: 15px; }
+        nav button { width: auto; background: transparent; color: var(--g); font-size: 0.8rem; }
+        .tab-content { display: none; padding: 20px; max-width: 800px; margin: auto; background: var(--p); min-height: 80vh; box-shadow: 0 0 20px rgba(0,0,0,0.3); }
+        .active { display: block; }
+        
+        /* Elements */
+        .char-card { background: rgba(0,0,0,0.05); padding: 15px; margin: 10px 0; border-left: 4px solid var(--g); cursor: pointer; }
+        .stat-circle { width: 80px; height: 80px; border: 3px solid var(--g); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px; }
+        .gm-pc-card { background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+        .cinzel { font-family: 'Cinzel'; }
+    </style>
 </head>
 <body>
 
 <div id="authScreen">
-  <h2>⚔ Grimoire</h2>
-  <p class="subtitle">Accédez à vos chroniques</p>
-  
-  <div class="input-group">
-    <label>Email du Voyageur</label>
-    <input id="authEmail" type="email" placeholder="aventurier@donjon.fr">
-  </div>
-
-  <div class="input-group">
-    <label>Sceau de Sécurité</label>
-    <input id="authPass" type="password" placeholder="••••••••">
-  </div>
-
-  <button class="btn-primary" onclick="window._doLogin()">Entrer dans le Donjon</button>
-  <button class="btn-secondary" onclick="window._doSignup()">Créer un nouveau profil</button>
-  
-  <div id="authError"></div>
+    <div class="auth-box">
+        <h2 class="cinzel" style="text-align:center">GRIMOIRE</h2>
+        <input id="authEmail" type="email" placeholder="Email">
+        <input id="authPass" type="password" placeholder="Mot de passe">
+        <button class="btn-gold" onclick="window._doLogin()">SE CONNECTER</button>
+        <button style="background:none; color:#666; font-size:0.7rem" onclick="window._doSignup()">Créer un compte</button>
+    </div>
 </div>
 
-<div id="sheetScreen">
-  <p>Connecté en tant que : <span id="userEmail"></span></p>
-  <button class="btn-secondary" onclick="window._doLogout()">Quitter le Grimoire</button>
+<div id="appScreen" style="display:none">
+    <nav>
+        <button onclick="_showTab('tab-list')">MES FICHES</button>
+        <button onclick="_showTab('tab-sheet')">GRIMOIRE</button>
+        <button onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
+        <button onclick="_doLogout()" style="color: #8b1a1a;">QUITTER</button>
+    </nav>
+
+    <div id="tab-list" class="tab-content active">
+        <h2 class="cinzel">Vos Chroniques</h2>
+        <div id="charList"></div>
+        <button class="btn-gold" onclick="_createChar()">+ NOUVEAU HÉROS</button>
+    </div>
+
+    <div id="tab-sheet" class="tab-content">
+        <h2 id="charNameDisp" class="cinzel">Nom du Héros</h2>
+        <div style="display:flex; justify-content: space-around;">
+            <div class="stat-circle"><small>PV</small><b id="hpVal">0/0</b></div>
+            <div class="stat-circle"><small>CA</small><b id="acVal">0</b></div>
+        </div>
+        <p style="font-size: 0.7rem; color: #666; text-align: center;">ID de partage : <span id="activeCharIdDisplay"></span></p>
+        <hr>
+        <p><i>Système de dés et inventaire en cours de synchronisation...</i></p>
+    </div>
+
+    <div id="tab-gm" class="tab-content">
+        <h2 class="cinzel">Écran du Maître</h2>
+        <div style="display:flex; gap:10px">
+            <input id="gmSearchId" type="text" placeholder="Coller l'ID de la fiche">
+            <button class="btn-gold" style="width:150px" onclick="_watchChar()">SUIVRE</button>
+        </div>
+        <div id="gmMonitor" style="margin-top:20px">
+            <p>Entrez l'ID d'un joueur pour surveiller ses stats en temps réel.</p>
+        </div>
+    </div>
 </div>
 
 </body>
