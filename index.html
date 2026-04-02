@@ -10,8 +10,6 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, onSnapshot, getDoc }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
@@ -24,19 +22,19 @@
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-  const db = getFirestore(app);
 
-  // Exposition des fonctions pour le script classique
   window._doSignup = async () => {
     const email = document.getElementById('authEmail').value;
     const pass = document.getElementById('authPass').value;
-    try { await createUserWithEmailAndPassword(auth, email, pass); } catch(e) { alert(e.message); }
+    try { await createUserWithEmailAndPassword(auth, email, pass); } 
+    catch(e) { document.getElementById('authError').textContent = "Erreur : " + e.message; }
   };
 
   window._doLogin = async () => {
     const email = document.getElementById('authEmail').value;
     const pass = document.getElementById('authPass').value;
-    try { await signInWithEmailAndPassword(auth, email, pass); } catch(e) { alert(e.message); }
+    try { await signInWithEmailAndPassword(auth, email, pass); } 
+    catch(e) { document.getElementById('authError').textContent = "Identifiants incorrects."; }
   };
 
   window._doLogout = () => signOut(auth);
@@ -49,36 +47,125 @@
 </script>
 
 <style>
-  /* Le style que tu as déjà (extrait simplifié pour l'exemple) */
-  body { background: #1a0f05; color: #f2e8d5; font-family: 'Crimson Pro', serif; display: flex; justify-content: center; padding: 20px; }
-  #authScreen { display: flex; flex-direction: column; background: #f2e8d5; color: #2c1a0e; padding: 40px; border-radius: 4px; gap: 10px; margin-top: 50px; }
-  #sheetScreen { display: none; width: 100%; max-width: 800px; }
-  input { padding: 10px; margin-bottom: 10px; }
-  button { padding: 10px; cursor: pointer; background: #2c1a0e; color: #b8860b; border: none; }
+  :root {
+    --parchment: #f2e8d5;
+    --ink: #2c1a0e;
+    --ink-faded: #8b6a45;
+    --gold: #b8860b;
+    --gold-light: #d4a017;
+    --crimson: #8b1a1a;
+  }
+
+  body {
+    background: #1a0f05;
+    background-image: radial-gradient(ellipse at 20% 50%, #2d1a08, transparent 60%);
+    min-height: 100vh;
+    font-family: 'Crimson Pro', serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+  }
+
+  /* Style de la boîte de connexion (Style Grimoire) */
+  #authScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+    padding: 40px;
+    background: var(--parchment);
+    border-radius: 4px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 40px rgba(180,140,80,0.1);
+    position: relative;
+  }
+
+  /* Ornements de coins */
+  #authScreen::before, #authScreen::after {
+    content: '';
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M2,2 L20,2 M2,2 L2,20' stroke='%236b4423' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+  }
+  #authScreen::before { top: 15px; left: 15px; }
+  #authScreen::after { bottom: 15px; right: 15px; transform: rotate(180deg); }
+
+  h2 { font-family: 'Cinzel', serif; color: var(--ink); margin-bottom: 5px; letter-spacing: 2px; }
+  p.subtitle { font-size: 0.8rem; color: var(--ink-faded); font-style: italic; margin-bottom: 25px; }
+
+  .input-group { width: 100%; display: flex; flex-direction: column; margin-bottom: 15px; }
+  label { font-family: 'Cinzel', serif; font-size: 0.6rem; text-transform: uppercase; color: var(--ink-faded); margin-bottom: 5px; }
+  
+  input {
+    background: rgba(255,255,255,0.3);
+    border: 1px solid #d4c4a0;
+    border-bottom: 2px solid #d4c4a0;
+    padding: 10px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 1rem;
+    outline: none;
+  }
+  input:focus { border-color: var(--gold); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #2c1a0e, #1a0f05);
+    color: var(--gold-light);
+    font-family: 'Cinzel', serif;
+    font-size: 0.7rem;
+    padding: 12px;
+    border: 1px solid var(--gold);
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+    letter-spacing: 1px;
+  }
+  
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink-faded);
+    border: 1px solid #d4c4a0;
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    padding: 8px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  #authError { color: var(--crimson); font-size: 0.8rem; margin-top: 15px; text-align: center; }
+
+  /* Style de la page après connexion */
+  #sheetScreen { display: none; color: white; text-align: center; }
 </style>
 </head>
 <body>
 
 <div id="authScreen">
   <h2>⚔ Grimoire</h2>
-  <input id="authEmail" type="email" placeholder="Email">
-  <input id="authPass" type="password" placeholder="Mot de passe">
-  <button onclick="window._doLogin()">Se connecter</button>
-  <button onclick="window._doSignup()">Créer un compte</button>
+  <p class="subtitle">Accédez à vos chroniques</p>
+  
+  <div class="input-group">
+    <label>Email du Voyageur</label>
+    <input id="authEmail" type="email" placeholder="aventurier@donjon.fr">
+  </div>
+
+  <div class="input-group">
+    <label>Sceau de Sécurité</label>
+    <input id="authPass" type="password" placeholder="••••••••">
+  </div>
+
+  <button class="btn-primary" onclick="window._doLogin()">Entrer dans le Donjon</button>
+  <button class="btn-secondary" onclick="window._doSignup()">Créer un nouveau profil</button>
+  
+  <div id="authError"></div>
 </div>
 
 <div id="sheetScreen">
-  <header style="display:flex; justify-content: space-between; align-items: center;">
-    <h3>Grimoire D&D 5e</h3>
-    <div>
-      <span id="userEmail"></span>
-      <button onclick="window._doLogout()">Déconnexion</button>
-    </div>
-  </header>
-  <div style="background: #f2e8d5; color: #2c1a0e; padding: 40px; margin-top: 20px; border-radius: 4px;">
-    <h1>Fiche de Personnage</h1>
-    <p>Bienvenue dans ton grimoire !</p>
-  </div>
+  <p>Connecté en tant que : <span id="userEmail"></span></p>
+  <button class="btn-secondary" onclick="window._doLogout()">Quitter le Grimoire</button>
 </div>
 
 </body>
