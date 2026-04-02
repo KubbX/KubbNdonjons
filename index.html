@@ -47,8 +47,8 @@
     traits: "", notes: ""
   };
 
-  // ── AUTH UI ──────────────────────────────────────────────────────
-  async function doSignup() {
+ // ── AUTH UI (Modifié pour être accessible) ──────────────────────
+  window._doSignup = async function() {
     const email = document.getElementById('authEmail').value;
     const pass  = document.getElementById('authPass').value;
     try {
@@ -56,7 +56,7 @@
     } catch(e) { showAuthError(e.message); }
   }
 
-  async function doLogin() {
+  window._doLogin = async function() {
     const email = document.getElementById('authEmail').value;
     const pass  = document.getElementById('authPass').value;
     try {
@@ -64,22 +64,10 @@
     } catch(e) { showAuthError(e.message); }
   }
 
-  async function doLogout() {
+  window._doLogout = async function() {
     if (unsubscribe) unsubscribe();
     await signOut(auth);
   }
-
-  function showAuthError(msg) {
-    const el = document.getElementById('authError');
-    const map = {
-      'auth/email-already-in-use': 'Cet email est déjà utilisé.',
-      'auth/invalid-email': 'Email invalide.',
-      'auth/weak-password': 'Mot de passe trop faible (6 caractères min).',
-      'auth/invalid-credential': 'Email ou mot de passe incorrect.',
-    };
-    el.textContent = map[msg.split('(')[1]?.replace(')','').trim()] || msg;
-  }
-
   // ── AUTH STATE ───────────────────────────────────────────────────
   onAuthStateChanged(auth, async user => {
     currentUser = user;
