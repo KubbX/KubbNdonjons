@@ -2172,23 +2172,48 @@ const COMPENDIUM_DATA = {
 };
 
 // ============================================================
-// COMPENDIUM — FIRESTORE CRUD
+// COMPENDIUM — FIRESTORE CRUD (tout dans Firestore)
 // ============================================================
 let compendiumUnsubscribe = null;
-let compendiumCustomResources = [];
+let compendiumResources = [];
+let compendiumSeeded = false;
+
+// Seed: injecter les données de base dans Firestore si pas déjà fait
+async function seedCompendiumIfNeeded() {
+  if (compendiumSeeded) return;
+  // Check if system resources exist
+  const q = query(collection(db, "resources"), where("owner", "==", "system"));
+  const snap = await getDoc(doc(db, "meta", "compendium_seeded")).catch(() => null);
+  if (snap && snap.exists()) { compendiumSeeded = true; return; }
+  
+  // Seed all categories
+  const batch = [];
+  for (const [catId, items] of Object.entries(COMPENDIUM_DATA)) {
+    for (const item of items) {
+      batch.push(addDoc(collection(db, "resources"), {
+        ...item, type: catId, owner: "system", source: item.source || "PHB", createdAt: new Date().toISOString()
+      }));
+    }
+  }
+  await Promise.all(batch);
+  // Mark as seeded
+  await setDoc(doc(db, "meta", "compendium_seeded"), { seeded: true, date: new Date().toISOString() });
+  compendiumSeeded = true;
+}
 
 function loadCompendium() {
   if (compendiumUnsubscribe) compendiumUnsubscribe();
-  const q = query(collection(db, "resources"), where("owner", "in", [currentUid, "system"]));
-  compendiumUnsubscribe = onSnapshot(q, (snapshot) => {
-    compendiumCustomResources = [];
-    snapshot.forEach(docSnap => {
-      compendiumCustomResources.push({ id: docSnap.id, ...docSnap.data() });
+  seedCompendiumIfNeeded().then(() => {
+    const q = query(collection(db, "resources"), where("owner", "in", [currentUid, "system"]));
+    compendiumUnsubscribe = onSnapshot(q, (snapshot) => {
+      compendiumResources = [];
+      snapshot.forEach(docSnap => {
+        compendiumResources.push({ _docId: docSnap.id, ...docSnap.data() });
+      });
+      if (document.getElementById('tab-compendium')?.classList.contains('active')) {
+        renderCompendiumList(window._currentCompCategory || 'armor');
+      }
     });
-    // Re-render if compendium tab is active
-    if (document.getElementById('tab-compendium')?.classList.contains('active')) {
-      renderCompendiumList(window._currentCompCategory || 'armor');
-    }
   });
 }
 
@@ -2197,10 +2222,30 @@ async function addCustomResource(category, data) {
   await addDoc(collection(db, "resources"), resource);
 }
 
-async function deleteCustomResource(docId) {
-  if (!confirm("Supprimer cette ressource personnalisée ?")) return;
+async function deleteResource(docId) {
+  if (!confirm("Supprimer cette ressource ?")) return;
   await deleteDoc(doc(db, "resources", docId));
 }
+
+async function updateResource(docId, data) {
+  await updateDoc(doc(db, "resources", docId), data);
+}
+
+// Réinitialiser tout le compendium (supprimer + re-seeder)
+window._resetCompendium = async () => {
+  if (!confirm("Réinitialiser le compendium ? Cela supprimera toutes les modifications et rechargera les données de base. Les ressources personnelles (homebrew) seront conservées.")) return;
+  // Delete all system resources
+  const toDelete = compendiumResources.filter(r => r.owner === 'system');
+  for (const r of toDelete) {
+    await deleteDoc(doc(db, "resources", r._docId));
+  }
+  // Remove seed marker
+  await deleteDoc(doc(db, "meta", "compendium_seeded")).catch(() => {});
+  compendiumSeeded = false;
+  // Re-seed
+  await seedCompendiumIfNeeded();
+  alert("Compendium réinitialisé !");
+};
 
 // ============================================================
 // COMPENDIUM — RENDU UI
@@ -2214,7 +2259,6 @@ window._showCompendium = (catId) => {
   const searchEl = document.getElementById('compSearch');
   if (searchEl) searchEl.value = '';
   renderCompendiumList(window._currentCompCategory);
-  // Update active category button
   document.querySelectorAll('.comp-cat-btn').forEach(b => b.classList.remove('comp-cat-active'));
   const activeBtn = document.querySelector(`.comp-cat-btn[data-cat="${catId}"]`);
   if (activeBtn) activeBtn.classList.add('comp-cat-active');
@@ -2226,9 +2270,7 @@ window._compFilter = () => {
 };
 
 function getAllResourcesForCategory(catId) {
-  const builtIn = (COMPENDIUM_DATA[catId] || []).map(r => ({ ...r, _source: 'builtin' }));
-  const custom = compendiumCustomResources.filter(r => r.type === catId).map(r => ({ ...r, _source: 'custom', _docId: r.id }));
-  return [...builtIn, ...custom];
+  return compendiumResources.filter(r => r.type === catId);
 }
 
 function renderCompendiumList(catId) {
@@ -2236,21 +2278,25 @@ function renderCompendiumList(catId) {
   if (!listEl) return;
   const allRes = getAllResourcesForCategory(catId);
   const q = window._compSearchQuery;
-  const filtered = q ? allRes.filter(r => r.name.toLowerCase().includes(q)) : allRes;
+  const filtered = q ? allRes.filter(r => (r.name||'').toLowerCase().includes(q)) : allRes;
 
   if (filtered.length === 0) {
-    listEl.innerHTML = `<p style="color:#888;text-align:center;margin-top:30px;font-style:italic">Aucune ressource trouvée${q ? ' pour "' + q + '"' : ''}.</p>`;
+    listEl.innerHTML = `<p style="color:#888;text-align:center;margin-top:30px;font-style:italic">${
+      compendiumResources.length === 0 ? 'Chargement du compendium...' : 
+      'Aucune ressource trouvée' + (q ? ' pour "' + q + '"' : '') + '.'
+    }</p>`;
     return;
   }
 
-  listEl.innerHTML = filtered.map((r, i) => {
-    const isCustom = r._source === 'custom';
-    return `<div class="comp-card" onclick="window._showResourceDetail('${catId}',${i},${isCustom?`'${r._docId}'`:'null'})">
+  listEl.innerHTML = filtered.map((r) => {
+    const isHomebrew = r.owner !== 'system';
+    const isSystem = r.owner === 'system';
+    return `<div class="comp-card" onclick="window._showResourceDetail('${catId}','${r._docId}')">
       <div class="comp-card-main">
-        <div class="comp-card-name">${r.name} ${isCustom ? '<span class="comp-homebrew">Homebrew</span>' : ''}</div>
+        <div class="comp-card-name">${r.name||'?'} ${isHomebrew ? '<span class="comp-homebrew">Homebrew</span>' : ''}${isSystem && r._modified ? '<span class="comp-modified">Modifié</span>' : ''}</div>
         <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
       </div>
-      ${isCustom ? `<button class="btn-remove" onclick="event.stopPropagation();deleteCustomResource('${r._docId}')">✕</button>` : ''}
+      <button class="btn-remove" onclick="event.stopPropagation();deleteResource('${r._docId}')" title="Supprimer">✕</button>
     </div>`;
   }).join('');
 }
@@ -2268,9 +2314,8 @@ function getResourceSubtitle(catId, r) {
   }
 }
 
-window._showResourceDetail = (catId, index, customDocId) => {
-  const allRes = getAllResourcesForCategory(catId);
-  const r = customDocId ? allRes.find(x => x._docId === customDocId) : allRes[index];
+window._showResourceDetail = (catId, docId) => {
+  const r = compendiumResources.find(x => x._docId === docId);
   if (!r) return;
 
   const content = document.getElementById('forgeContent');
@@ -2279,42 +2324,113 @@ window._showResourceDetail = (catId, index, customDocId) => {
   document.getElementById('forgePrev').style.visibility = 'hidden';
   document.getElementById('forgeNext').style.display = 'none';
 
-  let html = `<h3 class="step-title">${r.name}</h3>`;
+  let html = `<h3 class="step-title">${r.name||'?'}</h3>`;
   html += `<div class="comp-detail">`;
   html += renderResourceDetail(catId, r);
   html += `</div>`;
 
-  // Add to character button
-  if (activeCharId) {
-    html += `<div style="margin-top:14px"><button class="btn-gold" onclick="window._addResourceToChar('${catId}',\`${encodeURIComponent(JSON.stringify({name:r.name,type:r.type||'',detail:getResourceSubtitle(catId,r)}))}\`)">+ Ajouter à la fiche active</button></div>`;
+  // Action buttons
+  html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">`;
+  if (activeCharId && catId !== 'monster') {
+    html += `<button class="btn-gold" onclick="window._addResourceToChar('${catId}','${docId}')">+ Ajouter à la fiche</button>`;
   }
+  html += `<button class="btn-gold" style="background:linear-gradient(135deg,#555,#333)" onclick="window._editResource('${catId}','${docId}')">✏ Modifier</button>`;
+  html += `<button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  html += `</div>`;
 
-  html += `<button class="btn-prev" style="margin-top:10px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
   content.innerHTML = html;
   document.getElementById('forgeOverlay').style.display = 'flex';
 };
 
 function renderResourceDetail(catId, r) {
   let html = '<div class="comp-detail-grid">';
-  const skip = ['_source','_docId','id','owner','createdAt','type'];
-  const labelMap = {name:'Nom',ac:'Classe d\'armure',type:'Type',strength:'Force requise',stealth:'Discrétion',cost:'Coût',weight:'Poids',source:'Source',damage:'Dégâts',properties:'Propriétés',desc:'Description',prereq:'Prérequis',rarity:'Rareté',cr:'Rang de dangerosité',size:'Taille',hp:'Points de vie',speed:'Vitesse',attacks:'Attaques',traits:'Traits',abilities:'Caractéristiques',skills:'Compétences',languages:'Langues',tools:'Outils',equipment:'Équipement',feature:'Aptitude'};
+  const skip = ['_source','_docId','id','owner','createdAt','type','_modified'];
+  const labelMap = {name:'Nom',ac:'Classe d\'armure',type:'Type',strength:'Force requise',stealth:'Discrétion',cost:'Coût',weight:'Poids',source:'Source',damage:'Dégâts',properties:'Propriétés',desc:'Description',prereq:'Prérequis',rarity:'Rareté',cr:'Rang de dangerosité',size:'Taille',hp:'Points de vie',speed:'Vitesse',attacks:'Attaques',traits:'Traits',abilities:'Caractéristiques',skills:'Compétences',languages:'Langues',tools:'Outils',equipment:'Équipement',feature:'Aptitude',level:'Niveau',school:'École',time:'Temps d\'incantation',range:'Portée',duration:'Durée',components:'Composantes',classes:'Classes'};
 
   for (const [key, val] of Object.entries(r)) {
     if (skip.includes(key) || val === '' || val === '—' || val === 0 || val === null || val === undefined) continue;
+    if (key === 'level' && val === 0) { html += `<div class="comp-detail-row"><span class="comp-detail-label">Niveau</span><span class="comp-detail-val">Sort mineur</span></div>`; continue; }
     const label = labelMap[key] || key;
     let display = val;
-    if (typeof val === 'object' && !Array.isArray(val)) {
-      display = Object.entries(val).map(([k,v])=>`${k.toUpperCase()}: ${v}`).join(', ');
-    }
+    if (Array.isArray(val)) display = val.join(', ');
+    else if (typeof val === 'object') display = Object.entries(val).map(([k,v])=>`${k.toUpperCase()}: ${v}`).join(', ');
     html += `<div class="comp-detail-row"><span class="comp-detail-label">${label}</span><span class="comp-detail-val">${display}</span></div>`;
   }
   html += '</div>';
   return html;
 }
 
-window._addResourceToChar = async (catId, encodedData) => {
+// ── Modifier une ressource ──
+window._editResource = (catId, docId) => {
+  const r = compendiumResources.find(x => x._docId === docId);
+  if (!r) return;
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">✏</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  // Build editable fields from current data
+  const skip = ['_docId','owner','createdAt','type','_modified','_source','id'];
+  const fieldTypes = {desc:'textarea',attacks:'textarea',traits:'textarea',equipment:'textarea',feature:'textarea'};
+  
+  let fieldsHtml = '';
+  for (const [key, val] of Object.entries(r)) {
+    if (skip.includes(key)) continue;
+    const isTextarea = fieldTypes[key];
+    const label = key.charAt(0).toUpperCase() + key.slice(1);
+    let displayVal = val;
+    if (Array.isArray(val)) displayVal = val.join(', ');
+    else if (typeof val === 'object' && val !== null) displayVal = JSON.stringify(val);
+    else displayVal = val ?? '';
+    
+    if (isTextarea) {
+      fieldsHtml += `<div class="field-group"><label>${label}</label><textarea id="edit_${key}" rows="2">${displayVal}</textarea></div>`;
+    } else {
+      fieldsHtml += `<div class="field-group"><label>${label}</label><input id="edit_${key}" type="text" value="${String(displayVal).replace(/"/g,'&quot;')}"></div>`;
+    }
+  }
+
+  content.innerHTML = `
+    <h3 class="step-title">✏ Modifier: ${r.name||'?'}</h3>
+    ${fieldsHtml}
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-gold" onclick="window._saveEditResource('${catId}','${docId}')">SAUVEGARDER</button>
+      <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+    </div>`;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._saveEditResource = async (catId, docId) => {
+  const r = compendiumResources.find(x => x._docId === docId);
+  if (!r) return;
+  const skip = ['_docId','owner','createdAt','type','_modified','_source','id'];
+  const data = { _modified: true };
+  
+  for (const key of Object.keys(r)) {
+    if (skip.includes(key)) continue;
+    const el = document.getElementById('edit_' + key);
+    if (!el) continue;
+    let val = el.value;
+    // Try to preserve original type
+    const orig = r[key];
+    if (Array.isArray(orig)) {
+      val = val.split(',').map(s => s.trim()).filter(s => s);
+    } else if (typeof orig === 'number') {
+      val = parseFloat(val) || 0;
+    } else if (typeof orig === 'object' && orig !== null) {
+      try { val = JSON.parse(val); } catch(e) { /* keep string */ }
+    }
+    data[key] = val;
+  }
+  
+  await updateResource(docId, data);
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+
+window._addResourceToChar = async (catId, docId) => {
   if (!activeCharId) { alert("Sélectionnez d'abord un personnage."); return; }
-  // Redirect to the picker which handles structured adding
   window._closeForge();
   document.getElementById('forgeNext').style.display = '';
   window._pickFromCompendium(activeCharId, catId);
@@ -2989,6 +3105,8 @@ nav button:last-child { color:#884444; }
 .comp-card-sub { color:#888; font-size:0.78rem; margin-top:2px; }
 .comp-homebrew { background:var(--gold); color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
   font-family:'Cinzel'; letter-spacing:1px; vertical-align:middle; margin-left:6px; }
+.comp-modified { background:#555; color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
+  font-family:'Cinzel'; letter-spacing:1px; vertical-align:middle; margin-left:6px; }
 .comp-detail { margin:12px 0; }
 .comp-detail-grid { display:flex; flex-direction:column; gap:1px; }
 .comp-detail-row { display:flex; justify-content:space-between; padding:7px 10px; background:#fff8ee;
@@ -3055,6 +3173,7 @@ nav button:last-child { color:#884444; }
       <div class="comp-toolbar">
         <input id="compSearch" type="text" placeholder="Rechercher..." oninput="window._compFilter()">
         <button class="btn-gold" onclick="window._openAddResource()">+ AJOUTER</button>
+        <button class="section-add-btn" style="padding:8px 12px;font-size:0.65rem" onclick="window._resetCompendium()" title="Réinitialiser les données de base">↻ Reset</button>
       </div>
       <div id="compList" class="comp-list"></div>
     </div>
