@@ -1167,9 +1167,9 @@ function renderCharSheet(id, d) {
         <div class="combat-label">Bonus Maîtrise</div>
         <div class="combat-val">+${pb}</div>
       </div>
-      <div class="combat-box ${d.inspiration?'inspired':''}">
+      <div class="combat-box ${d.inspiration?'inspired':''}" onclick="window._toggleInspiration('${id}')" style="cursor:pointer">
         <div class="combat-label">Inspiration</div>
-        <div class="combat-val editable" data-field="inspiration" data-type="bool">${d.inspiration?'★':'☆'}</div>
+        <div class="combat-val">${d.inspiration?'★':'☆'}</div>
       </div>
     </div>
   </div>
@@ -1205,14 +1205,17 @@ function renderCharSheet(id, d) {
  
       <!-- Compétences -->
       <div class="sheet-section">
-        <div class="section-title">Compétences</div>
+        <div class="section-title">Compétences <small style="color:#a89060;font-family:'Crimson Pro';letter-spacing:0">(clic pour maîtrise)</small></div>
         <div class="skill-list">
-          ${SKILLS_LIST.map(sk=>`
+          ${SKILLS_LIST.map(sk=>{
+            const prof = d.skillProficiencies?.[sk.name];
+            const dotClass = prof==='expert'?'expert':prof==='prof'?'filled':'';
+            return `
           <div class="skill-row">
-            <span class="prof-dot ${d.skillProficiencies?.[sk.name]?'filled':''}"></span>
+            <span class="prof-dot clickable ${dotClass}" onclick="window._cycleSkillProf('${id}','${sk.name}')" title="Clic: aucune → maîtrise → expertise"></span>
             <span class="skill-val">${fmtB(skillBonus(sk.name))}</span>
             <span class="skill-name">${sk.name} <small>(${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[sk.stat]})</small></span>
-          </div>`).join('')}
+          </div>`;}).join('')}
         </div>
       </div>
  
@@ -1235,8 +1238,9 @@ function renderCharSheet(id, d) {
           <div>
             <div class="combat-label">Jets de mort</div>
             <div class="death-saves">
-              <div class="ds-row">✓ Succès: ${[1,2,3].map(i=>`<span class="ds-dot ${(d.deathSaves?.success||0)>=i?'success':''}"></span>`).join('')}</div>
-              <div class="ds-row">✗ Échecs: ${[1,2,3].map(i=>`<span class="ds-dot ${(d.deathSaves?.fail||0)>=i?'fail':''}"></span>`).join('')}</div>
+              <div class="ds-row">✓ Succès: ${[1,2,3].map(i=>`<span class="ds-dot clickable ${(d.deathSaves?.success||0)>=i?'success':''}" onclick="window._toggleDeathSave('${id}','success',${i})"></span>`).join('')}</div>
+              <div class="ds-row">✗ Échecs: ${[1,2,3].map(i=>`<span class="ds-dot clickable ${(d.deathSaves?.fail||0)>=i?'fail':''}" onclick="window._toggleDeathSave('${id}','fail',${i})"></span>`).join('')}</div>
+              <div style="margin-top:4px"><button class="section-add-btn" onclick="window._resetDeathSaves('${id}')">Réinitialiser</button></div>
             </div>
           </div>
         </div>
@@ -1270,17 +1274,25 @@ function renderCharSheet(id, d) {
             <div class="coin-val editable" data-field="${c}" data-type="number">${d[c]||0}</div>
           </div>`).join('')}
         </div>
-        <!-- Armure équipée -->
+        <!-- Armures -->
         <div style="padding:8px 10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Armure équipée</label>
+            <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Armures</label>
             <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','armor')">+ Compendium</button>
           </div>
-          ${d.equipped_armor ? `
-            <div class="inv-item">
-              <div class="inv-item-main"><strong>${d.equipped_armor.name}</strong> <span style="color:#888">— CA ${d.equipped_armor.ac||'?'}</span></div>
-              <button class="inv-remove-btn" onclick="window._unequipArmor('${id}')">✕</button>
-            </div>` : `<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune armure</div>`}
+          <div class="inv-list">
+            ${(d.inventory_armors||[]).map((a,i)=>`
+            <div class="inv-item ${a.equipped?'inv-equipped':''}">
+              <div class="inv-item-main">
+                <strong>${a.name}</strong> <span style="color:#888">— CA ${a.ac||'?'} ${a.type?'('+a.type+')':''}</span>
+              </div>
+              <div class="inv-actions">
+                <button class="inv-equip-btn ${a.equipped?'equipped':''}" onclick="window._toggleEquipArmor('${id}',${i})">${a.equipped?'Équipée ✓':'Équiper'}</button>
+                <button class="inv-remove-btn" onclick="window._removeInventoryItem('${id}','inventory_armors',${i})">✕</button>
+              </div>
+            </div>`).join('')}
+            ${!(d.inventory_armors||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune armure</div>' : ''}
+          </div>
         </div>
         <!-- Inventaire objets -->
         <div style="padding:4px 10px 10px">
@@ -1750,13 +1762,14 @@ function renderGMCard(id, d) {
       <span>Mort: </span>
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.success||0)>=i?'success':''}">✓</span>`).join('')}
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.fail||0)>=i?'fail':''}">✗</span>`).join('')}
-      <span style="margin-left:10px">Inspiration: ${d.inspiration?'★':'☆'}</span>
+      <span style="margin-left:auto;cursor:pointer" onclick="window._toggleInspiration('${id}')">Inspiration: <strong>${d.inspiration?'★':'☆'}</strong></span>
     </div>
     <div class="gm-actions">
       <label class="gm-action-label">Modifier PV:</label>
       <input id="gmhp_${id}" type="number" class="gm-input" placeholder="±">
       <button class="btn-gm-action heal" onclick="window._gmHeal('${id}')">Soigner</button>
       <button class="btn-gm-action dmg" onclick="window._gmDamage('${id}')">Blessure</button>
+      <button class="btn-gm-action" style="margin-left:auto" onclick="window._toggleInspiration('${id}')">${d.inspiration?'Retirer ★':'Donner ★'}</button>
     </div>
     <details class="gm-notes">
       <summary>Notes MJ</summary>
@@ -1774,12 +1787,21 @@ window._gmHeal = async (id) => {
   await updateDoc(doc(db, "characters", id), {hp: newHp});
 };
 window._gmDamage = async (id) => {
-  const val = parseInt(document.getElementById(`gmhp_${id}`)?.value)||0;
+  const val = Math.abs(parseInt(document.getElementById(`gmhp_${id}`)?.value)||0);
   const snap = await getDoc(doc(db, "characters", id));
   if(!snap.exists()) return;
   const d = snap.data();
-  const newHp = Math.max(0, (d.hp||0) - Math.abs(val));
-  await updateDoc(doc(db, "characters", id), {hp: newHp});
+  let remaining = val;
+  let tmpHp = d.tmpHp || 0;
+  let hp = d.hp || 0;
+  // Absorb by temp HP first
+  if (tmpHp > 0) {
+    const absorbed = Math.min(tmpHp, remaining);
+    tmpHp -= absorbed;
+    remaining -= absorbed;
+  }
+  hp = Math.max(0, hp - remaining);
+  await updateDoc(doc(db, "characters", id), { hp, tmpHp });
 };
 window._saveGMNotes = async (id) => {
   const notes = document.getElementById(`gmnotes_${id}`)?.value||'';
@@ -2117,21 +2139,9 @@ window._pickResource = async (charId, catId, index) => {
     update.inventory_weapons = weapons;
   }
   else if (catId === 'armor') {
-    update.equipped_armor = { name: r.name, ac: r.ac||'?', type: r.type||'', stealth: r.stealth||'' };
-    // Recalculate AC
-    const acStr = r.ac||'10';
-    let newAc = 10;
-    const dexMod = mod(stats.dex);
-    if (r.type === 'Bouclier') {
-      newAc = (d.ac||10) + 2;
-    } else if (acStr.includes('mod DEX')) {
-      const baseAc = parseInt(acStr)||10;
-      if (acStr.includes('max 2')) newAc = baseAc + Math.min(dexMod, 2);
-      else newAc = baseAc + dexMod;
-    } else {
-      newAc = parseInt(acStr)||10;
-    }
-    update.ac = newAc;
+    const armors = [...(d.inventory_armors||[])];
+    armors.push({ name: r.name, ac: r.ac||'?', type: r.type||'', stealth: r.stealth||'', equipped: false });
+    update.inventory_armors = armors;
   }
   else if (catId === 'item') {
     const items = [...(d.inventory_items||[])];
@@ -2167,14 +2177,7 @@ window._removeInventoryItem = async (charId, field, index) => {
   await updateDoc(doc(db, "characters", charId), { [field]: arr });
 };
 
-// Unequip armor
-window._unequipArmor = async (charId) => {
-  const snap = await getDoc(doc(db, "characters", charId));
-  if (!snap.exists()) return;
-  const d = snap.data();
-  const dexMod = mod((d.stats?.dex)||10);
-  await updateDoc(doc(db, "characters", charId), { equipped_armor: null, ac: 10 + dexMod });
-};
+// (Armor equip/unequip now handled by _toggleEquipArmor)
 
 // Remove a feature by index
 window._removeFeature = async (charId, index) => {
@@ -2184,6 +2187,147 @@ window._removeFeature = async (charId, index) => {
   const feats = [...(d.features||[])];
   feats.splice(index, 1);
   await updateDoc(doc(db, "characters", charId), { features: feats });
+};
+
+// ── Toggle inspiration (simple click, works for player + GM) ──
+window._toggleInspiration = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  await updateDoc(doc(db, "characters", charId), { inspiration: !d.inspiration });
+};
+
+// ── Cycle skill proficiency: none → prof → expert → none ──
+window._cycleSkillProf = async (charId, skillName) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const profs = { ...(d.skillProficiencies || {}) };
+  const current = profs[skillName];
+  if (!current) profs[skillName] = 'prof';
+  else if (current === 'prof') profs[skillName] = 'expert';
+  else delete profs[skillName];
+  await updateDoc(doc(db, "characters", charId), { skillProficiencies: profs });
+};
+
+// ── Death saves toggle ──
+window._toggleDeathSave = async (charId, type, dotIndex) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const ds = { success: d.deathSaves?.success || 0, fail: d.deathSaves?.fail || 0 };
+  // If clicking the currently filled dot, reduce; otherwise set to that dot level
+  if (ds[type] >= dotIndex) ds[type] = dotIndex - 1;
+  else ds[type] = dotIndex;
+  await updateDoc(doc(db, "characters", charId), { deathSaves: ds });
+};
+
+window._resetDeathSaves = async (charId) => {
+  await updateDoc(doc(db, "characters", charId), { deathSaves: { success: 0, fail: 0 } });
+};
+
+// ── Toggle equip/unequip armor in inventory ──
+window._toggleEquipArmor = async (charId, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const armors = [...(d.inventory_armors || [])];
+  const target = armors[index];
+  if (!target) return;
+  const wasEquipped = target.equipped;
+  
+  // Unequip all others first (only one non-shield can be equipped at a time)
+  const isShield = (target.type || '').toLowerCase().includes('bouclier');
+  if (!wasEquipped) {
+    armors.forEach((a, i) => {
+      if (i !== index) {
+        const aIsShield = (a.type || '').toLowerCase().includes('bouclier');
+        // If equipping a non-shield, unequip other non-shields; if equipping a shield, unequip other shields
+        if (isShield === aIsShield) a.equipped = false;
+      }
+    });
+  }
+  target.equipped = !wasEquipped;
+
+  // Recalculate AC
+  const stats = d.stats || { dex: 10 };
+  const dexMod = mod(stats.dex || 10);
+  let baseAc = 10 + dexMod; // default unarmored
+  let shieldBonus = 0;
+  armors.forEach(a => {
+    if (!a.equipped) return;
+    const aIsShield = (a.type || '').toLowerCase().includes('bouclier');
+    if (aIsShield) { shieldBonus = 2; return; }
+    const acStr = a.ac || '10';
+    if (acStr.includes('mod DEX')) {
+      const base = parseInt(acStr) || 10;
+      baseAc = acStr.includes('max 2') ? base + Math.min(dexMod, 2) : base + dexMod;
+    } else {
+      const parsed = parseInt(acStr);
+      if (!isNaN(parsed) && parsed > 0) baseAc = parsed;
+    }
+  });
+
+  await updateDoc(doc(db, "characters", charId), { inventory_armors: armors, ac: baseAc + shieldBonus });
+};
+
+// ── Inline HP edit: absorb damage from tmpHp first ──
+// Override the default inline edit for hp field to handle tmpHp absorption
+const _origStartInlineEdit = startInlineEdit;
+startInlineEdit = async function(el, charId, charData) {
+  if (el.dataset.field === 'hp') {
+    // Custom HP editor with +/- buttons
+    if (el.querySelector('input')) return;
+    const currentHp = charData.hp || 0;
+    const orig = el.innerHTML;
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:4px">
+      <button class="pb-btn" style="width:22px;height:22px;font-size:0.8rem;color:#f44336;border-color:#f44336" onclick="window._adjustHp('${charId}',-1,event)">−</button>
+      <input type="number" value="${currentHp}" class="inline-input" style="width:50px;text-align:center">
+      <button class="pb-btn" style="width:22px;height:22px;font-size:0.8rem;color:#4caf50;border-color:#4caf50" onclick="window._adjustHp('${charId}',1,event)">+</button>
+    </div>`;
+    const input = el.querySelector('input');
+    input.focus();
+    const save = async () => {
+      const newVal = parseInt(input.value) || 0;
+      const diff = newVal - currentHp;
+      if (diff < 0) {
+        // Damage: absorb with tmpHp first
+        const snap = await getDoc(doc(db, "characters", charId));
+        if (!snap.exists()) return;
+        const d = snap.data();
+        let remaining = Math.abs(diff);
+        let tmpHp = d.tmpHp || 0;
+        let hp = d.hp || 0;
+        if (tmpHp > 0) { const ab = Math.min(tmpHp, remaining); tmpHp -= ab; remaining -= ab; }
+        hp = Math.max(0, hp - remaining);
+        await updateDoc(doc(db, "characters", charId), { hp, tmpHp });
+      } else {
+        const newHp = Math.min(charData.hpMax || 999, currentHp + diff);
+        await updateDoc(doc(db, "characters", charId), { hp: newHp });
+      }
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') el.innerHTML = orig; });
+    return;
+  }
+  return _origStartInlineEdit.call(this, el, charId, charData);
+};
+
+window._adjustHp = async (charId, delta, event) => {
+  event.stopPropagation();
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  if (delta < 0) {
+    let tmpHp = d.tmpHp || 0;
+    let hp = d.hp || 0;
+    if (tmpHp > 0) { tmpHp -= 1; }
+    else { hp = Math.max(0, hp - 1); }
+    await updateDoc(doc(db, "characters", charId), { hp, tmpHp });
+  } else {
+    const newHp = Math.min(d.hpMax || 999, (d.hp || 0) + 1);
+    await updateDoc(doc(db, "characters", charId), { hp: newHp });
+  }
 };
 
 // ── Ajout de ressource personnalisée ──
@@ -2532,6 +2676,19 @@ nav button:last-child { color:#884444; }
 .inv-remove-btn:hover { background:#cc4444; color:#fff; }
 .feature-item-removable { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
 .feature-item-removable > div { flex:1; }
+
+/* Clickable dots & equip buttons */
+.prof-dot.clickable { cursor:pointer; transition:all 0.15s; }
+.prof-dot.clickable:hover { transform:scale(1.3); box-shadow:0 0 4px var(--gold); }
+.prof-dot.expert { background:var(--gold); border-color:var(--gold); box-shadow:0 0 0 2px #fff, 0 0 0 3px var(--gold); }
+.ds-dot.clickable { cursor:pointer; transition:all 0.15s; }
+.ds-dot.clickable:hover { transform:scale(1.3); }
+.inv-equipped { background:#f0f8e8; border-left-color:#4caf50; }
+.inv-actions { display:flex; gap:4px; align-items:center; flex-shrink:0; }
+.inv-equip-btn { background:transparent; border:1px solid #aaa; color:#888; padding:2px 8px; font-family:'Cinzel';
+  font-size:0.58rem; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.15s; }
+.inv-equip-btn:hover { border-color:var(--gold); color:var(--gold); }
+.inv-equip-btn.equipped { background:#4caf50; border-color:#4caf50; color:#fff; }
 .comp-container { max-width:800px; margin:auto; padding:24px 20px; }
 .comp-container h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:16px; letter-spacing:3px; }
 .comp-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
