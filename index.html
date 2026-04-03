@@ -1279,10 +1279,13 @@ function renderCharSheet(id, d) {
       </div>
     </div>
     <!-- États / Conditions -->
-    <div class="conditions-bar">
+    <div class="conditions-grid-sheet">
       ${CONDITIONS.map(c => {
         const active = (d.conditions||[]).includes(c.id);
-        return `<span class="cond-badge ${active?'cond-active':''} ${c.id==='concentrating'?'cond-conc':''}" onclick="window._toggleCondition('${id}','${c.id}')" title="${c.name}: ${c.desc}">${c.icon}${c.id==='exhaustion'&&(d.exhaustionLevel||0)>0?' '+d.exhaustionLevel:''}</span>`;
+        return `<div class="cond-sheet-item ${active?'cond-sheet-active':''} ${c.id==='concentrating'?'cond-sheet-conc':''}" onclick="window._toggleCondition('${id}','${c.id}')" title="${c.desc}">
+          <span class="cond-sheet-icon">${c.icon}</span>
+          <span class="cond-sheet-name">${c.name}${c.id==='exhaustion'&&(d.exhaustionLevel||0)>0?' ('+d.exhaustionLevel+'/6)':''}</span>
+        </div>`;
       }).join('')}
     </div>
     ${(d.conditions||[]).includes('concentrating') && d.concentratingOn ? `
@@ -3068,12 +3071,11 @@ window._breakConcentration = async (charId) => {
   await updateDoc(doc(db, "characters", charId), { conditions, concentratingOn: null });
 };
 
-// Concentration save check — triggered when damage is dealt to a concentrating character
+// Concentration save check — simple maintain/lose dialog
 window._triggerConcentrationCheck = (charId, damage, charData) => {
   const dc = Math.max(10, Math.floor(damage / 2));
   const conMod = mod(charData.stats?.con || 10);
   const pb = profBonus(totalLevel(charData));
-  // Check if character has CON save proficiency
   const hasCONprof = charData.saveProficiencies?.con;
   const totalBonus = conMod + (hasCONprof ? pb : 0);
 
@@ -3083,35 +3085,21 @@ window._triggerConcentrationCheck = (charId, damage, charData) => {
   document.getElementById('forgeNext').style.display = 'none';
 
   content.innerHTML = `
-    <h3 class="step-title">🧠 Jet de Concentration</h3>
+    <h3 class="step-title">🧠 Sauvegarde de Concentration</h3>
     <div class="info-box" style="margin-bottom:14px">
       <strong>${charData.name}</strong> subit <strong>${damage} dégâts</strong> en étant concentré sur <strong>${charData.concentratingOn||'un sort'}</strong>.<br><br>
-      <strong>DD du jet de sauvegarde CON :</strong> ${dc} (= max(10, ${damage}/2))<br>
-      <strong>Bonus de sauvegarde CON :</strong> +${totalBonus} (${conMod} CON${hasCONprof?' + '+pb+' maîtrise':''})
+      <strong>DD du jet de sauvegarde CON :</strong> ${dc}<br>
+      <small style="color:#888">(= max(10, ${damage} ÷ 2))</small><br><br>
+      <strong>Bonus de sauvegarde CON :</strong> +${totalBonus}<br>
+      <small style="color:#888">(${conMod} CON${hasCONprof ? ' + '+pb+' maîtrise' : ''})</small>
     </div>
-    <div style="display:flex;gap:10px;margin-bottom:14px">
-      <button class="btn-gold" style="flex:1" onclick="window._rollConcentrationSave('${charId}',${dc},${totalBonus})">🎲 Lancer le dé (1d20+${totalBonus})</button>
-    </div>
-    <div id="conc_result"></div>
-    <div style="display:flex;gap:10px;margin-top:14px">
-      <button class="btn-gm-action heal" style="flex:1;padding:10px" onclick="window._resolveConcentration('${charId}',true)">✓ Réussi — Maintenir</button>
-      <button class="btn-gm-action dmg" style="flex:1;padding:10px" onclick="window._resolveConcentration('${charId}',false)">✗ Raté — Perdue</button>
+    <p style="font-size:0.88rem;color:#555;margin-bottom:14px;text-align:center">Lancez 1d20 + ${totalBonus} ≥ ${dc} pour maintenir la concentration.</p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-gold" style="flex:1;background:linear-gradient(135deg,#3a7a3a,#1a4e1a)" onclick="window._resolveConcentration('${charId}',true)">✓ Réussi — Maintenir</button>
+      <button class="btn-gold" style="flex:1;background:linear-gradient(135deg,var(--red),#5a0000)" onclick="window._resolveConcentration('${charId}',false)">✗ Raté — Perdue</button>
     </div>`;
 
   document.getElementById('forgeOverlay').style.display = 'flex';
-};
-
-window._rollConcentrationSave = (charId, dc, bonus) => {
-  const roll = Math.floor(Math.random() * 20) + 1;
-  const total = roll + bonus;
-  const success = total >= dc;
-  const resultEl = document.getElementById('conc_result');
-  resultEl.innerHTML = `
-    <div class="conc-roll-result ${success?'conc-success':'conc-fail'}">
-      <div class="conc-roll-dice">🎲 ${roll}</div>
-      <div class="conc-roll-total">${roll} + ${bonus} = <strong>${total}</strong> vs DD ${dc}</div>
-      <div class="conc-roll-verdict">${success?'✓ RÉUSSI — Concentration maintenue !':'✗ RATÉ — Concentration perdue !'}</div>
-    </div>`;
 };
 
 window._resolveConcentration = async (charId, maintained) => {
@@ -3325,18 +3313,27 @@ nav button:last-child { color:#884444; }
   border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
 
 /* ── CONDITIONS ── */
-.conditions-bar { display:flex; flex-wrap:wrap; gap:4px; margin-top:10px; padding:0 2px; }
-.cond-badge { width:28px; height:28px; border-radius:50%; border:2px solid #555; display:inline-flex;
-  align-items:center; justify-content:center; font-size:0.85rem; cursor:pointer; transition:all 0.15s;
-  opacity:0.35; background:rgba(255,255,255,0.05); }
-.cond-badge:hover { opacity:0.7; transform:scale(1.15); }
-.cond-badge.cond-active { opacity:1; border-color:var(--gold); background:rgba(184,134,11,0.2); box-shadow:0 0 6px rgba(184,134,11,0.4); }
-.cond-badge.cond-conc.cond-active { border-color:#9b59b6; background:rgba(155,89,182,0.2); box-shadow:0 0 6px rgba(155,89,182,0.4); }
+.conditions-grid-sheet { display:flex; flex-wrap:wrap; gap:4px; margin-top:10px; padding:0 2px; }
+.cond-sheet-item { display:flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px;
+  border:1px solid #555; cursor:pointer; transition:all 0.15s; opacity:0.4; background:rgba(255,255,255,0.05); }
+.cond-sheet-item:hover { opacity:0.7; }
+.cond-sheet-item.cond-sheet-active { opacity:1; border-color:var(--gold); background:rgba(184,134,11,0.2); box-shadow:0 0 6px rgba(184,134,11,0.3); }
+.cond-sheet-item.cond-sheet-conc.cond-sheet-active { border-color:#9b59b6; background:rgba(155,89,182,0.2); box-shadow:0 0 6px rgba(155,89,182,0.3); }
+.cond-sheet-icon { font-size:0.85rem; }
+.cond-sheet-name { font-size:0.65rem; font-family:'Cinzel'; color:#c9a860; letter-spacing:0.5px; }
+.cond-sheet-active .cond-sheet-name { color:var(--gold); }
+.cond-sheet-conc.cond-sheet-active .cond-sheet-name { color:#c39bd3; }
 .conc-banner { background:linear-gradient(90deg,rgba(155,89,182,0.15),transparent); padding:6px 14px; color:#9b59b6;
   font-size:0.82rem; border-top:1px solid rgba(155,89,182,0.3); display:flex; align-items:center; }
 
 /* GM conditions */
 .gm-conditions { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; align-items:center; background:#f9f4ea; border-top:1px solid #e0d0b0; }
+.cond-badge { width:26px; height:26px; border-radius:50%; border:2px solid var(--gold); display:inline-flex;
+  align-items:center; justify-content:center; font-size:0.8rem; cursor:pointer; transition:all 0.15s;
+  background:rgba(184,134,11,0.15); }
+.cond-badge:hover { transform:scale(1.15); }
+.cond-badge.cond-active { background:rgba(184,134,11,0.3); box-shadow:0 0 6px rgba(184,134,11,0.4); }
+.cond-badge.cond-conc { border-color:#9b59b6; background:rgba(155,89,182,0.2); }
 .gm-conc-banner { background:rgba(155,89,182,0.1); padding:4px 14px; color:#9b59b6; font-size:0.78rem; border-top:1px solid rgba(155,89,182,0.2); }
 .gm-spellslots { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; background:#f0e8d8; }
 .gm-slot { background:#fff; border:1px solid #d4c4a0; border-radius:3px; padding:2px 6px; font-size:0.7rem; font-family:'Cinzel'; color:var(--ink); }
@@ -3351,13 +3348,7 @@ nav button:last-child { color:#884444; }
 .cond-picker-icon { font-size:1.2rem; }
 .cond-picker-name { font-size:0.82rem; }
 
-/* Concentration roll result */
-.conc-roll-result { text-align:center; padding:16px; border-radius:4px; margin:10px 0; }
-.conc-success { background:#e8f5e9; border:2px solid #4caf50; }
-.conc-fail { background:#ffebee; border:2px solid #f44336; }
-.conc-roll-dice { font-size:2rem; margin-bottom:6px; }
-.conc-roll-total { font-size:1rem; color:#444; }
-.conc-roll-verdict { font-size:1.1rem; font-family:'Cinzel'; margin-top:8px; letter-spacing:1px; }
+/* Concentration roll result — removed, using simple maintain/lose dialog */
 
 /* ── LEVEL UP DETAILS ── */
 .lvlup-section { background:#fff; border:1px solid #d4c4a0; border-radius:4px; margin:12px 0; overflow:hidden; }
