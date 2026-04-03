@@ -548,6 +548,26 @@ function getCantripsKnown(className, level) {
 
 // XP thresholds par niveau
 const XP_THRESHOLDS = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,100000,120000,140000,165000,195000,225000,265000,305000,355000];
+
+// États / Conditions D&D 5e
+const CONDITIONS = [
+  {id:'blinded',name:'Aveuglé',icon:'🙈',desc:'Échoue auto les jets nécessitant la vue. Attaques: désavantage. Attaques contre: avantage.'},
+  {id:'charmed',name:'Charmé',icon:'💕',desc:'Ne peut attaquer le charmeur ni le cibler avec capacités nuisibles. Le charmeur a avantage en interaction sociale.'},
+  {id:'deafened',name:'Assourdi',icon:'🔇',desc:'Échoue auto les jets nécessitant l\'ouïe.'},
+  {id:'frightened',name:'Effrayé',icon:'😨',desc:'Désavantage aux jets de compétence et attaque tant que source de peur visible. Ne peut se rapprocher volontairement.'},
+  {id:'grappled',name:'Agrippé',icon:'🤝',desc:'Vitesse réduite à 0. Fin si agrippeur incapacité ou effet éloigne.'},
+  {id:'incapacitated',name:'Incapacité',icon:'💫',desc:'Ne peut pas effectuer d\'action ni de réaction.'},
+  {id:'invisible',name:'Invisible',icon:'👻',desc:'Impossible à voir. Attaques: avantage. Attaques contre: désavantage.'},
+  {id:'paralyzed',name:'Paralysé',icon:'⚡',desc:'Incapacité, ne peut bouger ni parler. Échoue auto JdS FOR et DEX. Attaques contre: avantage. Critique auto si adjacent.'},
+  {id:'petrified',name:'Pétrifié',icon:'🗿',desc:'Transformé en substance inanimée. Résistance à tous les dégâts. Immunité poison et maladie.'},
+  {id:'poisoned',name:'Empoisonné',icon:'🤢',desc:'Désavantage aux jets d\'attaque et de compétence.'},
+  {id:'prone',name:'Au sol',icon:'⬇',desc:'Peut ramper. Désavantage aux attaques. Attaques contre depuis 1.5m: avantage. Attaques contre à distance: désavantage.'},
+  {id:'restrained',name:'Entravé',icon:'⛓',desc:'Vitesse 0. Attaques: désavantage. Attaques contre: avantage. Désavantage JdS DEX.'},
+  {id:'stunned',name:'Étourdi',icon:'💥',desc:'Incapacité, ne peut bouger. Parle avec difficulté. Échoue auto JdS FOR et DEX. Attaques contre: avantage.'},
+  {id:'unconscious',name:'Inconscient',icon:'😵',desc:'Incapacité, tombe au sol, lâche tout. Échoue auto JdS FOR et DEX. Attaques contre: avantage. Critique auto si adjacent.'},
+  {id:'exhaustion',name:'Épuisement',icon:'😩',desc:'6 niveaux cumulatifs. Niv.1: désavantage compétences. Niv.6: mort.'},
+  {id:'concentrating',name:'Concentré',icon:'🧠',desc:'Maintient un sort de concentration. Perdu si: nouveau sort de concentration, incapacité, mort, ou JdS CON raté après dégâts.'}
+];
  
 const BACKGROUNDS = {
   "Acolyte":{ skills:["Intuition","Religion"], lang:2, equipment:"Symbole sacré, livre de prières, 5 bâtonnets d'encens, vêtements d'apparat, 15po", feature:"Abri des fidèles" },
@@ -1258,6 +1278,15 @@ function renderCharSheet(id, d) {
         <div class="combat-val">${d.inspiration?'★':'☆'}</div>
       </div>
     </div>
+    <!-- États / Conditions -->
+    <div class="conditions-bar">
+      ${CONDITIONS.map(c => {
+        const active = (d.conditions||[]).includes(c.id);
+        return `<span class="cond-badge ${active?'cond-active':''} ${c.id==='concentrating'?'cond-conc':''}" onclick="window._toggleCondition('${id}','${c.id}')" title="${c.name}: ${c.desc}">${c.icon}${c.id==='exhaustion'&&(d.exhaustionLevel||0)>0?' '+d.exhaustionLevel:''}</span>`;
+      }).join('')}
+    </div>
+    ${(d.conditions||[]).includes('concentrating') && d.concentratingOn ? `
+    <div class="conc-banner">🧠 Concentration : <strong>${d.concentratingOn}</strong> <button class="section-add-btn" onclick="window._breakConcentration('${id}')" style="margin-left:8px">Briser</button></div>` : ''}
   </div>
  
   <div class="sheet-body">
@@ -1903,6 +1932,27 @@ function renderGMCard(id, d) {
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.fail||0)>=i?'fail':''}">✗</span>`).join('')}
       <span style="margin-left:auto;cursor:pointer" onclick="window._toggleInspiration('${id}')">Inspiration: <strong>${d.inspiration?'★':'☆'}</strong></span>
     </div>
+    <!-- Conditions on GM card -->
+    <div class="gm-conditions">
+      ${CONDITIONS.map(c => {
+        const active = (d.conditions||[]).includes(c.id);
+        return active ? `<span class="cond-badge cond-active ${c.id==='concentrating'?'cond-conc':''}" onclick="window._toggleCondition('${id}','${c.id}')" title="${c.name}">${c.icon}</span>` : '';
+      }).join('')}
+      ${(d.conditions||[]).length === 0 ? '<span style="color:#888;font-size:0.75rem;font-style:italic">Aucun état</span>' : ''}
+      <button class="section-add-btn" style="margin-left:auto" onclick="window._openGMConditions('${id}')">± États</button>
+    </div>
+    ${(d.conditions||[]).includes('concentrating') && d.concentratingOn ? `
+    <div class="gm-conc-banner">🧠 ${d.concentratingOn}</div>` : ''}
+    <!-- Spell slots summary on GM card -->
+    ${(()=>{
+      const ss = getSpellSlots(d);
+      const usedSlots = d.usedSpellSlots || {};
+      if (!ss.slots.some(s=>s>0) && !ss.pactSlots) return '';
+      let slotsHtml = '<div class="gm-spellslots">';
+      ss.slots.forEach((max,i) => { if(max>0) { const used=usedSlots['s'+(i+1)]||0; slotsHtml += `<span class="gm-slot">N${i+1}: ${max-used}/${max}</span>`; }});
+      if (ss.pactSlots) { const pu=usedSlots['pact']||0; slotsHtml += `<span class="gm-slot gm-slot-pact">P${ss.pactSlots.level}: ${ss.pactSlots.count-pu}/${ss.pactSlots.count}</span>`; }
+      return slotsHtml + '</div>';
+    })()}
     <div class="gm-actions">
       <label class="gm-action-label">Modifier PV:</label>
       <input id="gmhp_${id}" type="number" class="gm-input" placeholder="±">
@@ -1927,13 +1977,13 @@ window._gmHeal = async (id) => {
 };
 window._gmDamage = async (id) => {
   const val = Math.abs(parseInt(document.getElementById(`gmhp_${id}`)?.value)||0);
+  if (val === 0) return;
   const snap = await getDoc(doc(db, "characters", id));
   if(!snap.exists()) return;
   const d = snap.data();
   let remaining = val;
   let tmpHp = d.tmpHp || 0;
   let hp = d.hp || 0;
-  // Absorb by temp HP first
   if (tmpHp > 0) {
     const absorbed = Math.min(tmpHp, remaining);
     tmpHp -= absorbed;
@@ -1941,6 +1991,11 @@ window._gmDamage = async (id) => {
   }
   hp = Math.max(0, hp - remaining);
   await updateDoc(doc(db, "characters", id), { hp, tmpHp });
+
+  // Concentration check
+  if ((d.conditions||[]).includes('concentrating') && d.concentratingOn && val > 0) {
+    window._triggerConcentrationCheck(id, val, d);
+  }
 };
 window._saveGMNotes = async (id) => {
   const notes = document.getElementById(`gmnotes_${id}`)?.value||'';
@@ -2071,9 +2126,28 @@ window._castSpell = async (charId, slotLevel, slotKey, spellName) => {
   const d = snap.data();
   const usedSlots = { ...(d.usedSpellSlots || {}) };
   usedSlots[slotKey] = (usedSlots[slotKey] || 0) + 1;
-  await updateDoc(doc(db, "characters", charId), { usedSpellSlots: usedSlots });
+  const update = { usedSpellSlots: usedSlots };
+
+  // Check if spell requires concentration
+  const knownSpells = d.known_spells || [];
+  const sp = knownSpells.find(s => s.name === spellName);
+  const isConcentration = sp && (sp.duration||'').toLowerCase().includes('concentration');
+  let concMessage = '';
+
+  if (isConcentration) {
+    // If already concentrating, break previous concentration
+    const conditions = [...(d.conditions||[])];
+    if (!conditions.includes('concentrating')) conditions.push('concentrating');
+    update.conditions = conditions;
+    update.concentratingOn = spellName;
+    concMessage = `<div style="color:#9b59b6;font-size:0.88rem;margin-top:8px">🧠 Concentration active sur ${spellName}</div>`;
+    if ((d.conditions||[]).includes('concentrating') && d.concentratingOn) {
+      concMessage += `<div style="color:#cc4444;font-size:0.82rem">Concentration sur ${d.concentratingOn} perdue</div>`;
+    }
+  }
+
+  await updateDoc(doc(db, "characters", charId), update);
   
-  // Show confirmation then close
   const content = document.getElementById('forgeContent');
   content.innerHTML = `
     <div style="text-align:center;padding:40px 20px">
@@ -2081,6 +2155,7 @@ window._castSpell = async (charId, slotLevel, slotKey, spellName) => {
       <h3 class="step-title" style="border:none">${spellName}</h3>
       <div style="font-size:1rem;color:var(--gold);margin:10px 0">Lancé au niveau ${slotLevel} !</div>
       <div style="font-size:0.85rem;color:#888">Emplacement ${slotKey === 'pact' ? 'de pacte' : 'niv.'+slotLevel} consommé</div>
+      ${concMessage}
     </div>
     <button class="btn-gold" style="width:100%;margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">OK</button>`;
 };
@@ -2910,6 +2985,10 @@ startInlineEdit = async function(el, charId, charData) {
         if (tmpHp > 0) { const ab = Math.min(tmpHp, remaining); tmpHp -= ab; remaining -= ab; }
         hp = Math.max(0, hp - remaining);
         await updateDoc(doc(db, "characters", charId), { hp, tmpHp });
+        // Concentration check if needed
+        if (remaining > 0 && (d.conditions||[]).includes('concentrating') && d.concentratingOn) {
+          setTimeout(() => window._triggerConcentrationCheck(charId, Math.abs(diff), d), 300);
+        }
       } else {
         const newHp = Math.min(charData.hpMax || 999, currentHp + diff);
         await updateDoc(doc(db, "characters", charId), { hp: newHp });
@@ -2930,13 +3009,143 @@ window._adjustHp = async (charId, delta, event) => {
   if (delta < 0) {
     let tmpHp = d.tmpHp || 0;
     let hp = d.hp || 0;
+    let realDmg = 0;
     if (tmpHp > 0) { tmpHp -= 1; }
-    else { hp = Math.max(0, hp - 1); }
+    else { hp = Math.max(0, hp - 1); realDmg = 1; }
     await updateDoc(doc(db, "characters", charId), { hp, tmpHp });
+    if (realDmg > 0 && (d.conditions||[]).includes('concentrating')) {
+      window._triggerConcentrationCheck(charId, realDmg, d);
+    }
   } else {
     const newHp = Math.min(d.hpMax || 999, (d.hp || 0) + 1);
     await updateDoc(doc(db, "characters", charId), { hp: newHp });
   }
+};
+
+// ============================================================
+// CONDITIONS / ÉTATS
+// ============================================================
+
+window._toggleCondition = async (charId, conditionId) => {
+  // Exhaustion is special: cycle 0-6
+  if (conditionId === 'exhaustion') {
+    const snap = await getDoc(doc(db, "characters", charId));
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const current = d.exhaustionLevel || 0;
+    const next = (current + 1) % 7; // 0,1,2,3,4,5,6,0
+    const conditions = [...(d.conditions||[])];
+    if (next > 0 && !conditions.includes('exhaustion')) conditions.push('exhaustion');
+    if (next === 0) { const idx = conditions.indexOf('exhaustion'); if(idx>=0) conditions.splice(idx,1); }
+    await updateDoc(doc(db, "characters", charId), { conditions, exhaustionLevel: next });
+    return;
+  }
+
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const conditions = [...(d.conditions||[])];
+  const idx = conditions.indexOf(conditionId);
+  const update = {};
+
+  if (idx >= 0) {
+    conditions.splice(idx, 1);
+    if (conditionId === 'concentrating') {
+      update.concentratingOn = null;
+    }
+  } else {
+    conditions.push(conditionId);
+  }
+  update.conditions = conditions;
+  await updateDoc(doc(db, "characters", charId), update);
+};
+
+window._breakConcentration = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const conditions = (d.conditions||[]).filter(c => c !== 'concentrating');
+  await updateDoc(doc(db, "characters", charId), { conditions, concentratingOn: null });
+};
+
+// Concentration save check — triggered when damage is dealt to a concentrating character
+window._triggerConcentrationCheck = (charId, damage, charData) => {
+  const dc = Math.max(10, Math.floor(damage / 2));
+  const conMod = mod(charData.stats?.con || 10);
+  const pb = profBonus(totalLevel(charData));
+  // Check if character has CON save proficiency
+  const hasCONprof = charData.saveProficiencies?.con;
+  const totalBonus = conMod + (hasCONprof ? pb : 0);
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🧠</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  content.innerHTML = `
+    <h3 class="step-title">🧠 Jet de Concentration</h3>
+    <div class="info-box" style="margin-bottom:14px">
+      <strong>${charData.name}</strong> subit <strong>${damage} dégâts</strong> en étant concentré sur <strong>${charData.concentratingOn||'un sort'}</strong>.<br><br>
+      <strong>DD du jet de sauvegarde CON :</strong> ${dc} (= max(10, ${damage}/2))<br>
+      <strong>Bonus de sauvegarde CON :</strong> +${totalBonus} (${conMod} CON${hasCONprof?' + '+pb+' maîtrise':''})
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <button class="btn-gold" style="flex:1" onclick="window._rollConcentrationSave('${charId}',${dc},${totalBonus})">🎲 Lancer le dé (1d20+${totalBonus})</button>
+    </div>
+    <div id="conc_result"></div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn-gm-action heal" style="flex:1;padding:10px" onclick="window._resolveConcentration('${charId}',true)">✓ Réussi — Maintenir</button>
+      <button class="btn-gm-action dmg" style="flex:1;padding:10px" onclick="window._resolveConcentration('${charId}',false)">✗ Raté — Perdue</button>
+    </div>`;
+
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._rollConcentrationSave = (charId, dc, bonus) => {
+  const roll = Math.floor(Math.random() * 20) + 1;
+  const total = roll + bonus;
+  const success = total >= dc;
+  const resultEl = document.getElementById('conc_result');
+  resultEl.innerHTML = `
+    <div class="conc-roll-result ${success?'conc-success':'conc-fail'}">
+      <div class="conc-roll-dice">🎲 ${roll}</div>
+      <div class="conc-roll-total">${roll} + ${bonus} = <strong>${total}</strong> vs DD ${dc}</div>
+      <div class="conc-roll-verdict">${success?'✓ RÉUSSI — Concentration maintenue !':'✗ RATÉ — Concentration perdue !'}</div>
+    </div>`;
+};
+
+window._resolveConcentration = async (charId, maintained) => {
+  if (!maintained) {
+    await window._breakConcentration(charId);
+  }
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+
+// GM: open full condition picker for a character
+window._openGMConditions = (charId) => {
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">⚡</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  // We need to read current conditions from Firestore
+  getDoc(doc(db, "characters", charId)).then(snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const active = d.conditions || [];
+    content.innerHTML = `
+      <h3 class="step-title">États de ${d.name}</h3>
+      <div class="cond-picker-grid">
+        ${CONDITIONS.map(c => `
+        <div class="cond-picker-item ${active.includes(c.id)?'cond-picker-active':''}" onclick="window._toggleCondition('${charId}','${c.id}');setTimeout(()=>window._openGMConditions('${charId}'),300)">
+          <span class="cond-picker-icon">${c.icon}</span>
+          <span class="cond-picker-name">${c.name}${c.id==='exhaustion'?' ('+(d.exhaustionLevel||0)+'/6)':''}</span>
+        </div>`).join('')}
+      </div>
+      <button class="btn-prev" style="margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  });
+  document.getElementById('forgeOverlay').style.display = 'flex';
 };
 
 // ── Ajout de ressource personnalisée ──
@@ -3114,6 +3323,41 @@ nav button:last-child { color:#884444; }
 /* Rest hit dice */
 .rest-hd-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0;
   border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
+
+/* ── CONDITIONS ── */
+.conditions-bar { display:flex; flex-wrap:wrap; gap:4px; margin-top:10px; padding:0 2px; }
+.cond-badge { width:28px; height:28px; border-radius:50%; border:2px solid #555; display:inline-flex;
+  align-items:center; justify-content:center; font-size:0.85rem; cursor:pointer; transition:all 0.15s;
+  opacity:0.35; background:rgba(255,255,255,0.05); }
+.cond-badge:hover { opacity:0.7; transform:scale(1.15); }
+.cond-badge.cond-active { opacity:1; border-color:var(--gold); background:rgba(184,134,11,0.2); box-shadow:0 0 6px rgba(184,134,11,0.4); }
+.cond-badge.cond-conc.cond-active { border-color:#9b59b6; background:rgba(155,89,182,0.2); box-shadow:0 0 6px rgba(155,89,182,0.4); }
+.conc-banner { background:linear-gradient(90deg,rgba(155,89,182,0.15),transparent); padding:6px 14px; color:#9b59b6;
+  font-size:0.82rem; border-top:1px solid rgba(155,89,182,0.3); display:flex; align-items:center; }
+
+/* GM conditions */
+.gm-conditions { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; align-items:center; background:#f9f4ea; border-top:1px solid #e0d0b0; }
+.gm-conc-banner { background:rgba(155,89,182,0.1); padding:4px 14px; color:#9b59b6; font-size:0.78rem; border-top:1px solid rgba(155,89,182,0.2); }
+.gm-spellslots { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; background:#f0e8d8; }
+.gm-slot { background:#fff; border:1px solid #d4c4a0; border-radius:3px; padding:2px 6px; font-size:0.7rem; font-family:'Cinzel'; color:var(--ink); }
+.gm-slot-pact { border-color:#9b59b6; color:#9b59b6; }
+
+/* Condition picker (GM popup) */
+.cond-picker-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+.cond-picker-item { display:flex; align-items:center; gap:8px; padding:8px 10px; background:#fff; border:1px solid #d4c4a0;
+  border-radius:3px; cursor:pointer; transition:all 0.15s; }
+.cond-picker-item:hover { border-color:var(--gold); }
+.cond-picker-active { background:#fff8ee; border-color:var(--gold); border-width:2px; }
+.cond-picker-icon { font-size:1.2rem; }
+.cond-picker-name { font-size:0.82rem; }
+
+/* Concentration roll result */
+.conc-roll-result { text-align:center; padding:16px; border-radius:4px; margin:10px 0; }
+.conc-success { background:#e8f5e9; border:2px solid #4caf50; }
+.conc-fail { background:#ffebee; border:2px solid #f44336; }
+.conc-roll-dice { font-size:2rem; margin-bottom:6px; }
+.conc-roll-total { font-size:1rem; color:#444; }
+.conc-roll-verdict { font-size:1.1rem; font-family:'Cinzel'; margin-top:8px; letter-spacing:1px; }
 
 /* ── LEVEL UP DETAILS ── */
 .lvlup-section { background:#fff; border:1px solid #d4c4a0; border-radius:4px; margin:12px 0; overflow:hidden; }
