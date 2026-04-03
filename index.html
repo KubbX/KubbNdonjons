@@ -463,6 +463,89 @@ const SPELL_SLOTS_WARLOCK = {
   11:[3,5],12:[3,5],13:[3,5],14:[3,5],15:[3,5],16:[3,5],17:[4,5],18:[4,5],19:[4,5],20:[4,5]
 };
 
+// Type de lanceur par classe: full=1, half=0.5, third=0.334, pact=special, none=0
+const CASTER_TYPE = {
+  "Barde":"full","Clerc":"full","Druide":"full","Ensorceleur":"full","Magicien":"full",
+  "Paladin":"half","Rôdeur":"half","Artificier":"half",
+  "Occultiste":"pact",
+  "Guerrier":"third","Roublard":"third",
+  "Barbare":"none","Moine":"none"
+};
+// NB: Guerrier et Roublard ne sont "third" que s'ils ont la sous-classe Chevalier occulte / Escroc arcanique
+function getCasterType(className, subclassName) {
+  if (className === 'Guerrier' && subclassName === 'Chevalier occulte') return 'third';
+  if (className === 'Roublard' && subclassName === 'Escroc arcanique') return 'third';
+  if (className === 'Guerrier' || className === 'Roublard') return 'none';
+  return CASTER_TYPE[className] || 'none';
+}
+
+// Calcul du niveau de lanceur multiclasse (PHB p.164)
+function computeMulticlassCasterLevel(classes, subclasses) {
+  let casterLevel = 0;
+  let hasWarlock = false;
+  let warlockLevel = 0;
+  classes.forEach(c => {
+    const ct = getCasterType(c.name, subclasses?.[c.name]);
+    if (ct === 'full') casterLevel += c.level;
+    else if (ct === 'half') casterLevel += Math.floor(c.level / 2);
+    else if (ct === 'third') casterLevel += Math.floor(c.level / 3);
+    else if (ct === 'pact') { hasWarlock = true; warlockLevel = c.level; }
+  });
+  return { casterLevel: Math.max(casterLevel, 0), hasWarlock, warlockLevel };
+}
+
+// Retourne les emplacements de sorts pour un personnage
+function getSpellSlots(d) {
+  const classes = getClasses(d);
+  const subclasses = d.subclasses || {};
+  if (classes.length === 0) return { slots: [], pactSlots: null };
+
+  // Monoclass
+  if (classes.length === 1) {
+    const c = classes[0];
+    const ct = getCasterType(c.name, subclasses[c.name]);
+    if (ct === 'none') return { slots: [], pactSlots: null };
+    if (ct === 'pact') {
+      const ws = SPELL_SLOTS_WARLOCK[c.level] || [0,0];
+      return { slots: [], pactSlots: { count: ws[0], level: ws[1] } };
+    }
+    if (ct === 'full') return { slots: SPELL_SLOTS_FULL[c.level] || [], pactSlots: null };
+    if (ct === 'half') {
+      const s = SPELL_SLOTS_HALF[c.level] || [];
+      // Pad to 9 levels
+      return { slots: [...s, ...Array(9 - s.length).fill(0)], pactSlots: null };
+    }
+    if (ct === 'third') {
+      const effLvl = Math.max(1, Math.floor(c.level / 3));
+      return { slots: SPELL_SLOTS_FULL[effLvl] || [], pactSlots: null };
+    }
+  }
+
+  // Multiclass
+  const { casterLevel, hasWarlock, warlockLevel } = computeMulticlassCasterLevel(classes, subclasses);
+  let slots = casterLevel > 0 ? (SPELL_SLOTS_FULL[casterLevel] || []) : [];
+  let pactSlots = null;
+  if (hasWarlock) {
+    const ws = SPELL_SLOTS_WARLOCK[warlockLevel] || [0,0];
+    pactSlots = { count: ws[0], level: ws[1] };
+  }
+  return { slots, pactSlots };
+}
+
+// Sorts mineurs connus (approximation par classe et niveau)
+function getCantripsKnown(className, level) {
+  const table = {
+    "Barde":     [2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+    "Clerc":     [3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
+    "Druide":    [2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+    "Ensorceleur":[4,4,4,5,5,5,5,5,5,6,6,6,6,6,6,6,6,6,6,6],
+    "Magicien":  [3,3,3,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5],
+    "Occultiste":[2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4],
+    "Artificier":[2,2,2,2,2,2,2,2,2,3,3,3,3,4,4,4,4,4,4,4],
+  };
+  return table[className]?.[level-1] || 0;
+}
+
 // XP thresholds par niveau
 const XP_THRESHOLDS = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000,100000,120000,140000,165000,195000,225000,265000,305000,355000];
  
@@ -1111,6 +1194,7 @@ function fmtMod(score) { const m = mod(score); return (m>=0?'+':'')+m; }
 function profBonus(level) { return PROF_BONUS[(level||1)-1] || 2; }
  
 function renderCharSheet(id, d) {
+  window._currentSheetData = d;
   const tLvl = totalLevel(d);
   const pb = profBonus(tLvl);
   const stats = d.stats || {str:10,dex:10,con:10,int:10,wis:10,cha:10};
@@ -1313,27 +1397,85 @@ function renderCharSheet(id, d) {
         ${d.equipment ? `<div class="field-group" style="margin:0 10px 10px"><label>Équipement (texte libre)</label><div class="editable block-edit" data-field="equipment" data-type="textarea">${d.equipment||'—'}</div></div>` : ''}
       </div>
  
-      <!-- Sorts (si lanceur) -->
-      ${d.spellcaster?`
+      <!-- Sorts -->
+      ${(()=>{
+        const ss = getSpellSlots(d);
+        const hasMagic = ss.slots.some(s=>s>0) || ss.pactSlots;
+        if (!hasMagic && !d.spellcaster) return '';
+        const spellAbility = d.spellAbility||'';
+        const knownSpells = d.known_spells || [];
+        const usedSlots = d.usedSpellSlots || {};
+        // Group spells by level
+        const spellsByLvl = {};
+        knownSpells.forEach(sp => { if(!spellsByLvl[sp.level]) spellsByLvl[sp.level]=[]; spellsByLvl[sp.level].push(sp); });
+
+        return `
       <div class="sheet-section">
-        <div class="section-title">Sorts</div>
+        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">+ Compendium</button></div>
         <div class="spell-stats">
-          <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${(d.spellAbility||'').toUpperCase()}</div></div>
-          <div class="spell-stat-box"><div class="combat-label">DC Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
+          <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${spellAbility.toUpperCase()||'—'}</div></div>
+          <div class="spell-stat-box"><div class="combat-label">DD Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
           <div class="spell-stat-box"><div class="combat-label">Bonus Attaque</div><div>${fmtB(d.spellAttackBonus||0)}</div></div>
         </div>
-        <div class="spell-slots">
-          ${[1,2,3,4,5,6,7,8,9].map(lvl=>`
-          <div class="spell-level">
-            <span class="spell-lvl-num">Niv.${lvl}</span>
-            <span class="editable inline-edit" data-field="spellSlots${lvl}" data-type="text">${d['spellSlots'+lvl]||'—/—'}</span>
-          </div>`).join('')}
+
+        <!-- Emplacements de sorts calculés -->
+        ${ss.slots.some(s=>s>0) ? `
+        <div class="spell-slots-section">
+          <div class="combat-label" style="padding:4px 10px">Emplacements de sorts</div>
+          <div class="spell-slots-grid">
+            ${ss.slots.map((max,i)=> max>0 ? `
+            <div class="spell-slot-box">
+              <div class="spell-slot-lvl">Niv.${i+1}</div>
+              <div class="spell-slot-dots">
+                ${Array.from({length:max},(_, j)=>`<span class="spell-slot-dot ${(usedSlots['s'+(i+1)]||0)>j?'used':''}" onclick="window._toggleSpellSlot('${id}',${i+1},${j},${max})"></span>`).join('')}
+              </div>
+              <div class="spell-slot-count">${max - (usedSlots['s'+(i+1)]||0)}/${max}</div>
+            </div>` : '').join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- Emplacements de pacte (Occultiste) -->
+        ${ss.pactSlots ? `
+        <div class="spell-slots-section" style="border-top:1px solid #e0d0b0">
+          <div class="combat-label" style="padding:4px 10px">Pacte (niv.${ss.pactSlots.level})</div>
+          <div class="spell-slots-grid">
+            <div class="spell-slot-box">
+              <div class="spell-slot-lvl">Pacte</div>
+              <div class="spell-slot-dots">
+                ${Array.from({length:ss.pactSlots.count},(_,j)=>`<span class="spell-slot-dot pact ${(usedSlots['pact']||0)>j?'used':''}" onclick="window._toggleSpellSlot('${id}','pact',${j},${ss.pactSlots.count})"></span>`).join('')}
+              </div>
+              <div class="spell-slot-count">${ss.pactSlots.count - (usedSlots['pact']||0)}/${ss.pactSlots.count}</div>
+            </div>
+          </div>
+        </div>` : ''}
+
+        <!-- Bouton repos -->
+        <div style="padding:4px 10px 8px;text-align:right">
+          <button class="section-add-btn" onclick="window._restoreAllSlots('${id}')">Repos long (restaurer)</button>
         </div>
-        <div class="field-group" style="margin-top:8px">
-          <label>Sorts préparés / connus</label>
-          <div class="editable block-edit" data-field="spellList" data-type="textarea">${d.spellList||'—'}</div>
+
+        <!-- Sorts connus/préparés groupés par niveau -->
+        <div class="spell-known-list">
+          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : ''}
+          ${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
+            const spells = spellsByLvl[lvl];
+            if (!spells || !spells.length) return '';
+            return `
+            <div class="spell-level-group">
+              <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
+              ${spells.map((sp,si) => `
+              <div class="spell-known-item">
+                <div class="spell-known-main" onclick="window._showSpellDetail('${id}',${lvl},${si})">
+                  <strong>${sp.name}</strong>
+                  <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
+                </div>
+                <button class="inv-remove-btn" onclick="window._removeSpell('${id}',${lvl},${si})">✕</button>
+              </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
-      </div>`:''}
+      </div>`;
+      })()}
     </div>
  
     <!-- COLONNE DROITE -->
@@ -1813,12 +1955,76 @@ window._wizardPrev = window._wizardPrev || function(){};
 window._wizardNext = window._wizardNext || function(){};
 
 // ============================================================
+// SORTS — GESTION EMPLACEMENTS & SORTS CONNUS
+// ============================================================
+
+window._toggleSpellSlot = async (charId, levelOrPact, dotIndex, max) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const usedSlots = { ...(d.usedSpellSlots || {}) };
+  const key = levelOrPact === 'pact' ? 'pact' : 's' + levelOrPact;
+  const current = usedSlots[key] || 0;
+  if (current > dotIndex) usedSlots[key] = dotIndex;
+  else usedSlots[key] = dotIndex + 1;
+  usedSlots[key] = Math.max(0, Math.min(max, usedSlots[key]));
+  await updateDoc(doc(db, "characters", charId), { usedSpellSlots: usedSlots });
+};
+
+window._restoreAllSlots = async (charId) => {
+  await updateDoc(doc(db, "characters", charId), { usedSpellSlots: {} });
+};
+
+window._removeSpell = async (charId, level, indexInLevel) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const spells = [...(d.known_spells || [])];
+  let count = 0;
+  for (let i = 0; i < spells.length; i++) {
+    if (spells[i].level === level) {
+      if (count === indexInLevel) { spells.splice(i, 1); break; }
+      count++;
+    }
+  }
+  await updateDoc(doc(db, "characters", charId), { known_spells: spells });
+};
+
+window._showSpellDetail = (charId, level, indexInLevel) => {
+  if (!window._currentSheetData) return;
+  const spells = window._currentSheetData.known_spells || [];
+  const byLvl = {};
+  spells.forEach(sp => { if(!byLvl[sp.level]) byLvl[sp.level]=[]; byLvl[sp.level].push(sp); });
+  const sp = byLvl[level]?.[indexInLevel];
+  if (!sp) return;
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">✨</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+  content.innerHTML = `
+    <h3 class="step-title">${sp.name}</h3>
+    <div class="comp-detail"><div class="comp-detail-grid">
+      <div class="comp-detail-row"><span class="comp-detail-label">Niveau</span><span class="comp-detail-val">${sp.level===0?'Sort mineur':sp.level}</span></div>
+      <div class="comp-detail-row"><span class="comp-detail-label">École</span><span class="comp-detail-val">${sp.school||'—'}</span></div>
+      <div class="comp-detail-row"><span class="comp-detail-label">Temps</span><span class="comp-detail-val">${sp.time||'—'}</span></div>
+      <div class="comp-detail-row"><span class="comp-detail-label">Portée</span><span class="comp-detail-val">${sp.range||'—'}</span></div>
+      <div class="comp-detail-row"><span class="comp-detail-label">Durée</span><span class="comp-detail-val">${sp.duration||'—'}</span></div>
+      <div class="comp-detail-row"><span class="comp-detail-label">Composantes</span><span class="comp-detail-val">${sp.components||'—'}</span></div>
+      ${sp.classes?.length?`<div class="comp-detail-row"><span class="comp-detail-label">Classes</span><span class="comp-detail-val">${sp.classes.join(', ')}</span></div>`:''}
+    </div>
+    <div style="padding:10px;font-size:0.88rem;line-height:1.5;color:#444">${sp.desc||'—'}</div></div>
+    <button class="btn-prev" style="margin-top:10px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+// ============================================================
 // COMPENDIUM — DONNÉES DE BASE (SRD / PHB)
 // ============================================================
 const COMPENDIUM_CATEGORIES = [
   {id:'armor', name:'Armures', icon:'🛡'},
   {id:'weapon', name:'Armes', icon:'⚔'},
   {id:'item', name:'Objets', icon:'🎒'},
+  {id:'spell', name:'Sorts', icon:'✨'},
   {id:'feat', name:'Dons', icon:'⭐'},
   {id:'monster', name:'Monstres', icon:'🐉'},
   {id:'background', name:'Historiques', icon:'📜'}
@@ -1860,6 +2066,52 @@ const COMPENDIUM_DATA = {
     {name:"Marteau de guerre",type:"Martiale mêlée",damage:"1d8 contondant",properties:"Polyvalente (1d10)",cost:"15 po",weight:"1 kg",source:"PHB"},
     {name:"Arc long",type:"Martiale distance",damage:"1d8 perçant",properties:"Munitions (45/180), lourde, deux mains",cost:"50 po",weight:"1 kg",source:"PHB"},
     {name:"Arbalète lourde",type:"Martiale distance",damage:"1d10 perçant",properties:"Munitions (30/120), chargement, lourde, deux mains",cost:"50 po",weight:"9 kg",source:"PHB"}
+  ],
+  spell: [
+    // Sorts mineurs (niveau 0)
+    {name:"Lumière",level:0,school:"Évocation",time:"1 action",range:"Contact",duration:"1 heure",components:"V, M",classes:["Barde","Clerc","Ensorceleur","Magicien","Artificier"],desc:"Objet touché émet lumière vive 6m + faible 6m",source:"PHB"},
+    {name:"Trait de feu",level:0,school:"Évocation",time:"1 action",range:"36m",duration:"Instantanée",components:"V, S",classes:["Ensorceleur","Magicien","Artificier"],desc:"Attaque de sort à distance: 1d10 feu (augmente aux niveaux 5, 11, 17)",source:"PHB"},
+    {name:"Rayon de givre",level:0,school:"Évocation",time:"1 action",range:"18m",duration:"Instantanée",components:"V, S",classes:["Ensorceleur","Magicien","Artificier"],desc:"Attaque de sort: 1d8 froid, −3m vitesse jusqu'au tour suivant",source:"PHB"},
+    {name:"Explosion occulte",level:0,school:"Évocation",time:"1 action",range:"36m",duration:"Instantanée",components:"V, S",classes:["Occultiste"],desc:"1d10 force. Rayons supplémentaires aux niveaux 5, 11, 17",source:"PHB"},
+    {name:"Thaumaturgie",level:0,school:"Transmutation",time:"1 action",range:"9m",duration:"1 minute",components:"V",classes:["Clerc"],desc:"Effet mineur surnaturel (trembler le sol, amplifier la voix, etc.)",source:"PHB"},
+    {name:"Prestidigitation",level:0,school:"Transmutation",time:"1 action",range:"3m",duration:"1 heure",components:"V, S",classes:["Barde","Ensorceleur","Magicien","Occultiste","Artificier"],desc:"Tour de magie mineur (nettoyer, allumer, illusion sensorielle, etc.)",source:"PHB"},
+    {name:"Druidisme",level:0,school:"Transmutation",time:"1 action",range:"9m",duration:"Instantanée",components:"V, S",classes:["Druide"],desc:"Effet naturel mineur (prédire météo, fleur s'ouvre, etc.)",source:"PHB"},
+    {name:"Main de mage",level:0,school:"Invocation",time:"1 action",range:"9m",duration:"1 minute",components:"V, S",classes:["Barde","Ensorceleur","Magicien","Occultiste","Artificier"],desc:"Main spectrale qui peut manipuler des objets à distance",source:"PHB"},
+    {name:"Message",level:0,school:"Transmutation",time:"1 action",range:"36m",duration:"1 round",components:"V, S, M",classes:["Barde","Ensorceleur","Magicien","Artificier"],desc:"Murmurer un message à une cible qui peut répondre",source:"PHB"},
+    {name:"Moquerie cruelle",level:0,school:"Enchantement",time:"1 action",range:"18m",duration:"Instantanée",components:"V",classes:["Barde"],desc:"1d4 psychiques, désavantage prochain jet d'attaque (JdS SAG)",source:"PHB"},
+    {name:"Mot de guérison",level:0,school:"Évocation",time:"1 action",range:"18m",duration:"Instantanée",components:"V",classes:["Barde"],desc:"Sort mineur — en réalité niveau 1 (voir ci-dessous)",source:"PHB"},
+    {name:"Coup au but",level:0,school:"Divination",time:"1 action",range:"9m",duration:"Concentration, 1 round",components:"S",classes:["Barde","Clerc","Druide","Ensorceleur","Magicien","Occultiste"],desc:"Avantage au prochain jet d'attaque contre la cible",source:"PHB"},
+    // Niveau 1
+    {name:"Armure de mage",level:1,school:"Abjuration",time:"1 action",range:"Contact",duration:"8 heures",components:"V, S, M",classes:["Ensorceleur","Magicien"],desc:"CA de la cible = 13 + mod DEX (pas d'armure)",source:"PHB"},
+    {name:"Bouclier",level:1,school:"Abjuration",time:"1 réaction",range:"Soi-même",duration:"1 round",components:"V, S",classes:["Ensorceleur","Magicien"],desc:"+5 CA jusqu'au début du prochain tour, inclut déclencheur",source:"PHB"},
+    {name:"Charme-personne",level:1,school:"Enchantement",time:"1 action",range:"9m",duration:"1 heure",components:"V, S",classes:["Barde","Druide","Ensorceleur","Magicien","Occultiste"],desc:"Humanoïde charmé si JdS SAG raté (avantage si combat)",source:"PHB"},
+    {name:"Détection de la magie",level:1,school:"Divination",time:"1 action (rituel)",range:"Soi-même",duration:"Concentration, 10 min",components:"V, S",classes:["Barde","Clerc","Druide","Ensorceleur","Magicien","Paladin","Rôdeur","Artificier"],desc:"Détecter la magie dans un rayon de 9m, identifier l'école",source:"PHB"},
+    {name:"Guérison",level:1,school:"Évocation",time:"1 action",range:"Contact",duration:"Instantanée",components:"V, S",classes:["Barde","Clerc","Druide","Paladin","Rôdeur","Artificier"],desc:"Récupérer 1d8 + mod de carac. PV (augmente avec le niveau d'emplacement)",source:"PHB"},
+    {name:"Mot de guérison",level:1,school:"Évocation",time:"1 action bonus",range:"18m",duration:"Instantanée",components:"V",classes:["Barde","Clerc","Druide"],desc:"Récupérer 1d4 + mod de carac. PV à distance",source:"PHB"},
+    {name:"Projectile magique",level:1,school:"Évocation",time:"1 action",range:"36m",duration:"Instantanée",components:"V, S",classes:["Ensorceleur","Magicien"],desc:"3 fléchettes de 1d4+1 force chacune, touche automatique (+1 fléchette/niveau supérieur)",source:"PHB"},
+    {name:"Sommeil",level:1,school:"Enchantement",time:"1 action",range:"27m",duration:"1 minute",components:"V, S, M",classes:["Barde","Ensorceleur","Magicien"],desc:"5d8 PV de créatures endormies (commence par les plus faibles)",source:"PHB"},
+    {name:"Soins",level:1,school:"Évocation",time:"1 action",range:"Contact",duration:"Instantanée",components:"V, S",classes:["Barde","Clerc","Druide","Paladin","Rôdeur"],desc:"Récupérer 1d8 + mod carac. PV",source:"PHB"},
+    {name:"Thunderwave",level:1,school:"Évocation",time:"1 action",range:"Soi-même (cube 4.5m)",duration:"Instantanée",components:"V, S",classes:["Barde","Druide","Ensorceleur","Magicien"],desc:"2d8 tonnerre + repousser 3m (JdS CON), son audible à 90m",source:"PHB"},
+    {name:"Représailles infernales",level:1,school:"Évocation",time:"1 réaction",range:"18m",duration:"Instantanée",components:"V, S",classes:["Occultiste"],desc:"Réaction quand touché: 2d10 feu (+1d10/niveau supérieur)",source:"PHB"},
+    {name:"Héroïsme",level:1,school:"Enchantement",time:"1 action",range:"Contact",duration:"Concentration, 1 min",components:"V, S",classes:["Barde","Paladin"],desc:"PV temporaires = mod carac. au début de chaque tour, immunité terreur",source:"PHB"},
+    // Niveau 2
+    {name:"Immobiliser un humanoïde",level:2,school:"Enchantement",time:"1 action",range:"18m",duration:"Concentration, 1 min",components:"V, S, M",classes:["Barde","Clerc","Druide","Ensorceleur","Magicien","Occultiste"],desc:"Humanoïde paralysé (JdS SAG à chaque tour)",source:"PHB"},
+    {name:"Invisibilité",level:2,school:"Illusion",time:"1 action",range:"Contact",duration:"Concentration, 1 heure",components:"V, S, M",classes:["Barde","Ensorceleur","Magicien","Occultiste","Artificier"],desc:"Cible invisible jusqu'à attaque ou sort. +1 cible/niveau supérieur",source:"PHB"},
+    {name:"Restauration inférieure",level:2,school:"Abjuration",time:"1 action",range:"Contact",duration:"Instantanée",components:"V, S",classes:["Barde","Clerc","Druide","Paladin","Rôdeur","Artificier"],desc:"Guérir une maladie ou un état: aveuglé, sourd, paralysé, empoisonné",source:"PHB"},
+    {name:"Aide",level:2,school:"Abjuration",time:"1 action",range:"9m",duration:"8 heures",components:"V, S, M",classes:["Barde","Clerc","Paladin","Artificier"],desc:"3 créatures gagnent +5 PV max et PV actuels (+5/niveau supérieur)",source:"PHB"},
+    {name:"Arme spirituelle",level:2,school:"Évocation",time:"1 action bonus",range:"18m",duration:"1 minute",components:"V, S",classes:["Clerc"],desc:"Arme spectrale: action bonus 1d8+mod SAG force (+1d8/2 niveaux supérieurs)",source:"PHB"},
+    // Niveau 3
+    {name:"Boule de feu",level:3,school:"Évocation",time:"1 action",range:"45m",duration:"Instantanée",components:"V, S, M",classes:["Ensorceleur","Magicien"],desc:"Sphère 6m rayon: 8d6 feu (JdS DEX moitié). +1d6/niveau supérieur",source:"PHB"},
+    {name:"Contresort",level:3,school:"Abjuration",time:"1 réaction",range:"18m",duration:"Instantanée",components:"S",classes:["Ensorceleur","Magicien","Occultiste"],desc:"Interrompre un sort niv.3 ou moins. Niv. supérieur: jet de carac. DD 10+niv",source:"PHB"},
+    {name:"Dissipation de la magie",level:3,school:"Abjuration",time:"1 action",range:"36m",duration:"Instantanée",components:"V, S",classes:["Barde","Clerc","Druide","Magicien","Occultiste","Paladin","Ensorceleur","Artificier"],desc:"Mettre fin à un sort niv.3 ou moins. Niv. supérieur: jet DD 10+niv",source:"PHB"},
+    {name:"Hâte",level:3,school:"Transmutation",time:"1 action",range:"9m",duration:"Concentration, 1 min",components:"V, S, M",classes:["Ensorceleur","Magicien","Artificier"],desc:"+2 CA, avantage JdS DEX, vitesse ×2, action supplémentaire limitée",source:"PHB"},
+    {name:"Réanimation",level:3,school:"Nécromancie",time:"1 action",range:"Contact",duration:"Instantanée",components:"V, S, M (300 po)",classes:["Clerc","Paladin"],desc:"Ramener un mort (≤1 min) à 1 PV",source:"PHB"},
+    // Niveau 4
+    {name:"Bannissement",level:4,school:"Abjuration",time:"1 action",range:"18m",duration:"Concentration, 1 min",components:"V, S, M",classes:["Clerc","Paladin","Ensorceleur","Magicien","Occultiste"],desc:"Bannir une créature dans un demi-plan (JdS CHA). Si pas du plan, permanent",source:"PHB"},
+    {name:"Bouclier de feu",level:4,school:"Évocation",time:"1 action",range:"Soi-même",duration:"10 minutes",components:"V, S, M",classes:["Magicien","Artificier"],desc:"Résistance froid ou feu; 2d8 dégâts rétorsion à l'attaquant en mêlée",source:"PHB"},
+    // Niveau 5
+    {name:"Rappel à la vie",level:5,school:"Nécromancie",time:"1 action",range:"Contact",duration:"Instantanée",components:"V, S, M (500 po)",classes:["Barde","Clerc","Druide","Paladin"],desc:"Ramener un mort (≤10 jours) à 1 PV, guérir poison/maladies",source:"PHB"},
+    {name:"Mur de force",level:5,school:"Évocation",time:"1 action",range:"36m",duration:"Concentration, 10 min",components:"V, S, M",classes:["Magicien"],desc:"Mur invisible et indestructible (10 panneaux de 3×3m ou dôme 3m rayon)",source:"PHB"}
   ],
   item: [
     {name:"Potion de soins",type:"Potion",desc:"Récupérer 2d4+2 PV",cost:"50 po",rarity:"Courant",source:"PHB"},
@@ -2008,6 +2260,7 @@ function getResourceSubtitle(catId, r) {
     case 'armor': return `${r.type||''} · CA ${r.ac||'—'} · ${r.cost||''}`;
     case 'weapon': return `${r.type||''} · ${r.damage||''} · ${r.cost||''}`;
     case 'item': return `${r.type||''} · ${r.rarity||'—'} · ${r.cost||''}`;
+    case 'spell': return `Niv.${r.level===0?'mineur':r.level} · ${r.school||''} · ${(r.classes||[]).join(', ')}`;
     case 'feat': return `${r.prereq ? 'Prérequis: '+r.prereq : 'Aucun prérequis'}`;
     case 'monster': return `RC ${r.cr||'?'} · ${r.type||''} · ${r.size||''}`;
     case 'background': return `Compétences: ${r.skills||'—'}`;
@@ -2155,6 +2408,13 @@ window._pickResource = async (charId, catId, index) => {
     const feats = [...(d.features||[])];
     feats.push({ name: `Don: ${r.name}`, desc: r.desc||r.prereq||'', src: 'Compendium' });
     update.features = feats;
+  }
+  else if (catId === 'spell') {
+    const spells = [...(d.known_spells||[])];
+    if (!spells.find(s => s.name === r.name)) {
+      spells.push({ name:r.name, level:r.level, school:r.school||'', time:r.time||'', range:r.range||'', duration:r.duration||'', desc:r.desc||'', components:r.components||'', classes:r.classes||[] });
+    }
+    update.known_spells = spells;
   }
   else if (catId === 'background') {
     update.background = r.name;
@@ -2660,6 +2920,28 @@ nav button:last-child { color:#884444; }
 .gm-notes summary { cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; }
 .gm-notes-area { width:100%; margin-top:6px; }
  
+/* ── SPELL SLOTS ── */
+.spell-slots-section { padding:4px 0; }
+.spell-slots-grid { display:flex; flex-wrap:wrap; gap:6px; padding:4px 10px; }
+.spell-slot-box { background:#fff8ee; border:1px solid #e0d0b0; border-radius:3px; padding:5px 8px; text-align:center; min-width:70px; }
+.spell-slot-lvl { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); }
+.spell-slot-dots { display:flex; gap:3px; justify-content:center; margin:4px 0; }
+.spell-slot-dot { width:14px; height:14px; border-radius:50%; border:2px solid var(--gold); cursor:pointer; transition:all 0.15s; background:transparent; }
+.spell-slot-dot:hover { transform:scale(1.2); box-shadow:0 0 4px var(--gold); }
+.spell-slot-dot.used { background:#ccc; border-color:#aaa; }
+.spell-slot-dot.pact { border-color:#9b59b6; }
+.spell-slot-dot.pact:hover { box-shadow:0 0 4px #9b59b6; }
+.spell-slot-dot.pact.used { background:#ccc; border-color:#aaa; }
+.spell-slot-count { font-size:0.7rem; color:#888; }
+.spell-known-list { }
+.spell-level-group { border-top:1px solid #f0e8d8; }
+.spell-level-header { background:#f9f4ea; padding:4px 10px; font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); letter-spacing:1px; }
+.spell-known-item { display:flex; align-items:center; padding:4px 10px; border-bottom:1px solid #f8f0e0; }
+.spell-known-item:hover { background:#fffbf4; }
+.spell-known-main { flex:1; cursor:pointer; }
+.spell-known-main strong { font-size:0.85rem; }
+.spell-known-meta { font-size:0.72rem; color:#999; margin-left:6px; }
+
 /* ── COMPENDIUM ── */
 #tab-compendium { background:var(--parch); min-height:100vh; }
 
