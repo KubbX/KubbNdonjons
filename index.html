@@ -1224,6 +1224,8 @@ function renderCharSheet(id, d) {
     </div>
     <div class="sheet-levelup-row">
       <button class="btn-levelup" onclick="window._openLevelUp('${id}')">⬆ MONTER DE NIVEAU</button>
+      <button class="btn-rest btn-rest-short" onclick="window._doShortRest('${id}')">☀ Repos court</button>
+      <button class="btn-rest btn-rest-long" onclick="window._doLongRest('${id}')">🌙 Repos long</button>
     </div>
     <div class="sheet-combat-row">
       <div class="combat-box">
@@ -1449,11 +1451,6 @@ function renderCharSheet(id, d) {
           </div>
         </div>` : ''}
 
-        <!-- Bouton repos -->
-        <div style="padding:4px 10px 8px;text-align:right">
-          <button class="section-add-btn" onclick="window._restoreAllSlots('${id}')">Repos long (restaurer)</button>
-        </div>
-
         <!-- Sorts connus/préparés groupés par niveau -->
         <div class="spell-known-list">
           ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : ''}
@@ -1465,7 +1462,7 @@ function renderCharSheet(id, d) {
               <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
               ${spells.map((sp,si) => `
               <div class="spell-known-item">
-                <div class="spell-known-main" onclick="window._showSpellDetail('${id}',${lvl},${si})">
+                <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
                   <strong>${sp.name}</strong>
                   <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
                 </div>
@@ -1991,29 +1988,265 @@ window._removeSpell = async (charId, level, indexInLevel) => {
 };
 
 window._showSpellDetail = (charId, level, indexInLevel) => {
+  // Kept for compendium detail view — redirects to cast dialog from sheet
+  window._openCastSpell(charId, level, indexInLevel);
+};
+
+window._openCastSpell = (charId, level, indexInLevel) => {
   if (!window._currentSheetData) return;
-  const spells = window._currentSheetData.known_spells || [];
+  const d = window._currentSheetData;
+  const spells = d.known_spells || [];
   const byLvl = {};
   spells.forEach(sp => { if(!byLvl[sp.level]) byLvl[sp.level]=[]; byLvl[sp.level].push(sp); });
   const sp = byLvl[level]?.[indexInLevel];
   if (!sp) return;
+
   const content = document.getElementById('forgeContent');
   document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">✨</div>';
   document.getElementById('forgePrev').style.visibility = 'hidden';
   document.getElementById('forgeNext').style.display = 'none';
+
+  const ss = getSpellSlots(d);
+  const usedSlots = d.usedSpellSlots || {};
+
+  // Spell detail
+  let html = `<h3 class="step-title">${sp.name}</h3>`;
+  html += `<div class="comp-detail"><div class="comp-detail-grid">
+    <div class="comp-detail-row"><span class="comp-detail-label">Niveau</span><span class="comp-detail-val">${sp.level===0?'Sort mineur':sp.level}</span></div>
+    <div class="comp-detail-row"><span class="comp-detail-label">École</span><span class="comp-detail-val">${sp.school||'—'}</span></div>
+    <div class="comp-detail-row"><span class="comp-detail-label">Temps</span><span class="comp-detail-val">${sp.time||'—'}</span></div>
+    <div class="comp-detail-row"><span class="comp-detail-label">Portée</span><span class="comp-detail-val">${sp.range||'—'}</span></div>
+    <div class="comp-detail-row"><span class="comp-detail-label">Durée</span><span class="comp-detail-val">${sp.duration||'—'}</span></div>
+    <div class="comp-detail-row"><span class="comp-detail-label">Composantes</span><span class="comp-detail-val">${sp.components||'—'}</span></div>
+  </div>
+  <div style="padding:10px;font-size:0.88rem;line-height:1.5;color:#444">${sp.desc||'—'}</div></div>`;
+
+  // Cast section — cantrips don't use slots
+  if (sp.level === 0) {
+    html += `<div class="cast-section">
+      <button class="btn-gold cast-btn" onclick="alert('Sort mineur lancé : ${sp.name.replace(/'/g,"\\'")} !');window._closeForge();document.getElementById('forgeNext').style.display=''">✨ Lancer (sort mineur — illimité)</button>
+    </div>`;
+  } else {
+    // Build available slot levels (from spell level up to 9)
+    html += `<div class="cast-section">
+      <div class="cast-header">Lancer à quel niveau ?</div>
+      <div class="cast-slots">`;
+
+    // Regular spell slots
+    for (let lvl = sp.level; lvl <= 9; lvl++) {
+      const max = ss.slots[lvl-1] || 0;
+      if (max === 0) continue;
+      const used = usedSlots['s'+lvl] || 0;
+      const remaining = max - used;
+      const available = remaining > 0;
+      html += `<button class="cast-slot-btn ${available?'':'cast-slot-empty'}" ${available?`onclick="window._castSpell('${charId}',${lvl},'s${lvl}','${sp.name.replace(/'/g,"\\'")}')"`:''}>
+        <div class="cast-slot-lvl">Niv.${lvl}</div>
+        <div class="cast-slot-remaining">${remaining}/${max}</div>
+        ${lvl > sp.level ? '<div class="cast-slot-upcast">▲</div>' : ''}
+      </button>`;
+    }
+
+    // Pact slots (Occultiste)
+    if (ss.pactSlots && ss.pactSlots.level >= sp.level) {
+      const pUsed = usedSlots['pact'] || 0;
+      const pRemaining = ss.pactSlots.count - pUsed;
+      const pAvailable = pRemaining > 0;
+      html += `<button class="cast-slot-btn cast-slot-pact ${pAvailable?'':'cast-slot-empty'}" ${pAvailable?`onclick="window._castSpell('${charId}',${ss.pactSlots.level},'pact','${sp.name.replace(/'/g,"\\'")}')"`:''}>
+        <div class="cast-slot-lvl">Pacte (niv.${ss.pactSlots.level})</div>
+        <div class="cast-slot-remaining">${pRemaining}/${ss.pactSlots.count}</div>
+      </button>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  html += `<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>`;
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._castSpell = async (charId, slotLevel, slotKey, spellName) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const usedSlots = { ...(d.usedSpellSlots || {}) };
+  usedSlots[slotKey] = (usedSlots[slotKey] || 0) + 1;
+  await updateDoc(doc(db, "characters", charId), { usedSpellSlots: usedSlots });
+  
+  // Show confirmation then close
+  const content = document.getElementById('forgeContent');
   content.innerHTML = `
-    <h3 class="step-title">${sp.name}</h3>
-    <div class="comp-detail"><div class="comp-detail-grid">
-      <div class="comp-detail-row"><span class="comp-detail-label">Niveau</span><span class="comp-detail-val">${sp.level===0?'Sort mineur':sp.level}</span></div>
-      <div class="comp-detail-row"><span class="comp-detail-label">École</span><span class="comp-detail-val">${sp.school||'—'}</span></div>
-      <div class="comp-detail-row"><span class="comp-detail-label">Temps</span><span class="comp-detail-val">${sp.time||'—'}</span></div>
-      <div class="comp-detail-row"><span class="comp-detail-label">Portée</span><span class="comp-detail-val">${sp.range||'—'}</span></div>
-      <div class="comp-detail-row"><span class="comp-detail-label">Durée</span><span class="comp-detail-val">${sp.duration||'—'}</span></div>
-      <div class="comp-detail-row"><span class="comp-detail-label">Composantes</span><span class="comp-detail-val">${sp.components||'—'}</span></div>
-      ${sp.classes?.length?`<div class="comp-detail-row"><span class="comp-detail-label">Classes</span><span class="comp-detail-val">${sp.classes.join(', ')}</span></div>`:''}
+    <div style="text-align:center;padding:40px 20px">
+      <div style="font-size:2.5rem;margin-bottom:16px">✨</div>
+      <h3 class="step-title" style="border:none">${spellName}</h3>
+      <div style="font-size:1rem;color:var(--gold);margin:10px 0">Lancé au niveau ${slotLevel} !</div>
+      <div style="font-size:0.85rem;color:#888">Emplacement ${slotKey === 'pact' ? 'de pacte' : 'niv.'+slotLevel} consommé</div>
     </div>
-    <div style="padding:10px;font-size:0.88rem;line-height:1.5;color:#444">${sp.desc||'—'}</div></div>
-    <button class="btn-prev" style="margin-top:10px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+    <button class="btn-gold" style="width:100%;margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">OK</button>`;
+};
+
+// ============================================================
+// REPOS COURT & LONG
+// ============================================================
+
+window._doShortRest = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const classes = getClasses(d);
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">☀</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  // Compute available hit dice
+  const hitDiceInfo = classes.map(c => {
+    const clData = CLASSES[c.name];
+    const hd = clData ? clData.hd : 8;
+    return { name: c.name, hd, level: c.level };
+  });
+
+  let html = `<h3 class="step-title">☀ Repos court</h3>`;
+  html += `<div class="info-box" style="margin-bottom:14px">
+    <strong>Effets du repos court :</strong><br>
+    • Dépenser des dés de vie pour récupérer des PV<br>
+    • Récupération des aptitudes de repos court<br>
+    ${classes.some(c=>c.name==='Occultiste') ? '• <strong>Occultiste:</strong> récupérer les emplacements de pacte<br>' : ''}
+    ${classes.some(c=>c.name==='Guerrier') ? '• <strong>Guerrier:</strong> récupérer Second souffle et Fougue<br>' : ''}
+    ${classes.some(c=>c.name==='Moine') ? '• <strong>Moine:</strong> récupérer tous les points de ki<br>' : ''}
+  </div>`;
+
+  // Hit dice spending
+  html += `<div class="lvlup-section">
+    <div class="lvlup-header">Dés de vie à dépenser</div>
+    <div class="lvlup-body">
+      <p style="font-size:0.82rem;color:#666;margin-bottom:8px">PV actuels : ${d.hp||0} / ${d.hpMax||0}</p>
+      ${hitDiceInfo.map(h => `
+      <div class="rest-hd-row">
+        <span>${h.name} — d${h.hd}</span>
+        <span>Disponibles: <strong>${h.level - (d.usedHitDice?.[h.name]||0)}</strong> / ${h.level}</span>
+        <input type="number" min="0" max="${h.level - (d.usedHitDice?.[h.name]||0)}" value="0" id="rest_hd_${h.name.replace(/\s/g,'_')}" style="width:50px;text-align:center">
+      </div>`).join('')}
+    </div>
+  </div>`;
+
+  html += `<div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn-gold" onclick="window._confirmShortRest('${charId}')">✓ Repos court</button>
+    <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+  </div>`;
+
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._confirmShortRest = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const classes = getClasses(d);
+  const stats = d.stats || {};
+  const conMod = mod(stats.con || 10);
+  const update = {};
+
+  // Calculate HP healed from hit dice
+  let totalHealed = 0;
+  const usedHitDice = { ...(d.usedHitDice || {}) };
+  classes.forEach(c => {
+    const el = document.getElementById('rest_hd_' + c.name.replace(/\s/g,'_'));
+    const spent = parseInt(el?.value) || 0;
+    if (spent > 0) {
+      const clData = CLASSES[c.name];
+      const hd = clData ? clData.hd : 8;
+      for (let i = 0; i < spent; i++) {
+        totalHealed += Math.max(1, Math.floor(Math.random() * hd) + 1 + conMod);
+      }
+      usedHitDice[c.name] = (usedHitDice[c.name] || 0) + spent;
+    }
+  });
+
+  update.usedHitDice = usedHitDice;
+  if (totalHealed > 0) {
+    update.hp = Math.min(d.hpMax || 0, (d.hp || 0) + totalHealed);
+  }
+
+  // Occultiste: restore pact slots
+  if (classes.some(c => c.name === 'Occultiste')) {
+    const usedSlots = { ...(d.usedSpellSlots || {}) };
+    delete usedSlots['pact'];
+    update.usedSpellSlots = usedSlots;
+  }
+
+  await updateDoc(doc(db, "characters", charId), update);
+
+  const content = document.getElementById('forgeContent');
+  content.innerHTML = `
+    <div style="text-align:center;padding:30px 20px">
+      <div style="font-size:2.5rem;margin-bottom:12px">☀</div>
+      <h3 class="step-title" style="border:none">Repos court terminé</h3>
+      ${totalHealed > 0 ? `<div style="color:#4caf50;font-size:1rem;margin:8px 0">+${totalHealed} PV récupérés</div>` : ''}
+      ${classes.some(c=>c.name==='Occultiste') ? '<div style="color:#9b59b6;font-size:0.88rem">Emplacements de pacte restaurés</div>' : ''}
+    </div>
+    <button class="btn-gold" style="width:100%;margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">OK</button>`;
+};
+
+window._doLongRest = async (charId) => {
+  if (!confirm("Effectuer un repos long ?\n\nEffets :\n• PV restaurés au maximum\n• PV temporaires remis à 0\n• Tous les emplacements de sorts restaurés\n• Moitié des dés de vie récupérés (minimum 1)\n• Jets de mort réinitialisés\n• Aptitudes de repos long rechargées")) return;
+
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const classes = getClasses(d);
+
+  const update = {};
+
+  // Restore HP to max
+  update.hp = d.hpMax || 0;
+
+  // Remove temp HP
+  update.tmpHp = 0;
+
+  // Restore all spell slots
+  update.usedSpellSlots = {};
+
+  // Reset death saves
+  update.deathSaves = { success: 0, fail: 0 };
+
+  // Recover half of total hit dice (minimum 1)
+  const totalHitDice = classes.reduce((s, c) => s + c.level, 0);
+  const recover = Math.max(1, Math.floor(totalHitDice / 2));
+  const usedHitDice = { ...(d.usedHitDice || {}) };
+  let toRecover = recover;
+  // Recover proportionally across classes
+  for (const c of classes) {
+    const used = usedHitDice[c.name] || 0;
+    const recoverThis = Math.min(used, toRecover);
+    usedHitDice[c.name] = used - recoverThis;
+    toRecover -= recoverThis;
+    if (toRecover <= 0) break;
+  }
+  update.usedHitDice = usedHitDice;
+
+  await updateDoc(doc(db, "characters", charId), update);
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🌙</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  content.innerHTML = `
+    <div style="text-align:center;padding:30px 20px">
+      <div style="font-size:2.5rem;margin-bottom:12px">🌙</div>
+      <h3 class="step-title" style="border:none">Repos long terminé</h3>
+      <div style="font-size:0.92rem;color:#555;line-height:1.6;margin-top:12px">
+        <div style="color:#4caf50">✓ PV restaurés au maximum (${d.hpMax||0})</div>
+        <div style="color:#4caf50">✓ Tous les emplacements de sorts restaurés</div>
+        <div style="color:#4caf50">✓ ${recover} dé(s) de vie récupéré(s)</div>
+        <div style="color:#4caf50">✓ Jets de mort réinitialisés</div>
+        <div style="color:#888">✓ PV temporaires retirés</div>
+      </div>
+    </div>
+    <button class="btn-gold" style="width:100%;margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">OK</button>`;
   document.getElementById('forgeOverlay').style.display = 'flex';
 };
 
@@ -2851,7 +3084,36 @@ nav button:last-child { color:#884444; }
 .btn-levelup { background:linear-gradient(135deg, #2a6e2a, #1a4e1a); color:#fff; padding:8px 18px; border:none; cursor:pointer;
   font-family:'Cinzel'; font-size:0.72rem; letter-spacing:2px; border-radius:3px; transition:all 0.2s; }
 .btn-levelup:hover { background:linear-gradient(135deg, #3a8e3a, #2a6e2a); transform:translateY(-1px); box-shadow:0 4px 12px rgba(42,110,42,0.5); }
-.sheet-levelup-row { margin-top:10px; }
+.sheet-levelup-row { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+/* Rest buttons */
+.btn-rest { padding:6px 14px; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.68rem;
+  letter-spacing:1px; border-radius:3px; transition:all 0.2s; }
+.btn-rest-short { background:linear-gradient(135deg, #c67b30, #8b5a1a); color:#fff; }
+.btn-rest-short:hover { background:linear-gradient(135deg, #d98b40, #c67b30); transform:translateY(-1px); }
+.btn-rest-long { background:linear-gradient(135deg, #3a3a8e, #1a1a5e); color:#fff; }
+.btn-rest-long:hover { background:linear-gradient(135deg, #5050a0, #3a3a8e); transform:translateY(-1px); }
+
+/* Cast dialog */
+.cast-section { margin-top:14px; padding:12px; background:#fff8ee; border:1px solid #e0c880; border-radius:4px; }
+.cast-header { font-family:'Cinzel'; font-size:0.78rem; color:var(--gold); letter-spacing:1px; margin-bottom:10px; }
+.cast-slots { display:flex; flex-wrap:wrap; gap:8px; }
+.cast-slot-btn { background:#fff; border:2px solid var(--gold); border-radius:4px; padding:8px 12px; cursor:pointer;
+  text-align:center; min-width:70px; transition:all 0.2s; }
+.cast-slot-btn:hover:not(.cast-slot-empty) { background:var(--gold); color:#fff; transform:translateY(-2px); box-shadow:0 4px 12px rgba(184,134,11,0.4); }
+.cast-slot-btn:hover:not(.cast-slot-empty) .cast-slot-lvl,
+.cast-slot-btn:hover:not(.cast-slot-empty) .cast-slot-remaining { color:#fff; }
+.cast-slot-empty { border-color:#ccc; opacity:0.4; cursor:not-allowed; }
+.cast-slot-pact { border-color:#9b59b6; }
+.cast-slot-pact:hover:not(.cast-slot-empty) { background:#9b59b6; }
+.cast-slot-lvl { font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); letter-spacing:1px; }
+.cast-slot-remaining { font-size:0.82rem; font-weight:600; color:var(--ink); }
+.cast-slot-upcast { font-size:0.6rem; color:#888; }
+.cast-btn { width:100%; }
+
+/* Rest hit dice */
+.rest-hd-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0;
+  border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
 
 /* ── LEVEL UP DETAILS ── */
 .lvlup-section { background:#fff; border:1px solid #d4c4a0; border-radius:4px; margin:12px 0; overflow:hidden; }
