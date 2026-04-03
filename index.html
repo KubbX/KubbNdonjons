@@ -9,7 +9,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
 const firebaseConfig = {
   apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
@@ -639,7 +639,11 @@ window._doSignup = () => {
   const p = document.getElementById('authPass').value;
   createUserWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.message));
 };
-window._doLogout = () => signOut(auth);
+window._doLogout = () => {
+  compendiumUnsubscribes.forEach(u => u());
+  compendiumUnsubscribes = [];
+  signOut(auth);
+};
  
 function showAuthError(msg) {
   const el = document.getElementById('authError');
@@ -1278,6 +1282,7 @@ function renderCharSheet(id, d) {
         <div class="combat-val">${d.inspiration?'★':'☆'}</div>
       </div>
     </div>
+    <!-- États / Conditions -->
     <div class="conditions-grid-sheet">
       ${CONDITIONS.map(c => {
         const active = (d.conditions||[]).includes(c.id);
@@ -1292,7 +1297,9 @@ function renderCharSheet(id, d) {
   </div>
  
   <div class="sheet-body">
+    <!-- COLONNE GAUCHE -->
     <div class="sheet-col-left">
+      <!-- Caractéristiques -->
       <div class="sheet-section">
         <div class="section-title">Caractéristiques</div>
         <div class="stats-grid">
@@ -1305,6 +1312,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Sauvegardes -->
       <div class="sheet-section">
         <div class="section-title">Jets de sauvegarde</div>
         <div class="save-list">
@@ -1317,6 +1325,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Compétences -->
       <div class="sheet-section">
         <div class="section-title">Compétences <small style="color:#a89060;font-family:'Crimson Pro';letter-spacing:0">(clic pour maîtrise)</small></div>
         <div class="skill-list">
@@ -1332,6 +1341,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Perceptions passives -->
       <div class="sheet-section">
         <div class="section-title">Sens passifs</div>
         <div class="passive-row"><span>Perception passive</span><strong>${10 + skillBonus('Perception')}</strong></div>
@@ -1340,7 +1350,9 @@ function renderCharSheet(id, d) {
       </div>
     </div>
  
+    <!-- COLONNE CENTRALE -->
     <div class="sheet-col-center">
+      <!-- Dés de vie & Morts -->
       <div class="sheet-section">
         <div class="section-title">Dés de vie & Jets de mort</div>
         <div class="hd-row">
@@ -1356,6 +1368,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Armes & Attaques -->
       <div class="sheet-section">
         <div class="section-title">Armes & Attaques <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','weapon')">+ Compendium</button></div>
         <table class="weapon-table">
@@ -1373,6 +1386,7 @@ function renderCharSheet(id, d) {
         </table>
       </div>
  
+      <!-- Équipement & Monnaie -->
       <div class="sheet-section">
         <div class="section-title">Équipement & Monnaie</div>
         <div class="coin-row">
@@ -1382,6 +1396,7 @@ function renderCharSheet(id, d) {
             <div class="coin-val editable" data-field="${c}" data-type="number">${d[c]||0}</div>
           </div>`).join('')}
         </div>
+        <!-- Armures -->
         <div style="padding:8px 10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Armures</label>
@@ -1401,6 +1416,7 @@ function renderCharSheet(id, d) {
             ${!(d.inventory_armors||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune armure</div>' : ''}
           </div>
         </div>
+        <!-- Inventaire objets -->
         <div style="padding:4px 10px 10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Objets & Équipement</label>
@@ -1415,9 +1431,11 @@ function renderCharSheet(id, d) {
             ${!(d.inventory_items||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Inventaire vide</div>' : ''}
           </div>
         </div>
+        <!-- Legacy text equipment (kept for backward compat) -->
         ${d.equipment ? `<div class="field-group" style="margin:0 10px 10px"><label>Équipement (texte libre)</label><div class="editable block-edit" data-field="equipment" data-type="textarea">${d.equipment||'—'}</div></div>` : ''}
       </div>
  
+      <!-- Sorts -->
       ${(()=>{
         const ss = getSpellSlots(d);
         const hasMagic = ss.slots.some(s=>s>0) || ss.pactSlots;
@@ -1438,6 +1456,7 @@ function renderCharSheet(id, d) {
           <div class="spell-stat-box"><div class="combat-label">Bonus Attaque</div><div>${fmtB(d.spellAttackBonus||0)}</div></div>
         </div>
 
+        <!-- Emplacements de sorts calculés -->
         ${ss.slots.some(s=>s>0) ? `
         <div class="spell-slots-section">
           <div class="combat-label" style="padding:4px 10px">Emplacements de sorts</div>
@@ -1453,6 +1472,7 @@ function renderCharSheet(id, d) {
           </div>
         </div>` : ''}
 
+        <!-- Emplacements de pacte (Occultiste) -->
         ${ss.pactSlots ? `
         <div class="spell-slots-section" style="border-top:1px solid #e0d0b0">
           <div class="combat-label" style="padding:4px 10px">Pacte (niv.${ss.pactSlots.level})</div>
@@ -1467,6 +1487,7 @@ function renderCharSheet(id, d) {
           </div>
         </div>` : ''}
 
+        <!-- Sorts connus/préparés groupés par niveau -->
         <div class="spell-known-list">
           ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : ''}
           ${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
@@ -1490,7 +1511,9 @@ function renderCharSheet(id, d) {
       })()}
     </div>
  
+    <!-- COLONNE DROITE -->
     <div class="sheet-col-right">
+      <!-- Informations générales -->
       <div class="sheet-section">
         <div class="section-title">Informations</div>
         <div class="info-grid">
@@ -1502,6 +1525,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Personnalité -->
       <div class="sheet-section">
         <div class="section-title">Personnalité</div>
         <div class="rp-block">
@@ -1522,6 +1546,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Aptitudes & Traits -->
       <div class="sheet-section">
         <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
         <div class="features-list">
@@ -1538,11 +1563,13 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Maîtrises & Langues -->
       <div class="sheet-section">
         <div class="section-title">Maîtrises & Langues</div>
         <div class="editable block-edit" data-field="profLang" data-type="textarea">${d.profLang||'Commun'}</div>
       </div>
  
+      <!-- Apparence & Histoire -->
       <div class="sheet-section">
         <div class="section-title">Apparence & Histoire</div>
         <div class="rp-block">
@@ -1555,6 +1582,7 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Notes -->
       <div class="sheet-section">
         <div class="section-title">Notes libres</div>
         <div class="editable block-edit" data-field="notes" data-type="textarea">${d.notes||'—'}</div>
@@ -1911,6 +1939,7 @@ function renderGMCard(id, d) {
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.fail||0)>=i?'fail':''}">✗</span>`).join('')}
       <span style="margin-left:auto;cursor:pointer" onclick="window._toggleInspiration('${id}')">Inspiration: <strong>${d.inspiration?'★':'☆'}</strong></span>
     </div>
+    <!-- Conditions on GM card -->
     <div class="gm-conditions">
       ${CONDITIONS.map(c => {
         const active = (d.conditions||[]).includes(c.id);
@@ -1921,6 +1950,7 @@ function renderGMCard(id, d) {
     </div>
     ${(d.conditions||[]).includes('concentrating') && d.concentratingOn ? `
     <div class="gm-conc-banner">🧠 ${d.concentratingOn}</div>` : ''}
+    <!-- Spell slots summary on GM card -->
     ${(()=>{
       const ss = getSpellSlots(d);
       const usedSlots = d.usedSpellSlots || {};
@@ -2457,98 +2487,129 @@ const COMPENDIUM_DATA = {
 };
 
 // ============================================================
-// COMPENDIUM — FIRESTORE CRUD (tout dans Firestore)
+// COMPENDIUM — FIRESTORE CRUD (une collection par catégorie)
 // ============================================================
-let compendiumUnsubscribes = [];
+// Structure Firebase :
+//   compendium_armor / "Harnois"          → ressource système
+//   compendium_armor / "MonArmure_abc123"  → ressource homebrew (suffixe uid court)
+//   compendium_weapon / "Épée longue"
+//   compendium_spell / "Boule de feu"
+//   etc.
+// ============================================================
+
+let compendiumUnsubscribes = [];   // un listener par catégorie
 let compendiumResources = [];
 let compendiumSeeded = false;
 
-// Seed: injecter les données de base dans Firestore si pas déjà fait
+// Nom de collection Firestore pour une catégorie
+function colName(catId) {
+  return `compendium_${catId}`;
+}
+
+// Générer un ID "lisible" pour un document Firestore
+// - Ressources système  → nom exact (ex: "Épée longue")
+// - Homebrew           → "NomRessource_uidCourt" pour éviter les collisions
+function makeDocId(name, isSystem) {
+  // Nettoyer les caractères interdits par Firestore dans les IDs
+  const safe = name.trim().replace(/[\/\\\.#\[\]]/g, '_');
+  if (isSystem) return safe;
+  // Pour le homebrew, ajouter les 6 premiers chars de l'UID pour unicité
+  const uidPart = currentUid ? currentUid.slice(0, 6) : 'hb';
+  return `${safe}_${uidPart}`;
+}
+
+// Seed : injecter les données de base dans Firestore si pas déjà fait
 async function seedCompendiumIfNeeded() {
   if (compendiumSeeded) return;
-  const snap = await getDoc(doc(db, "meta", "compendium_seeded")).catch(() => null);
+  const snap = await getDoc(doc(db, "meta", "compendium_seeded_v2")).catch(() => null);
   if (snap && snap.exists()) { compendiumSeeded = true; return; }
-  
-  const batch = [];
+
+  // Seed toutes les catégories avec des documents nommés
+  const promises = [];
   for (const [catId, items] of Object.entries(COMPENDIUM_DATA)) {
     for (const item of items) {
-      // On utilise le nom de l'objet comme ID (en remplaçant les slashs par sécurité)
-      const docId = item.name.replace(/\//g, '-');
-      // On cible la collection de la catégorie (ex: "weapon", "armor")
-      batch.push(setDoc(doc(db, catId, docId), {
-        ...item, type: catId, owner: "system", source: item.source || "PHB", createdAt: new Date().toISOString()
-      }));
+      const docId = makeDocId(item.name, true);
+      const ref = doc(db, colName(catId), docId);
+      promises.push(setDoc(ref, {
+        ...item,
+        type: catId,
+        owner: "system",
+        source: item.source || "PHB",
+        createdAt: new Date().toISOString()
+      }, { merge: false }));
     }
   }
-  await Promise.all(batch);
-  // Mark as seeded
-  await setDoc(doc(db, "meta", "compendium_seeded"), { seeded: true, date: new Date().toISOString() });
+  await Promise.all(promises);
+  await setDoc(doc(db, "meta", "compendium_seeded_v2"), { seeded: true, date: new Date().toISOString() });
   compendiumSeeded = true;
 }
 
 function loadCompendium() {
-  if (compendiumUnsubscribes.length > 0) {
-    compendiumUnsubscribes.forEach(unsub => unsub());
-    compendiumUnsubscribes = [];
-  }
-  
+  // Désabonner les anciens listeners
+  compendiumUnsubscribes.forEach(u => u());
+  compendiumUnsubscribes = [];
+  compendiumResources = [];
+
   seedCompendiumIfNeeded().then(() => {
-    compendiumResources = []; // On vide le tableau global
-    
-    // On boucle sur toutes tes catégories pour créer un écouteur par collection
-    COMPENDIUM_CATEGORIES.forEach(categoryObj => {
-      const catId = categoryObj.id;
-      const q = query(collection(db, catId), where("owner", "in", [currentUid, "system"]));
-      
-      const unsub = onSnapshot(q, (snapshot) => {
-        // On retire les anciennes données de cette catégorie pour éviter les doublons
-        compendiumResources = compendiumResources.filter(r => r.type !== catId);
-        
+    // Un onSnapshot par collection/catégorie
+    for (const cat of COMPENDIUM_CATEGORIES) {
+      const colRef = collection(db, colName(cat.id));
+      const unsub = onSnapshot(colRef, (snapshot) => {
+        // Retirer les anciennes entrées de cette catégorie
+        compendiumResources = compendiumResources.filter(r => r.type !== cat.id);
         snapshot.forEach(docSnap => {
-          compendiumResources.push({ _docId: docSnap.id, ...docSnap.data() });
+          const d = docSnap.data();
+          // Ne garder que les ressources système ou appartenant à l'utilisateur
+          if (d.owner === 'system' || d.owner === currentUid) {
+            compendiumResources.push({ _docId: docSnap.id, _col: colName(cat.id), ...d });
+          }
         });
-        
-        // On rafraîchit l'affichage si on est sur l'onglet
         if (document.getElementById('tab-compendium')?.classList.contains('active')) {
           renderCompendiumList(window._currentCompCategory || 'armor');
         }
       });
       compendiumUnsubscribes.push(unsub);
-    });
+    }
   });
 }
 
 async function addCustomResource(category, data) {
-  const resource = { type: category, owner: currentUid, ...data, createdAt: new Date().toISOString() };
-  const docId = data.name.replace(/\//g, '-');
-  // On utilise setDoc au lieu de addDoc pour forcer l'ID
-  await setDoc(doc(db, category, docId), resource);
+  const name = data.name || 'Sans nom';
+  const docId = makeDocId(name, false);
+  const ref = doc(db, colName(category), docId);
+  await setDoc(ref, {
+    ...data,
+    type: category,
+    owner: currentUid,
+    createdAt: new Date().toISOString()
+  });
 }
 
-// On ajoute le paramètre "category"
-async function deleteResource(category, docId) {
+async function deleteResource(docId) {
   if (!confirm("Supprimer cette ressource ?")) return;
-  await deleteDoc(doc(db, category, docId));
+  const r = compendiumResources.find(x => x._docId === docId);
+  if (!r) return;
+  await deleteDoc(doc(db, r._col || colName(r.type), docId));
 }
 
-// On ajoute le paramètre "category"
-async function updateResource(category, docId, data) {
-  await updateDoc(doc(db, category, docId), data);
+async function updateResource(docId, data) {
+  const r = compendiumResources.find(x => x._docId === docId);
+  if (!r) return;
+  await updateDoc(doc(db, r._col || colName(r.type), docId), data);
 }
 
 // Réinitialiser tout le compendium (supprimer + re-seeder)
 window._resetCompendium = async () => {
   if (!confirm("Réinitialiser le compendium ? Cela supprimera toutes les modifications et rechargera les données de base. Les ressources personnelles (homebrew) seront conservées.")) return;
-  // Delete all system resources
+  // Supprimer uniquement les ressources système de chaque collection
   const toDelete = compendiumResources.filter(r => r.owner === 'system');
   for (const r of toDelete) {
-    // On utilise r.type pour trouver la bonne collection
-    await deleteDoc(doc(db, r.type, r._docId));
+    await deleteDoc(doc(db, r._col || colName(r.type), r._docId));
   }
-  // Remove seed marker
-  await deleteDoc(doc(db, "meta", "compendium_seeded")).catch(() => {});
+  // Supprimer le marqueur de seed
+  await deleteDoc(doc(db, "meta", "compendium_seeded_v2")).catch(() => {});
   compendiumSeeded = false;
-  // Re-seed
+  // Re-seeder
   await seedCompendiumIfNeeded();
   alert("Compendium réinitialisé !");
 };
@@ -2602,7 +2663,7 @@ function renderCompendiumList(catId) {
         <div class="comp-card-name">${r.name||'?'} ${isHomebrew ? '<span class="comp-homebrew">Homebrew</span>' : ''}${isSystem && r._modified ? '<span class="comp-modified">Modifié</span>' : ''}</div>
         <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
       </div>
-      <button class="btn-remove" onclick="event.stopPropagation();deleteResource('${catId}', '${r._docId}')" title="Supprimer">✕</button>
+      <button class="btn-remove" onclick="event.stopPropagation();deleteResource('${r._docId}')" title="Supprimer">✕</button>
     </div>`;
   }).join('');
 }
@@ -2730,7 +2791,7 @@ window._saveEditResource = async (catId, docId) => {
     data[key] = val;
   }
   
-  await updateResource(catId, docId, data);
+  await updateResource(docId, data);
   window._closeForge();
   document.getElementById('forgeNext').style.display = '';
 };
@@ -3086,4 +3147,619 @@ window._triggerConcentrationCheck = (charId, damage, charData) => {
       <strong>DD du jet de sauvegarde CON :</strong> ${dc}<br>
       <small style="color:#888">(= max(10, ${damage} ÷ 2))</small><br><br>
       <strong>Bonus de sauvegarde CON :</strong> +${totalBonus}<br>
-      <small style="color
+      <small style="color:#888">(${conMod} CON${hasCONprof ? ' + '+pb+' maîtrise' : ''})</small>
+    </div>
+    <p style="font-size:0.88rem;color:#555;margin-bottom:14px;text-align:center">Lancez 1d20 + ${totalBonus} ≥ ${dc} pour maintenir la concentration.</p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-gold" style="flex:1;background:linear-gradient(135deg,#3a7a3a,#1a4e1a)" onclick="window._resolveConcentration('${charId}',true)">✓ Réussi — Maintenir</button>
+      <button class="btn-gold" style="flex:1;background:linear-gradient(135deg,var(--red),#5a0000)" onclick="window._resolveConcentration('${charId}',false)">✗ Raté — Perdue</button>
+    </div>`;
+
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._resolveConcentration = async (charId, maintained) => {
+  if (!maintained) {
+    await window._breakConcentration(charId);
+  }
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+
+// GM: open full condition picker for a character
+window._openGMConditions = (charId) => {
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">⚡</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  // We need to read current conditions from Firestore
+  getDoc(doc(db, "characters", charId)).then(snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const active = d.conditions || [];
+    content.innerHTML = `
+      <h3 class="step-title">États de ${d.name}</h3>
+      <div class="cond-picker-grid">
+        ${CONDITIONS.map(c => `
+        <div class="cond-picker-item ${active.includes(c.id)?'cond-picker-active':''}" onclick="window._toggleCondition('${charId}','${c.id}');setTimeout(()=>window._openGMConditions('${charId}'),300)">
+          <span class="cond-picker-icon">${c.icon}</span>
+          <span class="cond-picker-name">${c.name}${c.id==='exhaustion'?' ('+(d.exhaustionLevel||0)+'/6)':''}</span>
+        </div>`).join('')}
+      </div>
+      <button class="btn-prev" style="margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  });
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+// ── Ajout de ressource personnalisée ──
+window._openAddResource = () => {
+  const catId = window._currentCompCategory;
+  const cat = COMPENDIUM_CATEGORIES.find(c => c.id === catId);
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = `<div class="progress-step active">+</div>`;
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  let fields = '';
+  if (catId === 'armor') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text" placeholder="Ex: Armure magique"></div>
+      <div class="field-row"><div class="field-group"><label>Type</label><select id="nr_type"><option>Légère</option><option>Moyenne</option><option>Lourde</option><option>Bouclier</option></select></div>
+      <div class="field-group"><label>CA</label><input id="nr_ac" type="text" placeholder="Ex: 15 + mod DEX (max 2)"></div></div>
+      <div class="field-row"><div class="field-group"><label>Coût</label><input id="nr_cost" type="text" placeholder="Ex: 500 po"></div>
+      <div class="field-group"><label>Poids</label><input id="nr_weight" type="text" placeholder="Ex: 20 kg"></div></div>
+      <div class="field-group"><label>Force requise</label><input id="nr_strength" type="text" placeholder="Ex: FOR 15"></div>
+      <div class="field-group"><label>Discrétion</label><input id="nr_stealth" type="text" placeholder="Ex: Désavantage"></div>`;
+  } else if (catId === 'weapon') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text" placeholder="Ex: Épée de feu"></div>
+      <div class="field-row"><div class="field-group"><label>Type</label><select id="nr_type"><option>Simple mêlée</option><option>Simple distance</option><option>Martiale mêlée</option><option>Martiale distance</option></select></div>
+      <div class="field-group"><label>Dégâts</label><input id="nr_damage" type="text" placeholder="Ex: 1d8+2 feu"></div></div>
+      <div class="field-group"><label>Propriétés</label><input id="nr_properties" type="text" placeholder="Ex: Finesse, légère"></div>
+      <div class="field-row"><div class="field-group"><label>Coût</label><input id="nr_cost" type="text"></div>
+      <div class="field-group"><label>Poids</label><input id="nr_weight" type="text"></div></div>`;
+  } else if (catId === 'item') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-row"><div class="field-group"><label>Type</label><select id="nr_type"><option>Aventurier</option><option>Outils</option><option>Potion</option><option>Objet magique</option></select></div>
+      <div class="field-group"><label>Rareté</label><select id="nr_rarity"><option>Courant</option><option>Peu courant</option><option>Rare</option><option>Très rare</option><option>Légendaire</option></select></div></div>
+      <div class="field-group"><label>Description</label><textarea id="nr_desc" rows="2"></textarea></div>
+      <div class="field-group"><label>Coût</label><input id="nr_cost" type="text"></div>`;
+  } else if (catId === 'feat') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-group"><label>Description</label><textarea id="nr_desc" rows="3"></textarea></div>
+      <div class="field-group"><label>Prérequis</label><input id="nr_prereq" type="text" placeholder="Ex: Lanceur de sorts, FOR 13..."></div>`;
+  } else if (catId === 'monster') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-row"><div class="field-group"><label>RC</label><input id="nr_cr" type="text" placeholder="Ex: 3"></div>
+      <div class="field-group"><label>Type</label><input id="nr_type" type="text" placeholder="Ex: Mort-vivant"></div></div>
+      <div class="field-row"><div class="field-group"><label>Taille</label><select id="nr_size"><option>TP</option><option>P</option><option>M</option><option>G</option><option>TG</option><option>Gig</option></select></div>
+      <div class="field-group"><label>CA</label><input id="nr_ac" type="text" placeholder="Ex: 15 (naturelle)"></div></div>
+      <div class="field-row"><div class="field-group"><label>PV</label><input id="nr_hp" type="text" placeholder="Ex: 52 (7d10+14)"></div>
+      <div class="field-group"><label>Vitesse</label><input id="nr_speed" type="text" placeholder="Ex: 9m, vol 18m"></div></div>
+      <div class="field-group"><label>Attaques</label><textarea id="nr_attacks" rows="2"></textarea></div>
+      <div class="field-group"><label>Traits</label><textarea id="nr_traits" rows="2"></textarea></div>`;
+  } else if (catId === 'background') {
+    fields = `
+      <div class="field-group"><label>Nom *</label><input id="nr_name" type="text"></div>
+      <div class="field-group"><label>Compétences</label><input id="nr_skills" type="text" placeholder="Ex: Perception, Survie"></div>
+      <div class="field-row"><div class="field-group"><label>Langues</label><input id="nr_languages" type="number" value="0"></div>
+      <div class="field-group"><label>Outils</label><input id="nr_tools" type="text"></div></div>
+      <div class="field-group"><label>Équipement</label><textarea id="nr_equipment" rows="2"></textarea></div>
+      <div class="field-group"><label>Aptitude</label><textarea id="nr_feature" rows="2"></textarea></div>`;
+  }
+
+  content.innerHTML = `<h3 class="step-title">+ Nouvelle ${cat?.name?.slice(0,-1) || 'ressource'}</h3>
+    ${fields}
+    <div class="field-group"><label>Source</label><input id="nr_source" type="text" value="Homebrew"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-gold" onclick="window._saveNewResource('${catId}')">CRÉER</button>
+      <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+    </div>`;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._saveNewResource = async (catId) => {
+  const name = document.getElementById('nr_name')?.value?.trim();
+  if (!name) { alert("Le nom est obligatoire."); return; }
+  const data = { name, source: document.getElementById('nr_source')?.value || 'Homebrew' };
+
+  // Collect all nr_ fields
+  document.querySelectorAll('[id^="nr_"]').forEach(el => {
+    const key = el.id.replace('nr_', '');
+    if (key === 'name' || key === 'source') return;
+    const val = el.tagName === 'SELECT' ? el.value : (el.type === 'number' ? parseInt(el.value)||0 : el.value.trim());
+    if (val !== '' && val !== 0) data[key] = val;
+  });
+
+  await addCustomResource(catId, data);
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+</script>
+ 
+<style>
+:root {
+  --parch: #f4ece1;
+  --parch2: #ede0c8;
+  --ink: #2c1a0e;
+  --gold: #b8860b;
+  --gold-light: #d4a017;
+  --red: #8b0000;
+  --red-light: #a52020;
+  --bg: #1a0f05;
+  --bg2: #231508;
+  --border: rgba(184,134,11,0.3);
+  --shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+ 
+* { box-sizing: border-box; margin:0; padding:0; }
+body { background: var(--bg); color: var(--ink); font-family: 'Crimson Pro', serif; font-size: 15px; }
+ 
+/* ── AUTH ── */
+#authScreen { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background: radial-gradient(ellipse at 50% 30%, #3d1f06 0%, var(--bg) 70%); }
+.auth-box { background: var(--parch); padding:40px 36px; border-radius:4px; width:320px;
+  box-shadow: var(--shadow); border: 1px solid var(--gold); position:relative; }
+.auth-box::before { content:''; position:absolute; inset:4px; border:1px solid rgba(184,134,11,0.2); border-radius:2px; pointer-events:none; }
+.auth-title { font-family:'Cinzel'; font-size:1.8rem; text-align:center; color:var(--gold); margin-bottom:6px; letter-spacing:4px; }
+.auth-sub { font-family:'Crimson Pro'; font-style:italic; text-align:center; color:#888; font-size:0.9rem; margin-bottom:20px; }
+#authError { background:#ffeaea; color:var(--red); padding:8px; border-radius:3px; font-size:0.82rem; display:none; margin-bottom:10px; }
+input, select, textarea { width:100%; padding:9px 12px; margin:6px 0; border:1px solid #c9b99a; border-radius:3px;
+  background:#fffdf8; font-family:'Crimson Pro'; font-size:0.95rem; color:var(--ink); outline:none; transition:border 0.2s; }
+input:focus, select:focus, textarea:focus { border-color:var(--gold); box-shadow:0 0 0 2px rgba(184,134,11,0.15); }
+textarea { resize:vertical; }
+ 
+/* ── APP ── */
+#appScreen { min-height:100vh; }
+nav { background: var(--bg2); padding:0 20px; display:flex; justify-content:center; gap:4px; position:sticky; top:0; z-index:100;
+  border-bottom: 2px solid var(--gold); box-shadow:0 2px 12px rgba(0,0,0,0.5); }
+nav button { background:transparent; color:#a89060; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem;
+  padding:14px 18px; letter-spacing:2px; transition:all 0.2s; border-bottom:3px solid transparent; }
+nav button:hover { color:var(--gold-light); }
+nav button.nav-active { color:var(--gold); border-bottom:3px solid var(--gold); }
+nav button:last-child { color:#884444; }
+ 
+.tab-content { display:none; }
+.active { display:block; }
+ 
+/* ── BUTTONS ── */
+.btn-gold { background:linear-gradient(135deg, var(--gold), #8b6509); color:#fff; padding:12px 20px; border:none; cursor:pointer;
+  font-family:'Cinzel'; font-size:0.78rem; letter-spacing:2px; border-radius:3px; transition:all 0.2s; }
+.btn-gold:hover { background:linear-gradient(135deg, var(--gold-light), var(--gold)); transform:translateY(-1px); box-shadow:0 4px 12px rgba(184,134,11,0.4); }
+.btn-copy { background:transparent; border:1px solid var(--gold); color:var(--gold); padding:4px 10px; font-size:0.72rem;
+  cursor:pointer; border-radius:2px; font-family:'Cinzel'; letter-spacing:1px; }
+ 
+/* ── LEVEL UP BUTTON ── */
+.btn-levelup { background:linear-gradient(135deg, #2a6e2a, #1a4e1a); color:#fff; padding:8px 18px; border:none; cursor:pointer;
+  font-family:'Cinzel'; font-size:0.72rem; letter-spacing:2px; border-radius:3px; transition:all 0.2s; }
+.btn-levelup:hover { background:linear-gradient(135deg, #3a8e3a, #2a6e2a); transform:translateY(-1px); box-shadow:0 4px 12px rgba(42,110,42,0.5); }
+.sheet-levelup-row { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+/* Rest buttons */
+.btn-rest { padding:6px 14px; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.68rem;
+  letter-spacing:1px; border-radius:3px; transition:all 0.2s; }
+.btn-rest-short { background:linear-gradient(135deg, #c67b30, #8b5a1a); color:#fff; }
+.btn-rest-short:hover { background:linear-gradient(135deg, #d98b40, #c67b30); transform:translateY(-1px); }
+.btn-rest-long { background:linear-gradient(135deg, #3a3a8e, #1a1a5e); color:#fff; }
+.btn-rest-long:hover { background:linear-gradient(135deg, #5050a0, #3a3a8e); transform:translateY(-1px); }
+
+/* Cast dialog */
+.cast-section { margin-top:14px; padding:12px; background:#fff8ee; border:1px solid #e0c880; border-radius:4px; }
+.cast-header { font-family:'Cinzel'; font-size:0.78rem; color:var(--gold); letter-spacing:1px; margin-bottom:10px; }
+.cast-slots { display:flex; flex-wrap:wrap; gap:8px; }
+.cast-slot-btn { background:#fff; border:2px solid var(--gold); border-radius:4px; padding:8px 12px; cursor:pointer;
+  text-align:center; min-width:70px; transition:all 0.2s; }
+.cast-slot-btn:hover:not(.cast-slot-empty) { background:var(--gold); color:#fff; transform:translateY(-2px); box-shadow:0 4px 12px rgba(184,134,11,0.4); }
+.cast-slot-btn:hover:not(.cast-slot-empty) .cast-slot-lvl,
+.cast-slot-btn:hover:not(.cast-slot-empty) .cast-slot-remaining { color:#fff; }
+.cast-slot-empty { border-color:#ccc; opacity:0.4; cursor:not-allowed; }
+.cast-slot-pact { border-color:#9b59b6; }
+.cast-slot-pact:hover:not(.cast-slot-empty) { background:#9b59b6; }
+.cast-slot-lvl { font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); letter-spacing:1px; }
+.cast-slot-remaining { font-size:0.82rem; font-weight:600; color:var(--ink); }
+.cast-slot-upcast { font-size:0.6rem; color:#888; }
+.cast-btn { width:100%; }
+
+/* Rest hit dice */
+.rest-hd-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0;
+  border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
+
+/* ── CONDITIONS ── */
+.conditions-grid-sheet { display:flex; flex-wrap:wrap; gap:4px; margin-top:10px; padding:0 2px; }
+.cond-sheet-item { display:flex; align-items:center; gap:4px; padding:3px 8px; border-radius:12px;
+  border:1px solid #555; cursor:pointer; transition:all 0.15s; opacity:0.4; background:rgba(255,255,255,0.05); }
+.cond-sheet-item:hover { opacity:0.7; }
+.cond-sheet-item.cond-sheet-active { opacity:1; border-color:var(--gold); background:rgba(184,134,11,0.2); box-shadow:0 0 6px rgba(184,134,11,0.3); }
+.cond-sheet-item.cond-sheet-conc.cond-sheet-active { border-color:#9b59b6; background:rgba(155,89,182,0.2); box-shadow:0 0 6px rgba(155,89,182,0.3); }
+.cond-sheet-icon { font-size:0.85rem; }
+.cond-sheet-name { font-size:0.65rem; font-family:'Cinzel'; color:#c9a860; letter-spacing:0.5px; }
+.cond-sheet-active .cond-sheet-name { color:var(--gold); }
+.cond-sheet-conc.cond-sheet-active .cond-sheet-name { color:#c39bd3; }
+.conc-banner { background:linear-gradient(90deg,rgba(155,89,182,0.15),transparent); padding:6px 14px; color:#9b59b6;
+  font-size:0.82rem; border-top:1px solid rgba(155,89,182,0.3); display:flex; align-items:center; }
+
+/* GM conditions */
+.gm-conditions { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; align-items:center; background:#f9f4ea; border-top:1px solid #e0d0b0; }
+.cond-badge { width:26px; height:26px; border-radius:50%; border:2px solid var(--gold); display:inline-flex;
+  align-items:center; justify-content:center; font-size:0.8rem; cursor:pointer; transition:all 0.15s;
+  background:rgba(184,134,11,0.15); }
+.cond-badge:hover { transform:scale(1.15); }
+.cond-badge.cond-active { background:rgba(184,134,11,0.3); box-shadow:0 0 6px rgba(184,134,11,0.4); }
+.cond-badge.cond-conc { border-color:#9b59b6; background:rgba(155,89,182,0.2); }
+.gm-conc-banner { background:rgba(155,89,182,0.1); padding:4px 14px; color:#9b59b6; font-size:0.78rem; border-top:1px solid rgba(155,89,182,0.2); }
+.gm-spellslots { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; background:#f0e8d8; }
+.gm-slot { background:#fff; border:1px solid #d4c4a0; border-radius:3px; padding:2px 6px; font-size:0.7rem; font-family:'Cinzel'; color:var(--ink); }
+.gm-slot-pact { border-color:#9b59b6; color:#9b59b6; }
+
+/* Condition picker (GM popup) */
+.cond-picker-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+.cond-picker-item { display:flex; align-items:center; gap:8px; padding:8px 10px; background:#fff; border:1px solid #d4c4a0;
+  border-radius:3px; cursor:pointer; transition:all 0.15s; }
+.cond-picker-item:hover { border-color:var(--gold); }
+.cond-picker-active { background:#fff8ee; border-color:var(--gold); border-width:2px; }
+.cond-picker-icon { font-size:1.2rem; }
+.cond-picker-name { font-size:0.82rem; }
+
+/* Concentration roll result — removed, using simple maintain/lose dialog */
+
+/* ── LEVEL UP DETAILS ── */
+.lvlup-section { background:#fff; border:1px solid #d4c4a0; border-radius:4px; margin:12px 0; overflow:hidden; }
+.lvlup-header { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
+  font-size:0.72rem; letter-spacing:1.5px; padding:7px 12px; }
+.lvlup-body { padding:10px 14px; }
+.lvlup-row { display:flex; justify-content:space-between; padding:4px 0; font-size:0.88rem; border-bottom:1px solid #f0e8d8; }
+.lvlup-row:last-child { border-bottom:none; }
+.lvlup-feature { margin:6px 0; padding:6px 10px; background:#fff8ee; border-left:3px solid var(--gold); border-radius:2px; }
+.lvlup-feature strong { color:var(--ink); font-size:0.88rem; }
+.lvlup-feature-desc { font-size:0.82rem; color:#555; margin-top:2px; line-height:1.4; }
+.lvlup-select { width:100%; }
+ 
+/* ── LIST TAB ── */
+#tab-list { background:var(--parch); min-height:100vh; padding:30px 20px; max-width:700px; margin:auto; }
+#tab-list h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:20px; letter-spacing:3px; }
+.char-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); margin:10px 0;
+  border-radius:3px; overflow:hidden; transition:box-shadow 0.2s; }
+.char-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.15); }
+.char-card-main { padding:15px 18px; cursor:pointer; }
+.char-card-main:hover { background:#fffbf4; }
+.char-card-name { font-family:'Cinzel'; font-size:1.05rem; color:var(--ink); }
+.char-card-info { color:#666; font-size:0.88rem; margin:3px 0; }
+.char-card-stats { color:#888; font-size:0.82rem; }
+.char-card-id { padding:8px 18px; background:#f9f4ea; border-top:1px solid #e8d8b8; display:flex; align-items:center; justify-content:space-between; }
+.char-card-id small { color:#999; font-size:0.72rem; font-family:monospace; }
+ 
+/* ── WIZARD ── */
+#forgeOverlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.88); z-index:1000; align-items:center; justify-content:center; }
+.forge-window { background:var(--parch); border-radius:5px; width:92%; max-width:580px; max-height:92vh;
+  overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.7); border:1px solid var(--gold); }
+.forge-top { background:linear-gradient(135deg, var(--ink), #3d1f06); padding:18px 24px; }
+.forge-top h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.2rem; letter-spacing:3px; }
+.forge-progress { display:flex; align-items:center; margin-top:14px; }
+.progress-step { width:28px; height:28px; border-radius:50%; border:2px solid #666; color:#666; display:flex;
+  align-items:center; justify-content:center; font-size:0.75rem; font-family:'Cinzel'; transition:all 0.3s; flex-shrink:0; }
+.progress-step.active { border-color:var(--gold); color:var(--gold); box-shadow:0 0 10px rgba(184,134,11,0.5); }
+.progress-step.done { border-color:var(--gold); background:var(--gold); color:#fff; }
+.progress-line { flex:1; height:2px; background:#444; }
+.progress-line.done { background:var(--gold); }
+#forgeContent { flex:1; overflow-y:auto; padding:20px 24px; }
+.step-title { font-family:'Cinzel'; color:var(--gold); font-size:1rem; margin-bottom:16px; letter-spacing:2px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.field-group { margin:12px 0; }
+.field-group label { display:block; font-size:0.78rem; font-family:'Cinzel'; letter-spacing:1px; color:#666; margin-bottom:4px; }
+.field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.info-box { background:#fff8ee; border:1px solid #e0c880; padding:10px 14px; border-radius:3px; font-size:0.82rem;
+  line-height:1.6; color:#555; }
+.pb-header { margin:8px 0; color:var(--gold); font-family:'Cinzel'; font-size:0.82rem; }
+.pb-grid { display:flex; flex-direction:column; gap:6px; }
+.pb-row { display:flex; align-items:center; gap:10px; }
+.pb-label { font-family:'Cinzel'; font-size:0.75rem; width:36px; color:var(--gold); }
+.pb-btn { width:26px; height:26px; border:1px solid var(--gold); background:transparent; color:var(--gold);
+  cursor:pointer; border-radius:3px; font-size:1rem; line-height:1; transition:all 0.15s; }
+.pb-btn:hover { background:var(--gold); color:#fff; }
+.pb-val { min-width:28px; text-align:center; font-size:1.05rem; font-weight:600; }
+.pb-mod { color:#888; font-size:0.82rem; }
+.skill-check-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; }
+.skill-check { display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer; padding:3px; border-radius:2px; }
+.skill-check:hover { background:#f0e8d8; }
+.skill-check input { width:auto; }
+.summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.summary-section { background:#fff8ee; border:1px solid #e0c880; padding:12px; border-radius:3px; }
+.summary-section h4 { font-family:'Cinzel'; font-size:0.78rem; color:var(--gold); margin-bottom:8px; }
+.summary-section p { font-size:0.85rem; margin:3px 0; }
+.stat-mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.stat-mini { background:white; border:1px solid #d4c4a0; border-radius:3px; padding:4px; text-align:center; }
+.stat-mini-name { font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); display:block; }
+.stat-mini-val { font-size:1rem; font-weight:600; display:block; }
+.stat-mini-mod { font-size:0.78rem; color:#666; display:block; }
+.forge-footer { padding:14px 24px; background:#f0e8d8; border-top:1px solid #d4c4a0; display:flex; justify-content:space-between; align-items:center; }
+.btn-prev { background:transparent; border:1px solid #aaa; color:#666; padding:10px 20px; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem; border-radius:3px; }
+.btn-prev:hover { border-color:var(--ink); color:var(--ink); }
+ 
+/* ── CHARACTER SHEET ── */
+#tab-sheet { background:var(--parch); min-height:100vh; }
+.sheet-header { background:linear-gradient(135deg, var(--ink) 0%, #3d2010 100%); padding:18px 24px; border-bottom:3px solid var(--gold); }
+.sheet-name { font-family:'Cinzel'; font-size:1.6rem; color:var(--gold); margin-bottom:4px; }
+.sheet-subtitle { color:#c9a860; font-size:0.9rem; }
+.sheet-combat-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.combat-box { background:rgba(255,255,255,0.08); border:1px solid rgba(184,134,11,0.4); border-radius:4px;
+  padding:6px 12px; text-align:center; min-width:70px; }
+.combat-box.inspired { background:rgba(184,134,11,0.2); }
+.combat-label { font-size:0.6rem; font-family:'Cinzel'; color:#a89060; letter-spacing:1px; display:block; }
+.combat-val { font-size:1.3rem; color:#fff; font-weight:600; cursor:pointer; }
+.combat-sub { font-size:0.78rem; color:#a89060; }
+ 
+.sheet-body { display:grid; grid-template-columns:200px 1fr 260px; gap:0; }
+.sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid #d4c4a0; }
+.sheet-col-right { border-right:none; }
+.sheet-section { margin-bottom:14px; background:#fff; border:1px solid #ddd; border-radius:3px; overflow:hidden; }
+.section-title { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
+  font-size:0.65rem; letter-spacing:2px; padding:5px 10px; }
+.stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#eee; padding:1px; }
+.stat-box { background:#fff; padding:8px 4px; text-align:center; }
+.stat-label { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); letter-spacing:1px; display:block; }
+.stat-mod { font-size:1.1rem; font-weight:700; color:var(--ink); }
+.stat-val { font-size:0.9rem; color:#666; cursor:pointer; border-bottom:1px dashed #ccc; }
+.save-list, .skill-list { padding:6px 10px; }
+.save-row, .skill-row { display:flex; align-items:center; gap:6px; padding:2px 0; font-size:0.82rem; }
+.prof-dot { width:9px; height:9px; border-radius:50%; border:1px solid #aaa; flex-shrink:0; }
+.prof-dot.filled { background:var(--gold); border-color:var(--gold); }
+.save-val, .skill-val { min-width:28px; font-weight:600; font-size:0.82rem; text-align:right; }
+.save-name, .skill-name { color:#444; }
+.skill-name small { color:#999; }
+.passive-row { display:flex; justify-content:space-between; padding:5px 10px; font-size:0.85rem; }
+.passive-row:not(:last-child) { border-bottom:1px solid #f0e8d8; }
+ 
+.hd-row { display:flex; gap:16px; padding:10px; }
+.death-saves { font-size:0.82rem; }
+.ds-row { margin:3px 0; display:flex; align-items:center; gap:4px; }
+.ds-dot { width:12px; height:12px; border-radius:50%; border:2px solid #ccc; display:inline-block; }
+.ds-dot.success { background:#4caf50; border-color:#4caf50; }
+.ds-dot.fail { background:#f44336; border-color:#f44336; }
+ 
+.weapon-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.weapon-table th { background:var(--ink); color:var(--gold); font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; padding:5px 8px; }
+.weapon-table th:last-child { width:30px; }
+.weapon-table td { padding:6px 8px; border-bottom:1px solid #f0e8d8; }
+.weapon-table td:hover { background:#fffbf0; }
+ 
+.coin-row { display:flex; gap:4px; padding:8px; }
+.coin-box { flex:1; background:#fff8ee; border:1px solid #e0c880; border-radius:3px; text-align:center; padding:6px 2px; }
+.coin-label { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); display:block; }
+.coin-val { font-size:0.95rem; font-weight:600; cursor:pointer; }
+ 
+.spell-stats { display:flex; gap:8px; padding:8px; }
+.spell-stat-box { flex:1; text-align:center; }
+.spell-slots { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:0 8px 8px; font-size:0.8rem; }
+.spell-level { background:#f9f4ea; border:1px solid #e0d0b0; border-radius:2px; padding:3px 5px; }
+.spell-lvl-num { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); display:block; }
+ 
+.rp-block { padding:6px 10px; }
+.rp-block label { font-size:0.65rem; font-family:'Cinzel'; color:var(--gold); display:block; margin-bottom:2px; letter-spacing:1px; }
+.features-list { padding:6px 10px; max-height:260px; overflow-y:auto; }
+.feature-item { font-size:0.82rem; margin:4px 0; color:#444; line-height:1.4; }
+.info-grid { padding:6px 10px; }
+.info-row { display:flex; justify-content:space-between; font-size:0.82rem; padding:3px 0; border-bottom:1px solid #f0e8d8; }
+ 
+/* Inline edit */
+.editable { cursor:pointer; border-radius:2px; transition:background 0.15s; }
+.editable:hover { background:rgba(184,134,11,0.1); }
+.inline-input { border:1px solid var(--gold)!important; margin:0!important; padding:2px 6px!important; font-size:inherit; width:100%; }
+.block-edit { padding:4px 10px; font-size:0.85rem; min-height:24px; white-space:pre-wrap; word-break:break-word; line-height:1.5; }
+ 
+/* ── GM TAB ── */
+#tab-gm { background:var(--bg); min-height:100vh; padding:20px; }
+#tab-gm h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.3rem; margin-bottom:16px; letter-spacing:3px; }
+.gm-search { display:flex; gap:8px; margin-bottom:20px; }
+.gm-search input { background:#2a1a0a; border-color:#555; color:#ddd; max-width:420px; }
+#gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+.gm-card { background:var(--parch); border:1px solid var(--gold); border-radius:4px; overflow:hidden; }
+.gm-card-header { padding:12px 14px; background:linear-gradient(135deg, var(--ink), #3d2010);
+  display:flex; justify-content:space-between; align-items:flex-start; }
+.gm-card-name { font-family:'Cinzel'; color:var(--gold); font-size:1rem; }
+.gm-card-sub { color:#a89060; font-size:0.78rem; margin-top:2px; }
+.btn-remove { background:transparent; border:1px solid #884444; color:#cc4444; padding:3px 8px;
+  cursor:pointer; border-radius:2px; font-size:0.75rem; }
+.gm-hp-bar-wrap { height:8px; background:#eee; }
+.gm-hp-bar { height:100%; transition:width 0.5s ease, background 0.5s; }
+.gm-stats-row { display:flex; gap:8px; padding:10px 14px; background:#f9f4ea; }
+.gm-stat { flex:1; text-align:center; }
+.gm-stat-label { display:block; font-family:'Cinzel'; font-size:0.58rem; color:var(--gold); }
+.gm-stat-val { font-size:1rem; font-weight:700; }
+.gm-chars-row { display:flex; padding:8px 14px; gap:4px; }
+.gm-char { flex:1; text-align:center; background:#fff; border:1px solid #e0d0b0; border-radius:3px; padding:4px 2px; }
+.gm-char-lbl { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); display:block; }
+.gm-char-val { font-size:0.95rem; font-weight:600; }
+.gm-char-mod { font-size:0.72rem; color:#888; }
+.gm-ds-row { padding:6px 14px; font-size:0.82rem; display:flex; align-items:center; gap:4px; background:#f0e8d8; }
+.gm-ds { display:inline-flex; width:18px; height:18px; border-radius:50%; border:1px solid #ccc; align-items:center; justify-content:center; font-size:0.7rem; }
+.gm-ds.success { background:#4caf50; color:#fff; border-color:#4caf50; }
+.gm-ds.fail { background:#f44336; color:#fff; border-color:#f44336; }
+.gm-actions { padding:10px 14px; display:flex; align-items:center; gap:6px; }
+.gm-action-label { font-size:0.78rem; font-family:'Cinzel'; color:#666; }
+.gm-input { width:60px!important; padding:5px 8px!important; margin:0!important; text-align:center; }
+.btn-gm-action { padding:6px 12px; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.68rem; border-radius:3px; }
+.btn-gm-action.heal { background:#3a7a3a; color:#fff; }
+.btn-gm-action.dmg { background:var(--red); color:#fff; }
+.btn-gm-action:not(.heal):not(.dmg) { background:var(--gold); color:#fff; }
+.gm-notes { padding:8px 14px; }
+.gm-notes summary { cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; }
+.gm-notes-area { width:100%; margin-top:6px; }
+ 
+/* ── SPELL SLOTS ── */
+.spell-slots-section { padding:4px 0; }
+.spell-slots-grid { display:flex; flex-wrap:wrap; gap:6px; padding:4px 10px; }
+.spell-slot-box { background:#fff8ee; border:1px solid #e0d0b0; border-radius:3px; padding:5px 8px; text-align:center; min-width:70px; }
+.spell-slot-lvl { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); }
+.spell-slot-dots { display:flex; gap:3px; justify-content:center; margin:4px 0; }
+.spell-slot-dot { width:14px; height:14px; border-radius:50%; border:2px solid var(--gold); cursor:pointer; transition:all 0.15s; background:transparent; }
+.spell-slot-dot:hover { transform:scale(1.2); box-shadow:0 0 4px var(--gold); }
+.spell-slot-dot.used { background:#ccc; border-color:#aaa; }
+.spell-slot-dot.pact { border-color:#9b59b6; }
+.spell-slot-dot.pact:hover { box-shadow:0 0 4px #9b59b6; }
+.spell-slot-dot.pact.used { background:#ccc; border-color:#aaa; }
+.spell-slot-count { font-size:0.7rem; color:#888; }
+.spell-known-list { }
+.spell-level-group { border-top:1px solid #f0e8d8; }
+.spell-level-header { background:#f9f4ea; padding:4px 10px; font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); letter-spacing:1px; }
+.spell-known-item { display:flex; align-items:center; padding:4px 10px; border-bottom:1px solid #f8f0e0; }
+.spell-known-item:hover { background:#fffbf4; }
+.spell-known-main { flex:1; cursor:pointer; }
+.spell-known-main strong { font-size:0.85rem; }
+.spell-known-meta { font-size:0.72rem; color:#999; margin-left:6px; }
+
+/* ── COMPENDIUM ── */
+#tab-compendium { background:var(--parch); min-height:100vh; }
+
+/* Inventory items on character sheet */
+.section-add-btn { float:right; background:transparent; border:1px solid rgba(184,134,11,0.5); color:var(--gold);
+  padding:1px 8px; font-family:'Cinzel'; font-size:0.55rem; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
+.section-add-btn:hover { background:var(--gold); color:#fff; }
+.inv-list { display:flex; flex-direction:column; gap:3px; }
+.inv-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:#fff8ee;
+  border-left:3px solid var(--gold); border-radius:2px; font-size:0.82rem; }
+.inv-item-main { flex:1; }
+.inv-remove-btn { background:transparent; border:1px solid #cc4444; color:#cc4444; width:20px; height:20px;
+  font-size:0.65rem; cursor:pointer; border-radius:2px; flex-shrink:0; padding:0; line-height:18px; text-align:center; }
+.inv-remove-btn:hover { background:#cc4444; color:#fff; }
+.feature-item-removable { display:flex; justify-content:space-between; align-items:flex-start; gap:6px; }
+.feature-item-removable > div { flex:1; }
+
+/* Clickable dots & equip buttons */
+.prof-dot.clickable { cursor:pointer; transition:all 0.15s; }
+.prof-dot.clickable:hover { transform:scale(1.3); box-shadow:0 0 4px var(--gold); }
+.prof-dot.expert { background:var(--gold); border-color:var(--gold); box-shadow:0 0 0 2px #fff, 0 0 0 3px var(--gold); }
+.ds-dot.clickable { cursor:pointer; transition:all 0.15s; }
+.ds-dot.clickable:hover { transform:scale(1.3); }
+.inv-equipped { background:#f0f8e8; border-left-color:#4caf50; }
+.inv-actions { display:flex; gap:4px; align-items:center; flex-shrink:0; }
+.inv-equip-btn { background:transparent; border:1px solid #aaa; color:#888; padding:2px 8px; font-family:'Cinzel';
+  font-size:0.58rem; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.15s; }
+.inv-equip-btn:hover { border-color:var(--gold); color:var(--gold); }
+.inv-equip-btn.equipped { background:#4caf50; border-color:#4caf50; color:#fff; }
+.comp-container { max-width:800px; margin:auto; padding:24px 20px; }
+.comp-container h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:16px; letter-spacing:3px; }
+.comp-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.comp-cat-btn { background:#fff; border:1px solid #d4c4a0; color:var(--ink); padding:8px 14px; cursor:pointer;
+  font-family:'Cinzel'; font-size:0.7rem; letter-spacing:1px; border-radius:3px; transition:all 0.2s; }
+.comp-cat-btn:hover { border-color:var(--gold); color:var(--gold); }
+.comp-cat-btn.comp-cat-active { background:var(--ink); color:var(--gold); border-color:var(--gold); }
+.comp-toolbar { display:flex; gap:8px; margin-bottom:16px; }
+.comp-toolbar input { flex:1; }
+.comp-list { display:flex; flex-direction:column; gap:6px; }
+.comp-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); border-radius:3px;
+  display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:box-shadow 0.2s; }
+.comp-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.12); }
+.comp-card-main { padding:12px 16px; flex:1; }
+.comp-card-name { font-family:'Cinzel'; font-size:0.92rem; color:var(--ink); }
+.comp-card-sub { color:#888; font-size:0.78rem; margin-top:2px; }
+.comp-homebrew { background:var(--gold); color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
+  font-family:'Cinzel'; letter-spacing:1px; vertical-align:middle; margin-left:6px; }
+.comp-modified { background:#555; color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
+  font-family:'Cinzel'; letter-spacing:1px; vertical-align:middle; margin-left:6px; }
+.comp-detail { margin:12px 0; }
+.comp-detail-grid { display:flex; flex-direction:column; gap:1px; }
+.comp-detail-row { display:flex; justify-content:space-between; padding:7px 10px; background:#fff8ee;
+  border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
+.comp-detail-label { font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; min-width:120px; }
+.comp-detail-val { color:var(--ink); text-align:right; flex:1; }
+
+/* Responsive */
+@media(max-width:900px) {
+  .sheet-body { grid-template-columns:1fr; }
+  .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid #d4c4a0; }
+  .summary-grid { grid-template-columns:1fr; }
+}
+@media(max-width:600px) {
+  .sheet-combat-row { gap:5px; }
+  .combat-box { min-width:55px; padding:5px 8px; }
+}
+</style>
+</head>
+<body>
+ 
+<!-- AUTH -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-title">GRIMOIRE</div>
+    <div class="auth-sub">Compagnon de Campagne D&D 5e</div>
+    <div id="authError"></div>
+    <input id="authEmail" type="email" placeholder="Email">
+    <input id="authPass" type="password" placeholder="Mot de passe">
+    <button class="btn-gold" style="width:100%;margin-top:8px" onclick="window._doLogin()">SE CONNECTER</button>
+    <button style="background:none;border:none;width:100%;color:#888;font-size:0.78rem;margin-top:10px;cursor:pointer;font-family:'Crimson Pro'" onclick="window._doSignup()">Pas encore de compte ? Créer un accès</button>
+  </div>
+</div>
+ 
+<!-- APP -->
+<div id="appScreen" style="display:none">
+  <nav>
+    <button id="navList" class="nav-active" onclick="_showTab('tab-list')">MES HÉROS</button>
+    <button id="navSheet" onclick="_showTab('tab-sheet')">FICHE</button>
+    <button id="navCompendium" onclick="_showTab('tab-compendium')">COMPENDIUM</button>
+    <button id="navGM" onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
+    <button onclick="_doLogout()">QUITTER</button>
+  </nav>
+ 
+  <!-- Liste -->
+  <div id="tab-list" class="tab-content active">
+    <h2>Vos Chroniques</h2>
+    <div id="charList"></div>
+    <button class="btn-gold" style="margin-top:24px;width:100%;max-width:700px;display:block;margin-left:auto;margin-right:auto" onclick="window._openForge()">+ FORGER UN NOUVEAU HÉROS</button>
+  </div>
+ 
+  <!-- Fiche -->
+  <div id="tab-sheet" class="tab-content">
+    <div style="padding:40px;text-align:center;color:#888;font-style:italic">
+      Sélectionne un personnage pour voir sa fiche
+    </div>
+  </div>
+ 
+  <!-- Compendium -->
+  <div id="tab-compendium" class="tab-content">
+    <div class="comp-container">
+      <h2>Compendium</h2>
+      <div class="comp-cats" id="compCats"></div>
+      <div class="comp-toolbar">
+        <input id="compSearch" type="text" placeholder="Rechercher..." oninput="window._compFilter()">
+        <button class="btn-gold" onclick="window._openAddResource()">+ AJOUTER</button>
+        <button class="section-add-btn" style="padding:8px 12px;font-size:0.65rem" onclick="window._resetCompendium()" title="Réinitialiser les données de base">↻ Reset</button>
+      </div>
+      <div id="compList" class="comp-list"></div>
+    </div>
+  </div>
+ 
+  <!-- GM -->
+  <div id="tab-gm" class="tab-content">
+    <h2>Écran du Maître</h2>
+    <div class="gm-search">
+      <input id="gmSearchId" type="text" placeholder="Coller l'ID du personnage à surveiller">
+      <button class="btn-gold" onclick="window._watchChar()">AJOUTER</button>
+    </div>
+    <div id="gmMonitor">
+      <p style="color:#666;font-style:italic">Collez l'ID d'une fiche pour la surveiller en temps réel. Plusieurs personnages peuvent être affichés simultanément.</p>
+    </div>
+  </div>
+</div>
+ 
+<!-- WIZARD FORGE -->
+<div id="forgeOverlay">
+  <div class="forge-window">
+    <div class="forge-top">
+      <h2>⚔ La Forge du Héros</h2>
+      <div id="forgeProgress" class="forge-progress"></div>
+    </div>
+    <div id="forgeContent"></div>
+    <div class="forge-footer">
+      <button id="forgePrev" class="btn-prev" onclick="window._wizardPrev()">← Précédent</button>
+      <span id="forgeStepLabel" style="font-family:'Cinzel';font-size:0.7rem;color:#888;letter-spacing:1px"></span>
+      <button id="forgeNext" class="btn-gold" onclick="window._wizardNext()">SUIVANT →</button>
+    </div>
+  </div>
+</div>
+ 
+</body>
+</html>
