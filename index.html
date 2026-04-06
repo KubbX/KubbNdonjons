@@ -79,104 +79,729 @@ const SUBCLASSES = {
   "Barbare": {
     level: 3, label: "Voie primitive",
     options: {
-      "Berserker": {features:[{lvl:3,name:"Frénésie",desc:"En rage: attaque supplémentaire en action bonus (1 niveau d'épuisement après)"},{lvl:6,name:"Rage aveugle",desc:"Immunité aux effets de charme et de terreur en rage"},{lvl:10,name:"Présence intimidante",desc:"Terrifier les créatures autour (SAG DD 8+BM+mod CHA)"},{lvl:14,name:"Représailles",desc:"Réaction: attaque de mêlée quand touché par une créature à portée"}]},
-      "Guerrier totem": {features:[{lvl:3,name:"Esprit totem",desc:"Choisir Ours (résistance tous dégâts sauf psychiques en rage), Aigle (désavantage des attaques d'opportunité, Foncer en action bonus) ou Loup (avantage aux alliés adjacents)"},{lvl:6,name:"Aspect de la bête",desc:"Capacité utilitaire selon totem choisi"},{lvl:10,name:"Marcheur spirituel",desc:"Communion avec les esprits (Communion avec la nature rituel)"},{lvl:14,name:"Totem de combat",desc:"Capacité de combat avancée selon totem"}]}
+      "Berserker": {features:[
+        {lvl:3,name:"Frénésie",desc:"En rage: attaque supplémentaire en action bonus (1 niveau d'épuisement après)"},
+        {lvl:6,name:"Rage aveugle",desc:"Immunité aux effets de charme et de terreur en rage"},
+        {lvl:10,name:"Présence intimidante",desc:"Terrifier les créatures autour (SAG DD 8+BM+mod CHA)"},
+        {lvl:14,name:"Représailles",desc:"Réaction: attaque de mêlée quand touché par une créature à portée"}
+      ]},
+      "Guerrier totem": {features:[
+        {lvl:3,name:"Esprit totem",desc:"Choisir Ours (résistance tous dégâts sauf psychiques en rage), Aigle (désavantage AoO, Foncer AB) ou Loup (avantage aux alliés adjacents)"},
+        {lvl:6,name:"Aspect de la bête",desc:"Capacité utilitaire selon totem choisi"},
+        {lvl:10,name:"Marcheur spirituel",desc:"Communion avec les esprits (Communion avec la nature rituel)"},
+        {lvl:14,name:"Totem de combat",desc:"Capacité de combat avancée selon totem"}
+      ]},
+      "Berserker des ancêtres": {features:[
+        {lvl:3,name:"Ancêtres spirituels",desc:"En rage: des esprits d'ancêtres vous entourent. Les ennemis ont désavantage aux attaques contre vos alliés adjacents"},
+        {lvl:6,name:"Bouclier spectral",desc:"Réaction: donner résistance à tous dégâts à un allié à 9m (dure jusqu'à début de votre prochain tour)"},
+        {lvl:10,name:"Consultation des esprits",desc:"Lancer Communion avec la nature comme rituel"},
+        {lvl:14,name:"Vengeance des ancêtres",desc:"Réaction: forcer un attaquant à relancer son attaque contre vous; si raté, les ancêtres contre-attaquent (6d6 nécrotique, JdS CON)"}
+      ]},
+      "Héraut des tempêtes": {features:[
+        {lvl:3,name:"Aura de la tempête",desc:"En rage: aura de 3m au choix — Désert (dégâts de feu), Mer (dégâts de foudre), Toundra (PV temporaires)"},
+        {lvl:6,name:"Âme de la tempête",desc:"Résistances selon l'aura choisie; capacité de nage ou survie en conditions extrêmes"},
+        {lvl:10,name:"Protection de la tempête",desc:"Distribuer résistances de votre aura aux alliés à 3m en rage"},
+        {lvl:14,name:"Rage de la tempête",desc:"En rage: JdS raté ennemi adjacent subit effet automatique (aveuglé/jeté au sol/ralenti selon aura)"}
+      ]},
+      "Zélateur": {features:[
+        {lvl:3,name:"Fureur divine",desc:"En rage: dégâts bonus nécrotiques ou radiants sur première attaque (1d6 + moitié niveau barbare)"},
+        {lvl:3,name:"Guerrier des dieux",desc:"Si mourant: régénérer 1d12+mod CON PV au lieu de mourir (1/repos long)"},
+        {lvl:6,name:"Esprit fanatique",desc:"Alliés adjacents immunisés à la peur en rage"},
+        {lvl:10,name:"Zèle divin",desc:"En rage: immunité aux dégâts nécrotiques et radiants"},
+        {lvl:14,name:"Présence exaltée",desc:"Aura 9m en rage: tous ennemis ont désavantage à leurs JdS SAG"}
+      ]},
+      "Bête sauvage": {features:[
+        {lvl:3,name:"Forme de la bête",desc:"En rage: choisir griffes (1d6, attaque supp AB), morsure (1d8, soins = mod CON) ou queue (portée 3m, 1d8)"},
+        {lvl:6,name:"Instinct bestial",desc:"Avantage Initiative; pas de désavantage en attaque si adjacent à 2+ ennemis"},
+        {lvl:10,name:"Frénésie des griffes",desc:"Avantage aux attaques de griffes; toutes vos attaques corps-à-corps comptent comme magiques"},
+        {lvl:14,name:"Forme de la bête améliorée",desc:"Chaque attaque en forme de bête inflige 1d6 supplémentaires; régénérer mod CON PV/tour en rage"}
+      ]}
     }
   },
   "Barde": {
     level: 3, label: "Collège bardique",
     options: {
-      "Collège du Savoir": {features:[{lvl:3,name:"Maîtrises supplémentaires",desc:"3 compétences au choix"},{lvl:3,name:"Mots cinglants",desc:"Réaction: soustraire le dé d'inspiration d'un jet adverse"},{lvl:6,name:"Secrets magiques supplémentaires",desc:"2 sorts de n'importe quelle classe"},{lvl:14,name:"Maîtrise inégalée",desc:"Ajouter dé d'inspiration aux jets de compétence sans maîtrise"}]},
-      "Collège de la Vaillance": {features:[{lvl:3,name:"Maîtrises supplémentaires",desc:"Armures moyennes, boucliers, armes martiales"},{lvl:3,name:"Inspiration de combat",desc:"Le bénéficiaire peut ajouter le dé aux dégâts ou à la CA"},{lvl:6,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},{lvl:14,name:"Inspiration de guerre",desc:"Action bonus: un allié inspiré peut attaquer en réaction"}]}
+      "Collège du Savoir": {features:[
+        {lvl:3,name:"Maîtrises supplémentaires",desc:"3 compétences au choix"},
+        {lvl:3,name:"Mots cinglants",desc:"Réaction: soustraire le dé d'inspiration d'un jet adverse"},
+        {lvl:6,name:"Secrets magiques supplémentaires",desc:"2 sorts de n'importe quelle classe"},
+        {lvl:14,name:"Maîtrise inégalée",desc:"Ajouter dé d'inspiration aux jets de compétence sans maîtrise"}
+      ]},
+      "Collège de la Vaillance": {features:[
+        {lvl:3,name:"Maîtrises supplémentaires",desc:"Armures moyennes, boucliers, armes martiales"},
+        {lvl:3,name:"Inspiration de combat",desc:"Le bénéficiaire peut ajouter le dé aux dégâts ou à la CA"},
+        {lvl:6,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
+        {lvl:14,name:"Inspiration de guerre",desc:"Action bonus: un allié inspiré peut attaquer en réaction"}
+      ]},
+      "Collège des Épées": {features:[
+        {lvl:3,name:"Maîtrise des armes",desc:"Armures moyennes, rapières et cimeterres. Utiliser CHA pour attaque/dégâts avec ces armes"},
+        {lvl:3,name:"Manœuvres de fleuret",desc:"Dépenser inspiration bardique: manœuvres de combat (esquive, attaque courbe, riposte, fente)"},
+        {lvl:6,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
+        {lvl:14,name:"Maîtrise du fleuret",desc:"Régénérer inspiration bardique si un ennemi tombe à 0 PV lors d'un round d'attaque"}
+      ]},
+      "Collège de la Création": {features:[
+        {lvl:3,name:"Muse de la création",desc:"Inspiration bardique: l'allié peut ajouter le dé à une attaque, compétence ou sauvegarde"},
+        {lvl:3,name:"Note de vie animée",desc:"Utiliser inspiration pour animer un objet non-magique (taille M max): se déplace 15m, CA 11+niv BM"},
+        {lvl:6,name:"Symphonie de la création",desc:"Dépenser 3 inspirations: créer un objet non-magique (≤ 5po de valeur, disparaît après repos long)"},
+        {lvl:14,name:"Maîtrise de la performance",desc:"Animer un objet de taille G+; ou créer 2 objets par action"}
+      ]},
+      "Collège de l'Éloquence": {features:[
+        {lvl:3,name:"Rhétorique argentée",desc:"Si raté un jet de Tromperie ou Persuasion, ajouter le résultat à la prochaine tentative vs même cible"},
+        {lvl:3,name:"Mots de pouvoir",desc:"Inspiration bardique peut être donnée en réaction à un raté de JdS CHA d'un allié"},
+        {lvl:6,name:"Discours insensé",desc:"Utiliser Discours cinglant sans consommer d'inspiration si Persuasion ou Tromperie ≥ 15"},
+        {lvl:14,name:"Maîtrise de la parole",desc:"Toujours considéré comme ayant roulé 10 sur jets de Tromperie et Persuasion (si résultat inférieur)"}
+      ]},
+      "Collège des Esprits": {features:[
+        {lvl:3,name:"Guidage des esprits",desc:"Rituel: Parler aux morts, Détection de magie — gratuit via la tradition des esprits"},
+        {lvl:3,name:"Contes des au-delà",desc:"Utiliser inspiration bardique: tirer un effet aléatoire (soins, dégâts, avantage, etc.)"},
+        {lvl:6,name:"Manifestation spirituelle",desc:"Dépenser 1 inspiration: invoquer un esprit (attaque ou soin: 1d6+mod CHA × niveau barde)"},
+        {lvl:14,name:"Possession partielle",desc:"1/repos long: laisser un esprit agir via un allié inconscient ou mort-vivant contrôlé"}
+      ]}
     }
   },
   "Clerc": {
     level: 1, label: "Domaine divin",
     options: {
-      "Vie": {features:[{lvl:1,name:"Maîtrise des armures lourdes",desc:"Armures lourdes"},{lvl:1,name:"Disciple de la vie",desc:"+2+niveau du sort PV soignés"},{lvl:2,name:"Conduit: Préserver la vie",desc:"Pool de 5×niveau clerc PV distribués"},{lvl:6,name:"Guérisseur béni",desc:"Les sorts de soin s'appliquent aussi à soi"},{lvl:8,name:"Frappe divine",desc:"+1d8 dégâts radiants 1/tour"},{lvl:17,name:"Guérison suprême",desc:"Maximum de PV soignés (pas de jet)"}]},
-      "Lumière": {features:[{lvl:1,name:"Sort mineur supplémentaire: Lumière",desc:"Sort mineur Lumière"},{lvl:1,name:"Lueur protectrice",desc:"Réaction: désavantage sur attaque entrante"},{lvl:2,name:"Conduit: Radiance de l'aube",desc:"Zone de dégâts radiants (2d10+niv)"},{lvl:6,name:"Lueur améliorée",desc:"Lueur protectrice sur allié visible"},{lvl:8,name:"Frappe divine (radiant)",desc:"+1d8 dégâts radiants 1/tour"},{lvl:17,name:"Couronne de lumière",desc:"Lumière aveuglante, dégâts radiants continus"}]},
-      "Guerre": {features:[{lvl:1,name:"Maîtrise des armes martiales et armures lourdes",desc:"Armes martiales et armures lourdes"},{lvl:1,name:"Prêtre de guerre",desc:"Action bonus: attaque supplémentaire (mod SAG/repos long)"},{lvl:2,name:"Conduit: Frappe guidée",desc:"+10 à un jet d'attaque après résultat"},{lvl:6,name:"Conduit: Bénédiction du dieu de la guerre",desc:"+10 au jet d'attaque d'un allié"},{lvl:8,name:"Frappe divine",desc:"+1d8 dégâts du type de l'arme 1/tour"},{lvl:17,name:"Avatar de bataille",desc:"Résistance contondant/perçant/tranchant non-magiques"}]},
-      "Connaissance": {features:[{lvl:1,name:"Bénédictions du savoir",desc:"2 langues + 2 compétences (double maîtrise)"},{lvl:2,name:"Conduit: Savoir des âges",desc:"Maîtrise d'une compétence/outil pendant 10 min"},{lvl:6,name:"Conduit: Lecture des pensées",desc:"Lire les pensées superficielles"},{lvl:8,name:"Frappe divine (force)",desc:"+1d8 dégâts de force"},{lvl:17,name:"Visions du passé",desc:"Méditer pour voir le passé d'un lieu/objet"}]},
-      "Tempête": {features:[{lvl:1,name:"Maîtrise des armes martiales et armures lourdes",desc:"Armes martiales, armures lourdes"},{lvl:1,name:"Courroux de la tempête",desc:"Réaction: 2d8 foudre/tonnerre quand touché en mêlée"},{lvl:2,name:"Conduit: Courroux destructeur",desc:"Dégâts max sur sort foudre/tonnerre"},{lvl:6,name:"Conduit: Tonnerre du tonnerre de dieu",desc:"Repousser créatures de taille G ou moins"},{lvl:8,name:"Frappe divine (tonnerre)",desc:"+1d8 dégâts de tonnerre"},{lvl:17,name:"Né de la tempête",desc:"Vol 18m en extérieur"}]},
-      "Tromperie": {features:[{lvl:1,name:"Bénédiction du filou",desc:"Avantage Discrétion ou Tromperie à un allié"},{lvl:2,name:"Conduit: Duplicité invocatoire",desc:"Créer un double illusoire"},{lvl:6,name:"Conduit: Cape d'ombre",desc:"Invisibilité (concentration) pendant 1 tour"},{lvl:8,name:"Frappe divine (poison)",desc:"+1d8 dégâts de poison"},{lvl:17,name:"Alter ego amélioré",desc:"Le double peut lancer des sorts"}]}
+      "Vie": {features:[
+        {lvl:1,name:"Maîtrise des armures lourdes",desc:"Armures lourdes"},
+        {lvl:1,name:"Disciple de la vie",desc:"+2+niveau du sort PV soignés"},
+        {lvl:2,name:"Conduit: Préserver la vie",desc:"Pool de 5×niveau clerc PV distribués"},
+        {lvl:6,name:"Guérisseur béni",desc:"Les sorts de soin s'appliquent aussi à soi"},
+        {lvl:8,name:"Frappe divine",desc:"+1d8 dégâts radiants 1/tour"},
+        {lvl:17,name:"Guérison suprême",desc:"Maximum de PV soignés (pas de jet)"}
+      ]},
+      "Lumière": {features:[
+        {lvl:1,name:"Sort mineur: Lumière",desc:"Sort mineur Lumière offert"},
+        {lvl:1,name:"Lueur protectrice",desc:"Réaction: désavantage sur attaque entrante"},
+        {lvl:2,name:"Conduit: Radiance de l'aube",desc:"Zone de dégâts radiants (2d10+niv clerc)"},
+        {lvl:6,name:"Lueur améliorée",desc:"Lueur protectrice sur allié visible à 9m"},
+        {lvl:8,name:"Frappe divine (radiant)",desc:"+1d8 dégâts radiants 1/tour"},
+        {lvl:17,name:"Couronne de lumière",desc:"Lumière aveuglante, dégâts radiants continus"}
+      ]},
+      "Guerre": {features:[
+        {lvl:1,name:"Maîtrise des armes martiales et armures lourdes",desc:"Armes martiales et armures lourdes"},
+        {lvl:1,name:"Prêtre de guerre",desc:"Action bonus: attaque supplémentaire (mod SAG/repos long)"},
+        {lvl:2,name:"Conduit: Frappe guidée",desc:"+10 à un jet d'attaque après résultat"},
+        {lvl:6,name:"Conduit: Bénédiction du dieu de la guerre",desc:"+10 au jet d'attaque d'un allié"},
+        {lvl:8,name:"Frappe divine",desc:"+1d8 dégâts du type de l'arme 1/tour"},
+        {lvl:17,name:"Avatar de bataille",desc:"Résistance contondant/perçant/tranchant non-magiques"}
+      ]},
+      "Connaissance": {features:[
+        {lvl:1,name:"Bénédictions du savoir",desc:"2 langues + 2 compétences (double maîtrise)"},
+        {lvl:2,name:"Conduit: Savoir des âges",desc:"Maîtrise d'une compétence/outil pendant 10 min"},
+        {lvl:6,name:"Conduit: Lecture des pensées",desc:"Lire les pensées superficielles d'une cible"},
+        {lvl:8,name:"Frappe divine (force)",desc:"+1d8 dégâts de force 1/tour"},
+        {lvl:17,name:"Visions du passé",desc:"Méditer pour voir le passé d'un lieu ou objet"}
+      ]},
+      "Tempête": {features:[
+        {lvl:1,name:"Maîtrise des armes martiales et armures lourdes",desc:"Armes martiales, armures lourdes"},
+        {lvl:1,name:"Courroux de la tempête",desc:"Réaction: 2d8 foudre/tonnerre quand touché en mêlée (JdS DEX moitié)"},
+        {lvl:2,name:"Conduit: Courroux destructeur",desc:"Dégâts max sur sort foudre/tonnerre"},
+        {lvl:6,name:"Conduit: Tonnerre du dieu tonnerre",desc:"Repousser créatures de taille G ou moins"},
+        {lvl:8,name:"Frappe divine (tonnerre)",desc:"+1d8 dégâts de tonnerre 1/tour"},
+        {lvl:17,name:"Né de la tempête",desc:"Vol 18m en extérieur par temps orageux"}
+      ]},
+      "Tromperie": {features:[
+        {lvl:1,name:"Bénédiction du filou",desc:"Avantage Discrétion ou Tromperie à un allié"},
+        {lvl:2,name:"Conduit: Duplicité invocatoire",desc:"Créer un double illusoire"},
+        {lvl:6,name:"Conduit: Cape d'ombre",desc:"Invisibilité (concentration) pendant 1 tour"},
+        {lvl:8,name:"Frappe divine (poison)",desc:"+1d8 dégâts de poison 1/tour"},
+        {lvl:17,name:"Alter ego amélioré",desc:"Le double peut lancer des sorts de clerc"}
+      ]},
+      "Nature": {features:[
+        {lvl:1,name:"Maîtrise des armures lourdes",desc:"Armures lourdes + 1 sort mineur de druide"},
+        {lvl:1,name:"Disciple de la nature",desc:"Maîtrise: Dressage, Nature ou Survie"},
+        {lvl:2,name:"Conduit: Charme des animaux et des plantes",desc:"Charmer bêtes et plantes à 9m (JdS SAG) pendant 1 min"},
+        {lvl:6,name:"Repousser les fléaux",desc:"Résistance aux poisons et maladies; bêtes/plantes ont désavantage à attaquer"},
+        {lvl:8,name:"Frappe divine",desc:"+1d8 dégâts (froid/foudre/feu selon terrain) 1/tour"},
+        {lvl:17,name:"Maître de la nature",desc:"Immunité aux poisons/maladies; commander les bêtes et plantes charmées"}
+      ]},
+      "Mort": {features:[
+        {lvl:1,name:"Maîtrise des armures lourdes",desc:"Armures lourdes + sorts de mort supplémentaires"},
+        {lvl:1,name:"Récolte des âmes",desc:"Sorts de nécromancie maximisés en dégâts (une fois par sort)"},
+        {lvl:2,name:"Conduit: Touché nécromatique",desc:"Toucher: paralyser une créature vivante jusqu'à fin de son prochain tour (JdS CON)"},
+        {lvl:6,name:"Contact indestructible",desc:"Annuler résistance aux dégâts nécrotiques par vos sorts"},
+        {lvl:8,name:"Frappe divine (nécrotique)",desc:"+1d8 dégâts nécrotiques 1/tour"},
+        {lvl:17,name:"Appel impérieux des morts",desc:"Animation des morts: contrôle 4× plus de morts-vivants; délai avant décomposition doublé"}
+      ]},
+      "Forge": {features:[
+        {lvl:1,name:"Maîtrise des armures lourdes et outils de forgeron",desc:"Armures lourdes + outils de forgeron"},
+        {lvl:1,name:"Bénédiction de la forge",desc:"Bénir 1 arme ou armure: +1 jets d'attaque ou +1 CA"},
+        {lvl:2,name:"Conduit: Artisan des dieux",desc:"Créer un objet métallique simple (≤ 100 po) en 1 heure de prière"},
+        {lvl:6,name:"Âme de la forge",desc:"Résistance dégâts de feu; +1 CA si armure"},
+        {lvl:8,name:"Frappe divine (feu)",desc:"+1d8 dégâts de feu 1/tour"},
+        {lvl:17,name:"Enfant de la forge",desc:"Immunité aux dégâts de feu; armure lourde: résistance contondant/perçant/tranchant non-magiques"}
+      ]},
+      "Cimetière": {features:[
+        {lvl:1,name:"Cercle de mortalité",desc:"Sorts de soin maximisés sur des créatures à 0 PV"},
+        {lvl:1,name:"Œil pour l'œil",desc:"1/repos court: stabiliser une créature à 0 PV à 9m (sans toucher)"},
+        {lvl:2,name:"Conduit: Chemin vers le trépas",desc:"Cibler une créature: vulnérable aux prochains dégâts (JdS CON)"},
+        {lvl:6,name:"Sentinelle à la porte de la mort",desc:"Réaction: annuler un coup fatal contre soi ou allié adjacent (1/repos long)"},
+        {lvl:8,name:"Frappe divine (nécrotique)",desc:"+1d8 dégâts nécrotiques 1/tour"},
+        {lvl:17,name:"Gardien des âmes",desc:"Empêcher la montée en morts-vivants à 9m; résurrection: coûte moins de composantes"}
+      ]},
+      "Arcane": {features:[
+        {lvl:1,name:"Magie profane",desc:"Ajouter un sort de magicien par niveau de clerc aux sorts préparés"},
+        {lvl:1,name:"Récupération arcanique",desc:"1/repos long: récupérer emplacements (total ≤ moitié niveau clerc)"},
+        {lvl:2,name:"Conduit: Dissipation de magie",desc:"Lancer Dissipation de la magie sans emplacement"},
+        {lvl:6,name:"Magie profane renforcée",desc:"Ajouter mod INT aux jets d'attaque et DD de sauvegarde des sorts"},
+        {lvl:8,name:"Frappe divine (force)",desc:"+1d8 dégâts de force 1/tour"},
+        {lvl:17,name:"Maître de la magie profane",desc:"Préparer 4 sorts de magicien supp; lancer sorts 6e/7e niv gratuitement 1/repos long"}
+      ]},
+      "Ordre": {features:[
+        {lvl:1,name:"Maîtrise des armures lourdes et armes martiales",desc:"Armures lourdes + armes martiales"},
+        {lvl:1,name:"Voix de l'autorité",desc:"Si vous lancez un sort ciblant un allié, cet allié peut attaquer en réaction"},
+        {lvl:2,name:"Conduit: Ordre impérieux",desc:"Charmer jusqu'à 6 créatures (JdS SAG) pendant 1 min: exécutent vos ordres"},
+        {lvl:6,name:"Incarnation de la loi",desc:"Lancer sorts de charme 1 fois/repos sans emplacement (niv ≤ moitié niv clerc)"},
+        {lvl:8,name:"Frappe divine (psychique)",desc:"+1d8 dégâts psychiques 1/tour"},
+        {lvl:17,name:"Ordre divin",desc:"Immunité aux charmes; alliés à 9m ne peuvent être charmés"}
+      ]},
+      "Paix": {features:[
+        {lvl:1,name:"Mise en œuvre de la paix",desc:"Lancer Amitié magique, Aide et Protection contre le bien et le mal sans composantes matérielles"},
+        {lvl:1,name:"Lien de paix",desc:"Créer un lien entre 2 créatures (9m): partager dégâts subis moitié-moitié"},
+        {lvl:2,name:"Conduit: Prière embrassant tout",desc:"Soigner 2d6+SAG PV à toutes créatures choisies à 9m"},
+        {lvl:6,name:"Protéger la paix",desc:"Réaction: téléporter un allié à 1.5m de vous lors d'une attaque"},
+        {lvl:8,name:"Frappe divine (radiant)",desc:"+1d8 dégâts radiants 1/tour"},
+        {lvl:17,name:"Grâce partout",desc:"Lien de paix: partager résistances; +1d4 à tous jets de la créature liée"}
+      ]}
     }
   },
   "Druide": {
     level: 2, label: "Cercle druidique",
     options: {
-      "Cercle de la Terre": {features:[{lvl:2,name:"Sort mineur bonus",desc:"1 sort mineur de druide supplémentaire"},{lvl:2,name:"Récupération naturelle",desc:"Récupérer emplacements au repos court (total ≤ moitié du niveau)"},{lvl:3,name:"Sorts de cercle",desc:"Sorts supplémentaires selon terrain choisi"},{lvl:6,name:"Foulée de la terre",desc:"Le terrain difficile non-magique ne ralentit plus"},{lvl:10,name:"Protégé de la nature",desc:"Immunité au poison et aux maladies, immunité charme fées/élémentaires"},{lvl:14,name:"Sanctuaire naturel",desc:"Bêtes et végétaux doivent sauver SAG pour attaquer"}]},
-      "Cercle de la Lune": {features:[{lvl:2,name:"Forme sauvage de combat",desc:"Forme sauvage en action bonus, RC 1 max"},{lvl:6,name:"Frappe primale",desc:"Attaques en forme sauvage = magiques"},{lvl:10,name:"Forme sauvage élémentaire",desc:"Se transformer en élémentaire (2 utilisations)"},{lvl:14,name:"Mille formes",desc:"Modifier son apparence à volonté (Modification d'apparence)"}]}
+      "Cercle de la Terre": {features:[
+        {lvl:2,name:"Sort mineur bonus",desc:"1 sort mineur de druide supplémentaire"},
+        {lvl:2,name:"Récupération naturelle",desc:"Récupérer emplacements au repos court (total ≤ moitié du niveau)"},
+        {lvl:3,name:"Sorts de cercle",desc:"Sorts supplémentaires selon terrain choisi (Arctique, Littoral, Désert, Forêt, Plaines, Montagne, Marais ou Sous-terre)"},
+        {lvl:6,name:"Foulée de la terre",desc:"Le terrain difficile non-magique ne ralentit plus"},
+        {lvl:10,name:"Protégé de la nature",desc:"Immunité au poison et maladies; immunité charme fées/élémentaires"},
+        {lvl:14,name:"Sanctuaire naturel",desc:"Bêtes et végétaux doivent réussir JdS SAG pour attaquer"}
+      ]},
+      "Cercle de la Lune": {features:[
+        {lvl:2,name:"Forme sauvage de combat",desc:"Forme sauvage en action bonus; accès RC 1 max"},
+        {lvl:6,name:"Frappe primale",desc:"Attaques en forme sauvage comptent comme magiques"},
+        {lvl:10,name:"Forme sauvage élémentaire",desc:"Se transformer en élémentaire (air/eau/feu/terre) — 2 utilisations"},
+        {lvl:14,name:"Mille formes",desc:"Modifier son apparence à volonté (comme Modification d'apparence)"}
+      ]},
+      "Cercle des Spores": {features:[
+        {lvl:2,name:"Aura de Spores",desc:"Aura de 3m: dégâts nécrotiques 1d4+BM aux créatures débutant leur tour dans l'aura"},
+        {lvl:2,name:"Halo de spores",desc:"Réaction quand créature à 3m: 1d4 dégâts nécrotiques (JdS CON)"},
+        {lvl:6,name:"Forme symbiotique",desc:"En forme sauvage: ajouter dégâts nécrotiques à vos attaques; immunité poison/maladie"},
+        {lvl:10,name:"Catalyseur fongique",desc:"Lancer Reanimation des morts avec une spore; contrôler mort-vivant fongique"},
+        {lvl:14,name:"Animateur de spores",desc:"1/repos long: animer un corps mort comme zombie fongique (permanent jusqu'à destruction)"}
+      ]},
+      "Cercle des Étoiles": {features:[
+        {lvl:2,name:"Carte des étoiles",desc:"Objet astronomique: ajouter d6 aux jets d'attaque de sorts mineurs ou INT (1/repos court)"},
+        {lvl:2,name:"Forme stellaire",desc:"Forme sauvage: chalumeau (sort bonus), dragon (bonus jets attaque de sorts), araignée (soins 1d8+SAG)"},
+        {lvl:6,name:"Âme cosmique",desc:"Tirer une constellation au repos long: avantage à certains jets liés au signe"},
+        {lvl:10,name:"Corps de lumière stellaire",desc:"En forme stellaire: lumière vive 3m; immunité dégâts radiants"},
+        {lvl:14,name:"Plein soleil",desc:"Forme stellaire (dragon): ajouter dégâts radiants à chaque attaque de sort qui touche"}
+      ]},
+      "Cercle des Rêves": {features:[
+        {lvl:2,name:"Balm of the Summer Court",desc:"Pool de dés (BM d6 = niveau druide): dépenser pour soigner et accorder vitesse bonus (+3m) à une créature touchée"},
+        {lvl:6,name:"Gardien des rêves",desc:"Envoyer un messager onirique à une créature endormie dans les 1,5 km (comme Messager)"},
+        {lvl:10,name:"Porte vers les rêves",desc:"1/repos court: créer une porte de fée entre 2 points (portail temporaire)"},
+        {lvl:14,name:"Vigilance onirique",desc:"Pendant un repos long: partager vos rêves protecteurs avec vos alliés (avantage aux jets de perception)"}
+      ]},
+      "Cercle du Berger": {features:[
+        {lvl:2,name:"Langage des bêtes et des feuilles",desc:"Communiquer avec bêtes et végétaux; avantage aux jets d'influence sur les bêtes"},
+        {lvl:2,name:"Invocation du monde naturel",desc:"Sorts d'invocation: bêtes et fées durent 1 round de plus; gains de PV temporaires"},
+        {lvl:6,name:"Gardien du sanctuaire",desc:"Invoquer un esprit totem dans 9m: buff aux bêtes/fées invoquées (PV bonus, avantage attaque)"},
+        {lvl:10,name:"Communion animale fidèle",desc:"Lancer Communion avec la nature et Parler aux animaux à volonté"},
+        {lvl:14,name:"Invocation du monde naturel améliorée",desc:"Invoquer 2 esprits totems; bêtes et fées regagnent PV au début de leur tour"}
+      ]},
+      "Cercle des Feux": {features:[
+        {lvl:2,name:"Lien flamboyant",desc:"Créer un lien enflammé avec une créature à 9m: si elle attaque, réaction pour lui infliger 2d8 feu"},
+        {lvl:2,name:"Sorts de flammes sauvages",desc:"Sorts bonus: Purification des aliments/boissons, Feu follet, Bouche de feu, Tempête de feu, Rappel aux flammes"},
+        {lvl:6,name:"Guérison de la vitalité flamboyante",desc:"Lorsqu'un lien est brisé par la mort: soigner allié dans 3m de 2d10+SAG PV"},
+        {lvl:10,name:"Esprit sauvage des flammes",desc:"En forme sauvage: immunité aux dégâts de feu; dégâts de feu sur sortie de forme sauvage"},
+        {lvl:14,name:"Inferno amélioré",desc:"Lien flamboyant: porter la zone à 18m; les alliés à proximité régénèrent 2d6 PV par tour"}
+      ]}
     }
   },
   "Guerrier": {
     level: 3, label: "Archétype martial",
     options: {
-      "Champion": {features:[{lvl:3,name:"Critique amélioré",desc:"Critique sur 19-20 (au lieu de 20)"},{lvl:7,name:"Athlète remarquable",desc:"Ajouter moitié BM aux jets FOR/DEX/CON sans maîtrise"},{lvl:10,name:"Style de combat supplémentaire",desc:"Choisir un 2e style de combat"},{lvl:15,name:"Critique supérieur",desc:"Critique sur 18-20"},{lvl:18,name:"Survivant",desc:"Régénérer 5+mod CON PV/tour si < moitié PV max"}]},
-      "Maître de guerre": {features:[{lvl:3,name:"Supériorité martiale",desc:"4 dés de supériorité (d8) + 3 manœuvres"},{lvl:7,name:"Savoir son ennemi",desc:"Étudier une créature (1 min) pour connaître ses capacités"},{lvl:10,name:"Dés de supériorité améliorés (d10)",desc:"Les dés passent à d10"},{lvl:15,name:"Implacable",desc:"Récupérer 1 dé de supériorité si aucun dé restant à l'initiative"},{lvl:18,name:"Dés de supériorité améliorés (d12)",desc:"Les dés passent à d12"}]},
-      "Chevalier occulte": {features:[{lvl:3,name:"Sorts de chevalier occulte",desc:"INT — 3 sorts de niv.1 (Abjuration/Évocation) + 2 sorts mineurs"},{lvl:7,name:"Magie de guerre",desc:"Lancer un sort mineur puis attaque en action bonus"},{lvl:10,name:"Frappe occulte",desc:"+dégâts de force sur attaque après un sort"},{lvl:15,name:"Magie de guerre liée",desc:"Téléportation 9m avant/après action Attaquer"},{lvl:18,name:"Magie de guerre améliorée",desc:"Lancer sort niv.1-2 puis attaque en action bonus"}]}
+      "Champion": {features:[
+        {lvl:3,name:"Critique amélioré",desc:"Critique sur 19-20 (au lieu de 20)"},
+        {lvl:7,name:"Athlète remarquable",desc:"Ajouter moitié BM aux jets FOR/DEX/CON sans maîtrise"},
+        {lvl:10,name:"Style de combat supplémentaire",desc:"Choisir un 2e style de combat"},
+        {lvl:15,name:"Critique supérieur",desc:"Critique sur 18-20"},
+        {lvl:18,name:"Survivant",desc:"Régénérer 5+mod CON PV/tour si < moitié PV max (si pas à 0)"}
+      ]},
+      "Maître de guerre": {features:[
+        {lvl:3,name:"Supériorité martiale",desc:"4 dés de supériorité (d8) + 3 manœuvres au choix"},
+        {lvl:7,name:"Savoir son ennemi",desc:"Étudier une créature (1 min) pour connaître 2 de ses capacités"},
+        {lvl:10,name:"Dés de supériorité (d10)",desc:"Les dés de supériorité passent à d10"},
+        {lvl:15,name:"Implacable",desc:"Récupérer 1 dé de supériorité si aucun dé restant à l'initiative"},
+        {lvl:18,name:"Dés de supériorité (d12)",desc:"Les dés passent à d12"}
+      ]},
+      "Chevalier occulte": {features:[
+        {lvl:3,name:"Sorts de chevalier occulte",desc:"INT — 3 sorts de niv.1 (Abjuration/Évocation) + 2 sorts mineurs"},
+        {lvl:7,name:"Magie de guerre",desc:"Lancer un sort mineur puis attaque en action bonus"},
+        {lvl:10,name:"Frappe occulte",desc:"+dégâts de force sur attaque après un sort"},
+        {lvl:15,name:"Magie de guerre liée",desc:"Téléportation 9m avant/après action Attaquer"},
+        {lvl:18,name:"Magie de guerre améliorée",desc:"Lancer sort niv.1-2 puis attaque en action bonus"}
+      ]},
+      "Archer arcanique": {features:[
+        {lvl:3,name:"Connaissances d'archer arcanique",desc:"Maîtrise de l'arc long ou court + connaissance de la magie arcanique ou fée"},
+        {lvl:3,name:"Flèches arcaniques",desc:"2 flèches arcaniques/repos court parmi 8 effets (flèche de guêpes, flèche banissante, flèche cherchante, etc.)"},
+        {lvl:7,name:"Tir magique",desc:"Vos flèches arcaniques passent à travers les armures magiques; ignorer résistance"},
+        {lvl:10,name:"Tir courbe",desc:"Quand vous ratez avec une flèche, réaction: relancer le jet (1/tour)"},
+        {lvl:15,name:"Flèches améliorées",desc:"3 flèches arcaniques/repos court; certaines flèches ont des effets améliorés"},
+        {lvl:18,name:"Tir flèche-éclair",desc:"Flèche éclair: tirer une ligne infinie de foudre (10d8 foudre, JdS DEX moitié)"}
+      ]},
+      "Cavalier": {features:[
+        {lvl:3,name:"Maîtrise équestre",desc:"Maîtrise des armures lourdes; monture en actions bonifiées; Persuasion ou Dressage au choix"},
+        {lvl:3,name:"Nés pour la selle",desc:"Avantage aux jets pour rester en selle; monture ne peut être charmée ou effrayée"},
+        {lvl:7,name:"Cavalier indéfectible",desc:"Attaque ennemie ciblant votre monture: réorienter vers vous"},
+        {lvl:10,name:"Charge de cavalerie",desc:"Si monture se déplace 10m+ en ligne droite puis attaque: +1d8 dégâts"},
+        {lvl:15,name:"Bouclier équestre",desc:"Si monture touchée, réaction: réduire dégâts de votre mod CON × 3"},
+        {lvl:18,name:"Maître cavalier",desc:"Monture agit à votre initiative; avantage aux jets d'attaque montés"}
+      ]},
+      "Samouraï": {features:[
+        {lvl:3,name:"Détermination combative",desc:"1/repos court: avantage à tous les jets d'attaque pendant 1 min"},
+        {lvl:3,name:"Élégance",desc:"Maîtrise d'une compétence (Histoire, Intuition, Performance ou Persuasion) + langue"},
+        {lvl:7,name:"Conduit intérieur",desc:"Ajouter BM aux jets de sauvegarde SAG et CHA si non maîtrisés"},
+        {lvl:10,name:"Profil majestueux",desc:"Bonus à Intimidation et Persuasion = BM (si pas déjà); choix de compétence supp."},
+        {lvl:15,name:"Coup rapide",desc:"1/tour: attaque supplémentaire si déjà utilisé l'action Attaquer ce tour"},
+        {lvl:18,name:"Force avant la mort",desc:"Réaction: passer à 1 PV au lieu de tomber à 0 PV (1/repos long) — ne peut lancer de sorts ce tour"}
+      ]},
+      "Banneret": {features:[
+        {lvl:3,name:"Discours de ralliement",desc:"Utiliser Second souffle: soin cible aussi jusqu'à 6 alliés à 9m (d6 PV temporaires)"},
+        {lvl:3,name:"Maîtrises royales",desc:"Maîtrise: Persuasion + une compétence au choix ou langue au choix"},
+        {lvl:7,name:"Inspiration royale",desc:"Utiliser Fougue: accord d'avantage à un jet d'attaque d'un allié à 9m"},
+        {lvl:10,name:"Courage royal",desc:"Alliés à 9m: immunité à la peur si vous n'êtes pas incapacité"},
+        {lvl:15,name:"Rugissement royal",desc:"Discours de ralliement: alliés régénèrent plus de PV (moitié BM supplémentaire)"},
+        {lvl:18,name:"Commandement royal",desc:"1/repos long: ordonner à des alliés d'attaquer en réaction (AoO) chaque ennemi qui vous attaque"}
+      ]},
+      "Psi Warrior": {features:[
+        {lvl:3,name:"Puissance psionique",desc:"Pool de dés psioniques (d6, total = 2× BM): dépenser pour protéger, propulser ou perturber"},
+        {lvl:3,name:"Bouclier psionique",desc:"Dépenser 1 dé: réduire dégâts d'un résultat de dé + mod INT"},
+        {lvl:7,name:"Frappe télékinétique",desc:"Dépenser 1 dé: repousser une cible touchée de 3m (JdS FOR) ou la jeter à terre"},
+        {lvl:10,name:"Saut télékinétique",desc:"Action bonus: propulser soi-même ou allié de 9m dans les airs"},
+        {lvl:15,name:"Frappe psionique",desc:"1/tour: dégâts psychiques sup sur une attaque (dé de puissance + mod INT)"},
+        {lvl:18,name:"Forme de guerre psionique",desc:"Créer une armure de force (10 PV temp) et grappin télékinétique permanent en combat"}
+      ]},
+      "Chevalier runique": {features:[
+        {lvl:3,name:"Forger des runes",desc:"Graver 2 runes sur armes/armures: effets de combat (Géant du feu, Géant du gel, Géant de pierre, etc.)"},
+        {lvl:3,name:"Totem du géant",desc:"Activation d'une rune: avantage aux jets de compétence selon rune activée"},
+        {lvl:7,name:"Bastion runique",desc:"Dépenser 1 rune: taille G pendant 1 min; portée +1.5m, dégâts +1d6"},
+        {lvl:10,name:"Grande stature",desc:"Taille G permanente (si espace); +7 kg portées; dé runique sup"},
+        {lvl:15,name:"Maître runiste",desc:"Connaître 4 runes; activation sans dépenser de charge (1/repos long par rune)"},
+        {lvl:18,name:"Seigneur runique",desc:"1/repos long: taille TG (12m hauteur) pendant 10 min; avantage FOR, dégâts +1d8"}
+      ]}
     }
   },
   "Magicien": {
     level: 2, label: "Tradition arcanique",
     options: {
-      "Évocation": {features:[{lvl:2,name:"Façonneur de sorts",desc:"Créer des poches de sécurité dans les sorts de zone (alliés protégés)"},{lvl:6,name:"Sort mineur puissant",desc:"Les sorts mineurs infligent des dégâts même sur sauvegarde réussie"},{lvl:10,name:"Évocation renforcée",desc:"+mod INT aux dégâts d'un sort d'évocation"},{lvl:14,name:"Surpuissance",desc:"Dégâts max sur sorts d'évocation de niv.1-5 (1 emplacement niv.5)"}]},
-      "Abjuration": {features:[{lvl:2,name:"Protecteur arcanique",desc:"Bouclier de PV temporaires (2×niv magicien+mod INT) rechargeable"},{lvl:6,name:"Protecteur projeté",desc:"Transférer le bouclier sur un allié adjacent"},{lvl:10,name:"Abjuration améliorée",desc:"Avantage aux JdS vs sorts, résistance aux dégâts des sorts"},{lvl:14,name:"Résistance aux sorts",desc:"Avantage à tous les JdS contre les sorts"}]},
-      "Divination": {features:[{lvl:2,name:"Présage",desc:"Lancer 2d20 au repos long; remplacer n'importe quel jet plus tard"},{lvl:6,name:"Vision de l'expert",desc:"Sorts de divination ne consomment pas d'emplacement si niv.2+"},{lvl:10,name:"Le troisième œil",desc:"Vision dans le noir 36m, éthéré, lire toutes langues, ou invisibilité"},{lvl:14,name:"Présage supérieur",desc:"3 dés de présage au lieu de 2"}]},
-      "Nécromancie": {features:[{lvl:2,name:"Moisson macabre",desc:"Regagner PV en tuant avec sorts niv.1+ (2+niv sort, ou 3× si nécromancie)"},{lvl:6,name:"Serviteurs morts-vivants",desc:"Animation des morts crée un zombi/squelette supplémentaire gratuit"},{lvl:10,name:"Accoutumance à la mort",desc:"Résistance aux dégâts nécrotiques, PV max ne peut être réduit"},{lvl:14,name:"Commandement des morts-vivants",desc:"Prendre le contrôle de morts-vivants (SAG DD)"}]}
+      "Évocation": {features:[
+        {lvl:2,name:"Façonneur de sorts",desc:"Créer des zones sûres dans les sorts de zone (alliés protégés)"},
+        {lvl:6,name:"Sort mineur puissant",desc:"Les sorts mineurs infligent des dégâts même sur sauvegarde réussie"},
+        {lvl:10,name:"Évocation renforcée",desc:"+mod INT aux dégâts d'un sort d'évocation"},
+        {lvl:14,name:"Surpuissance",desc:"Dégâts max sur sorts d'évocation de niv.1-5 (1 emplacement niv.5 dépensé)"}
+      ]},
+      "Abjuration": {features:[
+        {lvl:2,name:"Protecteur arcanique",desc:"Bouclier de PV temporaires (2×niv+mod INT) rechargeable au repos long"},
+        {lvl:6,name:"Protecteur projeté",desc:"Transférer le bouclier sur un allié adjacent"},
+        {lvl:10,name:"Abjuration améliorée",desc:"Avantage aux JdS vs sorts; résistance aux dégâts des sorts"},
+        {lvl:14,name:"Résistance aux sorts",desc:"Avantage à tous les JdS contre les sorts"}
+      ]},
+      "Divination": {features:[
+        {lvl:2,name:"Présage",desc:"Lancer 2d20 au repos long; remplacer n'importe quel jet par ces résultats"},
+        {lvl:6,name:"Vision de l'expert",desc:"Sorts de divination niv.2+ ne consomment pas d'emplacement"},
+        {lvl:10,name:"Le troisième oeil",desc:"Vision dans le noir 36m, vision ethérée, lire toutes langues, ou vision invisible"},
+        {lvl:14,name:"Présage supérieur",desc:"3 dés de présage au lieu de 2"}
+      ]},
+      "Nécromancie": {features:[
+        {lvl:2,name:"Moisson macabre",desc:"Regagner PV en tuant avec sorts niv.1+ (2+niv sort, ou 3× si nécromancie)"},
+        {lvl:6,name:"Serviteurs morts-vivants",desc:"Animation des morts crée un mort-vivant supplémentaire gratuit"},
+        {lvl:10,name:"Accoutumance à la mort",desc:"Résistance aux dégâts nécrotiques; PV max ne peut être réduit"},
+        {lvl:14,name:"Commandement des morts-vivants",desc:"Prendre le contrôle d'un mort-vivant (JdS SAG)"}
+      ]},
+      "Transmutation": {features:[
+        {lvl:2,name:"Alchimiste transmutateur",desc:"Maîtrise des outils d'alchimiste; identifier les poisons et drogues automatiquement"},
+        {lvl:2,name:"Pierre des transmutateurs",desc:"Créer une pierre: accorder vision dans le noir, vitesse +3m, résistance (un type), ou concentration de réserve"},
+        {lvl:6,name:"Transformer la matière",desc:"Transformer un matériau non-magique en un autre (eau-sable, fer-cuivre, etc.) pendant 1 heure"},
+        {lvl:10,name:"Maîtrise de la transmutation",desc:"Immunité aux poisons et maladies; vous pouvez régénérer vos capacités physiques"},
+        {lvl:14,name:"Transmutation de soi",desc:"1/repos long: transformer soi-même en n'importe quelle créature (comme Métamorphose)"}
+      ]},
+      "Enchantement": {features:[
+        {lvl:2,name:"Hypnose du bonimenteur",desc:"Lancer Amis sans dépenser de sort mineur; cible n'est pas consciente d'être charmée"},
+        {lvl:2,name:"Réorientation de charme",desc:"Lancer un sort de charme/domination sur une cible déjà charmée sans la libérer"},
+        {lvl:6,name:"Charme instinctif",desc:"Réaction quand attaqué: rediriger l'attaque sur la créature la plus proche (JdS SAG)"},
+        {lvl:10,name:"Partage de sort",desc:"2 cibles sur un sort normalement mono-cible"},
+        {lvl:14,name:"Domination mentale",desc:"1/repos long: lancer Domination de monstre sans emplacement"}
+      ]},
+      "Illusion": {features:[
+        {lvl:2,name:"Tisserand d'illusions",desc:"Lancer Illusion mineure gratuitement; créer sons ET images avec un seul sort"},
+        {lvl:2,name:"Illusion malléable",desc:"Modifier une illusion de concentration déjà en cours (action)"},
+        {lvl:6,name:"Avatar illusoire",desc:"Créer une copie de soi dans l'illusion (comme Faux-semblant sans emplacement, 1/repos court)"},
+        {lvl:10,name:"Illusion illusoire",desc:"Si illusion révélée, rendre une partie encore réelle (infliger dégâts, blocage physique)"},
+        {lvl:14,name:"Réalité illusoire",desc:"Après lancer d'illusion niv.1+: rendre UN élément non-magique réel pendant 1 min"}
+      ]},
+      "Invocation": {features:[
+        {lvl:2,name:"Adepte de l'invocation",desc:"Sorts d'invocation réduits en demi-temps d'incantation (1 action→action bonus, etc.)"},
+        {lvl:2,name:"Invocation tenace",desc:"Créatures invoquées: +2 CA et +2 dégâts"},
+        {lvl:6,name:"Renvoi bienveillant",desc:"Téléporter une créature invoquée 9m en action bonus"},
+        {lvl:10,name:"Invocation concentrée",desc:"Conserver une invocation de concentration sans la concentration si inactif ce round"},
+        {lvl:14,name:"Invocateur accompli",desc:"1/repos long: lancer Invocation d'élémentaire ou Invocation de créatures VI sans emplacement"}
+      ]},
+      "Lame des ombres (Bladesinging)": {features:[
+        {lvl:2,name:"Maîtrise supplémentaire",desc:"Maîtrise des armes légères (rapière conseillée); épée à 1 main seulement"},
+        {lvl:2,name:"Chant de lame",desc:"Action bonus 2/repos court: +INT à CA, +3m vitesse, avantage Acrobaties, concentration avec avantage"},
+        {lvl:6,name:"Sort extra-attaque",desc:"Remplacer une attaque de l'action Attaquer par un sort mineur"},
+        {lvl:10,name:"Danse du chant de lame",desc:"Lancer un sort niv.1-5 en action bonus si action Attaquer utilisée"},
+        {lvl:14,name:"Tourbillon de lames",desc:"En chant de lame: lancer un sort niv.1-5 + attaquer en un seul tour (1/repos court)"}
+      ]},
+      "Magie de guerre": {features:[
+        {lvl:2,name:"Contre-sort arcanique",desc:"Maîtrise de Contre-sort; ajouter INT aux jets de concentration"},
+        {lvl:2,name:"Frappe éclair",desc:"Lancer un sort mineur d'attaque, puis action bonus: attaque de mêlée/distance"},
+        {lvl:6,name:"Puissance arcanique",desc:"Réaction si concentration menacée: dépenser emplacement pour garantir réussite"},
+        {lvl:10,name:"Magie durable",desc:"Si emplacement dépensé en dehors de concentration: gagner PV temporaires (niv emplacement ×5)"},
+        {lvl:14,name:"Frappe de sort",desc:"1/repos court: quand sort touche, infliger automatiquement effets supplémentaires (déstabiliser, aveugler)"}
+      ]},
+      "Chronurgie": {features:[
+        {lvl:2,name:"Horloge temporelle",desc:"Façonner le temps: 1/repos court—relancer n'importe quel jet vu (avant ou après résultat)"},
+        {lvl:2,name:"Tempo temporel",desc:"Réaction quand créature à 9m commence son tour: modifier son initiative +/-2 (BM/repos long)"},
+        {lvl:6,name:"Distorsion temporelle",desc:"1/repos long: accorder à une créature un tour supplémentaire immédiat"},
+        {lvl:10,name:"Suspension temporaire",desc:"1/repos long: suspendre une créature hors du temps (insensible à tout, hasta début tour prochain)"},
+        {lvl:14,name:"Inversion temporelle",desc:"1/repos long: restaurer l'état d'une créature à celui du début du round (PV, emplacements, conditions)"}
+      ]},
+      "Graviturgie": {features:[
+        {lvl:2,name:"Ajustement de la densité",desc:"Action: alléger ou alourdir objet/créature à 9m — vitesse +3m ou -3m, avantage/désavantage"},
+        {lvl:2,name:"Sens gravitationnel",desc:"Connaître l'emplacement de toute créature à 9m (ignorer invisibilité)"},
+        {lvl:6,name:"Frappe de gravité",desc:"Dépenser emplacement: reduire vitesse d'une cible touchée à 0 jusqu'à fin de son tour"},
+        {lvl:10,name:"Événement gravitationnel",desc:"Réaction quand créature tombe: annuler ou rediriger la chute (jusqu'à 9m)"},
+        {lvl:14,name:"Maîtrise gravitationnelle",desc:"1/repos long: lancer Champ gravitationnel (zone de pesanteur altérée 18m rayon)"}
+      ]}
     }
   },
   "Moine": {
     level: 3, label: "Tradition monastique",
     options: {
-      "Main ouverte": {features:[{lvl:3,name:"Technique de la main ouverte",desc:"Tempête de coups: repousser 4.5m, mettre à terre, ou empêcher réaction"},{lvl:6,name:"Intégrité physique",desc:"Se soigner de 3×niveau moine PV (1/repos long)"},{lvl:11,name:"Tranquillité",desc:"Effet de Sanctuaire sur soi au début du tour"},{lvl:17,name:"Paume frémissante",desc:"Vibrations mortelles: cible fait JdS CON ou tombe à 0 PV"}]},
-      "Voie de l'Ombre": {features:[{lvl:3,name:"Arts de l'ombre",desc:"Lancer Ténèbres, Vision dans le noir, Passage sans trace ou Silence (2 ki)"},{lvl:6,name:"Pas de l'ombre",desc:"Téléportation 18m d'ombre en ombre (action bonus)"},{lvl:11,name:"Cape d'ombres",desc:"Invisibilité dans les zones d'ombre (pas d'action)"},{lvl:17,name:"Opportuniste",desc:"Attaque de mêlée en réaction quand un allié touche une cible adjacente"}]},
-      "Quatre éléments": {features:[{lvl:3,name:"Disciplines élémentaires",desc:"Choisir des disciplines élémentaires alimentées par le ki"},{lvl:6,name:"Discipline supplémentaire",desc:"1 discipline élémentaire supplémentaire"},{lvl:11,name:"Discipline supplémentaire",desc:"1 discipline supplémentaire + accès niv.3"},{lvl:17,name:"Discipline supplémentaire",desc:"1 discipline supplémentaire + accès niv.4"}]}
+      "Main ouverte": {features:[
+        {lvl:3,name:"Technique de la main ouverte",desc:"Tempête de coups: repousser 4.5m, mettre à terre, ou empêcher réaction"},
+        {lvl:6,name:"Intégrité physique",desc:"Se soigner de 3×niveau moine PV (1/repos long)"},
+        {lvl:11,name:"Tranquillité",desc:"Effet de Sanctuaire sur soi au début du tour"},
+        {lvl:17,name:"Paume frémissante",desc:"Vibrations mortelles: cible fait JdS CON ou tombe à 0 PV"}
+      ]},
+      "Voie de l'Ombre": {features:[
+        {lvl:3,name:"Arts de l'ombre",desc:"Lancer Ténèbres, Vision dans le noir, Passage sans trace ou Silence (2 ki chacun)"},
+        {lvl:6,name:"Pas de l'ombre",desc:"Téléportation 18m d'ombre en ombre (action bonus, 2 ki)"},
+        {lvl:11,name:"Cape d'ombres",desc:"Invisibilité dans les zones d'ombre (pas d'action, gratuitement)"},
+        {lvl:17,name:"Opportuniste",desc:"Attaque de mêlée en réaction quand un allié touche une cible adjacente"}
+      ]},
+      "Quatre éléments": {features:[
+        {lvl:3,name:"Disciplines élémentaires",desc:"Choisir des disciplines élémentaires alimentées par le ki (Poing des 4 vents, Mur de l'eau, etc.)"},
+        {lvl:6,name:"Discipline supplémentaire",desc:"1 discipline élémentaire supplémentaire"},
+        {lvl:11,name:"Disciplines avancées",desc:"1 discipline supplémentaire + accès disciplines de niveau 3"},
+        {lvl:17,name:"Discipline suprême",desc:"1 discipline supplémentaire + accès disciplines de niveau 4"}
+      ]},
+      "Voie du Soleil": {features:[
+        {lvl:3,name:"Poing solaire",desc:"Lancer Lumières dansantes gratuitement; 1 ki: attaque radiant 1d4+mod DEX+BM à portée 9m"},
+        {lvl:6,name:"Coup de soleil",desc:"2 ki: lancer Boule de feu centrée sur soi ou sur une cible touchée (JdS DEX)"},
+        {lvl:11,name:"Bouclier de l'aube",desc:"3 ki: Lumière éblouissante 18m (comme Lumière du jour) pendant 1 min"},
+        {lvl:17,name:"Nova solaire",desc:"4 ki: explosion solaire 9m rayon (Str DEX JdS, dégâts radiants massifs)"}
+      ]},
+      "Voie de la Miséricorde": {features:[
+        {lvl:3,name:"Mains de guérison",desc:"1 ki + 1 attaque sans arme: soigner une créature de 1d6+SAG×BM PV"},
+        {lvl:3,name:"Mains de mal",desc:"1 ki: imposer empoisonné à une créature touchée jusqu'à fin de votre prochain tour"},
+        {lvl:6,name:"Toucher miséricordieux",desc:"Mains de guérison: aussi annuler une condition (aveuglé/sourd/effrayé/empoisonné)"},
+        {lvl:11,name:"Médecin de l'âme",desc:"Mains de mal: infliger 3 conditions simultanées; soigner aussi soi-même"},
+        {lvl:17,name:"Toucher de mort",desc:"1 ki: lancer Arrêt du cœur (concentration, 1 min) sur une créature touchée (JdS CON)"}
+      ]},
+      "Voie des Poings ivres": {features:[
+        {lvl:3,name:"Style du moine ivre",desc:"Désengagement + Foncer en action bonus; avantage aux jets d'attaque si adjacent à un ennemi"},
+        {lvl:3,name:"Ruse enivrée",desc:"Dépenser 1 ki après touché: déstabiliser la cible (désavantage à ses attaques jusqu'à fin de son tour)"},
+        {lvl:6,name:"Parade ivrogne",desc:"Réaction: déplacer une cible à portée pour qu'elle absorbe une attaque (comme bouclier vivant)"},
+        {lvl:11,name:"Imprévisibilité envrante",desc:"Désavantage permanent aux attaques ennemies vous ciblant si moins de moitié PV max"},
+        {lvl:17,name:"Maîtrise enivrée",desc:"1/repos long: entrer en transe d'ivresse (avantage tous jets, immunité critique, attaque supp)"}
+      ]},
+      "Voie du Kensei": {features:[
+        {lvl:3,name:"Armes de Kensei",desc:"Choisir 2 armes comme armes de moine (inclus arc long); utiliser dé martial avec elles"},
+        {lvl:3,name:"Tir du Kensei",desc:"1 ki: tirs à distance sans désavantage à courte portée; bonus dégâts ranged"},
+        {lvl:6,name:"Frappe précise",desc:"Tir ciblé: reroll 1 dé de dégât et garder le meilleur"},
+        {lvl:11,name:"Frappe éclair du Kensei",desc:"1 ki: après une attaque d'arme, lancer un sort mineur en action bonus"},
+        {lvl:17,name:"Frappe invincible",desc:"3 ki: attaque de Kensei ignore résistances et immunités; double les dés de dégâts"}
+      ]},
+      "Voie de l'Âme astrale": {features:[
+        {lvl:3,name:"Bras de l'âme astrale",desc:"Action bonus 1/repos long: invoquer des bras astraux (portée 3m, 1d6+SAG force)"},
+        {lvl:6,name:"Visage de l'âme astrale",desc:"Action bonus: manifester un visage astral (Intimidation/Persuasion avec SAG; terrifier ou sonder)"},
+        {lvl:11,name:"Maison de l'âme",desc:"Dépenser 10 ki: sortir de son corps dans un avatar astral (vol 9m, avantage attaques, sorts améliorés)"},
+        {lvl:17,name:"Avatar éveillé",desc:"Avatar astral: ajouter tous les appendices (bras, visage, ailes); invulnérable aux dégâts hors-astral"}
+      ]}
     }
   },
   "Paladin": {
     level: 3, label: "Serment sacré",
     options: {
-      "Dévotion": {features:[{lvl:3,name:"Conduit: Arme sacrée",desc:"+mod CHA à l'attaque pendant 1 min, arme lumineuse"},{lvl:3,name:"Conduit: Renvoi des impies",desc:"Fiélons et morts-vivants en fuite pendant 1 min"},{lvl:7,name:"Aura de dévotion",desc:"Immunité au charme à 3m (6m au niv.18)"},{lvl:15,name:"Pureté d'esprit",desc:"Toujours sous Protection contre le bien et le mal"},{lvl:20,name:"Nimbe sacré",desc:"Transformation: lumière, 10 dégâts radiants ennemis à 9m"}]},
-      "Anciens": {features:[{lvl:3,name:"Conduit: Colère de la nature",desc:"Vignes qui immobilisent dans une zone 3m"},{lvl:3,name:"Conduit: Renvoi des infidèles",desc:"Fées et fiélons en fuite"},{lvl:7,name:"Aura de protection",desc:"Résistance aux dégâts de sorts à 3m"},{lvl:15,name:"Sentinelle immuable",desc:"Ne peut pas être vieilli magiquement"},{lvl:20,name:"Champion de la nature",desc:"Transformation: régénération 10 PV/tour, sorts de druide en action bonus"}]},
-      "Vengeance": {features:[{lvl:3,name:"Conduit: Vœu d'inimitié",desc:"Avantage aux attaques contre une cible pendant 1 min"},{lvl:3,name:"Conduit: Renvoi par abjuration",desc:"Fées et fiélons terrifiés et immobilisés"},{lvl:7,name:"Pourchasseur implacable",desc:"Attaque d'opportunité si cible se téléporte à 9m"},{lvl:15,name:"Âme vengeresse",desc:"Résistance aux dégâts de la cible du Vœu"},{lvl:20,name:"Ange vengeur",desc:"Transformation: ailes (vol 18m), aura de terreur 9m"}]}
+      "Dévotion": {features:[
+        {lvl:3,name:"Conduit: Arme sacrée",desc:"+mod CHA à l'attaque pendant 1 min; arme lumineuse"},
+        {lvl:3,name:"Conduit: Renvoi des impies",desc:"Fiélons et morts-vivants fuient pendant 1 min (JdS SAG)"},
+        {lvl:7,name:"Aura de dévotion",desc:"Immunité au charme à 3m (6m au niv.18)"},
+        {lvl:15,name:"Pureté d'esprit",desc:"Toujours sous Protection contre le bien et le mal"},
+        {lvl:20,name:"Nimbe sacré",desc:"Transformation: lumière vive 9m; 10 dégâts radiants/tour aux ennemis à 9m"}
+      ]},
+      "Anciens": {features:[
+        {lvl:3,name:"Conduit: Colère de la nature",desc:"Vignes immobilisantes dans une zone 3m (JdS FOR ou DEX)"},
+        {lvl:3,name:"Conduit: Renvoi des infidèles",desc:"Fées et fiélons fuient (JdS SAG)"},
+        {lvl:7,name:"Aura de protection de la nature",desc:"Résistance aux dégâts de sorts à 3m (6m niv.18)"},
+        {lvl:15,name:"Sentinelle immuable",desc:"Ne peut pas être vieilli magiquement; immunité aux dégâts des plantes"},
+        {lvl:20,name:"Champion de la nature",desc:"Transformation: régénérer 10 PV/tour, immunité dégâts froids/électriques/feu; sorts druide en action bonus"}
+      ]},
+      "Vengeance": {features:[
+        {lvl:3,name:"Conduit: Vœu d'inimitié",desc:"Avantage à toutes attaques contre une cible pendant 1 min"},
+        {lvl:3,name:"Conduit: Renvoi par abjuration",desc:"Fées et fiélons: terrifiés et immobilisés"},
+        {lvl:7,name:"Pourchasseur implacable",desc:"Attaque d'opportunité si cible se téléporte à 9m"},
+        {lvl:15,name:"Âme vengeresse",desc:"Résistance à tous les dégâts de la cible du Vœu"},
+        {lvl:20,name:"Ange vengeur",desc:"Transformation: ailes (vol 18m); aura de terreur 9m"}
+      ]},
+      "Gloire": {features:[
+        {lvl:3,name:"Conduit: Inspiration héroïque",desc:"Octroyer avantage à un jet d'attaque ou de compétence à un allié (réaction)"},
+        {lvl:3,name:"Conduit: Serment de gloire",desc:"Vous et vos alliés à 9m obtenez +BM aux jets de FOR, DEX et CHA pendant 1 min"},
+        {lvl:7,name:"Aura de gloire",desc:"Alliés à 3m: avantage aux jets de sauvegarde contre la peur"},
+        {lvl:15,name:"Perfection glorieuse",desc:"1/repos long: réussir automatiquement un jet de sauvegarde raté"},
+        {lvl:20,name:"Forme glorieuse",desc:"Transformation: lumineux, vol 9m; attaques comptent comme magiques; aura soin 10 PV/allié/tour"}
+      ]},
+      "Conquérant": {features:[
+        {lvl:3,name:"Conduit: Conquête guidée",desc:"Terrifier un ennemi visible à 18m (JdS SAG); réduit leur vitesse à 0"},
+        {lvl:3,name:"Conduit: Présence terrifiante",desc:"Effets de terreur dans 9m (JdS SAG)"},
+        {lvl:7,name:"Aura de conquête",desc:"Ennemis effrayés à 3m: vitesse réduite à 0; subissent dégâts psychiques 1d4/tour"},
+        {lvl:15,name:"Regard scélérat",desc:"1/repos long: réaction pour forcer l'ennemi à vous rater automatiquement"},
+        {lvl:20,name:"Conquérant invincible",desc:"Transformation: résistance tous dégâts, attaque extra en action Attaquer, critique sur 19-20"}
+      ]},
+      "Rédemption": {features:[
+        {lvl:3,name:"Conduit: Offre de paix",desc:"Action: charmer ennemi à 9m pour 1 min; cesse si vous l'attaquez ou si un allié l'attaque"},
+        {lvl:3,name:"Persuasion éloquente",desc:"Maîtrise Persuasion; double maîtrise si déjà maîtrisé"},
+        {lvl:7,name:"Aura de gardien",desc:"Réaction: subir à la place d'un allié à 3m tous les dégâts qu'il devait subir"},
+        {lvl:15,name:"Protection de la grâce",desc:"Résistance à tous les dégâts pendant l'aura de gardien"},
+        {lvl:20,name:"Ange de la miséricorde",desc:"Transformation: ailes (vol 9m), soins massifs aux alliés proches; immunité dégâts nécrotiques"}
+      ]},
+      "Serment brisé": {features:[
+        {lvl:3,name:"Conduit: Oeil de la haine",desc:"Voir créatures invisibles à 9m; avantage aux jets d'attaque vs cibles charme ou terrifié"},
+        {lvl:3,name:"Conduit: Contrôle des morts-vivants",desc:"Lancer Contrôle des morts-vivants sans emplacement"},
+        {lvl:7,name:"Aura de haine",desc:"Vous et morts-vivants alliés: +CHA dégâts corps-à-corps"},
+        {lvl:15,name:"Attaque spectrale",desc:"Attaques comptent comme magiques; frapper ignore résistances non-magiques"},
+        {lvl:20,name:"Réforme de l'Oathbreaker",desc:"Transformation: forme spectrale, vol 9m, résistance dégâts non-magiques, aura de terreur"}
+      ]}
     }
   },
   "Rôdeur": {
     level: 3, label: "Archétype de rôdeur",
     options: {
-      "Chasseur": {features:[{lvl:3,name:"Proie du chasseur",desc:"Choisir: Tueur de colosses (+1d8 1/tour), Tueur de géants (riposte si touché) ou Tueur de hordes (+dégâts si 2+ ennemis adjacents)"},{lvl:7,name:"Tactiques défensives",desc:"Choisir: Échapper à la horde, Défense multiattaque ou Volonté d'acier"},{lvl:11,name:"Multiattaque",desc:"Choisir: Volée (attaquer chaque créature à 3m d'un point) ou Attaque tourbillonnante (mêlée chaque adjacent)"},{lvl:15,name:"Défense du chasseur supérieure",desc:"Choisir: Évasion, Se mettre à couvert ou Esquive instinctive"}]},
-      "Maître des bêtes": {features:[{lvl:3,name:"Compagnon du rôdeur",desc:"Bête de compagnie (RC 1/4 max), agit à votre tour"},{lvl:7,name:"Entraînement exceptionnel",desc:"Le compagnon peut Foncer/Esquiver/Se désengager en action bonus"},{lvl:11,name:"Furie bestiale",desc:"Le compagnon attaque 2 fois"},{lvl:15,name:"Partager les sorts",desc:"Sorts ciblant soi s'appliquent aussi au compagnon"}]}
+      "Chasseur": {features:[
+        {lvl:3,name:"Proie du chasseur",desc:"Tueur de colosses (+1d8/tour), Tueur de géants (riposte si touché) ou Tueur de hordes (+dégâts 2+ adj)"},
+        {lvl:7,name:"Tactiques défensives",desc:"Échapper à la horde, Défense multiattaque ou Volonté d'acier"},
+        {lvl:11,name:"Multiattaque",desc:"Volée (attaquer chaque créature à 3m d'un point) ou Attaque tourbillonnante"},
+        {lvl:15,name:"Défense du chasseur supérieure",desc:"Évasion, Se mettre à couvert ou Esquive instinctive"}
+      ]},
+      "Maître des bêtes": {features:[
+        {lvl:3,name:"Compagnon du rôdeur",desc:"Bête de compagnie (RC 1/4 max); agit à votre tour sur votre commande"},
+        {lvl:7,name:"Entraînement exceptionnel",desc:"Le compagnon peut Foncer/Esquiver/Se désengager en action bonus"},
+        {lvl:11,name:"Furie bestiale",desc:"Le compagnon attaque 2 fois par action"},
+        {lvl:15,name:"Partager les sorts",desc:"Sorts ciblant soi s'appliquent aussi au compagnon"}
+      ]},
+      "Rôdeur de l'horizon": {features:[
+        {lvl:3,name:"Détection portale",desc:"Détecter automatiquement portails et failles dimensionnelles dans 9m"},
+        {lvl:3,name:"Magie de plan",desc:"Sorts supplémentaires: Protection contre le bien et le mal, Lame du zéphyr, Hâte, Bannissement, etc."},
+        {lvl:7,name:"Frappe fugace",desc:"Au début du combat: attaque supplémentaire sur la cible (surpris uniquement)"},
+        {lvl:11,name:"Foulée interdite",desc:"Après se déplacer: téléporter de 3m en action bonus"},
+        {lvl:15,name:"Résistance spectrale",desc:"Résistance aux dégâts de force; immunité aux effets de choc dimensionnel"}
+      ]},
+      "Tueur de monstres": {features:[
+        {lvl:3,name:"Chasseur surnaturel",desc:"Action bonus: marquer une créature surnaturelle; avantage aux jets d'attaque et sauvegarde contre elle"},
+        {lvl:3,name:"Magie du tueur",desc:"Sorts: Protection contre le bien et le mal, Rayon de lune, Zone de vérité, Bannissement, etc."},
+        {lvl:7,name:"Sens magique",desc:"Identifier les capacités et résistances d'un monstre (action, DC 10+CR)"},
+        {lvl:11,name:"Défense contre le surnaturel",desc:"Réaction contre la magie d'un monstre marqué: JdS avec avantage; si réussi, dégâts en retour"},
+        {lvl:15,name:"Tueur parfait",desc:"Attaque critique automatique en début de combat vs cible marquée (si vous agissez en premier)"}
+      ]},
+      "Rôdeur des fées": {features:[
+        {lvl:3,name:"Présence draconique",desc:"Dextérité mentale: ajouter mod CHA aux jets de Tromperie, Persuasion et Perception"},
+        {lvl:3,name:"Sorts de fée",desc:"Sorts supplémentaires: Charme-personne, Détection de magie, Respiration aquatique, Invisibilité, etc."},
+        {lvl:7,name:"Promenade dans les fées",desc:"1/repos long: emmener jusqu'à 5 créatures via un portail de fée (téléportation 1km)"},
+        {lvl:11,name:"Regard mystique",desc:"Regarder une créature: connaître ses résistances/immunités et si elle ment"},
+        {lvl:15,name:"Don des terres de fées",desc:"1/repos long: octroyer charme féerique permanent sur une créature (JdS SAG)"}
+      ]},
+      "Traqueur (Swarmkeeper)": {features:[
+        {lvl:3,name:"Essaim de natur",desc:"Essaim de fées/bêtes minuscules vous entourent: +1d6 dégâts sur une attaque/tour"},
+        {lvl:3,name:"Sorts de l'essaim",desc:"Sorts supplémentaires: Repas des fées, Bourrasque de vent, Insecte géant, Nuée de vermine, etc."},
+        {lvl:7,name:"Déluge de l'essaim",desc:"1/tour: essaim peut repousser ou ralentir la cible touchée au lieu de +dégâts"},
+        {lvl:11,name:"Sanctuaire de l'essaim",desc:"Réaction: l'essaim absorbe une attaque (réduire dégâts de 2d8)"},
+        {lvl:15,name:"Vol de l'essaim",desc:"Vous pouvez voler à votre vitesse de déplacement (porté par l'essaim)"}
+      ]}
     }
   },
   "Roublard": {
     level: 3, label: "Archétype de roublard",
     options: {
-      "Voleur": {features:[{lvl:3,name:"Mains lestes",desc:"Action bonus: Escamotage, outils de voleur, Utiliser un objet"},{lvl:3,name:"Monte-en-l'air",desc:"Escalade à vitesse normale, saut avec élan +mod DEX (×30cm)"},{lvl:9,name:"Furtivité suprême",desc:"Avantage Discrétion si mouvement ≤ moitié vitesse"},{lvl:13,name:"Utilisation d'objets magiques",desc:"Ignorer les prérequis de classe/race/niveau pour objets magiques"},{lvl:17,name:"Réflexes de voleur",desc:"2 tours au premier round de combat"}]},
-      "Assassin": {features:[{lvl:3,name:"Maîtrise supplémentaire",desc:"Kit de déguisement + kit d'empoisonneur"},{lvl:3,name:"Assassinat",desc:"Avantage vs créatures n'ayant pas agi, critique auto si surprise"},{lvl:9,name:"Infiltration experte",desc:"Créer une fausse identité en 7 jours"},{lvl:13,name:"Imposteur",desc:"Copier parfaitement la voix/l'écriture/l'apparence"},{lvl:17,name:"Frappe mortelle",desc:"Double dégâts si surprise (JdS CON DD 8+mod DEX+BM ou 0 PV)"}]},
-      "Escroc arcanique": {features:[{lvl:3,name:"Sorts d'escroc arcanique",desc:"INT — Enchantement et Illusion + Main de mage invisible"},{lvl:9,name:"Embuscade magique",desc:"Avantage à l'attaque si invisible ou caché quand sort lancé"},{lvl:13,name:"Escroc versatile",desc:"Action bonus: Main de mage peut voler/placer objets discrètement"},{lvl:17,name:"Voleur de sorts",desc:"Voler la connaissance d'un sort adverse (réaction, 1/repos long)"}]}
+      "Voleur": {features:[
+        {lvl:3,name:"Mains lestes",desc:"Action bonus: Escamotage, outils de voleur ou Utiliser un objet"},
+        {lvl:3,name:"Monte-en-l'air",desc:"Escalade à vitesse normale; saut avec élan +mod DEX × 30cm"},
+        {lvl:9,name:"Furtivité suprême",desc:"Avantage Discrétion si mouvement ≤ moitié vitesse"},
+        {lvl:13,name:"Utilisation d'objets magiques",desc:"Ignorer les prérequis de classe/race/niveau pour objets magiques"},
+        {lvl:17,name:"Réflexes de voleur",desc:"2 tours au premier round de combat"}
+      ]},
+      "Assassin": {features:[
+        {lvl:3,name:"Maîtrise supplémentaire",desc:"Kit de déguisement + kit d'empoisonneur"},
+        {lvl:3,name:"Assassinat",desc:"Avantage vs créatures n'ayant pas agi; critique auto si surprise"},
+        {lvl:9,name:"Infiltration experte",desc:"Créer une fausse identité en 7 jours (papiers, contacts, etc.)"},
+        {lvl:13,name:"Imposteur",desc:"Copier parfaitement voix, écriture et apparence d'une personne"},
+        {lvl:17,name:"Frappe mortelle",desc:"Double dégâts si surprise (JdS CON DD 8+DEX+BM ou tomber à 0 PV)"}
+      ]},
+      "Escroc arcanique": {features:[
+        {lvl:3,name:"Sorts d'escroc arcanique",desc:"INT — sorts d'Enchantement et Illusion + Main de mage invisible"},
+        {lvl:9,name:"Embuscade magique",desc:"Avantage à l'attaque si invisible ou caché quand sort lancé"},
+        {lvl:13,name:"Escroc versatile",desc:"Action bonus: Main de mage peut voler/placer objets discrètement"},
+        {lvl:17,name:"Voleur de sorts",desc:"Voler la connaissance d'un sort adverse (réaction, 1/repos long)"}
+      ]},
+      "Âme fantôme": {features:[
+        {lvl:3,name:"Écho spectral",desc:"Action bonus: invoquer un écho fantôme — crée une zone de distorsion qui peut agir comme si c'était vous"},
+        {lvl:3,name:"Maîtrise macabre",desc:"Maîtrise de l'Histoire et Médecine; communiquer avec un mort récent (1 question/repos long)"},
+        {lvl:9,name:"Don du mortel",desc:"Les attaques de l'écho infligent dégâts nécrotiques supplémentaires (d4→d8)"},
+        {lvl:13,name:"Regard spectral",desc:"1/repos long: l'écho fait une attaque sans provoquer d'AoO; se téléporter à l'écho"},
+        {lvl:17,name:"Liens fantomatiques",desc:"Mort de l'écho: explosion nécrotique; vous devenez fantôme pendant 1 min (incorporel, vol)"}
+      ]},
+      "Filou sombrelame": {features:[
+        {lvl:3,name:"Lame psionique",desc:"Action bonus: faire apparaître une lame d'énergie psychique (1d6 psychique, finesse, légère, 9m portée)"},
+        {lvl:3,name:"Couteau de crise télépatique",desc:"Communiquer télépathiquement avec toute créature à 9m (pas besoin de langue commune)"},
+        {lvl:9,name:"Lame améliorée",desc:"Lame psionique: 2d6 dégâts; lancer gratuitement 2 fois/repos court"},
+        {lvl:13,name:"Frappe sombrelame",desc:"Attaque avec lame: téléporter la cible de 1d6×1.5m (JdS FOR)"},
+        {lvl:17,name:"Psycho-furtivité",desc:"Se rendre invisible via la lame 1/repos court (jusqu'à début de votre prochain tour)"}
+      ]},
+      "Intrus": {features:[
+        {lvl:3,name:"Inquisiteur du combat",desc:"Ajouter dé d'Attaque sournoise à des jets de Perspicacité et d'Investigation"},
+        {lvl:3,name:"Déduction rapide",desc:"Lire les mensonges automatiquement dans 9m; avantage Perspicacité en combat"},
+        {lvl:9,name:"Acuité permanente",desc:"Ne pas avoir besoin d'avantage pour l'Attaque sournoise si aucun désavantage"},
+        {lvl:13,name:"Regard implacable",desc:"Cibler une créature: elle ne peut vous cacher ses intentions (action)"},
+        {lvl:17,name:"Œil de vérité",desc:"1/repos court: voir à travers illusions, invisibilité et déguisements pendant 1 min"}
+      ]},
+      "Éclaireur": {features:[
+        {lvl:3,name:"Mobilité de l'éclaireur",desc:"Maîtrise Nature et Survie + double maîtrise; Discrétion pas limitée par vitesse"},
+        {lvl:3,name:"Attaquant naturel",desc:"Premier round de combat: avantage à toutes les attaques si pas de surprise"},
+        {lvl:9,name:"Superiorité de l'éclaireur",desc:"Réaction: se déplacer de moitié sa vitesse si une créature s'approche dans 1.5m"},
+        {lvl:13,name:"Camoufler",desc:"Se cacher même si la créature cherche activement — dissimulation parfaite en terrain naturel"},
+        {lvl:17,name:"Esquive de l'éclaireur",desc:"Action bonus: se désengager ET se cacher simultanément"}
+      ]}
     }
   },
   "Ensorceleur": {
     level: 1, label: "Origine magique",
     options: {
-      "Âme draconique": {features:[{lvl:1,name:"Ancêtre draconique",desc:"Choisir type de dragon: parler draconique, PV max +1/niveau"},{lvl:6,name:"Résilience élémentaire",desc:"Résistance au type de dégât de l'ancêtre"},{lvl:14,name:"Ailes de dragon",desc:"Ailes: vitesse de vol = vitesse de marche"},{lvl:18,name:"Présence draconique",desc:"Aura 18m: terreur ou charme (5 points de sorcellerie)"}]},
-      "Magie sauvage": {features:[{lvl:1,name:"Sursaut de magie sauvage",desc:"Après un sort niv.1+, le MJ peut demander un jet sur la table de magie sauvage"},{lvl:6,name:"Pli de la chance",desc:"Réaction: modifier un jet de 1d4+ ou 1d4− (flexible)"},{lvl:14,name:"Chaos contrôlé",desc:"Lancer 2 fois sur la table de magie sauvage, choisir le résultat"},{lvl:18,name:"Bombardement de sorts",desc:"1/tour, relancer les dés de dégâts d'un sort (1 point de sorcellerie)"}]}
+      "Âme draconique": {features:[
+        {lvl:1,name:"Ancêtre draconique",desc:"Choisir type de dragon: parler draconique; PV max +1/niveau"},
+        {lvl:6,name:"Résilience élémentaire",desc:"Résistance au type de dégât de l'ancêtre draconique"},
+        {lvl:14,name:"Ailes de dragon",desc:"Action bonus: ailes (vitesse de vol = vitesse de marche)"},
+        {lvl:18,name:"Présence draconique",desc:"Aura 18m: terreur ou charme sur les ennemis (5 pts de sorcellerie)"}
+      ]},
+      "Magie sauvage": {features:[
+        {lvl:1,name:"Sursaut de magie sauvage",desc:"Après un sort niv.1+, le MJ peut demander un jet sur la table de magie sauvage"},
+        {lvl:6,name:"Pli de la chance",desc:"Réaction: modifier un jet d'1d4+ ou d4- (dépenser points sorcellerie)"},
+        {lvl:14,name:"Chaos contrôlé",desc:"Lancer 2 fois sur la table de magie sauvage, choisir le résultat"},
+        {lvl:18,name:"Bombardement de sorts",desc:"1/tour: relancer les dés de dégâts d'un sort (1 point de sorcellerie)"}
+      ]},
+      "Âme divine": {features:[
+        {lvl:1,name:"Magie divine",desc:"Ajouter un sort de clerc à chaque niveau de sorts connus; choisir une affinité divine"},
+        {lvl:1,name:"Faveur des cieux",desc:"1/repos long: lancer Restauration inférieure ou Protection contre le bien et le mal sans emplacement"},
+        {lvl:6,name:"Résistance sacrée",desc:"Réaction: interposer une résistance aux dégâts (lancer si ≤ moitié PV max)"},
+        {lvl:14,name:"Élan divin",desc:"Obtenir avantage à tous les jets d'attaque et de sauvegarde jusqu'à fin du combat (1/repos long)"},
+        {lvl:18,name:"Corps céleste",desc:"Vol 9m permanents; aura 9m: alliés regagnent 2d4+CHA PV au début de leur tour"}
+      ]},
+      "Magie des tempêtes": {features:[
+        {lvl:1,name:"Âme de tempête",desc:"Résistance aux dégâts de foudre et de tonnerre; ne pas être affecté par les vents forts"},
+        {lvl:6,name:"Cœur de la tempête",desc:"En lançant un sort de foudre ou tonnerre: dégâts bonus 1 × niveau ensorceleur aux alentours"},
+        {lvl:14,name:"Forme de tempête",desc:"1 point sorcellerie: voler 9m et résistance foudre/tonnerre jusqu'à fin du sort"},
+        {lvl:18,name:"Chaos de la tempête",desc:"1/repos long: centre d'une tempête magique — décharges aléatoires, vol illimité, immunité foudre/tonnerre"}
+      ]},
+      "Magie des ombres": {features:[
+        {lvl:1,name:"Oeil des ténèbres",desc:"Vision dans le noir 36m; voir dans les ténèbres magiques"},
+        {lvl:1,name:"Force des ombres",desc:"1/repos long: si réduit à 0 PV en pénombre: JdS CON DD5 pour rester à 1 PV"},
+        {lvl:6,name:"Hound of Ill Omen",desc:"3 pts: invoquer un loup des ombres hantant une cible (avantage vos attaques vs elle, résistance JdS)"},
+        {lvl:14,name:"Marche des ombres",desc:"1/repos court: se téléporter de 3m dans les ombres (action bonus)"},
+        {lvl:18,name:"Forme d'ombre",desc:"1/repos long: devenir une ombre pendant 1 min (incorporel, vol 9m, résistances)"}
+      ]},
+      "Âme aberrante": {features:[
+        {lvl:1,name:"Conscience télépatique",desc:"Télépathie 18m; parler avec toute créature à portée sans langue commune"},
+        {lvl:1,name:"Sorts de l'esprit",desc:"Sorts supplémentaires liés aux aberrations: Mot sacré, Domination de personne, etc."},
+        {lvl:6,name:"Pensée oculaire",desc:"1 pt sorcellerie: avantage aux jets de Tromperie, Intimidation ou Perspicacité; voir invisible"},
+        {lvl:14,name:"Forme aberrante",desc:"1/repos long: pousser jusqu'à 3 tentacules psioniques d'un sort (1d6 psychique chacun)"},
+        {lvl:18,name:"Corps aberrant",desc:"Immunité dégâts psychiques; avantage JdS vs charme/terreur; résistance au poison"}
+      ]},
+      "Âme mécanique (Clockwork)": {features:[
+        {lvl:1,name:"Sorts de l'horloge",desc:"Sorts supplémentaires ordonnés: Alarme, Mot de rappel, Lenteur, Hâte, etc."},
+        {lvl:1,name:"Restauration de l'ordre",desc:"1/tour: annuler un avantage ou désavantage sur un jet visible (réaction)"},
+        {lvl:6,name:"Bastion de loi",desc:"Créer un bouclier d'ordre pour un allié: absorbe 1d8 × niv ensorceleur dégâts"},
+        {lvl:14,name:"Aura de l'horloge",desc:"Aura 9m: immunité aux sorts qui altèrent la vitesse; vos sorts ne peuvent être rédirected"},
+        {lvl:18,name:"Forteresse du droit",desc:"1/repos long: zone de temps parfait (sans avantage ni désavantage) — vous contrôlez tout"}
+      ]}
     }
   },
   "Occultiste": {
     level: 1, label: "Patron d'Outre-monde",
     options: {
-      "Archifée": {features:[{lvl:1,name:"Présence féerique",desc:"Charmer ou terrifier les créatures dans un cube de 3m (1/repos court)"},{lvl:6,name:"Repli brumeux",desc:"Réaction si touché: devenir invisible et se téléporter à 18m"},{lvl:10,name:"Résistance au charme",desc:"Immunité au charme, réflexion sur le charmeur"},{lvl:14,name:"Sombre délire",desc:"Charmer ou terrifier (jusqu'à 1 min) créature à portée"}]},
-      "Fiélon": {features:[{lvl:1,name:"Bénédiction du ténébreux",desc:"Regagner PV = mod CHA + niveau occultiste quand un ennemi tombe à 0"},{lvl:6,name:"Chance du ténébreux",desc:"Ajouter d10 à un jet de compétence ou sauvegarde (1/repos court)"},{lvl:10,name:"Résistance fiélonne",desc:"Choisir 1 type de dégât: résistance (changeable au repos court)"},{lvl:14,name:"Traversée des enfers",desc:"Envoyer une cible frappée dans un plan inférieur (1/repos long)"}]},
-      "Grand Ancien": {features:[{lvl:1,name:"Esprit éveillé",desc:"Télépathie 9m avec toute créature, aucune langue requise"},{lvl:6,name:"Bouclier entropique",desc:"Réaction: désavantage sur attaque entrante; si raté, avantage à votre prochaine attaque"},{lvl:10,name:"Bouclier de pensées",desc:"Résistance dégâts psychiques, réflexion psychique"},{lvl:14,name:"Créer un vassal",desc:"Charmer un humanoïde incapacité (pas de limite de durée)"}]}
+      "Archifée": {features:[
+        {lvl:1,name:"Présence féerique",desc:"Charmer ou terrifier les créatures dans un cube de 3m (1/repos court, JdS SAG)"},
+        {lvl:6,name:"Repli brumeux",desc:"Réaction si touché: devenir invisible et se téléporter à 18m"},
+        {lvl:10,name:"Résistance au charme",desc:"Immunité au charme; réflexion sur le charmeur"},
+        {lvl:14,name:"Sombre délire",desc:"Charmer ou terrifier (jusqu'à 1 min) créature à portée (JdS SAG)"}
+      ]},
+      "Fiélon": {features:[
+        {lvl:1,name:"Bénédiction du ténébreux",desc:"Regagner PV = mod CHA + niveau occultiste quand un ennemi tombe à 0"},
+        {lvl:6,name:"Chance du ténébreux",desc:"Ajouter d10 à un jet de compétence ou sauvegarde (1/repos court)"},
+        {lvl:10,name:"Résistance fiélonne",desc:"Choisir 1 type de dégât: résistance (changeable au repos court)"},
+        {lvl:14,name:"Traversée des enfers",desc:"Envoyer une cible frappée dans un plan inférieur (1/repos long)"}
+      ]},
+      "Grand Ancien": {features:[
+        {lvl:1,name:"Esprit éveillé",desc:"Télépathie 9m avec toute créature, aucune langue commune requise"},
+        {lvl:6,name:"Bouclier entropique",desc:"Réaction: désavantage sur attaque entrante; si raté, avantage à votre prochaine attaque"},
+        {lvl:10,name:"Bouclier de pensées",desc:"Résistance dégâts psychiques; réflexion psychique sur l'attaquant"},
+        {lvl:14,name:"Créer un vassal",desc:"Charmer un humanoïde incapacité — durée indéfinie"}
+      ]},
+      "Céleste": {features:[
+        {lvl:1,name:"Sorts du céleste",desc:"Sorts bonus: Lumière, Flamme sacrée, Soins, Lumière du jour, Protection contre le poison, etc."},
+        {lvl:1,name:"Baume de la Lumière",desc:"1 utilisation/repos: soigner mod CHA + niv occultiste PV à une créature touchée"},
+        {lvl:6,name:"Radiance de l'aube",desc:"Action bonus: 1d6 soins à allié à 9m ou dégâts radiants à ennemi à 9m"},
+        {lvl:10,name:"Protection céleste",desc:"Alliés à 9m: +mod CHA aux jets de sauvegarde"},
+        {lvl:14,name:"Ascension céleste",desc:"1/repos long: vol 9m, immunité radiant, aura de soin (1d6 alliés/début tour)"}
+      ]},
+      "Mort-vivant (Undead)": {features:[
+        {lvl:1,name:"Forme du Mort",desc:"Action bonus 1/repos long: prendre la forme du Mort-vivant (1 min) — immunité frayeur, vol 9m, avantage attaques"}  ,
+        {lvl:1,name:"Présence mortelle",desc:"Sorts bonus: Prémonition, Fausse mort, Arrêt du cœur, Spectral Form, etc."},
+        {lvl:6,name:"Toucher du Mort",desc:"Réaction si touché: infliger 1d8 + mod CHA nécrotique à l'attaquant"},
+        {lvl:10,name:"Résistance mortelle",desc:"En forme du Mort: résistance à tous les dégâts non-radiants et non-magiques"},
+        {lvl:14,name:"Forme suprême du Mort",desc:"1/repos long: forme du Mort améliorée (taille G, +5m portée, 2d8 nécrotique supplémentaires)"}
+      ]},
+      "Génie": {features:[
+        {lvl:1,name:"Type de génie",desc:"Choisir Dao (pierre), Djinn (air), Efreeti (feu) ou Marid (eau): sorts et dégâts liés au type"},
+        {lvl:1,name:"Vase du génie",desc:"Vase magique (comme un refuge): s'y reposer court en 10 min; emmener 5 créatures"},
+        {lvl:6,name:"Existence d'efendi",desc:"Améliorer dégâts du type du génie +BM; sorts bonus via le patron"},
+        {lvl:10,name:"Limites des génies",desc:"Lancer un sort de 6e niveau du patron gratuitement (1/repos long)"},
+        {lvl:14,name:"Voyage dans la vase",desc:"Téléporter soi ou allié dans la vase depuis n'importe où dans le même plan (1/repos long)"}
+      ]}
     }
   },
   "Artificier": {
     level: 3, label: "Spécialité d'artificier",
     options: {
-      "Alchimiste": {features:[{lvl:3,name:"Élixir expérimental",desc:"Créer un élixir aléatoire au repos long (soins, vitesse, résilience, audace, vol, transformation)"},{lvl:5,name:"Sorts d'alchimiste",desc:"Restauration inférieure, Rayon ardent, Restauration supérieure, etc."},{lvl:9,name:"Alchimie régénératrice",desc:"Lancer Restauration inférieure gratuitement"},{lvl:15,name:"Maîtrise chimique",desc:"2 élixirs gratuits + résistance acide/poison"}]},
-      "Artilleur": {features:[{lvl:3,name:"Canon occulte",desc:"Invoquer un canon (lance-flammes, baliste ou protecteur)"},{lvl:5,name:"Sorts d'artilleur",desc:"Mur de vent, Sphère de feu, etc."},{lvl:9,name:"Canon arcanique",desc:"Le canon inflige +1d8 dégâts"},{lvl:15,name:"Canon fortifié",desc:"2 canons simultanés"}]},
-      "Forgeur de bataille": {features:[{lvl:3,name:"Armure arcanique",desc:"Infuser une armure: PV bonus, gantelet (dégâts tonnerre), propulseurs (vol), etc."},{lvl:5,name:"Sorts de forgeur",desc:"Bouclier de feu, Hâte, etc."},{lvl:9,name:"Modification d'armure",desc:"2 améliorations supplémentaires"},{lvl:15,name:"Armure perfectionnée",desc:"Attaque supplémentaire si pas d'Attaque supplémentaire"}]}
+      "Alchimiste": {features:[
+        {lvl:3,name:"Élixir expérimental",desc:"Créer un élixir aléatoire au repos long (soins, vitesse, résilience, audace, vol, transformation)"},
+        {lvl:5,name:"Sorts d'alchimiste",desc:"Sorts bonus: Restauration inférieure, Rayon ardent, Nuage putride, Boule de feu, etc."},
+        {lvl:9,name:"Alchimie régénératrice",desc:"Lancer Restauration inférieure ou Neutralisation du poison gratuitement (1/repos long chacun)"},
+        {lvl:15,name:"Maîtrise chimique",desc:"2 élixirs gratuits/repos long + résistance acide et poison"}
+      ]},
+      "Artilleur": {features:[
+        {lvl:3,name:"Canon occulte",desc:"Invoquer un canon (lance-flammes, baliste ou protecteur) — taille TP, CA 18, PV 5×niveau"},
+        {lvl:5,name:"Sorts d'artilleur",desc:"Sorts bonus: Mur de vent, Sphère de feu, Mur de feu, Cône de froid, Mur de force"},
+        {lvl:9,name:"Canon arcanique",desc:"Le canon inflige +1d8 dégâts de son type"},
+        {lvl:15,name:"Canon fortifié",desc:"Maintenir 2 canons simultanément"}
+      ]},
+      "Forgeur de bataille": {features:[
+        {lvl:3,name:"Armure arcanique",desc:"Infuser une armure: PV bonus, gantelet (dégâts tonnerre), propulseurs (vol 9m), etc."},
+        {lvl:5,name:"Sorts de forgeur",desc:"Sorts bonus: Bouclier de feu, Hâte, Frappe de foudre, Mur de fer, Animé les objets"},
+        {lvl:9,name:"Modification d'armure",desc:"2 améliorations d'armure supplémentaires"},
+        {lvl:15,name:"Armure perfectionnée",desc:"Attaque supplémentaire si classe n'en a pas; armure compte comme arme magique"}
+      ]}
     }
   }
 };
