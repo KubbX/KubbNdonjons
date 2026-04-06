@@ -1518,11 +1518,11 @@ function renderCharSheet(id, d) {
           <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th><th></th></tr></thead>
           <tbody>
             ${(d.inventory_weapons||[]).map((w,i)=>`
-            <tr>
+            <tr class="weapon-row-click" onclick="window._showSheetWeaponDetail('${id}',${i})">
               <td>${w.name||'—'}</td>
               <td>${w.atk||'—'}</td>
               <td>${w.dmg||'—'}</td>
-              <td><button class="inv-remove-btn" onclick="window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
+              <td><button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
             </tr>`).join('')}
             ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — utilisez le Compendium pour en ajouter</td></tr>' : ''}
           </tbody>
@@ -1547,13 +1547,13 @@ function renderCharSheet(id, d) {
           </div>
           <div class="inv-list">
             ${(d.inventory_armors||[]).map((a,i)=>`
-            <div class="inv-item ${a.equipped?'inv-equipped':''}">
+            <div class="inv-item ${a.equipped?'inv-equipped':''}" onclick="window._showSheetArmorDetail('${id}',${i})" style="cursor:pointer">
               <div class="inv-item-main">
                 <strong>${a.name}</strong> <span style="color:#888">— CA ${a.ac||'?'} ${a.type?'('+a.type+')':''}</span>
               </div>
               <div class="inv-actions">
-                <button class="inv-equip-btn ${a.equipped?'equipped':''}" onclick="window._toggleEquipArmor('${id}',${i})">${a.equipped?'Équipée ✓':'Équiper'}</button>
-                <button class="inv-remove-btn" onclick="window._removeInventoryItem('${id}','inventory_armors',${i})">✕</button>
+                <button class="inv-equip-btn ${a.equipped?'equipped':''}" onclick="event.stopPropagation();window._toggleEquipArmor('${id}',${i})">${a.equipped?'Équipée ✓':'Équiper'}</button>
+                <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_armors',${i})">✕</button>
               </div>
             </div>`).join('')}
             ${!(d.inventory_armors||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune armure</div>' : ''}
@@ -1567,9 +1567,9 @@ function renderCharSheet(id, d) {
           </div>
           <div class="inv-list">
             ${(d.inventory_items||[]).map((it,i)=>`
-            <div class="inv-item">
+            <div class="inv-item" onclick="window._showSheetItemDetail('${id}',${i})" style="cursor:pointer">
               <div class="inv-item-main"><strong>${it.name}</strong>${it.qty>1?` ×${it.qty}`:''} ${it.detail?`<span style="color:#888;font-size:0.78rem">— ${it.detail}</span>`:''}</div>
-              <button class="inv-remove-btn" onclick="window._removeInventoryItem('${id}','inventory_items',${i})">✕</button>
+              <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_items',${i})">✕</button>
             </div>`).join('')}
             ${!(d.inventory_items||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Inventaire vide</div>' : ''}
           </div>
@@ -2332,17 +2332,8 @@ window._openCastSpell = (charId, level, indexInLevel) => {
   const ss = getSpellSlots(d);
   const usedSlots = d.usedSpellSlots || {};
 
-  // Spell detail
-  let html = `<h3 class="step-title">${sp.name}</h3>`;
-  html += `<div class="comp-detail"><div class="comp-detail-grid">
-    <div class="comp-detail-row"><span class="comp-detail-label">Niveau</span><span class="comp-detail-val">${sp.level===0?'Sort mineur':sp.level}</span></div>
-    <div class="comp-detail-row"><span class="comp-detail-label">École</span><span class="comp-detail-val">${sp.school||'—'}</span></div>
-    <div class="comp-detail-row"><span class="comp-detail-label">Temps</span><span class="comp-detail-val">${sp.time||'—'}</span></div>
-    <div class="comp-detail-row"><span class="comp-detail-label">Portée</span><span class="comp-detail-val">${sp.range||'—'}</span></div>
-    <div class="comp-detail-row"><span class="comp-detail-label">Durée</span><span class="comp-detail-val">${sp.duration||'—'}</span></div>
-    <div class="comp-detail-row"><span class="comp-detail-label">Composantes</span><span class="comp-detail-val">${sp.components||'—'}</span></div>
-  </div>
-  <div style="padding:10px;font-size:0.88rem;line-height:1.5;color:#444">${sp.desc||'—'}</div></div>`;
+  // Spell detail in rd-sheet style
+  let html = `<div class="rd-sheet">${_renderSpellDetail(sp)}</div>`;
 
   // Cast section — cantrips don't use slots
   if (sp.level === 0) {
@@ -2350,12 +2341,10 @@ window._openCastSpell = (charId, level, indexInLevel) => {
       <button class="btn-gold cast-btn" onclick="alert('Sort mineur lancé : ${sp.name.replace(/'/g,"\\'")} !');window._closeForge();document.getElementById('forgeNext').style.display=''">✨ Lancer (sort mineur — illimité)</button>
     </div>`;
   } else {
-    // Build available slot levels (from spell level up to 9)
     html += `<div class="cast-section">
       <div class="cast-header">Lancer à quel niveau ?</div>
       <div class="cast-slots">`;
 
-    // Regular spell slots
     for (let lvl = sp.level; lvl <= 9; lvl++) {
       const max = ss.slots[lvl-1] || 0;
       if (max === 0) continue;
@@ -2369,7 +2358,6 @@ window._openCastSpell = (charId, level, indexInLevel) => {
       </button>`;
     }
 
-    // Pact slots (Occultiste)
     if (ss.pactSlots && ss.pactSlots.level >= sp.level) {
       const pUsed = usedSlots['pact'] || 0;
       const pRemaining = ss.pactSlots.count - pUsed;
@@ -2431,6 +2419,115 @@ window._castSpell = async (charId, slotLevel, slotKey, spellName) => {
 // ============================================================
 // REPOS COURT & LONG
 // ============================================================
+
+// ── Detail views from character sheet (rd-sheet style) ──
+
+window._showSheetWeaponDetail = async (charId, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const w = (d.inventory_weapons||[])[index];
+  if (!w) return;
+
+  // Try to find richer data from compendium
+  const compWeapon = compendiumResources.find(r => r.type === 'weapon' && r.name === w.name);
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">⚔</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  const r = compWeapon || w;
+  let html = `<div class="rd-sheet">
+    <div class="rd-title">${w.name||'?'}</div>
+    <div class="rd-subtitle">${r.type||w.type||'Arme'}</div>
+    <div class="rd-separator"></div>
+    <div class="rd-props">
+      <div class="rd-prop"><span class="rd-prop-label">Bonus d'attaque :</span> ${w.atk||'—'}</div>
+      <div class="rd-prop"><span class="rd-prop-label">Dégâts :</span> ${w.dmg||r.damage||'—'}</div>
+      ${r.properties ? `<div class="rd-prop"><span class="rd-prop-label">Propriétés :</span> ${r.properties}</div>` : ''}
+      ${r.cost ? `<div class="rd-prop"><span class="rd-prop-label">Coût :</span> ${r.cost}</div>` : ''}
+      ${r.weight ? `<div class="rd-prop"><span class="rd-prop-label">Poids :</span> ${r.weight}</div>` : ''}
+    </div>
+    ${r.desc ? `<div class="rd-separator"></div><div class="rd-desc">${r.desc}</div>` : ''}
+    <div class="rd-separator"></div>
+    <div class="rd-tags"><span class="rd-source-tag">${r.source||'PHB'}</span></div>
+  </div>`;
+  html += `<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._showSheetArmorDetail = async (charId, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const a = (d.inventory_armors||[])[index];
+  if (!a) return;
+
+  const compArmor = compendiumResources.find(r => r.type === 'armor' && r.name === a.name);
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🛡</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  const r = compArmor || a;
+  let html = `<div class="rd-sheet">
+    <div class="rd-title">${a.name||'?'}</div>
+    <div class="rd-subtitle">${a.type||r.type||'Armure'}${a.equipped ? ' — <strong style="color:var(--gold)">Équipée</strong>' : ''}</div>
+    <div class="rd-separator"></div>
+    <div class="rd-props">
+      <div class="rd-prop"><span class="rd-prop-label">Classe d'armure :</span> ${a.ac||r.ac||'—'}</div>
+      ${r.strength ? `<div class="rd-prop"><span class="rd-prop-label">Force requise :</span> ${r.strength}</div>` : ''}
+      ${(a.stealth||r.stealth) ? `<div class="rd-prop"><span class="rd-prop-label">Discrétion :</span> ${a.stealth||r.stealth}</div>` : ''}
+      ${r.cost ? `<div class="rd-prop"><span class="rd-prop-label">Coût :</span> ${r.cost}</div>` : ''}
+      ${r.weight ? `<div class="rd-prop"><span class="rd-prop-label">Poids :</span> ${r.weight}</div>` : ''}
+    </div>
+    ${r.desc ? `<div class="rd-separator"></div><div class="rd-desc">${r.desc}</div>` : ''}
+    <div class="rd-separator"></div>
+    <div class="rd-tags"><span class="rd-source-tag">${r.source||'PHB'}</span></div>
+  </div>`;
+  html += `<div style="display:flex;gap:8px;margin-top:12px">
+    <button class="btn-gold" onclick="window._toggleEquipArmor('${charId}',${index});window._closeForge();document.getElementById('forgeNext').style.display=''">${a.equipped?'Déséquiper':'Équiper'}</button>
+    <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>
+  </div>`;
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._showSheetItemDetail = async (charId, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const it = (d.inventory_items||[])[index];
+  if (!it) return;
+
+  const compItem = compendiumResources.find(r => r.type === 'item' && r.name === it.name);
+
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🎒</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  const r = compItem || it;
+  let html = `<div class="rd-sheet">
+    <div class="rd-title">${it.name||'?'}${it.qty>1 ? ` ×${it.qty}` : ''}</div>
+    <div class="rd-subtitle">${r.type||'Objet'}${r.rarity ? ' — '+r.rarity : ''}</div>
+    <div class="rd-separator"></div>
+    <div class="rd-props">
+      ${r.cost ? `<div class="rd-prop"><span class="rd-prop-label">Coût :</span> ${r.cost}</div>` : ''}
+      ${r.weight ? `<div class="rd-prop"><span class="rd-prop-label">Poids :</span> ${r.weight}</div>` : ''}
+      ${it.detail ? `<div class="rd-prop"><span class="rd-prop-label">Détail :</span> ${it.detail}</div>` : ''}
+    </div>
+    ${r.desc ? `<div class="rd-separator"></div><div class="rd-desc">${r.desc}</div>` : ''}
+    <div class="rd-separator"></div>
+    <div class="rd-tags"><span class="rd-source-tag">${r.source||'—'}</span></div>
+  </div>`;
+  html += `<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  content.innerHTML = html;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
 
 window._doShortRest = async (charId) => {
   const snap = await getDoc(doc(db, "characters", charId));
@@ -5951,6 +6048,8 @@ nav button:last-child { color:#884444; }
 .weapon-table th:last-child { width:30px; }
 .weapon-table td { padding:6px 8px; border-bottom:1px solid #f0e8d8; }
 .weapon-table td:hover { background:#fffbf0; }
+.weapon-row-click { cursor:pointer; transition:background 0.15s; }
+.weapon-row-click:hover { background:#fff8ee !important; }
  
 .coin-row { display:flex; gap:4px; padding:8px; }
 .coin-box { flex:1; background:#fff8ee; border:1px solid #e0c880; border-radius:3px; text-align:center; padding:6px 2px; }
