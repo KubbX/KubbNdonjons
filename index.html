@@ -1316,6 +1316,9 @@ function profBonus(level) { return PROF_BONUS[(level||1)-1] || 2; }
  
 function renderCharSheet(id, d) {
   window._currentSheetData = d;
+  // Cache caster classes for spell filter auto-apply
+  const cls = getClasses(d);
+  window._activeCharCasterClasses = cls.filter(c => CLASSES[c.name]?.spellcaster).map(c => c.name);
   const tLvl = totalLevel(d);
   const pb = profBonus(tLvl);
   const stats = d.stats || {str:10,dex:10,con:10,int:10,wis:10,cha:10};
@@ -4386,17 +4389,167 @@ window._resetCompendium = async () => {
 // ============================================================
 window._currentCompCategory = 'armor';
 window._compSearchQuery = '';
+window._spellFilters = { classes: [], level: 'all', ritual: false, reaction: false, bonusAction: false, school: 'all' };
+
+// Get the active character's caster classes for auto-filter
+function _getActiveCharCasterClasses() {
+  if (!activeCharId) return [];
+  // We need to find the data — look through the last rendered sheet
+  // We'll cache it when rendering the sheet
+  return window._activeCharCasterClasses || [];
+}
 
 window._showCompendium = (catId) => {
   window._currentCompCategory = catId || 'armor';
   window._compSearchQuery = '';
   const searchEl = document.getElementById('compSearch');
   if (searchEl) searchEl.value = '';
+
+  // Show/hide spell filters
+  const filtersEl = document.getElementById('compSpellFilters');
+  if (filtersEl) {
+    if (catId === 'spell') {
+      filtersEl.style.display = 'block';
+      _initSpellFilters();
+    } else {
+      filtersEl.style.display = 'none';
+    }
+  }
+
   renderCompendiumList(window._currentCompCategory);
   document.querySelectorAll('.comp-cat-btn').forEach(b => b.classList.remove('comp-cat-active'));
   const activeBtn = document.querySelector(`.comp-cat-btn[data-cat="${catId}"]`);
   if (activeBtn) activeBtn.classList.add('comp-cat-active');
 };
+
+function _initSpellFilters() {
+  // Auto-apply character classes if a character is active
+  const charClasses = _getActiveCharCasterClasses();
+  window._spellFilters = { classes: [...charClasses], level: 'all', ritual: false, reaction: false, bonusAction: false, school: 'all' };
+  _renderSpellFilterBar();
+}
+
+function _renderSpellFilterBar() {
+  const bar = document.getElementById('compSpellFiltersInner');
+  if (!bar) return;
+  const f = window._spellFilters;
+  const allClasses = ['Artificier','Barde','Clerc','Druide','Ensorceleur','Magicien','Occultiste','Paladin','Rôdeur'];
+  const allSchools = ['Abjuration','Divination','Enchantement','Illusion','Invocation','Nécromancie','Transmutation','Évocation'];
+
+  bar.innerHTML = `
+    <div class="spell-filter-section">
+      <div class="spell-filter-label">Classe</div>
+      <div class="spell-filter-chips">
+        ${allClasses.map(c => `<button class="spell-filter-chip ${f.classes.includes(c)?'active':''}" onclick="window._toggleSpellClassFilter('${c}')">${c}</button>`).join('')}
+        ${f.classes.length > 0 ? `<button class="spell-filter-chip spell-filter-clear" onclick="window._clearSpellClassFilter()">✕ Toutes</button>` : ''}
+      </div>
+    </div>
+    <div class="spell-filter-row">
+      <div class="spell-filter-section spell-filter-section-sm">
+        <div class="spell-filter-label">Niveau</div>
+        <select id="sfLevel" class="spell-filter-select" onchange="window._updateSpellFilter()">
+          <option value="all" ${f.level==='all'?'selected':''}>Tous</option>
+          <option value="0" ${f.level==='0'?'selected':''}>Mineur</option>
+          ${[1,2,3,4,5,6,7,8,9].map(i=>`<option value="${i}" ${f.level===String(i)?'selected':''}>Niv. ${i}</option>`).join('')}
+        </select>
+      </div>
+      <div class="spell-filter-section spell-filter-section-sm">
+        <div class="spell-filter-label">École</div>
+        <select id="sfSchool" class="spell-filter-select" onchange="window._updateSpellFilter()">
+          <option value="all" ${f.school==='all'?'selected':''}>Toutes</option>
+          ${allSchools.map(s=>`<option value="${s}" ${f.school===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="spell-filter-toggles">
+      <label class="spell-filter-toggle ${f.ritual?'active':''}">
+        <input type="checkbox" ${f.ritual?'checked':''} onchange="window._updateSpellFilter()"> Rituel
+      </label>
+      <label class="spell-filter-toggle ${f.reaction?'active':''}">
+        <input type="checkbox" ${f.reaction?'checked':''} onchange="window._updateSpellFilter()"> Réaction
+      </label>
+      <label class="spell-filter-toggle ${f.bonusAction?'active':''}">
+        <input type="checkbox" ${f.bonusAction?'checked':''} onchange="window._updateSpellFilter()"> Action bonus
+      </label>
+    </div>
+    <div class="spell-filter-count" id="spellFilterCount"></div>`;
+}
+
+window._toggleSpellClassFilter = (cls) => {
+  const f = window._spellFilters;
+  const idx = f.classes.indexOf(cls);
+  if (idx >= 0) f.classes.splice(idx, 1);
+  else f.classes.push(cls);
+  _renderSpellFilterBar();
+  renderCompendiumList('spell');
+};
+
+window._clearSpellClassFilter = () => {
+  window._spellFilters.classes = [];
+  _renderSpellFilterBar();
+  renderCompendiumList('spell');
+};
+
+window._updateSpellFilter = () => {
+  const f = window._spellFilters;
+  const lvlEl = document.getElementById('sfLevel');
+  const schoolEl = document.getElementById('sfSchool');
+  if (lvlEl) f.level = lvlEl.value;
+  if (schoolEl) f.school = schoolEl.value;
+  // Toggles
+  const toggles = document.querySelectorAll('.spell-filter-toggle input');
+  if (toggles.length >= 3) {
+    f.ritual = toggles[0].checked;
+    f.reaction = toggles[1].checked;
+    f.bonusAction = toggles[2].checked;
+  }
+  _renderSpellFilterBar();
+  renderCompendiumList('spell');
+};
+
+function _applySpellFiltersWithObj(spells, f) {
+  let result = spells;
+
+  // Filter by class
+  if (f.classes.length > 0) {
+    result = result.filter(r => {
+      const rClasses = r.classes || [];
+      return f.classes.some(c => rClasses.includes(c));
+    });
+  }
+
+  // Filter by level
+  if (f.level !== 'all') {
+    const lvl = parseInt(f.level);
+    result = result.filter(r => r.level === lvl);
+  }
+
+  // Filter by school
+  if (f.school !== 'all') {
+    result = result.filter(r => r.school === f.school);
+  }
+
+  // Filter by ritual
+  if (f.ritual) {
+    result = result.filter(r => (r.time||'').toLowerCase().includes('rituel'));
+  }
+
+  // Filter by reaction
+  if (f.reaction) {
+    result = result.filter(r => (r.time||'').toLowerCase().includes('réaction'));
+  }
+
+  // Filter by bonus action
+  if (f.bonusAction) {
+    result = result.filter(r => (r.time||'').toLowerCase().includes('action bonus'));
+  }
+
+  return result;
+}
+
+function _applySpellFilters(spells) {
+  return _applySpellFiltersWithObj(spells, window._spellFilters);
+}
 
 window._compFilter = () => {
   window._compSearchQuery = (document.getElementById('compSearch')?.value || '').toLowerCase();
@@ -4410,9 +4563,17 @@ function getAllResourcesForCategory(catId) {
 function renderCompendiumList(catId) {
   const listEl = document.getElementById('compList');
   if (!listEl) return;
-  const allRes = getAllResourcesForCategory(catId);
+  let allRes = getAllResourcesForCategory(catId);
   const q = window._compSearchQuery;
-  const filtered = q ? allRes.filter(r => (r.name||'').toLowerCase().includes(q)) : allRes;
+  let filtered = q ? allRes.filter(r => (r.name||'').toLowerCase().includes(q)) : [...allRes];
+
+  // Apply spell-specific filters
+  if (catId === 'spell') {
+    filtered = _applySpellFilters(filtered);
+    // Update counter
+    const countEl = document.getElementById('spellFilterCount');
+    if (countEl) countEl.textContent = `${filtered.length} sort${filtered.length>1?'s':''} trouvé${filtered.length>1?'s':''}`;
+  }
 
   if (filtered.length === 0) {
     listEl.innerHTML = `<p style="color:#888;text-align:center;margin-top:30px;font-style:italic">${
@@ -4575,37 +4736,123 @@ window._addResourceToChar = async (catId, docId) => {
 // ============================================================
 
 // Open a compendium picker scoped to a category, from within the character sheet
+window._pickerSpellFilters = { classes: [], level: 'all', ritual: false, reaction: false, bonusAction: false, school: 'all' };
+
 window._pickFromCompendium = (charId, catId) => {
   const content = document.getElementById('forgeContent');
   document.getElementById('forgeProgress').innerHTML = `<div class="progress-step active">${COMPENDIUM_CATEGORIES.find(c=>c.id===catId)?.icon||'📋'}</div>`;
   document.getElementById('forgePrev').style.visibility = 'hidden';
   document.getElementById('forgeNext').style.display = 'none';
 
-  const allRes = getAllResourcesForCategory(catId);
+  // Auto-apply character's classes for spell picker
+  if (catId === 'spell') {
+    const charClasses = _getActiveCharCasterClasses();
+    window._pickerSpellFilters = { classes: [...charClasses], level: 'all', ritual: false, reaction: false, bonusAction: false, school: 'all' };
+  }
 
   let html = `<h3 class="step-title">Choisir: ${COMPENDIUM_CATEGORIES.find(c=>c.id===catId)?.name||catId}</h3>`;
   html += `<div class="field-group"><input id="picker_search" type="text" placeholder="Rechercher..." oninput="window._filterPicker('${charId}','${catId}')"></div>`;
-  html += `<div id="picker_list" class="comp-list" style="max-height:50vh;overflow-y:auto">`;
-  html += allRes.map((r,i) => `
-    <div class="comp-card" onclick="window._pickResource('${charId}','${catId}',${i})">
-      <div class="comp-card-main">
-        <div class="comp-card-name">${r.name} ${r._source==='custom'?'<span class="comp-homebrew">HB</span>':''}</div>
-        <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
-      </div>
-    </div>`).join('');
-  html += `</div>`;
+  if (catId === 'spell') {
+    html += `<div id="pickerSpellFiltersInner" class="spell-filters-bar spell-filters-picker"></div>`;
+  }
+  html += `<div id="picker_list" class="comp-list" style="max-height:45vh;overflow-y:auto"></div>`;
   html += `<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>`;
 
   content.innerHTML = html;
+  if (catId === 'spell') _renderPickerSpellFilters(charId);
+  _updatePickerList(charId, catId);
   document.getElementById('forgeOverlay').style.display = 'flex';
 };
 
-window._filterPicker = (charId, catId) => {
+function _renderPickerSpellFilters(charId) {
+  const bar = document.getElementById('pickerSpellFiltersInner');
+  if (!bar) return;
+  const f = window._pickerSpellFilters;
+  const allClasses = ['Artificier','Barde','Clerc','Druide','Ensorceleur','Magicien','Occultiste','Paladin','Rôdeur'];
+  const allSchools = ['Abjuration','Divination','Enchantement','Illusion','Invocation','Nécromancie','Transmutation','Évocation'];
+
+  bar.innerHTML = `
+    <div class="spell-filter-section">
+      <div class="spell-filter-label">Classe</div>
+      <div class="spell-filter-chips">
+        ${allClasses.map(c => `<button class="spell-filter-chip ${f.classes.includes(c)?'active':''}" onclick="window._togglePickerClassFilter('${charId}','${c}')">${c}</button>`).join('')}
+        ${f.classes.length > 0 ? `<button class="spell-filter-chip spell-filter-clear" onclick="window._clearPickerClassFilter('${charId}')">✕ Toutes</button>` : ''}
+      </div>
+    </div>
+    <div class="spell-filter-row">
+      <div class="spell-filter-section spell-filter-section-sm">
+        <div class="spell-filter-label">Niveau</div>
+        <select id="psfLevel" class="spell-filter-select" onchange="window._updatePickerSpellFilter('${charId}')">
+          <option value="all" ${f.level==='all'?'selected':''}>Tous</option>
+          <option value="0" ${f.level==='0'?'selected':''}>Mineur</option>
+          ${[1,2,3,4,5,6,7,8,9].map(i=>`<option value="${i}" ${f.level===String(i)?'selected':''}>Niv. ${i}</option>`).join('')}
+        </select>
+      </div>
+      <div class="spell-filter-section spell-filter-section-sm">
+        <div class="spell-filter-label">École</div>
+        <select id="psfSchool" class="spell-filter-select" onchange="window._updatePickerSpellFilter('${charId}')">
+          <option value="all" ${f.school==='all'?'selected':''}>Toutes</option>
+          ${allSchools.map(s=>`<option value="${s}" ${f.school===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="spell-filter-toggles">
+      <label class="spell-filter-toggle ${f.ritual?'active':''}">
+        <input type="checkbox" ${f.ritual?'checked':''} onchange="window._updatePickerSpellFilter('${charId}')"> Rituel
+      </label>
+      <label class="spell-filter-toggle ${f.reaction?'active':''}">
+        <input type="checkbox" ${f.reaction?'checked':''} onchange="window._updatePickerSpellFilter('${charId}')"> Réaction
+      </label>
+      <label class="spell-filter-toggle ${f.bonusAction?'active':''}">
+        <input type="checkbox" ${f.bonusAction?'checked':''} onchange="window._updatePickerSpellFilter('${charId}')"> Action bonus
+      </label>
+    </div>`;
+}
+
+window._togglePickerClassFilter = (charId, cls) => {
+  const f = window._pickerSpellFilters;
+  const idx = f.classes.indexOf(cls);
+  if (idx >= 0) f.classes.splice(idx, 1);
+  else f.classes.push(cls);
+  _renderPickerSpellFilters(charId);
+  _updatePickerList(charId, 'spell');
+};
+
+window._clearPickerClassFilter = (charId) => {
+  window._pickerSpellFilters.classes = [];
+  _renderPickerSpellFilters(charId);
+  _updatePickerList(charId, 'spell');
+};
+
+window._updatePickerSpellFilter = (charId) => {
+  const f = window._pickerSpellFilters;
+  const lvlEl = document.getElementById('psfLevel');
+  const schoolEl = document.getElementById('psfSchool');
+  if (lvlEl) f.level = lvlEl.value;
+  if (schoolEl) f.school = schoolEl.value;
+  const toggles = document.querySelectorAll('#pickerSpellFiltersInner .spell-filter-toggle input');
+  if (toggles.length >= 3) {
+    f.ritual = toggles[0].checked;
+    f.reaction = toggles[1].checked;
+    f.bonusAction = toggles[2].checked;
+  }
+  _renderPickerSpellFilters(charId);
+  _updatePickerList(charId, 'spell');
+};
+
+function _updatePickerList(charId, catId) {
   const q = (document.getElementById('picker_search')?.value||'').toLowerCase();
   const allRes = getAllResourcesForCategory(catId);
-  const filtered = q ? allRes.filter(r => r.name.toLowerCase().includes(q)) : allRes;
+  let filtered = q ? allRes.filter(r => r.name.toLowerCase().includes(q)) : [...allRes];
+
+  // Apply spell filters in picker
+  if (catId === 'spell') {
+    filtered = _applySpellFiltersWithObj(filtered, window._pickerSpellFilters);
+  }
+
   const list = document.getElementById('picker_list');
-  list.innerHTML = filtered.map((r,i) => {
+  if (!list) return;
+  list.innerHTML = filtered.map((r) => {
     const origIdx = allRes.indexOf(r);
     return `<div class="comp-card" onclick="window._pickResource('${charId}','${catId}',${origIdx})">
       <div class="comp-card-main">
@@ -4614,6 +4861,10 @@ window._filterPicker = (charId, catId) => {
       </div>
     </div>`;
   }).join('') || '<p style="color:#888;text-align:center;margin:20px;font-style:italic">Aucun résultat</p>';
+}
+
+window._filterPicker = (charId, catId) => {
+  _updatePickerList(charId, catId);
 };
 
 window._pickResource = async (charId, catId, index) => {
@@ -5598,6 +5849,30 @@ nav button:last-child { color:#884444; }
 .comp-toolbar { display:flex; gap:8px; margin-bottom:16px; }
 .comp-toolbar input { flex:1; }
 .comp-list { display:flex; flex-direction:column; gap:6px; }
+
+/* ── SPELL FILTERS ── */
+.spell-filters-bar { background:#f9f4ea; border:1px solid #e0d0b0; border-radius:4px; padding:10px 14px; margin-bottom:14px; }
+.spell-filters-picker { margin-bottom:10px; }
+.spell-filter-section { margin-bottom:8px; }
+.spell-filter-section-sm { flex:1; min-width:120px; }
+.spell-filter-label { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); letter-spacing:1px; margin-bottom:4px; }
+.spell-filter-chips { display:flex; flex-wrap:wrap; gap:4px; }
+.spell-filter-chip { padding:3px 10px; border:1px solid #d4c4a0; border-radius:14px; background:#fff; color:#666;
+  font-family:'Crimson Pro'; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
+.spell-filter-chip:hover { border-color:var(--gold); color:var(--ink); }
+.spell-filter-chip.active { background:var(--gold); color:#fff; border-color:var(--gold); }
+.spell-filter-chip.spell-filter-clear { background:transparent; border-style:dashed; color:#999; font-size:0.72rem; }
+.spell-filter-chip.spell-filter-clear:hover { color:var(--red); border-color:var(--red); }
+.spell-filter-row { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+.spell-filter-select { width:100%; padding:4px 8px; border:1px solid #d4c4a0; border-radius:3px; font-family:'Crimson Pro';
+  font-size:0.82rem; background:#fff; color:var(--ink); }
+.spell-filter-toggles { display:flex; gap:6px; flex-wrap:wrap; }
+.spell-filter-toggle { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border:1px solid #d4c4a0;
+  border-radius:14px; background:#fff; font-family:'Crimson Pro'; font-size:0.78rem; color:#666; cursor:pointer; transition:all 0.15s; }
+.spell-filter-toggle:hover { border-color:var(--gold); }
+.spell-filter-toggle.active { background:var(--ink); color:var(--gold); border-color:var(--ink); }
+.spell-filter-toggle input { display:none; }
+.spell-filter-count { font-family:'Cinzel'; font-size:0.65rem; color:#888; text-align:right; margin-top:6px; letter-spacing:1px; }
 .comp-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); border-radius:3px;
   display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:box-shadow 0.2s; }
 .comp-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.12); }
@@ -5679,6 +5954,9 @@ nav button:last-child { color:#884444; }
         <input id="compSearch" type="text" placeholder="Rechercher..." oninput="window._compFilter()">
         <button class="btn-gold" onclick="window._openAddResource()">+ AJOUTER</button>
         <button class="section-add-btn" style="padding:8px 12px;font-size:0.65rem" onclick="window._resetCompendium()" title="Réinitialiser les données de base">↻ Reset</button>
+      </div>
+      <div id="compSpellFilters" style="display:none">
+        <div id="compSpellFiltersInner" class="spell-filters-bar"></div>
       </div>
       <div id="compList" class="comp-list"></div>
     </div>
