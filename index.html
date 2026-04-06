@@ -766,7 +766,7 @@ const SUBCLASSES = {
         {lvl:14,name:"Ascension céleste",desc:"1/repos long: vol 9m, immunité radiant, aura de soin (1d6 alliés/début tour)"}
       ]},
       "Mort-vivant (Undead)": {features:[
-        {lvl:1,name:"Forme du Mort",desc:"Action bonus 1/repos long: prendre la forme du Mort-vivant (1 min) — immunité frayeur, vol 9m, avantage attaques"}  ,
+        {lvl:1,name:"Forme du Mort",desc:"Action bonus 1/repos long: prendre la forme du Mort-vivant (1 min) — immunité frayeur, vol 9m, avantage attaques"},
         {lvl:1,name:"Présence mortelle",desc:"Sorts bonus: Prémonition, Fausse mort, Arrêt du cœur, Spectral Form, etc."},
         {lvl:6,name:"Toucher du Mort",desc:"Réaction si touché: infliger 1d8 + mod CHA nécrotique à l'attaquant"},
         {lvl:10,name:"Résistance mortelle",desc:"En forme du Mort: résistance à tous les dégâts non-radiants et non-magiques"},
@@ -5956,23 +5956,25 @@ window._removeFeature = async (charId, index) => {
 
 // ── Familier — Sélecteur depuis la liste de monstres ──
 window._openFamiliarPicker = (charId) => {
-  const content = document.getElementById('forgeContent');
+  const el = document.getElementById('forgeContent');
   document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🐾</div>';
   document.getElementById('forgePrev').style.visibility = 'hidden';
   document.getElementById('forgeNext').style.display = 'none';
 
-  let html = '<h3 class="step-title">🐾 Choisir un familier</h3>';
-  html += '<p style="font-size:0.82rem;color:#666;margin-bottom:10px">Sélectionnez une créature pour l'assigner comme familier.</p>';
-  html += '<div class="field-group"><input id="familiar_search" type="text" placeholder="Rechercher un monstre..." oninput="window._filterFamiliarPicker(' + "'" + charId + "'" + ')"></div>';
-  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="familiar_cr_filters">';
-  ["0","1/8","1/4","1/2","1","2","3","4","5"].forEach(cr => {
-    html += '<button class="spell-filter-chip" data-cr="' + cr + '" onclick="window._toggleFamiliarCR(' + "'" + charId + "'" + ','' + cr + '',this)">RC ' + cr + '</button>';
-  });
-  html += '</div>';
-  html += '<div id="familiar_list" class="comp-list" style="max-height:45vh;overflow-y:auto"></div>';
-  html += '<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>';
+  const crValues = ['0','1/8','1/4','1/2','1','2','3','4','5'];
+  const crBtns = crValues.map(cr =>
+    `<button class="spell-filter-chip" data-cr="${cr}" onclick="window._toggleFamiliarCR('${charId}','${cr}',this)">RC ${cr}</button>`
+  ).join('');
 
-  content.innerHTML = html;
+  el.innerHTML = `
+    <h3 class="step-title">🐾 Choisir un familier</h3>
+    <p style="font-size:0.82rem;color:#666;margin-bottom:10px">Sélectionnez une créature pour l'assigner comme familier.</p>
+    <div class="field-group"><input id="familiar_search" type="text" placeholder="Rechercher un monstre..." oninput="window._filterFamiliarPicker('${charId}')"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="familiar_cr_filters">${crBtns}</div>
+    <div id="familiar_list" class="comp-list" style="max-height:45vh;overflow-y:auto"></div>
+    <button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+  `;
+
   window._familiarCRFilter = null;
   _updateFamiliarPickerList(charId);
   document.getElementById('forgeOverlay').style.display = 'flex';
