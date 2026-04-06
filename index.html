@@ -1725,6 +1725,34 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+
+      <!-- Familier -->
+      <div class="sheet-section">
+        <div class="section-title">Familier <button class="section-add-btn" onclick="window._openFamiliarPicker('${id}')">+ Choisir</button></div>
+        ${(()=>{
+          const fam = d.familiar;
+          if (!fam) return '<div style="color:#aaa;font-style:italic;font-size:0.82rem;padding:4px 0">Aucun familier — cliquez sur + Choisir pour en sélectionner un.</div>';
+          return `<div class="familiar-card">
+            <div class="familiar-header">
+              <div>
+                <div class="familiar-name">${fam.name||'?'}</div>
+                <div class="familiar-sub">RC ${fam.cr||'?'} · ${fam.type||''} · Taille ${fam.size||'?'}</div>
+              </div>
+              <button class="inv-remove-btn" onclick="window._removeFamiliar('${id}')" title="Retirer le familier">✕</button>
+            </div>
+            <div class="familiar-stats">
+              <div class="familiar-stat"><span class="familiar-stat-label">PV</span><span>${fam.hp||'?'}</span></div>
+              <div class="familiar-stat"><span class="familiar-stat-label">CA</span><span>${fam.ac||'?'}</span></div>
+              <div class="familiar-stat"><span class="familiar-stat-label">Vitesse</span><span>${fam.speed||'?'}</span></div>
+            </div>
+            ${fam.attacks && fam.attacks !== '—' ? `<div class="familiar-detail"><span class="familiar-detail-label">Attaques :</span> ${fam.attacks}</div>` : ''}
+            ${fam.traits && fam.traits !== '—' ? `<div class="familiar-detail"><span class="familiar-detail-label">Traits :</span> ${fam.traits}</div>` : ''}
+            ${fam.desc ? `<div class="familiar-desc">${fam.desc}</div>` : ''}
+            <div style="font-size:0.7rem;color:#aaa;margin-top:4px;font-style:italic">${fam.source||'MM'}</div>
+          </div>`;
+        })()}
+      </div>
+
       <!-- Notes -->
       <div class="sheet-section">
         <div class="section-title">Notes libres</div>
@@ -1940,33 +1968,46 @@ window._toggleAsiMode = () => {
   if (mode === 'feat') window._filterFeatPicker();
 };
 
+// Stockage des dons filtrés pour accès par index (évite les problèmes d'encodage dans les onclick)
+window._featPickerData = [];
+
 window._filterFeatPicker = () => {
   const q = (document.getElementById('lvlup_feat_search')?.value||'').toLowerCase();
   const allFeats = getAllResourcesForCategory('feat');
   const builtInFeats = (COMPENDIUM_DATA.feat || []);
   const feats = allFeats.length > 0 ? allFeats : builtInFeats;
   const filtered = q ? feats.filter(f => (f.name||'').toLowerCase().includes(q) || (f.desc||'').toLowerCase().includes(q)) : feats;
+  window._featPickerData = filtered; // stocker la liste filtrée complète
   const list = document.getElementById('lvlup_feat_list');
   if (!list) return;
-  list.innerHTML = filtered.slice(0,30).map(f => {
-    const sb = f.statBonus ? JSON.stringify(f.statBonus).replace(/"/g,'&quot;') : 'null';
-    const desc = (f.desc||'').replace(/"/g,'&quot;').replace(/`/g,"'");
-    const name = (f.name||'').replace(/"/g,'&quot;');
-    return `<div class="comp-card" onclick="window._selectFeatForLevelUp(&quot;${name}&quot;,&quot;${desc}&quot;,&quot;${sb}&quot;)">
-      <div class="comp-card-main">
-        <div class="comp-card-name">${f.name}</div>
+  const shown = filtered.slice(0, 30);
+  list.innerHTML = shown.map((f, idx) => {
+    return `<div class="comp-card feat-picker-card" data-feat-idx="${idx}" style="cursor:pointer">
+      <div class="comp-card-main" style="pointer-events:none">
+        <div class="comp-card-name">${f.name||'?'}</div>
         <div class="comp-card-sub">${f.prereq && f.prereq !== '—' ? 'Prérequis: '+f.prereq : 'Aucun prérequis'}${f.statBonus ? ' · <strong style="color:var(--gold)">+1 stat</strong>' : ''}</div>
       </div>
     </div>`;
   }).join('') || '<p style="color:#888;text-align:center;font-style:italic;margin:16px 0">Aucun don trouvé</p>';
   if (filtered.length > 30) list.innerHTML += `<p style="color:#888;text-align:center;font-size:0.78rem">${filtered.length - 30} dons supplémentaires — affinez votre recherche</p>`;
+  // Délégation d'événement sur la liste
+  list.onclick = (e) => {
+    const card = e.target.closest('.feat-picker-card');
+    if (!card) return;
+    const idx = parseInt(card.dataset.featIdx);
+    const feat = window._featPickerData[idx];
+    if (feat) window._selectFeatForLevelUp(feat.name||'', feat.desc||'', feat.statBonus||null);
+  };
 };
 
-window._selectFeatForLevelUp = (name, desc, statBonusStr) => {
+window._selectFeatForLevelUp = (name, desc, statBonus) => {
   document.getElementById('lvlup_feat_name').value = name;
   document.getElementById('lvlup_feat_desc').value = desc;
   let bonus = null;
-  try { bonus = JSON.parse(statBonusStr.replace(/&quot;/g,'"')); } catch(e) {}
+  if (statBonus && typeof statBonus === "object") bonus = statBonus;
+  else if (typeof statBonus === "string" && statBonus !== "null") {
+    try { bonus = JSON.parse(statBonus.replace(/&quot;/g,'"')); } catch(e) {}
+  }
   const labelMap = {str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'};
   let html = `<div class="lvlup-feature" style="border-left-color:#4caf50"><strong>✓ ${name}</strong><div class="lvlup-feature-desc">${desc}</div></div>`;
   if (bonus) {
@@ -5250,6 +5291,14 @@ window._pickResource = async (charId, catId, index) => {
   else if (catId === 'background') {
     update.background = r.name;
   }
+  else if (catId === 'familiar') {
+    // Stocker le familier directement depuis le compendium monster
+    update.familiar = {
+      name: r.name, cr: r.cr||'?', type: r.type||'', size: r.size||'M',
+      hp: r.hp||'?', ac: r.ac||'?', speed: r.speed||'?',
+      attacks: r.attacks||'—', traits: r.traits||'—', desc: r.desc||'', source: r.source||'MM'
+    };
+  }
 
   if (Object.keys(update).length) {
     await updateDoc(doc(db, "characters", charId), update);
@@ -5278,6 +5327,92 @@ window._removeFeature = async (charId, index) => {
   const feats = [...(d.features||[])];
   feats.splice(index, 1);
   await updateDoc(doc(db, "characters", charId), { features: feats });
+};
+
+// ── Familier — Sélecteur depuis la liste de monstres ──
+window._openFamiliarPicker = (charId) => {
+  const content = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🐾</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  let html = '<h3 class="step-title">🐾 Choisir un familier</h3>';
+  html += '<p style="font-size:0.82rem;color:#666;margin-bottom:10px">Sélectionnez une créature pour l'assigner comme familier.</p>';
+  html += '<div class="field-group"><input id="familiar_search" type="text" placeholder="Rechercher un monstre..." oninput="window._filterFamiliarPicker(' + "'" + charId + "'" + ')"></div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="familiar_cr_filters">';
+  ["0","1/8","1/4","1/2","1","2","3","4","5"].forEach(cr => {
+    html += '<button class="spell-filter-chip" data-cr="' + cr + '" onclick="window._toggleFamiliarCR(' + "'" + charId + "'" + ','' + cr + '',this)">RC ' + cr + '</button>';
+  });
+  html += '</div>';
+  html += '<div id="familiar_list" class="comp-list" style="max-height:45vh;overflow-y:auto"></div>';
+  html += '<button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>';
+
+  content.innerHTML = html;
+  window._familiarCRFilter = null;
+  _updateFamiliarPickerList(charId);
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._familiarCRFilter = null;
+
+window._toggleFamiliarCR = (charId, cr, btn) => {
+  if (window._familiarCRFilter === cr) {
+    window._familiarCRFilter = null;
+    document.querySelectorAll('#familiar_cr_filters .spell-filter-chip').forEach(b => b.classList.remove('active'));
+  } else {
+    window._familiarCRFilter = cr;
+    document.querySelectorAll('#familiar_cr_filters .spell-filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  _updateFamiliarPickerList(charId);
+};
+
+window._filterFamiliarPicker = (charId) => _updateFamiliarPickerList(charId);
+
+function _updateFamiliarPickerList(charId) {
+  const q = (document.getElementById('familiar_search')?.value||'').toLowerCase();
+  const allMonsters = getAllResourcesForCategory('monster');
+  let filtered = q ? allMonsters.filter(r => (r.name||'').toLowerCase().includes(q) || (r.type||'').toLowerCase().includes(q)) : [...allMonsters];
+  if (window._familiarCRFilter !== null && window._familiarCRFilter !== undefined) {
+    filtered = filtered.filter(r => String(r.cr||'') === window._familiarCRFilter);
+  }
+  filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'fr'));
+
+  const list = document.getElementById('familiar_list');
+  if (!list) return;
+  window._familiarPickerData = filtered;
+  const shown = filtered.slice(0, 50);
+  list.innerHTML = shown.map((r, idx) => {
+    return '<div class="comp-card familiar-pick-card" data-idx="' + idx + '" style="cursor:pointer"><div class="comp-card-main" style="pointer-events:none"><div class="comp-card-name">' + (r.name||'?') + '</div><div class="comp-card-sub">RC ' + (r.cr||'?') + ' · ' + (r.type||'') + ' · ' + (r.size||'') + '</div></div></div>';
+  }).join('') || '<p style="color:#888;text-align:center;margin:20px;font-style:italic">Aucun monstre trouvé</p>';
+  if (filtered.length > 50) list.innerHTML += '<p style="color:#888;text-align:center;font-size:0.78rem">+' + (filtered.length-50) + ' créatures — affinez la recherche</p>';
+
+  list.onclick = (e) => {
+    const card = e.target.closest('.familiar-pick-card');
+    if (!card) return;
+    const idx = parseInt(card.dataset.idx);
+    const r = window._familiarPickerData?.[idx];
+    if (!r) return;
+    (async () => {
+      const snap = await getDoc(doc(db, 'characters', charId));
+      if (!snap.exists()) return;
+      const update = {
+        familiar: {
+          name: r.name, cr: r.cr||'?', type: r.type||'', size: r.size||'M',
+          hp: r.hp||'?', ac: r.ac||'?', speed: r.speed||'?',
+          attacks: r.attacks||'—', traits: r.traits||'—', desc: r.desc||'', source: r.source||'MM'
+        }
+      };
+      await updateDoc(doc(db, 'characters', charId), update);
+      window._closeForge();
+      document.getElementById('forgeNext').style.display = '';
+    })();
+  };
+}
+
+window._removeFamiliar = async (charId) => {
+  if (!confirm('Retirer ce familier ?')) return;
+  await updateDoc(doc(db, 'characters', charId), { familiar: null });
 };
 
 // ── Toggle inspiration (simple click, works for player + GM) ──
@@ -6240,6 +6375,18 @@ nav button:last-child { color:#884444; }
 .rd-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; align-items:center; }
 .rd-tag { background:var(--red); color:#fff; font-family:'Crimson Pro'; font-size:0.78rem; padding:3px 12px; border-radius:3px; }
 .rd-source-tag { background:#f0e8d8; color:#888; font-family:'Crimson Pro'; font-size:0.75rem; font-style:italic; padding:3px 10px; border-radius:3px; border:1px solid #d4c4a0; }
+
+/* Familier */
+.familiar-card { background:#fdf8f0; border:1px solid #d4c4a0; border-radius:6px; padding:10px 12px; margin-top:4px; }
+.familiar-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.familiar-name { font-family:'Cinzel'; font-size:0.95rem; font-weight:700; color:var(--red); }
+.familiar-sub { font-family:'Crimson Pro'; font-size:0.8rem; color:#888; margin-top:1px; }
+.familiar-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px; }
+.familiar-stat { background:#fff; border:1px solid #e0d0b0; border-radius:4px; padding:4px 6px; text-align:center; font-size:0.82rem; }
+.familiar-stat-label { display:block; font-family:'Cinzel'; font-size:0.62rem; color:#a89060; letter-spacing:0.5px; margin-bottom:2px; }
+.familiar-detail { font-family:'Crimson Pro'; font-size:0.82rem; color:#444; margin-bottom:3px; }
+.familiar-detail-label { font-weight:700; color:var(--red); }
+.familiar-desc { font-family:'Crimson Pro'; font-size:0.82rem; color:#555; font-style:italic; margin-top:5px; line-height:1.5; }
 
 /* Responsive */
 @media(max-width:900px) {
