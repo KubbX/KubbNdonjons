@@ -1279,9 +1279,14 @@ async function loadCharacterList() {
       card.className = 'char-card';
       card.innerHTML = `
         <div class="char-card-main" onclick="window._selectChar('${docSnap.id}')">
-          <div class="char-card-name">${d.name}</div>
-          <div class="char-card-info">${d.subrace?d.subrace+' ':''} ${d.race||'—'} · ${classesDisplayFull(d)} (Niv.${tLvl})</div>
-          <div class="char-card-stats">❤️ ${d.hp}/${d.hpMax} · 🛡 CA ${d.ac} · ${d.alignment||'—'}</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            ${d.avatarUrl ? `<img src="${d.avatarUrl}" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);object-fit:cover;flex-shrink:0">` : ''}
+            <div>
+              <div class="char-card-name">${d.name}</div>
+              <div class="char-card-info">${d.subrace?d.subrace+' ':''} ${d.race||'—'} · ${classesDisplayFull(d)} (Niv.${tLvl})</div>
+              <div class="char-card-stats">❤️ ${d.hp}/${d.hpMax} · 🛡 CA ${d.ac} · ${d.alignment||'—'}</div>
+            </div>
+          </div>
         </div>
         <div class="char-card-id">
           <small>ID : ${docSnap.id}</small>
@@ -1334,9 +1339,17 @@ function renderCharSheet(id, d) {
  
   sheet.innerHTML = `
   <div class="sheet-header">
-    <div class="sheet-name-block">
-      <div class="sheet-name editable" data-field="name" data-type="text">${d.name}</div>
-      <div class="sheet-subtitle">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesDisplayFull(d)} · Niveau total ${tLvl}</div>
+    <div class="sheet-header-top">
+      <div class="sheet-avatar-wrap" onclick="window._changeAvatar('${id}')">
+        ${d.avatarUrl 
+          ? `<img class="sheet-avatar" src="${d.avatarUrl}" alt="Portrait">`
+          : `<div class="sheet-avatar-placeholder">⚔</div>`}
+        <div class="sheet-avatar-edit">✎</div>
+      </div>
+      <div class="sheet-name-block">
+        <div class="sheet-name editable" data-field="name" data-type="text">${d.name}</div>
+        <div class="sheet-subtitle">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesDisplayFull(d)} · Niveau total ${tLvl}</div>
+      </div>
     </div>
     <div class="sheet-levelup-row">
       <button class="btn-levelup" onclick="window._openLevelUp('${id}')">⬆ MONTER DE NIVEAU</button>
@@ -2078,23 +2091,40 @@ window._removeGMWatch = (id) => {
 function renderGMCard(id, d) {
   const monitor = document.getElementById('gmMonitor');
   let card = document.getElementById(`gm_${id}`);
-  if(!card) {
+  const isNew = !card;
+  if(isNew) {
     card = document.createElement('div');
     card.id = `gm_${id}`;
     card.className = 'gm-card';
     monitor.appendChild(card);
   }
+
+  // Preserve notes state before re-render
+  const existingNotesEl = document.getElementById(`gmnotes_${id}`);
+  const preservedNotes = existingNotesEl ? existingNotesEl.value : null;
+  const notesWasOpen = card.querySelector('.gm-notes-section')?.classList.contains('gm-notes-open');
+  const hasNoteContent = preservedNotes ? preservedNotes.trim().length > 0 : (d.gmNotes||'').trim().length > 0;
+  const shouldBeOpen = isNew ? hasNoteContent : (notesWasOpen || hasNoteContent);
+
+  // Preserve HP input value
+  const existingHpInput = document.getElementById(`gmhp_${id}`);
+  const preservedHpVal = existingHpInput ? existingHpInput.value : '';
+
   const tLvl = totalLevel(d);
   const hpPct = Math.max(0, Math.min(100, Math.round((d.hp/d.hpMax)*100)));
   const hpColor = hpPct>60?'#4caf50':hpPct>30?'#ff9800':'#f44336';
   const pb = profBonus(tLvl);
   const stats = d.stats||{str:10,dex:10,con:10,int:10,wis:10,cha:10};
+  const inspClass = d.inspiration ? 'gm-insp-active' : '';
  
   card.innerHTML = `
     <div class="gm-card-header">
-      <div>
-        <div class="gm-card-name">${d.name}</div>
-        <div class="gm-card-sub">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesDisplayFull(d)} (Niv.${tLvl}) · ${d.alignment||'—'}</div>
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        ${d.avatarUrl ? `<img src="${d.avatarUrl}" style="width:36px;height:36px;border-radius:50%;border:2px solid var(--gold);object-fit:cover">` : ''}
+        <div>
+          <div class="gm-card-name">${d.name}</div>
+          <div class="gm-card-sub">${d.subrace?d.subrace+' ':''}${d.race||'—'} · ${classesDisplayFull(d)} (Niv.${tLvl}) · ${d.alignment||'—'}</div>
+        </div>
       </div>
       <button class="btn-remove" onclick="window._removeGMWatch('${id}')">✕</button>
     </div>
@@ -2119,7 +2149,7 @@ function renderGMCard(id, d) {
       <span>Mort: </span>
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.success||0)>=i?'success':''}">✓</span>`).join('')}
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.fail||0)>=i?'fail':''}">✗</span>`).join('')}
-      <span style="margin-left:auto;cursor:pointer" onclick="window._toggleInspiration('${id}')">Inspiration: <strong>${d.inspiration?'★':'☆'}</strong></span>
+      <span class="gm-insp-btn ${inspClass}" style="margin-left:auto;cursor:pointer" onclick="window._toggleInspiration('${id}')">Inspiration: <strong>${d.inspiration?'★':'☆'}</strong></span>
     </div>
     <!-- Conditions on GM card -->
     <div class="gm-conditions">
@@ -2165,17 +2195,42 @@ function renderGMCard(id, d) {
     })()}
     <div class="gm-actions">
       <label class="gm-action-label">Modifier PV:</label>
-      <input id="gmhp_${id}" type="number" class="gm-input" placeholder="±">
+      <input id="gmhp_${id}" type="number" class="gm-input" placeholder="±" value="${preservedHpVal}">
       <button class="btn-gm-action heal" onclick="window._gmHeal('${id}')">Soigner</button>
       <button class="btn-gm-action dmg" onclick="window._gmDamage('${id}')">Blessure</button>
-      <button class="btn-gm-action" style="margin-left:auto" onclick="window._toggleInspiration('${id}')">${d.inspiration?'Retirer ★':'Donner ★'}</button>
+      <button class="btn-gm-action gm-insp-action ${inspClass}" style="margin-left:auto" onclick="window._toggleInspiration('${id}')">${d.inspiration?'Retirer ★':'Donner ★'}</button>
     </div>
-    <details class="gm-notes">
-      <summary>Notes MJ</summary>
-      <textarea class="gm-notes-area" id="gmnotes_${id}" placeholder="Notes sur ce personnage...">${d.gmNotes||''}</textarea>
-      <button class="btn-gm-action" onclick="window._saveGMNotes('${id}')">Sauvegarder</button>
-    </details>`;
+    <div class="gm-notes-section ${shouldBeOpen ? 'gm-notes-open' : ''}">
+      <div class="gm-notes-header" onclick="window._toggleGMNotes('${id}')">
+        <span>Notes MJ</span>
+        <span class="gm-notes-chevron">${shouldBeOpen ? '▾' : '▸'}</span>
+      </div>
+      <div class="gm-notes-body" style="display:${shouldBeOpen ? 'block' : 'none'}">
+        <textarea class="gm-notes-area" id="gmnotes_${id}" placeholder="Notes sur ce personnage...">${preservedNotes !== null ? preservedNotes : (d.gmNotes||'')}</textarea>
+        <button class="btn-gm-action" onclick="window._saveGMNotes('${id}')">Sauvegarder</button>
+      </div>
+    </div>`;
 }
+
+// Toggle GM notes panel
+window._toggleGMNotes = (id) => {
+  const card = document.getElementById(`gm_${id}`);
+  if (!card) return;
+  const section = card.querySelector('.gm-notes-section');
+  const body = card.querySelector('.gm-notes-body');
+  const chevron = card.querySelector('.gm-notes-chevron');
+  if (!section || !body) return;
+  const isOpen = section.classList.contains('gm-notes-open');
+  if (isOpen) {
+    section.classList.remove('gm-notes-open');
+    body.style.display = 'none';
+    chevron.textContent = '▸';
+  } else {
+    section.classList.add('gm-notes-open');
+    body.style.display = 'block';
+    chevron.textContent = '▾';
+  }
+};
  
 window._gmHeal = async (id) => {
   const val = parseInt(document.getElementById(`gmhp_${id}`)?.value)||0;
@@ -4652,6 +4707,61 @@ window._toggleInspiration = async (charId) => {
   await updateDoc(doc(db, "characters", charId), { inspiration: !d.inspiration });
 };
 
+// ── Change avatar (image URL) ──
+window._changeAvatar = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+
+  const content = document.getElementById('forgeContent');
+  const progressEl = document.getElementById('forgeProgress');
+  progressEl.innerHTML = '<div class="progress-step active">🖼</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  content.innerHTML = `
+    <h3 class="step-title">Portrait du personnage</h3>
+    <p style="font-size:0.85rem;color:#666;margin-bottom:12px">Collez l'URL d'une image pour l'utiliser comme portrait. Vous pouvez héberger votre image sur <a href="https://imgur.com" target="_blank" style="color:var(--gold)">Imgur</a>, <a href="https://postimages.org" target="_blank" style="color:var(--gold)">PostImages</a> ou tout autre hébergeur d'images.</p>
+    <div class="field-group">
+      <label>URL de l'image</label>
+      <input id="avatarUrlInput" type="url" value="${d.avatarUrl||''}" placeholder="https://exemple.com/mon-portrait.jpg" style="width:100%">
+    </div>
+    ${d.avatarUrl ? `<div style="margin:12px 0;text-align:center"><img src="${d.avatarUrl}" style="max-width:200px;max-height:200px;border-radius:8px;border:2px solid var(--gold)"></div>` : ''}
+    <div id="avatarPreviewZone" style="margin:12px 0;text-align:center"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-gold" onclick="window._saveAvatar('${charId}')">ENREGISTRER</button>
+      ${d.avatarUrl ? `<button class="btn-prev" onclick="window._removeAvatar('${charId}')">Supprimer le portrait</button>` : ''}
+      <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+    </div>`;
+
+  // Live preview
+  const input = document.getElementById('avatarUrlInput');
+  input.addEventListener('input', () => {
+    const url = input.value.trim();
+    const zone = document.getElementById('avatarPreviewZone');
+    if (url) {
+      zone.innerHTML = `<img src="${url}" style="max-width:200px;max-height:200px;border-radius:8px;border:2px solid var(--gold)" onerror="this.style.display='none'">`;
+    } else {
+      zone.innerHTML = '';
+    }
+  });
+
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+window._saveAvatar = async (charId) => {
+  const url = document.getElementById('avatarUrlInput')?.value?.trim() || '';
+  await updateDoc(doc(db, "characters", charId), { avatarUrl: url || null });
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+
+window._removeAvatar = async (charId) => {
+  await updateDoc(doc(db, "characters", charId), { avatarUrl: null });
+  window._closeForge();
+  document.getElementById('forgeNext').style.display = '';
+};
+
 // ── Cycle skill proficiency: none → prof → expert → none ──
 window._cycleSkillProf = async (charId, skillName) => {
   const snap = await getDoc(doc(db, "characters", charId));
@@ -5306,6 +5416,14 @@ nav button:last-child { color:#884444; }
 /* ── CHARACTER SHEET ── */
 #tab-sheet { background:var(--parch); min-height:100vh; }
 .sheet-header { background:linear-gradient(135deg, var(--ink) 0%, #3d2010 100%); padding:18px 24px; border-bottom:3px solid var(--gold); }
+.sheet-header-top { display:flex; align-items:center; gap:16px; }
+.sheet-avatar-wrap { position:relative; cursor:pointer; flex-shrink:0; }
+.sheet-avatar { width:72px; height:72px; border-radius:50%; border:3px solid var(--gold); object-fit:cover; display:block; transition:opacity 0.2s; }
+.sheet-avatar-wrap:hover .sheet-avatar { opacity:0.7; }
+.sheet-avatar-placeholder { width:72px; height:72px; border-radius:50%; border:3px dashed rgba(184,134,11,0.5); display:flex; align-items:center; justify-content:center; font-size:1.8rem; color:rgba(184,134,11,0.5); background:rgba(255,255,255,0.05); transition:border-color 0.2s; }
+.sheet-avatar-wrap:hover .sheet-avatar-placeholder { border-color:var(--gold); }
+.sheet-avatar-edit { position:absolute; bottom:0; right:0; background:var(--gold); color:var(--ink); width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; opacity:0; transition:opacity 0.2s; pointer-events:none; }
+.sheet-avatar-wrap:hover .sheet-avatar-edit { opacity:1; }
 .sheet-name { font-family:'Cinzel'; font-size:1.6rem; color:var(--gold); margin-bottom:4px; }
 .sheet-subtitle { color:#c9a860; font-size:0.9rem; }
 .sheet-combat-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
@@ -5322,11 +5440,11 @@ nav button:last-child { color:#884444; }
 .sheet-section { margin-bottom:14px; background:#fff; border:1px solid #ddd; border-radius:3px; overflow:hidden; }
 .section-title { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
   font-size:0.65rem; letter-spacing:2px; padding:5px 10px; }
-.stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#eee; padding:1px; }
-.stat-box { background:#fff; padding:8px 4px; text-align:center; }
-.stat-label { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); letter-spacing:1px; display:block; }
-.stat-mod { font-size:1.1rem; font-weight:700; color:var(--ink); }
-.stat-val { font-size:0.9rem; color:#666; cursor:pointer; border-bottom:1px dashed #ccc; }
+.stats-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:#eee; padding:1px; }
+.stat-box { background:#fff; padding:10px 6px; text-align:center; }
+.stat-label { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); letter-spacing:1px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stat-mod { font-size:1.2rem; font-weight:700; color:var(--ink); }
+.stat-val { font-size:0.85rem; color:#666; cursor:pointer; border-bottom:1px dashed #ccc; }
 .save-list, .skill-list { padding:6px 10px; }
 .save-row, .skill-row { display:flex; align-items:center; gap:6px; padding:2px 0; font-size:0.82rem; }
 .prof-dot { width:9px; height:9px; border-radius:50%; border:1px solid #aaa; flex-shrink:0; }
@@ -5409,9 +5527,15 @@ nav button:last-child { color:#884444; }
 .btn-gm-action.heal { background:#3a7a3a; color:#fff; }
 .btn-gm-action.dmg { background:var(--red); color:#fff; }
 .btn-gm-action:not(.heal):not(.dmg) { background:var(--gold); color:#fff; }
-.gm-notes { padding:8px 14px; }
-.gm-notes summary { cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; }
-.gm-notes-area { width:100%; margin-top:6px; }
+.gm-notes-section { border-top:1px solid #e0d0b0; }
+.gm-notes-header { padding:8px 14px; cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; user-select:none; transition:background 0.15s; }
+.gm-notes-header:hover { background:#f0e8d8; }
+.gm-notes-chevron { font-size:0.8rem; }
+.gm-notes-body { padding:4px 14px 10px; }
+.gm-notes-area { width:100%; margin-top:4px; min-height:60px; }
+.gm-insp-btn { padding:2px 8px; border-radius:3px; transition:all 0.2s; }
+.gm-insp-btn.gm-insp-active { background:rgba(184,134,11,0.2); color:var(--gold); }
+.gm-insp-action.gm-insp-active { background:linear-gradient(135deg,#8b6914,#6b4f0e)!important; box-shadow:0 0 8px rgba(184,134,11,0.4); }
  
 /* ── SPELL SLOTS ── */
 .spell-slots-section { padding:4px 0; }
@@ -5496,10 +5620,14 @@ nav button:last-child { color:#884444; }
   .sheet-body { grid-template-columns:1fr; }
   .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid #d4c4a0; }
   .summary-grid { grid-template-columns:1fr; }
+  .stats-grid { grid-template-columns:repeat(3,1fr); }
 }
 @media(max-width:600px) {
   .sheet-combat-row { gap:5px; }
   .combat-box { min-width:55px; padding:5px 8px; }
+  .sheet-header-top { gap:10px; }
+  .sheet-avatar, .sheet-avatar-placeholder { width:56px; height:56px; }
+  .stats-grid { grid-template-columns:repeat(2,1fr); }
 }
 </style>
 </head>
