@@ -2800,6 +2800,66 @@ function renderCharSheet(id, d) {
       })()}
     </div>
  
+      <!-- Formes préparées (Druide / Rôdeur) -->
+      \${(()=>{
+        const classes = getClasses(d);
+        const isDruid   = classes.some(c => c.name === 'Druide');
+        const isRanger  = classes.some(c => c.name === 'Rôdeur');
+        if (!isDruid && !isRanger) return '';
+        const label = isDruid ? 'Formes sauvages & invocations' : 'Compagnons & invocations';
+        const forms = d.prepared_forms || [];
+        // Grouper par catégorie (type de créature)
+        const byType = {};
+        forms.forEach(f => {
+          const t = f.type || 'Autre';
+          if (!byType[t]) byType[t] = [];
+          byType[t].push(f);
+        });
+        const crVal = cr => {
+          if (!cr || cr === '?') return 999;
+          if (cr.includes('/')) { const p = cr.split('/'); return parseInt(p[0])/parseInt(p[1]); }
+          return parseFloat(cr) || 0;
+        };
+        // Calcul RC max pour forme sauvage druide
+        let wsMaxCr = '—';
+        if (isDruid) {
+          const druidClass = classes.find(c => c.name === 'Druide');
+          const lvl = druidClass ? druidClass.level : 1;
+          if (lvl >= 8) wsMaxCr = '4';
+          else if (lvl >= 4) wsMaxCr = '1';
+          else if (lvl >= 2) wsMaxCr = '1/4';
+          else wsMaxCr = '0';
+        }
+        return \`
+      <div class="sheet-section">
+        <div class="section-title">\${label} <button class="section-add-btn" onclick="window._openFormPicker('\${id}')">+ Compendium</button></div>
+        \${isDruid ? \`<div class="ws-info-bar">
+          <span class="ws-info-item">🐻 RC max forme sauvage : <strong>\${wsMaxCr}</strong></span>
+          <span class="ws-info-sep">·</span>
+          <span class="ws-info-item">🌊 Vol dès niv.8 · Nage dès niv.4</span>
+        </div>\` : ''}
+        <div class="form-known-list">
+          \${forms.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic;font-size:0.82rem">Aucune forme — utilisez + Compendium pour en ajouter</div>' : ''}
+          \${Object.entries(byType).map(([type, list]) => \`
+          <div class="spell-level-group">
+            <div class="spell-level-header">\${type}</div>
+            \${list.map((f, fi) => {
+              const realIdx = forms.indexOf(f);
+              const overCR = isDruid && wsMaxCr !== '—' && crVal(f.cr) > crVal(wsMaxCr);
+              return \`<div class="spell-known-item form-known-item \${overCR ? 'form-over-cr' : ''}">
+                <div class="form-cr-badge">RC \${f.cr||'?'}</div>
+                <div class="spell-known-main" onclick="window._openFormDetail('\${id}',\${realIdx})">
+                  <strong>\${f.name||'?'}</strong>
+                  <span class="spell-known-meta">\${f.type||''} · Taille \${f.size||'?'} · CA \${f.ac||'?'} · PV \${f.hp||'?'} · \${f.speed||'?'}</span>
+                </div>
+                <button class="inv-remove-btn" onclick="window._removePreparedForm('\${id}',\${realIdx})">✕</button>
+              </div>\`;
+            }).join('')}
+          </div>\`).join('')}
+        </div>
+      </div>\`;
+      })()}
+
     <!-- COLONNE DROITE -->
     <div class="sheet-col-right">
       <!-- Informations générales -->
@@ -4719,7 +4779,7 @@ const COMPENDIUM_DATA = {
     {name:"Abishai noir",cr:"7",type:"Fiélon (diable)",size:"M",hp:"58 (9d8+18)",ac:"15 (naturelle)",speed:"9m, vol 9m",attacks:"Multi (2): Cimeterre +6, 1d6+3 tranchant + 2d6 feu / Morsure +6, 1d10+3 perçant + 2d6 feu",traits:"Immolation de l'ombre, Résistance au feu, Vision dans le noir 36m",source:"MTF",desc:"Diable serviteur de Tiamat, enveloppé de flammes sombres."},
     {name:"Abishai rouge",cr:"19",type:"Fiélon (diable)",size:"M",hp:"255 (30d8+120)",ac:"22 (naturelle)",speed:"9m, vol 15m",attacks:"Multi (4): Morsure +14, 2d12+8 perçant + 3d6 feu / Griffes +14, 2d10+8 tranchant",traits:"Résistance à la magie, Immunité au feu, Incantation, Forme duale",source:"MTF",desc:"Le plus puissant des abishais, champion de Tiamat."},
     {name:"Abishai vert",cr:"15",type:"Fiélon (diable)",size:"M",hp:"187 (25d8+75)",ac:"18 (naturelle)",speed:"9m, vol 12m",attacks:"Multi (2): Bâton +12, 2d6+6 contondant / Griffes +12, 2d10+6 tranchant",traits:"Incantation, Résistance à la magie, Immunité au poison",source:"MTF",desc:"Abishai manipulateur et rusé au service de Tiamat."},
-    {name:"Aboleth",cr:"10",type:"Aberration",size:"G",hp:"135 (18d10+36)",ac:"17 (naturelle)",speed:"3m, nage 12m",attacks:"Multi (3): Tentacule +9, 2d6+5 contondant (maladie)",traits:"Esclavage, Nuage de mucus, Télépathie 36m, Amphibie, Perception de la réalité",source:"MM",desc:"Aberration aquatique légendaire et ancienne. Entoure ses proies d'un mucus altérant (CON DD14 : ne peut respirer que sous l'eau). Asservit mentalement ses victimes (SAG DD14) et peut lire leurs désirs profonds via télépathie. 3 actions légendaires."},
+    {name:"Aboleth",cr:"10",type:"Aberration",size:"G",hp:"135 (18d10+36)",ac:"17 (naturelle)",speed:"3m, nage 12m",attacks:"Multi (3): Tentacule +9, 2d6+5 contondant (maladie)",traits:"Esclavage, Nuage de mucus, Télépathie 36m, Amphibie, Perception de la réalité",source:"MM",desc:"Aberration aquatique ancienne (RC10). 3 tentacules +9 (2d6+5, maladie: ne respire qu'en dessous). Nuage de mucus sous l'eau (JdS CON DD14). Asservissement 3/jour (JdS SAG DD14 ou charmé indéfiniment). 3 actions légendaires. Amphibie. PV 135."},
     {name:"Abomination transdraconique",cr:"17",type:"Aberration",size:"TG",hp:"262 (21d12+126)",ac:"18 (naturelle)",speed:"12m",attacks:"Multi (3): Morsure +14, 4d8+8 perçant / Griffes +14, 2d8+8 tranchant",traits:"Résistance à la magie, Souffle multiple, Aura de terreur",source:"FTD",desc:"Créature draconique mutée et corrompue par une magie aberrante."},
     {name:"Acolyte",cr:"1/4",type:"Humanoïde",size:"M",hp:"9 (2d8)",ac:"10",speed:"9m",attacks:"Massue +2, 1d4 contondant",traits:"Incantation (niv 1 clerc): Lumière, Flamme sacrée, Thaumaturgie / Niv 1: Bénédiction, Soin des blessures, Sanctuaire",source:"MM",desc:"Serviteur religieux dévoué, pratiquant la magie divine."},
     {name:"Acérérak",cr:"23",type:"Mort-vivant",size:"M",hp:"285 (30d8+150)",ac:"21 (naturelle)",speed:"9m",attacks:"Bâton du Néant +11, 2d6+5 contondant + 10 nécrotique",traits:"Résistance légendaire (3/jour), Actions légendaires, Incantation (niv 20), Rejeter l'Incarnation, Résistance à la magie",source:"ToA",desc:"Archiliche et démiurge, créateur du Tombeau de l'Annihilation."},
@@ -4733,49 +4793,49 @@ const COMPENDIUM_DATA = {
     {name:"Alhoon",cr:"10",type:"Mort-vivant",size:"M",hp:"120 (16d8+48)",ac:"15 (naturelle)",speed:"9m",attacks:"Griffes +7, 1d8+4 tranchant + 3d6 psychiques",traits:"Résistance à la magie, Incantation (niv 12), Dévoreur de pensées",source:"VGM",desc:"Flagelleur mental ayant embrassé la non-vie, rejeté par sa communauté."},
     {name:"Alkilith",cr:"11",type:"Fiélon (démon)",size:"M",hp:"157 (15d8+90)",ac:"17 (naturelle)",speed:"12m",attacks:"Tentacule +8, 3d8+4 acide",traits:"Corruption, Intangibilité, Faux-semblant",source:"MTF",desc:"Démon amorphe qui corrompt les passages entre les plans."},
     {name:"Allip",cr:"5",type:"Mort-vivant",size:"M",hp:"40 (9d8)",ac:"13",speed:"0m, vol 12m (stationnaire)",attacks:"Toucher dément +6, 4d6+3 psychiques",traits:"Incorporel, Murmures déments, Résistance aux dégâts non-magiques",source:"MTF",desc:"Esprit torturé par un secret interdit, condamné à le murmurer éternellement."},
-    {name:"Allosaure",cr:"2",type:"Bête",size:"G",hp:"51 (6d10+18)",ac:"13 (naturelle)",speed:"18m",attacks:"Multi (2): Griffes +6, 1d8+4 tranchant / Morsure +6, 2d10+4 perçant",traits:"Tactique de meute",source:"MM",desc:"Dinosaure prédateur de grande taille. Bond : si charge de 9m+, la cible doit réussir FOR DD13 ou être renversée, permettant une morsure en action bonus."},
+    {name:"Allosaure",cr:"2",type:"Bête",size:"G",hp:"51 (6d10+18)",ac:"13 (naturelle)",speed:"18m",attacks:"Multi (2): Griffes +6, 1d8+4 tranchant / Morsure +6, 2d10+4 perçant",traits:"Tactique de meute",source:"MM",desc:"Dinosaure prédateur (RC2). Bond : charge 9m+ + griffes (JdS FOR DD13 ou à terre). Morsure AB si cible à terre (2d10+4). Griffes +6, 1d8+4. PV 51."},
     {name:"Amalgame trollesque",cr:"7",type:"Aberration",size:"G",hp:"95 (10d10+40)",ac:"14 (naturelle)",speed:"9m",attacks:"Multi (2): Morsure +8, 2d10+5 perçant / Griffes +8, 2d8+5 tranchant",traits:"Régénération 10 (acide/feu), Difformité",source:"IDRotF",desc:"Troll fusionné avec d'autres créatures, devenu une abomination difforme."},
     {name:"Amnizu",cr:"18",type:"Fiélon (diable)",size:"M",hp:"202 (27d8+81)",ac:"21 (naturelle)",speed:"9m, vol 12m",attacks:"Multi (2): Fouet à nœuds +11, 2d8+6 force + amnésie",traits:"Résistance à la magie, Incantation innée, Amnésie",source:"MTF",desc:"Diable gardien des portes des Neuf Enfers, maître de l'oubli."},
-    {name:"Androsphinx",cr:"17",type:"Monstruosité",size:"G",hp:"199 (19d10+95)",ac:"17 (naturelle)",speed:"12m, vol 18m",attacks:"Multi (2): Griffes +12, 2d10+6 tranchant",traits:"Rugissement (3/jour), Insondable, Résistance à la magie, Incantation (niv 12 clerc), Actions légendaires",source:"MM",desc:"Sphinx légendaire lanceur de sorts (clerc niv.12). Rugissement 3/jour : terreur, paralysie, puis 8d10 tonnerre. Immunisé au psychique et aux armes non-magiques. 3 actions légendaires."},
-    {name:"Ankheg",cr:"2",type:"Monstruosité",size:"G",hp:"39 (6d10+6)",ac:"14 (naturelle) / 11 (ventre)",speed:"9m, fouissement 3m",attacks:"Morsure +5, 2d6+3 tranchant + 1d6 acide",traits:"Acide (ligne 9m, 3d6 acide JdS DEX DD 13), Fouissement",source:"MM",desc:"Insecte géant qui creuse le sol. Morsure agrippante (évasion DD13) + acide. Vaporisation d'acide (recharge 6) : ligne 9m, 3d6 acide."},
+    {name:"Androsphinx",cr:"17",type:"Monstruosité",size:"G",hp:"199 (19d10+95)",ac:"17 (naturelle)",speed:"12m, vol 18m",attacks:"Multi (2): Griffes +12, 2d10+6 tranchant",traits:"Rugissement (3/jour), Insondable, Résistance à la magie, Incantation (niv 12 clerc), Actions légendaires",source:"MM",desc:"Grand sphinx mâle lanceur de sorts clerc niv.12 (RC17). Rugissements 3/jour progressifs : peur → paralysie → tonnerre 8d10 (JdS CON DD18). 3 actions légendaires. Immunité psychique + armes magiques. PV 199."},
+    {name:"Ankheg",cr:"2",type:"Monstruosité",size:"G",hp:"39 (6d10+6)",ac:"14 (naturelle) / 11 (ventre)",speed:"9m, fouissement 3m",attacks:"Morsure +5, 2d6+3 tranchant + 1d6 acide",traits:"Acide (ligne 9m, 3d6 acide JdS DEX DD 13), Fouissement",source:"MM",desc:"Monstruosité souterraine (RC2). Morsure +5 (2d6+3 tranchant + 1d6 acide, agrippe DD13). Vaporisation d'acide en ligne 9m (Recharge 6, 3d6 acide JdS DEX DD13). PV 39."},
     {name:"Ankylosaure",cr:"3",type:"Bête",size:"TG",hp:"68 (8d12+16)",ac:"15 (naturelle)",speed:"9m",attacks:"Queue +7, 4d6+4 contondant",traits:"Renversement possible",source:"MM",desc:"Dinosaure herbivore blindé. Queue en massue : 4d6+4 contondant + FOR DD14 ou renversé."},
     {name:"Apprenti magicien",cr:"1/4",type:"Humanoïde",size:"M",hp:"9 (2d8)",ac:"10",speed:"9m",attacks:"Dague +3, 1d4+1 perçant",traits:"Incantation (niv 1 magicien): Trait de feu, Prestidigitation / Niv 1: Bouclier, Projectile magique",source:"VGM",desc:"Jeune érudit apprenant les rudiments de la magie arcanique."},
     {name:"Arach",cr:"1",type:"Monstruosité",size:"M",hp:"22 (4d8+4)",ac:"13 (naturelle)",speed:"9m, escalade 9m",attacks:"Morsure +4, 1d8+2 perçant + 1d6 poison",traits:"Toile, Pattes d'araignée",source:"MTF",desc:"Créature arachnoïde issue de la malédiction de Lolth."},
     {name:"Araignée",cr:"0",type:"Bête",size:"TP",hp:"1 (1d4-1)",ac:"12",speed:"6m, escalade 6m",attacks:"Morsure +4, 1 perçant + 1d4 poison",traits:"Marche sur les murs, Toile, Perception par les toiles",source:"MM",desc:"Petite araignée commune."},
     {name:"Araignée de monte femelle",cr:"2",type:"Monstruosité",size:"G",hp:"52 (8d10+8)",ac:"14 (naturelle)",speed:"9m, escalade 9m",attacks:"Morsure +5, 1d8+3 perçant + 2d8 poison (JdS CON DD 12)",traits:"Marche sur les murs, Perception par les toiles, Toile",source:"OotA",desc:"Araignée géante drow utilisée comme monture."},
     {name:"Araignée de monte mâle",cr:"1",type:"Monstruosité",size:"G",hp:"32 (5d10+5)",ac:"13 (naturelle)",speed:"9m, escalade 9m",attacks:"Morsure +4, 1d8+2 perçant + 1d8 poison (JdS CON DD 11)",traits:"Marche sur les murs, Perception par les toiles",source:"OotA",desc:"Araignée géante mâle drow, moins imposante que la femelle."},
-    {name:"Araignée de phase",cr:"3",type:"Monstruosité",size:"G",hp:"32 (5d10+5)",ac:"13",speed:"9m, escalade 9m",attacks:"Morsure +4, 1d10+2 perçant + 4d8 poison (JdS CON DD 11)",traits:"Déplacement éthéré, Pattes d'araignée",source:"MM",desc:"Araignée qui se déplace entre plans. Déplacement éthéré. Morsure venimeuse (CON DD12, paralysé 1h). Attaque depuis l'éthéré."},
+    {name:"Araignée de phase",cr:"3",type:"Monstruosité",size:"G",hp:"32 (5d10+5)",ac:"13",speed:"9m, escalade 9m",attacks:"Morsure +4, 1d10+2 perçant + 4d8 poison (JdS CON DD 11)",traits:"Déplacement éthéré, Pattes d'araignée",source:"MM",desc:"Araignée (RC5). Téléportation entre plan matériel et éthéré (action bonus). Immunité aux armes non-magiques. Morsure +6 (2d10+4 perforant + 4d8 venin). PV 32."},
     {name:"Araignée géante",cr:"1",type:"Bête",size:"G",hp:"26 (4d10+4)",ac:"14 (naturelle)",speed:"9m, escalade 9m",attacks:"Morsure +5, 1d8+3 perçant + 2d8 poison (JdS CON DD 11)",traits:"Marche sur les murs, Toile (recharge 5-6), Perception par les toiles",source:"MM",desc:"Araignée de grande taille tissant des toiles colossales."},
     {name:"Araignée-loup géante",cr:"1/4",type:"Bête",size:"M",hp:"11 (2d8+2)",ac:"13",speed:"12m, escalade 12m",attacks:"Morsure +3, 1d6+1 perçant + 2d6 poison (JdS CON DD 11)",traits:"Marche sur les murs, Perception par les toiles, Discrétion +7",source:"MM",desc:"Araignée chasseuse agile qui bondit sur ses proies."},
-    {name:"Arbre éveillé",cr:"2",type:"Plante",size:"TG",hp:"59 (7d12+14)",ac:"13 (naturelle)",speed:"6m",attacks:"Coup +6, 3d6+4 contondant",traits:"Vulnérabilité au feu, Faux-semblant (immobile)",source:"MM",desc:"Grand arbre animé (sort Éveil). Fausse apparence. Résistance froid/feu. Coup de branche : 3d6+4 contondant."},
-    {name:"Arbuste éveillé",cr:"0",type:"Plante",size:"P",hp:"10 (3d6)",ac:"9",speed:"6m",attacks:"Griffes +1, 1d4-1 tranchant",traits:"Vulnérabilité au feu, Faux-semblant (immobile)",source:"MM",desc:"Petit buisson animé (sort Éveil). Fausse apparence. Résistance au feu. Coup de rameaux : 2d6+1."},
+    {name:"Arbre éveillé",cr:"2",type:"Plante",size:"TG",hp:"59 (7d12+14)",ac:"13 (naturelle)",speed:"6m",attacks:"Coup +6, 3d6+4 contondant",traits:"Vulnérabilité au feu, Faux-semblant (immobile)",source:"MM",desc:"Plante consciente (RC2). Immunité contondant. Coup de branche +6 (3d6+4 contondant). PV 59."},
+    {name:"Arbuste éveillé",cr:"0",type:"Plante",size:"P",hp:"10 (3d6)",ac:"9",speed:"6m",attacks:"Griffes +1, 1d4-1 tranchant",traits:"Vulnérabilité au feu, Faux-semblant (immobile)",source:"MM",desc:"Plante consciente (RC1/4). Coup de branche +3 (2d4+1 perforant). PV 10."},
     {name:"Arcanaloth",cr:"12",type:"Fiélon (yugolothe)",size:"M",hp:"104 (16d8+32)",ac:"17 (naturelle)",speed:"9m, vol 9m",attacks:"Multi (2): Griffes +7, 2d4+3 tranchant",traits:"Résistance à la magie, Incantation (niv 16 magicien), Télépathie, Changeur de forme",source:"MM",desc:"Yugolothe érudit et manipulateur, gardien des contrats infernaux."},
     {name:"Archer",cr:"3",type:"Humanoïde",size:"M",hp:"75 (10d8+30)",ac:"16 (cuir clouté)",speed:"9m",attacks:"Multi (2): Épée courte +6, 1d6+3 perçant / Arc long +6, 1d8+3 perçant",traits:"Tir précis (+1d8 dégâts avec armes à distance)",source:"VGM",desc:"Tireur d'élite spécialisé dans le combat à distance."},
     {name:"Archidruide",cr:"12",type:"Humanoïde",size:"M",hp:"132 (24d8+24)",ac:"16 (peau de dragon)",speed:"9m",attacks:"Bâton +4, 1d6+2 contondant",traits:"Incantation (niv 18 druide), Forme sauvage (RC 6 max), Changeur de forme",source:"VGM",desc:"Maître druide au sommet de sa puissance, protecteur de la nature."},
     {name:"Archimage",cr:"12",type:"Humanoïde",size:"M",hp:"99 (18d8+18)",ac:"12 (15 avec armure du mage)",speed:"9m",attacks:"Dague +6, 1d4+2 perçant",traits:"Résistance à la magie, Incantation (niv 18 magicien): Projectile magique, Bouclier, Boule de feu, Globe d'invulnérabilité, Téléportation, Arrêt du temps",source:"MM",desc:"Maître absolu de la magie arcanique, manipulant les forces les plus puissantes."},
     {name:"Armanite",cr:"7",type:"Fiélon (démon)",size:"G",hp:"84 (8d10+40)",ac:"16 (naturelle)",speed:"18m",attacks:"Multi (3): Serres +8, 1d10+5 tranchant / Sabot +8, 2d6+5 contondant / Queue de foudre +8, 2d8+5 foudre",traits:"Charge destructrice, Résistance à la magie",source:"MTF",desc:"Démon centaure, cavalier infernal des hordes abyssales."},
-    {name:"Armure animée",cr:"1",type:"Artificiel",size:"M",hp:"33 (6d8+6)",ac:"18 (naturelle)",speed:"7.5m",attacks:"Coup +4, 1d6+2 contondant",traits:"Antimagie, Faux-semblant (immobile), Immunité poison/psychique",source:"MM",desc:"Armure magique animée. Apparence trompeuse (indiscernable immobile). Sensibilité à l'antimagie : paralysée dans les zones d'antimagie. 2 attaques de coup."},
+    {name:"Armure animée",cr:"1",type:"Artificiel",size:"M",hp:"33 (6d8+6)",ac:"18 (naturelle)",speed:"7.5m",attacks:"Coup +4, 1d6+2 contondant",traits:"Antimagie, Faux-semblant (immobile), Immunité poison/psychique",source:"MM",desc:"Armure animée par la magie (RC1). Apparence trompeuse (imite une armure normale). Sensible à l'antimagie. 2 coups +4 (1d6+2). Immunité poison/psychique. PV 33."},
     {name:"Asmodée",cr:"30",type:"Fiélon (diable)",size:"G",hp:"666 (36d10+468)",ac:"22 (naturelle)",speed:"9m, vol 36m",attacks:"Multi (4): Rubis de l'Enfer +19, 4d10+12 nécrotique",traits:"Résistance légendaire (5/jour), Résistance à la magie, Incantation innée, Seigneur des Neuf Enfers, Actions légendaires, Régénération",source:"MPMM",desc:"Seigneur suprême des Neuf Enfers, le plus puissant des diables."},
     {name:"Assassin",cr:"8",type:"Humanoïde",size:"M",hp:"78 (12d8+24)",ac:"15 (cuir clouté)",speed:"9m",attacks:"Multi (2): Épée courte +6, 1d6+3 perçant + 7d6 poison",traits:"Assassinat, Évasion, Attaque sournoise (3d6)",source:"MM",desc:"Tueur professionnel maniant poisons et lames avec une précision mortelle."},
     {name:"Auroch",cr:"2",type:"Bête",size:"G",hp:"38 (4d10+16)",ac:"11",speed:"15m",attacks:"Coup de corne +6, 2d8+4 contondant",traits:"Charge (renverser)",source:"VGM",desc:"Bovidé sauvage préhistorique, ancêtre des bovins domestiques."},
     {name:"Automate cobra de fer",cr:"4",type:"Artificiel",size:"M",hp:"45 (7d8+14)",ac:"13",speed:"9m",attacks:"Morsure +5, 1d6+3 perçant + 3d6 poison",traits:"Résistance à la magie, Immunité au poison",source:"ToA",desc:"Serpent mécanique créé comme gardien et piège mortel."},
     {name:"Avatar de la Mort",cr:"5",type:"Mort-vivant",size:"M",hp:"73 (11d8+22)",ac:"20",speed:"18m, vol 18m (stationnaire)",attacks:"Faux spectrale +8, 1d8+5 tranchant + 3d6 nécrotique",traits:"Incorporel, Immunité aux dégâts non-magiques, Lié au destin",source:"DMG",desc:"Manifestation mortelle invoquée par la Carte de la Mort du Jeu des Merveilles."},
-    {name:"Azer",cr:"2",type:"Élémentaire",size:"M",hp:"39 (6d8+12)",ac:"17 (naturelle + bouclier)",speed:"9m",attacks:"Marteau de guerre +5, 1d8+3 contondant + 1d6 feu",traits:"Corps brûlant (1d10 feu au toucher), Immunité feu/poison, Armes incandescentes",source:"MM",desc:"Élémentaire de feu nain. Corps et armes brûlants (1d10 feu au contact). Immunisé au feu et au poison. Émet de la lumière vive."},
+    {name:"Azer",cr:"2",type:"Élémentaire",size:"M",hp:"39 (6d8+12)",ac:"17 (naturelle + bouclier)",speed:"9m",attacks:"Marteau de guerre +5, 1d8+3 contondant + 1d6 feu",traits:"Corps brûlant (1d10 feu au toucher), Immunité feu/poison, Armes incandescentes",source:"MM",desc:"Nain de feu élémentaire (RC2). Corps brûlant (1d10 feu au contact). Armes brûlantes (+1d6 feu). Illumine 3m. Marteau de guerre +5 (1d8+3 + 1d6 feu). Immunité feu. PV 39."},
     {name:"Babau",cr:"4",type:"Fiélon (démon)",size:"M",hp:"82 (11d8+33)",ac:"16 (naturelle)",speed:"12m",attacks:"Multi (2): Griffes +6, 1d12+4 tranchant",traits:"Mucus faiblement acide, Peau acide, Vision dans le noir 36m",source:"VGM",desc:"Démon assassin à la peau suintant d'acide."},
     {name:"Babouin",cr:"0",type:"Bête",size:"P",hp:"3 (1d6)",ac:"12",speed:"9m, escalade 9m",attacks:"Morsure +1, 1d4-1 perçant",traits:"Tactique de meute",source:"MM",desc:"Primate agressif vivant en groupe."},
-    {name:"Babélien",cr:"2",type:"Aberration",size:"M",hp:"67 (9d8+27)",ac:"9",speed:"3m, nage 3m",attacks:"Multi (2): Morsure +2, 5d6 perçant",traits:"Cacophonie aberrante (JdS SAG DD 10 ou Confusion), Terrain aberrant",source:"MM",desc:"Aberration putride et chaotique. Charabia : SAG DD10, la cible ne peut pas réagir et agit aléatoirement. Sol aberrant : terrain difficile à 3m, FOR DD10. Morsure massive (5d6) + salive aveuglante (DEX DD13)."},
+    {name:"Babélien",cr:"2",type:"Aberration",size:"M",hp:"67 (9d8+27)",ac:"9",speed:"3m, nage 3m",attacks:"Multi (2): Morsure +2, 5d6 perçant",traits:"Cacophonie aberrante (JdS SAG DD 10 ou Confusion), Terrain aberrant",source:"MM",desc:"Aberration (RC2). Sol aberrant (terrain difficile, JdS FOR DD10 ou vitesse 0). Charabia (JdS SAG DD10 ou d8 aléatoire). Morsure (5d6, avale les morts). Salive aveuglante Recharge 5-6. PV 67."},
     {name:"Badian",cr:"1/4",type:"Fiélon (démon)",size:"P",hp:"14 (4d6)",ac:"12",speed:"6m, vol 12m",attacks:"Griffes +4, 1d4+2 tranchant + 1d4 feu",traits:"Vol, Vision dans le noir 18m",source:"MPMM",desc:"Petit démon incendiaire."},
     {name:"Balhannoth",cr:"11",type:"Aberration",size:"G",hp:"114 (12d10+48)",ac:"17 (naturelle)",speed:"7.5m, escalade 7.5m",attacks:"Multi (2): Tentacule +8, 2d8+4 contondant + agripper",traits:"Repaire illusoire, Perception de la réalité, Actions légendaires",source:"MTF",desc:"Aberration créant des illusions de confort pour attirer ses proies."},
-    {name:"Balor",cr:"19",type:"Fiélon (démon)",size:"TG",hp:"262 (21d12+126)",ac:"19 (naturelle)",speed:"12m, vol 24m",attacks:"Multi (2): Épée longue +14, 3d8+8 tranchant + 3d8 foudre / Fouet +14, 2d6+8 tranchant + 3d6 feu (attirer 7.5m)",traits:"Aura de feu (3d6), Agonie mortelle (explosion 6m, 20d6 feu JdS DEX DD 20), Résistance à la magie, Armes magiques",source:"MM",desc:"Démon majeur de feu et de foudre. Aura de feu (3d6 feu/tour). Explose à la mort (20d6 feu, DEX DD20). Résistance à la magie. Épée longue + fouet (portée 9m). Téléportation."},
+    {name:"Balor",cr:"19",type:"Fiélon (démon)",size:"TG",hp:"262 (21d12+126)",ac:"19 (naturelle)",speed:"12m, vol 24m",attacks:"Multi (2): Épée longue +14, 3d8+8 tranchant + 3d8 foudre / Fouet +14, 2d6+8 tranchant + 3d6 feu (attirer 7.5m)",traits:"Aura de feu (3d6), Agonie mortelle (explosion 6m, 20d6 feu JdS DEX DD 20), Résistance à la magie, Armes magiques",source:"MM",desc:"Archidémon TG (RC19). Aura de feu 1.5m (3d6/début de tour). Explose à la mort (20d6 feu, zone 9m, JdS DEX DD20). Épée longue +14 (3d8+8+3d8 foudre). Fouet 9m +14 (2d6+8+3d6 feu + tire). 3 actions légendaires. PV 262."},
     {name:"Banderhobb",cr:"5",type:"Monstruosité",size:"G",hp:"84 (8d10+40)",ac:"15 (naturelle)",speed:"9m",attacks:"Multi (2): Morsure +8, 2d8+5 perçant / Langue +8, 1d6+5 contondant + agripper",traits:"Ombre, Avaler, Pas de l'ombre",source:"VGM",desc:"Créature sombre créée par magie pour kidnapper des victimes."},
     {name:"Bandit",cr:"1/8",type:"Humanoïde",size:"M",hp:"11 (2d8+2)",ac:"12 (cuir)",speed:"9m",attacks:"Cimeterre +3, 1d6+1 tranchant / Arbalète légère +3, 1d8+1 perçant",traits:"—",source:"MM",desc:"Hors-la-loi sans scrupule qui vit de pillage."},
     {name:"Bandit capitaine",cr:"2",type:"Humanoïde",size:"M",hp:"65 (10d8+20)",ac:"15 (cuir clouté)",speed:"9m",attacks:"Multi (3): Dague +5, 1d4+3 perçant / Cimeterre +5, 1d6+3 tranchant",traits:"Parade (+2 CA vs une attaque)",source:"MM",desc:"Chef de bande expérimenté et charismatique."},
-    {name:"Banshie",cr:"4",type:"Mort-vivant",size:"M",hp:"58 (13d8)",ac:"12",speed:"0m, vol 12m (stationnaire)",attacks:"Toucher corrupteur +4, 3d6+2 nécrotique",traits:"Gémissement (JdS CON DD 13 ou 0 PV à 9m), Incorporelle, Résistance aux dégâts non-magiques, Détection de la vie",source:"MM",desc:"Mort-vivant incorporel. Détection des vivants à 1,5km. Lamentation (recharge 1/jour) : CON DD13 ou tombe à 0 PV. Toucher corrupteur (3d6 nécrotique). Immunité aux armes non-magiques non-argentées."},
+    {name:"Banshie",cr:"4",type:"Mort-vivant",size:"M",hp:"58 (13d8)",ac:"12",speed:"0m, vol 12m (stationnaire)",attacks:"Toucher corrupteur +4, 3d6+2 nécrotique",traits:"Gémissement (JdS CON DD 13 ou 0 PV à 9m), Incorporelle, Résistance aux dégâts non-magiques, Détection de la vie",source:"MM",desc:"Mort-vivante incorporelle (RC4). Hurlement mortel : toutes créatures à 18m ayant des PV (JdS CON DD13 ou tombent à 0 PV). Corruption funèbre (JdS CHA DD13 ou malédiction). Immunité aux armes non-magiques. PV 58."},
     {name:"Baphomet",cr:"23",type:"Fiélon (démon)",size:"TG",hp:"275 (22d12+132)",ac:"22 (naturelle)",speed:"12m",attacks:"Multi (3): Bardiche +17, 3d8+10 tranchant / Morsure +17, 2d10+10 perçant / Charge +17, 4d8+10 perçant",traits:"Résistance légendaire (3/jour), Résistance à la magie, Incantation innée, Prince des Bêtes, Actions légendaires, Mémoire labyrinthique",source:"MTF",desc:"Prince démon des minotaures et seigneur des labyrinthes."},
     {name:"Barde",cr:"2",type:"Humanoïde",size:"M",hp:"44 (8d8+8)",ac:"15 (chemise de mailles)",speed:"9m",attacks:"Multi (2): Épée courte +5, 1d6+3 perçant / Arc court +5, 1d6+3 perçant",traits:"Incantation (niv 4 barde), Chant de repos, Mots cinglants",source:"VGM",desc:"Artiste et conteur itinérant maîtrisant la magie par la musique."},
     {name:"Barghest",cr:"4",type:"Fiélon",size:"G",hp:"52 (8d10+8)",ac:"14 (naturelle)",speed:"18m (quadrupède)",attacks:"Morsure +6, 2d8+4 perçant",traits:"Changeur de forme (gobelin/chien), Dévorer les âmes, Incantation innée",source:"VGM",desc:"Fiélon métamorphe prenant la forme d'un gobelin ou d'un chien monstrueux."},
     {name:"Barlgura",cr:"5",type:"Fiélon (démon)",size:"G",hp:"68 (8d10+24)",ac:"15 (naturelle)",speed:"12m, escalade 12m",attacks:"Multi (3): Morsure +7, 2d8+4 perçant / Poing +7, 1d10+4 contondant",traits:"Charge téméraire, Incantation innée (Déguisement, Invisibilité)",source:"MM",desc:"Démon simien féroce et agile, terreur des forêts abyssales."},
-    {name:"Basilic",cr:"3",type:"Monstruosité",size:"M",hp:"52 (8d8+16)",ac:"15 (naturelle)",speed:"6m",attacks:"Morsure +5, 2d6+3 perçant + 2d6 poison",traits:"Regard pétrifiant (JdS CON DD 12 ou pétrification)",source:"MM",desc:"Lézard pétrifiant. Regard pétrifiant : CON DD12, pétrifié en 24h si raté 3 fois de suite. Son sang peut défaire la pétrification."},
+    {name:"Basilic",cr:"3",type:"Monstruosité",size:"M",hp:"52 (8d8+16)",ac:"15 (naturelle)",speed:"6m",attacks:"Morsure +5, 2d6+3 perçant + 2d6 poison",traits:"Regard pétrifiant (JdS CON DD 12 ou pétrification)",source:"MM",desc:"Monstruosité (RC3). Regard pétrifiant : contact oculaire (JdS CON DD12, pétrifié progressivement). Morsure +5 (2d6+3 + 2d6 poison). Même pétrifié par soi-même si miroir. PV 52."},
     {name:"Baël",cr:"19",type:"Fiélon (diable)",size:"G",hp:"189 (18d10+90)",ac:"18 (harnois)",speed:"9m",attacks:"Multi (3): Marteau infernal +13, 2d8+8 contondant + 3d8 tonnerre",traits:"Résistance à la magie, Aura de commandement, Incantation innée, Actions légendaires, Régénération",source:"MTF",desc:"Archiduc déchu des Enfers, ancien seigneur de la première strate."},
     {name:"Bec-de-hache",cr:"1/4",type:"Bête",size:"G",hp:"19 (3d10+3)",ac:"11",speed:"15m",attacks:"Bec +4, 1d8+2 tranchant",traits:"—",source:"MM",desc:"Oiseau coureur géant au bec tranchant comme une hache."},
     {name:"Bel",cr:"25",type:"Fiélon (diable)",size:"G",hp:"364 (27d10+216)",ac:"19 (naturelle)",speed:"9m, vol 18m",attacks:"Multi (3): Épée +15, 4d6+9 tranchant + 6d6 feu",traits:"Résistance légendaire (3/jour), Résistance à la magie, Actions légendaires, Aura de terreur",source:"MTF",desc:"Ancien archiduc d'Averne, général des armées infernales."},
@@ -4794,7 +4854,7 @@ const COMPENDIUM_DATA = {
     {name:"Blaireau",cr:"0",type:"Bête",size:"TP",hp:"3 (1d4+1)",ac:"10",speed:"6m, fouissement 1.5m",attacks:"Morsure +2, 1 perçant",traits:"Perception aiguisée (odorat)",source:"MM",desc:"Petit mammifère fouisseur au caractère belliqueux."},
     {name:"Blaireau géant",cr:"1/4",type:"Bête",size:"M",hp:"13 (2d8+4)",ac:"10",speed:"9m, fouissement 3m",attacks:"Multi (2): Morsure +3, 1d6+1 perçant / Griffes +3, 2d4+1 tranchant",traits:"Perception aiguisée (odorat)",source:"MM",desc:"Blaireau massif et agressif."},
     {name:"Blarks",cr:"1/2",type:"Mort-vivant",size:"M",hp:"22 (4d8+4)",ac:"11",speed:"6m",attacks:"Griffes +3, 1d6+1 tranchant",traits:"Régénération 5 (acide/feu)",source:"MPMM",desc:"Mort-vivant résistant aux blessures ordinaires."},
-    {name:"Blême",cr:"2",type:"Mort-vivant",size:"M",hp:"22 (5d8)",ac:"12",speed:"9m",attacks:"Multi (2): Morsure +2, 2d6 perçant / Griffes +4, 2d4+2 tranchant",traits:"Griffes paralysantes (JdS CON DD 10 ou paralysie, 1 min)",source:"MM",desc:"Moisissure mortelle qui explose en nuage de spores (CON DD11 : empoisonné 1 min). Se divise quand touché par des dégâts tranchants ou perforants."},
+    {name:"Blême",cr:"2",type:"Mort-vivant",size:"M",hp:"22 (5d8)",ac:"12",speed:"9m",attacks:"Multi (2): Morsure +2, 2d6 perçant / Griffes +4, 2d4+2 tranchant",traits:"Griffes paralysantes (JdS CON DD 10 ou paralysie, 1 min)",source:"MM",desc:"Aberration (RC8). Regard hypnotisant (JdS SAG DD13 ou charme 30j). Yeux perturbants (désavantage aux attaques ennemies). Résistance magique. PV 97."},
     {name:"Bodak",cr:"6",type:"Mort-vivant",size:"M",hp:"58 (9d8+18)",ac:"15 (naturelle)",speed:"9m",attacks:"Poing +5, 1d4+2 contondant + 2d8 nécrotique",traits:"Regard mortel (JdS CON DD 13 ou 0 PV), Aura de mort, Sensibilité à la lumière du soleil",source:"VGM",desc:"Créature autrefois vivante transformée par un regard dans les Abysses."},
     {name:"Boiseux",cr:"1/4",type:"Plante",size:"P",hp:"10 (3d6)",ac:"13 (naturelle)",speed:"6m",attacks:"Griffes +3, 1d4+1 tranchant",traits:"Faux-semblant (dans la végétation)",source:"MPMM",desc:"Petite créature végétale semblable à un tas de branches animées."},
     {name:"Bonnet rouge",cr:"3",type:"Fée",size:"P",hp:"45 (6d6+24)",ac:"13 (naturelle)",speed:"7.5m",attacks:"Multi (3): Faucille +6, 2d4+4 tranchant / Coup de botte ferré +6, 1d6+4 contondant",traits:"Puissance surnaturelle, Bottes de fer, Baigner le bonnet (absorber le sang)",source:"VGM",desc:"Fée malfaisante trempant son bonnet dans le sang de ses victimes."},
@@ -4804,9 +4864,9 @@ const COMPENDIUM_DATA = {
     {name:"Brutacien",cr:"2",type:"Humanoïde",size:"M",hp:"45 (6d8+18)",ac:"14 (cuir)",speed:"9m",attacks:"Multi (2): Marteau de guerre +5, 1d8+3 contondant",traits:"Rage brutale",source:"MPMM",desc:"Guerrier brutal et féroce."},
     {name:"Brutacien chevalier",cr:"5",type:"Humanoïde",size:"M",hp:"78 (12d8+24)",ac:"17 (demi-plate)",speed:"9m",attacks:"Multi (3): Marteau de guerre +7, 1d8+4 contondant",traits:"Commandement, Parade",source:"MPMM",desc:"Chevalier brutacien commandant ses troupes avec autorité."},
     {name:"Buffle géant",cr:"2",type:"Bête",size:"G",hp:"42 (5d10+15)",ac:"12 (naturelle)",speed:"12m",attacks:"Charge +5, 2d6+3 contondant",traits:"Charge (2d6 bonus si élan de 6m)",source:"VGM",desc:"Énorme buffle des prairies sauvages."},
-    {name:"Bulette",cr:"5",type:"Monstruosité",size:"G",hp:"94 (9d10+45)",ac:"17 (naturelle)",speed:"12m, fouissement 12m",attacks:"Morsure +7, 4d12+4 perçant",traits:"Saut dévastateur (attaque de zone en retombant), Fouissement",source:"MM",desc:"Prédateur souterrain blindé. Saut fatal : atterrit sur des créatures dans une zone, 3d6+4 contondant, DEX DD16 ou renversé. Morsure puissante : 4d12+4 perforant."},
+    {name:"Bulette",cr:"5",type:"Monstruosité",size:"G",hp:"94 (9d10+45)",ac:"17 (naturelle)",speed:"12m, fouissement 12m",attacks:"Morsure +7, 4d12+4 perçant",traits:"Saut dévastateur (attaque de zone en retombant), Fouissement",source:"MM",desc:"Monstruosité blindée (RC5). Bond depuis le sol : atterrit en zone (4d12+4 contondant, JdS DEX DD16). Morsure +7 (4d12+4). Maîtrise de saut 15m+. PV 94."},
     {name:"Bulezau",cr:"3",type:"Fiélon (démon)",size:"M",hp:"52 (7d8+21)",ac:"14 (naturelle)",speed:"12m",attacks:"Cornes +5, 2d6+3 perçant + maladie",traits:"Course rotative, Charge (2d6 bonus)",source:"MTF",desc:"Démon à cornes répandant la maladie."},
-    {name:"Béhir",cr:"11",type:"Monstruosité",size:"TG",hp:"168 (16d12+64)",ac:"17 (naturelle)",speed:"15m, escalade 12m",attacks:"Multi (2): Morsure +10, 3d10+6 perçant / Constriction +10, 2d10+6 contondant + agripper",traits:"Souffle de foudre (ligne 6m, 12d10 foudre JdS DEX DD 16), Avaler",source:"MM",desc:"Serpent gigantesque à 12 pattes. Foudre (recharge 5-6) : ligne 20m, 12d10 foudre. Morsure + constriction (3d10+6, agrippé évasion DD16, aveuglé). Avale les cibles agrippées (6d6/tour)."},
+    {name:"Béhir",cr:"11",type:"Monstruosité",size:"TG",hp:"168 (16d12+64)",ac:"17 (naturelle)",speed:"15m, escalade 12m",attacks:"Multi (2): Morsure +10, 3d10+6 perçant / Constriction +10, 2d10+6 contondant + agripper",traits:"Souffle de foudre (ligne 6m, 12d10 foudre JdS DEX DD 16), Avaler",source:"MM",desc:"Monstruosité serpentiforme (RC11). Souffle de foudre 12d10 en ligne 6m (Recharge 5-6, JdS DEX DD16). Morsure +10 (3d10+6). Agrippe et avale. PV 168."},
     {name:"Bélaphoss",cr:"11",type:"Fiélon",size:"G",hp:"136 (16d10+48)",ac:"17 (naturelle)",speed:"9m, vol 12m",attacks:"Multi (2): Griffes +9, 2d8+5 tranchant + 2d6 nécrotique",traits:"Résistance à la magie, Aura de terreur",source:"MPMM",desc:"Fiélon puissant et terrifiant."},
     {name:"Bélial",cr:"22",type:"Fiélon (diable)",size:"G",hp:"285 (30d10+120)",ac:"20 (naturelle)",speed:"9m, vol 18m",attacks:"Multi (3): Fourche +16, 3d8+9 perçant + 3d6 feu",traits:"Résistance légendaire (3/jour), Résistance à la magie, Incantation innée, Actions légendaires",source:"MPMM",desc:"Archiduc du Quatrième Enfer, maître de la tromperie."},
     {name:"Bélier géant",cr:"2",type:"Bête",size:"G",hp:"76 (9d10+27)",ac:"14 (naturelle)",speed:"12m",attacks:"Coup de bélier +7, 2d6+5 contondant",traits:"Charge (renverser, JdS FOR DD 15)",source:"VGM",desc:"Mouflon colossal aux cornes redoutables."},
@@ -4820,7 +4880,7 @@ const COMPENDIUM_DATA = {
     {name:"Cambion",cr:"5",type:"Fiélon",size:"M",hp:"82 (11d8+33)",ac:"19 (écailles)",speed:"9m, vol 18m",attacks:"Multi (2): Lance +7, 1d6+4 perçant ou 1d8+4 (2 mains) + 1d6 feu",traits:"Héritage fiélonique, Charme fiélonique (JdS SAG DD 14), Incantation innée",source:"MM",desc:"Rejeton d'un fiélon et d'un humanoïde, être torturé entre deux natures."},
     {name:"Canoloth",cr:"8",type:"Fiélon (yugolothe)",size:"M",hp:"120 (16d8+48)",ac:"16 (naturelle)",speed:"9m",attacks:"Multi (2): Morsure +7, 2d8+4 perçant / Langue +7, 2d8+4 tranchant (attirer)",traits:"Résistance à la magie, Vision dimensionnelle, Langue préhensile",source:"MTF",desc:"Yugolothe gardien à la langue tranchante comme un rasoir."},
     {name:"Catoblépas",cr:"5",type:"Monstruosité",size:"G",hp:"84 (8d10+40)",ac:"14 (naturelle)",speed:"9m",attacks:"Queue +7, 5d6+4 contondant + étourdir",traits:"Rayon de mort (JdS CON DD 16 ou 8d8 nécrotique, halving), Puanteur",source:"VGM",desc:"Créature des marais au regard mortel et à la queue puissante."},
-    {name:"Centaure",cr:"2",type:"Monstruosité",size:"G",hp:"45 (6d10+12)",ac:"12",speed:"15m",attacks:"Multi (2): Pique +6, 1d10+4 perçant / Sabots +6, 2d6+4 contondant",traits:"Charge (sabots bonus si élan de 9m)",source:"MM",desc:"Humanoïde-cheval des plaines. Charge : si déplacement 9m+, 3d6+4 perforant supplémentaires. Sabots (2d6+4), lance (1d6+4), arc long."},
+    {name:"Centaure",cr:"2",type:"Monstruosité",size:"G",hp:"45 (6d10+12)",ac:"12",speed:"15m",attacks:"Multi (2): Pique +6, 1d10+4 perçant / Sabots +6, 2d6+4 contondant",traits:"Charge (sabots bonus si élan de 9m)",source:"MM",desc:"Fée mi-homme mi-cheval (RC2). Charge +8, 2d6+4 perforant. Lance de cavalerie +6, 1d12+4. Sabots +4, 2d6+4 contondant. PV 45."},
     {name:"Cerf",cr:"0",type:"Bête",size:"M",hp:"4 (1d8)",ac:"13",speed:"15m",attacks:"Bois +2, 1d6 contondant / Sabots +2, 1d4 contondant",traits:"—",source:"MM",desc:"Cervidé majestueux des forêts tempérées."},
     {name:"Cerveau vénérable",cr:"10",type:"Aberration",size:"G",hp:"210 (20d10+100)",ac:"18 (naturelle)",speed:"1.5m, nage 3m",attacks:"Tentacule +7, 3d8+4 contondant + agripper",traits:"Souffle de l'esprit (cône 18m, JdS INT DD 18), Télépathie 1.5km, Actions légendaires, Nuage de saumure",source:"MM",desc:"Cerveau monstrueux commandant une colonie de flagelleurs mentaux."},
     {name:"Cerveau vénérable draconique",cr:"10",type:"Aberration",size:"G",hp:"136 (16d10+48)",ac:"15 (naturelle)",speed:"3m, vol 18m (stationnaire)",attacks:"Multi (2): Tentacule +8, 2d8+4 psychiques",traits:"Souffle psychique, Résistance à la magie, Télépathie 36m",source:"FTD",desc:"Cerveau ancien doté de pouvoirs draconiques et psychiques."},
@@ -4835,7 +4895,7 @@ const COMPENDIUM_DATA = {
     {name:"Chauve-souris",cr:"0",type:"Bête",size:"TP",hp:"1 (1d4-1)",ac:"12",speed:"1.5m, vol 9m",attacks:"Morsure +0, 1 perçant",traits:"Écholocation 18m, Perception aiguisée (ouïe)",source:"MM",desc:"Petit chiroptère nocturne."},
     {name:"Chauve-souris garou",cr:"3",type:"Humanoïde (métamorphe)",size:"M",hp:"45 (7d8+14)",ac:"12 (naturelle)",speed:"9m, vol 18m (forme hybride)",attacks:"Morsure +4, 1d6+2 perçant (lycanthropie)",traits:"Changeur de forme, Écholocation 18m, Immunité contondant/perçant/tranchant non-argenté",source:"MM",desc:"Lycanthrope se transformant en chauve-souris géante."},
     {name:"Chauve-souris géante",cr:"1/4",type:"Bête",size:"G",hp:"22 (4d10)",ac:"13",speed:"3m, vol 18m",attacks:"Morsure +4, 1d6+2 perçant",traits:"Écholocation 18m, Perception aiguisée (ouïe)",source:"MM",desc:"Chiroptère de grande taille chassant dans les cavernes."},
-    {name:"Cheval de guerre",cr:"1/2",type:"Bête",size:"G",hp:"19 (3d10+3)",ac:"11",speed:"18m",attacks:"Sabots +6, 2d6+4 contondant",traits:"Charge piétinante (renverser si élan 6m)",source:"MM",desc:"Destrier entraîné au combat."},
+    {name:"Cheval de guerre",cr:"1/2",type:"Bête",size:"G",hp:"19 (3d10+3)",ac:"11",speed:"18m",attacks:"Sabots +6, 2d6+4 contondant",traits:"Charge piétinante (renverser si élan 6m)",source:"MM",desc:"Squelette de cheval de guerre. Ténacité. Sabots +4 (2d6+2). PV 22."},
     {name:"Cheval de selle",cr:"1/4",type:"Bête",size:"G",hp:"13 (2d10+2)",ac:"10",speed:"18m",attacks:"Sabots +5, 2d4+3 contondant",traits:"—",source:"MM",desc:"Cheval de monte commun."},
     {name:"Cheval de trait",cr:"1/4",type:"Bête",size:"G",hp:"19 (3d10+3)",ac:"10",speed:"12m",attacks:"Sabots +6, 2d4+4 contondant",traits:"—",source:"MM",desc:"Cheval robuste de labour et de traction."},
     {name:"Chevalier",cr:"3",type:"Humanoïde",size:"M",hp:"52 (8d8+16)",ac:"18 (harnois)",speed:"9m",attacks:"Multi (2): Épée à deux mains +5, 2d6+3 tranchant",traits:"Brave, Commandement",source:"MM",desc:"Guerrier noble en armure lourde, chef naturel."},
@@ -4844,11 +4904,11 @@ const COMPENDIUM_DATA = {
     {name:"Chevalier squelettique",cr:"3",type:"Mort-vivant",size:"M",hp:"52 (8d8+16)",ac:"18 (harnois)",speed:"9m",attacks:"Multi (2): Épée longue +5, 1d8+3 tranchant",traits:"Résistance aux dégâts non-magiques contondant/perçant/tranchant, Immunité au poison",source:"MPMM",desc:"Squelette en armure gardant d'anciens tombeaux."},
     {name:"Chien de chasse infernal",cr:"3",type:"Fiélon",size:"M",hp:"45 (7d8+14)",ac:"15 (naturelle)",speed:"15m",attacks:"Morsure +5, 1d8+3 perçant + 2d6 feu",traits:"Perception aiguisée (odorat, ouïe), Tactique de meute, Immunité feu",source:"MM",desc:"Chien de l'enfer crachant des flammes."},
     {name:"Chien de chasse yeth",cr:"4",type:"Fée",size:"G",hp:"51 (6d10+18)",ac:"14 (naturelle)",speed:"12m, vol 12m (planant)",attacks:"Morsure +6, 2d6+4 perçant + terreur",traits:"Hurlement terrifiant (JdS SAG DD 14), Sensibilité à la lumière du soleil, Vol",source:"VGM",desc:"Chien féerique spectral dont le hurlement glace le sang."},
-    {name:"Chien du trépas",cr:"1",type:"Monstruosité",size:"M",hp:"39 (6d8+12)",ac:"12",speed:"12m",attacks:"Morsure +4, 1d8+2 perçant + maladie",traits:"Deux têtes (avantage Perception)",source:"MM",desc:"Chien mort-vivant. Immunité aux effets de charme/peur/poison. Morsure paralysante (CON DD13, paralysé 1 min)."},
+    {name:"Chien du trépas",cr:"1",type:"Monstruosité",size:"M",hp:"39 (6d8+12)",ac:"12",speed:"12m",attacks:"Morsure +4, 1d8+2 perçant + maladie",traits:"Deux têtes (avantage Perception)",source:"MM",desc:"Mort-vivant (RC1). Morsure +3 (2d6+1 perforant + JdS CON DD11 ou empoisonné). PV 39."},
     {name:"Chien esquiveur",cr:"1/4",type:"Fée",size:"M",hp:"22 (4d8+4)",ac:"13",speed:"12m",attacks:"Morsure +3, 1d6+1 perçant",traits:"Perception aiguisée (ouïe, odorat), Téléportation (12m, action bonus)",source:"MM",desc:"Canidé féerique capable de se téléporter à courte distance."},
     {name:"Chien sauvage",cr:"0",type:"Bête",size:"P",hp:"4 (1d6+1)",ac:"12",speed:"12m",attacks:"Morsure +2, 1d4 perçant",traits:"Perception aiguisée (ouïe, odorat)",source:"VGM",desc:"Petit chien sauvage chassant en meute."},
     {name:"Chien sauvage dominant",cr:"1/4",type:"Bête",size:"P",hp:"7 (2d6)",ac:"13",speed:"12m",attacks:"Morsure +3, 1d6+1 perçant",traits:"Tactique de meute, Perception aiguisée",source:"VGM",desc:"Chef de meute de chiens sauvages."},
-    {name:"Chimère",cr:"6",type:"Monstruosité",size:"G",hp:"114 (12d10+48)",ac:"14 (naturelle)",speed:"9m, vol 18m",attacks:"Multi (3): Morsure +7, 2d6+4 perçant / Cornes +7, 1d12+4 contondant / Griffes +7, 2d6+4 tranchant",traits:"Souffle de feu (cône 4.5m, 7d8 feu JdS DEX DD 15, recharge 5-6)",source:"MM",desc:"Monstre tricéphale (lion/chèvre/dragon). Souffle de feu (recharge 5-6) : cône 15m, 7d8 feu. Trois attaques : morsure, cornes, griffes."},
+    {name:"Chimère",cr:"6",type:"Monstruosité",size:"G",hp:"114 (12d10+48)",ac:"14 (naturelle)",speed:"9m, vol 18m",attacks:"Multi (3): Morsure +7, 2d6+4 perçant / Cornes +7, 1d12+4 contondant / Griffes +7, 2d6+4 tranchant",traits:"Souffle de feu (cône 4.5m, 7d8 feu JdS DEX DD 15, recharge 5-6)",source:"MM",desc:"Monstruosité à 3 têtes (RC6). Souffle de feu 7d8 en cône 9m (Recharge 5-6, JdS DEX DD13). 3 attaques : morsure +6, cornes +6, griffes +6. PV 114."},
     {name:"Chitineux",cr:"1/2",type:"Monstruosité",size:"P",hp:"18 (4d6+4)",ac:"14 (naturelle)",speed:"9m, escalade 9m",attacks:"Multi (2): Morsure +4, 1d6+2 perçant / Dague +4, 1d4+2 perçant",traits:"Marche sur les murs, Toile, Vision dans le noir",source:"VGM",desc:"Créature arachnoïde au service des choldrithes et de Lolth."},
     {name:"Choldrithe",cr:"3",type:"Monstruosité",size:"M",hp:"66 (12d8+12)",ac:"15 (naturelle)",speed:"9m, escalade 9m",attacks:"Multi (2): Dague +5, 1d4+3 perçant + 2d6 poison",traits:"Marche sur les murs, Incantation innée (sorts de clerc), Toile",source:"VGM",desc:"Créature arachnoïde prêtresse servant Lolth dans l'Outreterre."},
     {name:"Chouette",cr:"0",type:"Bête",size:"TP",hp:"1 (1d4-1)",ac:"11",speed:"1.5m, vol 18m",attacks:"Serres +3, 1 tranchant",traits:"Vol rasant, Perception aiguisée (vue, ouïe)",source:"MM",desc:"Rapace nocturne silencieux."},
@@ -4872,7 +4932,7 @@ const COMPENDIUM_DATA = {
     {name:"Compagnon drake",cr:"1",type:"Dragon",size:"P",hp:"19 (3d6+9)",ac:"14 (naturelle)",speed:"12m",attacks:"Morsure +5, 1d6+3 perçant",traits:"Souffle infusé, Bond, Résistance élémentaire",source:"FTD",desc:"Petit drake loyal servant de compagnon à un rôdeur."},
     {name:"Consul de fer",cr:"8",type:"Artificiel",size:"M",hp:"110 (13d8+52)",ac:"18 (naturelle)",speed:"9m",attacks:"Multi (2): Épée +8, 2d8+5 tranchant + 2d6 feu",traits:"Immunité au feu, au poison, Résistance à la magie",source:"MPMM",desc:"Automate diplomate au service d'entités infernales."},
     {name:"Corbeau",cr:"0",type:"Bête",size:"TP",hp:"1 (1d4-1)",ac:"12",speed:"3m, vol 15m",attacks:"Bec +4, 1 perçant",traits:"Mimétisme (imiter des sons)",source:"MM",desc:"Oiseau noir intelligent capable d'imiter des sons."},
-    {name:"Couatl",cr:"4",type:"Céleste",size:"M",hp:"97 (13d8+39)",ac:"19 (naturelle)",speed:"9m, vol 27m",attacks:"Multi (2): Morsure +8, 1d6+5 perçant + 4d8 radiant / Constriction +6, 2d6+3 contondant",traits:"Sens magiques, Résistance à la magie, Changeur de forme, Incantation innée, Bouclier protecteur",source:"MM",desc:"Serpent ailé céleste. Lance des sorts de clerc (niv.9). Morsure : 4d6 perforant + poison (CON DD13, inconscient). Changement de forme. Immunité aux armes non-magiques non-bénies."},
+    {name:"Couatl",cr:"4",type:"Céleste",size:"M",hp:"97 (13d8+39)",ac:"19 (naturelle)",speed:"9m, vol 27m",attacks:"Multi (2): Morsure +8, 1d6+5 perçant + 4d8 radiant / Constriction +6, 2d6+3 contondant",traits:"Sens magiques, Résistance à la magie, Changeur de forme, Incantation innée, Bouclier protecteur",source:"MM",desc:"Céleste ailé (RC4). Lance des sorts. Morsure +6 (1d6+4, JdS CON DD13 ou endormi 24h). Enveloppement +6 (2d6+4, agrippe). Changement de forme. PV 97."},
     {name:"Coursier géant",cr:"1",type:"Bête",size:"G",hp:"26 (4d10+4)",ac:"12",speed:"21m",attacks:"Sabots +6, 2d6+4 contondant",traits:"—",source:"MPMM",desc:"Immense cheval sauvage d'une rapidité extraordinaire."},
     {name:"Crabe",cr:"0",type:"Bête",size:"TP",hp:"2 (1d4)",ac:"11 (naturelle)",speed:"6m, nage 6m",attacks:"Pince +0, 1 contondant",traits:"Amphibie",source:"MM",desc:"Petit crustacé commun."},
     {name:"Crabe des cavernes",cr:"1/2",type:"Bête",size:"G",hp:"22 (3d10+6)",ac:"15 (naturelle)",speed:"9m, escalade 9m",attacks:"Pince +4, 2d6+2 contondant",traits:"Faux-semblant (rocher)",source:"MPMM",desc:"Crabe géant cavernicole se camouflant en rocher."},
@@ -4885,17 +4945,17 @@ const COMPENDIUM_DATA = {
     {name:"Crocodile",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête aquatique. Morsure : 1d10+4 perforant + agrippé (évasion DD12). Maintien : maintient agrippé sous l'eau (suffocation)."},
     {name:"Crocodile Geant",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Bête reptilienne massive. Morsure : 3d10+7 perforant + agrippé. Maintien dans l'eau. 2 attaques."},
     {name:"Crokek Toeck",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon grenouille géant. Morsure massive. Avalage de créatures de taille P."},
-    {name:"Cube Gelatineux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Vase gélatineuse transparente de 3m de côté. Transparent (Perception DD15). Engloutit les créatures (CON DD12, 6d6 acide/tour). Résistance aux armes non-magiques. Immunité foudre/froid."},
+    {name:"Cube Gelatineux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Ooze cubique quasi-invisible (RC2). Engloutissement (agrippe, dissout intérieur 6d6 acide/tour). Corps acide (1d6 si contact). PV 84."},
     {name:"Cuirassier Astral",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Construct de githyanki. Armure vivante psychique. Résistance à la magie."},
     {name:"Cultiste",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde fanatique. Résistance aux charmes. Cimeterre 1d6+2 ou poignard. Peu puissant mais nombreux."},
-    {name:"Cyclope",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Géant à un œil. Manque de profondeur : désavantage aux jets d'attaque à distance. Massue géante : 3d10+9 contondant. 2 attaques."},
+    {name:"Cyclope",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Géant (RC6). Désavantage à toutes les attaques (un œil). Massue +9 (3d10+7). Rocher +9 (3d10+7, longue distance). Émergence à l'aube (si KO, se relève). PV 138."},
     {name:"Cérébrum",cr:"1",type:"Aberration",size:"TP",hp:"21 (6d4+6)",ac:"12",speed:"0m, vol 9m (stationnaire)",attacks:"Tentacule +4, 1d4+2 psychiques",traits:"Télépathie 18m, Détection des pensées, Prise de contrôle",source:"VGM",desc:"Cerveau flottant doté de tentacules, serviteur des flagelleurs mentaux."},
     {name:"Cérémorphe ettin",cr:"6",type:"Aberration",size:"G",hp:"85 (10d10+30)",ac:"14 (naturelle)",speed:"12m",attacks:"Multi (2): Tentacule +7, 2d6+4 psychiques",traits:"Deux têtes (avantage Perception), Extraction cérébrale, Télépathie 36m",source:"MPMM",desc:"Ettin transformé par le processus de cérébromorphose illithide."},
     {name:"Dao",cr:"5",type:"Élémentaire",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Génie de la terre. Creusement 9m. Sorts innés. Emprisonnement (enfermer dans la terre). Lance + maul."},
     {name:"Dauphin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Bête marine intelligente. Nage 18m. Écholocation. Morsure : 1d6+2. Charge : si 9m+, 1d6+2 extra."},
     {name:"Dauphin Enchanteur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Defenseur d'Acier",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Construct artificier. Armure magique auto-réparatrice. Attaques mécaniques."},
-    {name:"Demi Dragon Rouge Veteran",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Vétéran mi-dragon rouge. Souffle de feu. Résistance au feu. Compétences martiales."},
+    {name:"Demi Dragon Rouge Veteran",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Jeune dragon rouge (RC4). Souffle de feu 7d6 en cône 4.5m. PV 75."},
     {name:"Demi Liche",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant semi-lichifié. Sorts puissants. Toucher paralysant. Résistance armes non-magiques."},
     {name:"Demi Ogre",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Mi-homme mi-ogre. Massue géante (2d8+5). Grande taille et force."},
     {name:"Demogorgon",cr:"23",type:"Monstruosité",size:"M",hp:"350 (27d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Seigneur démon légendaire. Regard de démence. Sorts puissants. 3 actions légendaires."},
@@ -4903,26 +4963,26 @@ const COMPENDIUM_DATA = {
     {name:"Derro",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Humanoïde aberrant souterrain. Résistance à la magie. Folie. Carrelet 1d6."},
     {name:"Derro Savant",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Derro lanceur de sorts. Sorts d'enchantement. Folie magique."},
     {name:"Deslor",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Créature myconide géante. Spores psychiques. Réseau de spores."},
-    {name:"Destrier Noir",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Destrier infernal. Sabots enflammés (3d6+4+2d8 feu). Résistance feu."},
+    {name:"Destrier Noir",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Cheval fiélon (RC3). Sabots (2d6+4). Frayeur de zone (JdS SAG DD11). Vol. Se dissout dans les ombres. PV 68."},
     {name:"Deuilgivre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant de glace. Froid mortel. Toucher glacial."},
     {name:"Deva",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Ange messager céleste. Résistance à la magie. Immunité charme/peur. Masse de guerre magique (1d8+5+4d8 radiant). Guérison. Changement de forme. Sorts innés."},
     {name:"Devastateur Gris",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Céleste. Vitesse 9m. CA 14. PV 65 (8d8). Attaque +7."},
     {name:"Devoreur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Grande aberration. Corps dévorant. Engloutit les créatures. Pseudopodes multiples."},
     {name:"Devoreur d'Intellect",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Aberration psionique. Attaque de cerveau (consomme l'intelligence, CHA DD14). Incorporelle dans le crâne."},
     {name:"Dhergoloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Yugoïoth petit. Tourbillon de griffes. Résistance à la magie. Sorts innés."},
-    {name:"Diable a Chaines",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable armé de chaînes animées. Aura de peur (DD15). Chaînes (DEX DD15, agrippé). Résistance à la magie. Immunité feu/poison."},
-    {name:"Diable Barbele",cr:"26",type:"Fiélon (diable)",size:"M",hp:"420 (30d8)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Grand diable épineux. Aura de peur (DD15). Pointes blessant les agrippeurs. 3 attaques. Immunité feu/poison. Résistance à la magie."},
-    {name:"Diable Barbu",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable à barbe empoisonnée (CON DD12, ne peut récupérer PV). Résistance à la magie. 3 attaques. Immunité feu/poison."},
-    {name:"Diable Cornu",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Puissant diable. 4 attaques (fourche/queue/griffes/morsure). Sorts innés. Résistance à la magie. Immunité feu/poison."},
+    {name:"Diable a Chaines",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable (RC8). Chaînes enlaçantes (agrippe+entrave JdS FOR DC17). Aura glaçante. Résistances multiples. 3 Actions légendaires. PV 85."},
+    {name:"Diable Barbele",cr:"26",type:"Fiélon (diable)",size:"M",hp:"420 (30d8)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Diable épineux (RC5). Aura de barbelures (1d10 feu perçant à qui combat adjacent). 3 attaques. Résistances multiples. PV 110."},
+    {name:"Diable Barbu",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable (RC5). Barbe infectieuse (JdS CON DD12 ou saigne jusqu'à soins magiques). 3 attaques (pique+griffes). PV 110."},
+    {name:"Diable Cornu",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Grand diable (RC11). Vol 18m. Fourche +10 (2d8+6 + 3d6 feu). Téléportation. Résistances multiples. PV 178."},
     {name:"Diable Epineux",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Grand diable à épines. Corps épineux (blesser les agrippeurs). Griffes + morsure. Résistance à la magie."},
-    {name:"Diable Gele",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable de glace. Vue infernale. Souffle de glace (recharge 5-6, CON DD12). Résistance à la magie. Immunité froid/poison."},
-    {name:"Diable Osseux",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable à queue venimeuse (CON DD13, empoisonné). Vol. Résistance à la magie. Immunité feu/poison."},
+    {name:"Diable Gele",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable du froid (RC9). Immunité froid. Dard +8 (2d8+4 + 5d6 froid + JdS CON DD14 ou empoisonné). PV 180."},
+    {name:"Diable Osseux",cr:"5",type:"Fiélon (diable)",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Diable (RC9). Queue scorpion venimeuse +8 (2d8+4 + 4d6 poison). Vol 18m. Résistances multiples. PV 142."},
     {name:"Diablion de Feu",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Petit diable de feu. Immunité feu. Corps brûlant. Morsure enflammée. Résistance à la magie."},
-    {name:"Diablotin",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Petit diable espion. Résistance à la magie. Invisibilité à volonté. Morsure venimeuse (CON DD11, empoisonné). Changement de forme (rat/corbeau/araignée)."},
-    {name:"Diantrefosse",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Diable énorme légendaire. Résistance à la magie. 3 actions légendaires. Peur aura DD16. Morsure, griffes, queue avec venin (3d6 perforant + 4d6 poison)."},
+    {name:"Diablotin",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Diable minuscule (RC1). Métamorphe (rat/corbeau/araignée/diable). Dard +5 (1d4+3 perforant, JdS CON DD11 ou empoisonné+effrayé). Résistance magique. Invisibilité. PV 10."},
+    {name:"Diantrefosse",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Diable (RC5). Résistances multiples. 2 griffes +5 (2d8+3) + pique venimeuse +5. PV 110."},
     {name:"Dispater",cr:"22",type:"Monstruosité",size:"M",hp:"330 (26d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Archidiable légendaire. Résistance à la magie. Sorts puissants. Régénération. 3 actions légendaires."},
-    {name:"Djinn",cr:"5",type:"Élémentaire",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Génie de l'air. Vortex d'air. Vol 27m. Sorts innés (Détection de la magie, Invisibilité, Soins importants, Vol). Création (objets non-magiques). Multiforme."},
-    {name:"Doppelganger",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Métamorphe. Amphibolique : avantage aux jets d'attaque si allié adjacent. Lecture des pensées. Lire les pensées (3m, SAG DD13). Changement de forme à volonté."},
+    {name:"Djinn",cr:"5",type:"Élémentaire",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Génie de l'air (RC11). Vol 27m. Tourbillon (crée tornade). Lance des sorts. Frappe aérienne +9 (2d8+5+2d8 tonnerre). Exauce 3 vœux. PV 161."},
+    {name:"Doppelganger",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Métamorphe (RC3). Lecture des pensées (JdS SAG DD13). Se transforme en tout humanoïde taille M/P. Attaque surprise +7 (2d6+4 + avantage si surprise). PV 52."},
     {name:"Dracohydre",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Hydre à 7 têtes draconiennes. Chaque tête a un souffle différent. Se régénère."},
     {name:"Dracoliche Bleue Adulte",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Dragon dracoliche adulte de foudre. Mort-vivant légendaire. Souffle de foudre. Résistance à la magie. Actions légendaires. Repaire."},
     {name:"Draconien Aurak",cr:"2",type:"Humanoïde",size:"G",hp:"45 (6d10)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Draconien d'or. Sorts puissants. Explosion à la mort (2d6). Métamorphe."},
@@ -4937,48 +4997,48 @@ const COMPENDIUM_DATA = {
     {name:"Draconien Sivak",cr:"2",type:"Humanoïde",size:"G",hp:"45 (6d10)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Draconien d'argent. Changement de forme (copie les tués). Grand et puissant."},
     {name:"Draconnoeil",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Draegloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Dragon Blanc Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon blanc adulte légendaire. Souffle de froid (cône 18m, 12d8 froid). 3 actions légendaires."},
-    {name:"Dragon Blanc Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon blanc ancien. Souffle de froid (cône 27m, 16d8 froid). Présence terrifiante."},
+    {name:"Dragon Blanc Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Jeune dragon bleu (RC3). Souffle de foudre 2d10. PV 52."},
+    {name:"Dragon Blanc Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon blanc légendaire (RC20). Souffle glacial 16d8. 3 Actions légendaires. PV 333."},
     {name:"Dragon Blanc Dragonnet",cr:"2",type:"Dragon",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Dragon Blanc Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon blanc adolescent. Souffle de froid (cône 9m, 10d8 froid). Vol."},
-    {name:"Dragon Bleu Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon bleu adulte légendaire. Souffle de foudre (ligne 27m, 12d10 foudre). 3 actions légendaires."},
-    {name:"Dragon Bleu Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon bleu ancien légendaire. Souffle de foudre (ligne 36m, 16d10 foudre). Présence terrifiante."},
+    {name:"Dragon Blanc Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon blanc (RC9). Souffle glacial 10d8 en cône 15m. PV 152."},
+    {name:"Dragon Bleu Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon chromatique à foudre (RC16). Souffle de foudre 12d10 en ligne 27m (Recharge 5-6). 3 Actions légendaires. PV 225."},
+    {name:"Dragon Bleu Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon bleu légendaire (RC23). Souffle de foudre 16d10. PV 481."},
     {name:"Dragon Bleu Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon Bleu Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon bleu adolescent. Souffle de foudre (ligne 18m, 10d10 foudre). Sorts. Vol."},
+    {name:"Dragon Bleu Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon bleu (RC9). Souffle de foudre 10d10 en ligne 24m. PV 152."},
     {name:"Dragon Cave",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
-    {name:"Dragon d'Airain Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 18. PV 195 (18d12). Attaque +15."},
-    {name:"Dragon d'Airain Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 20. PV 290 (24d20). Attaque +15."},
+    {name:"Dragon d'Airain Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Jeune dragon d'airain (RC1). Souffle de feu 2d6. PV 16."},
+    {name:"Dragon d'Airain Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon d'airain légendaire (RC20). Souffle feu 14d6. PV 297."},
     {name:"Dragon d'Airain Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon d'Airain Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
+    {name:"Dragon d'Airain Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon d'airain (RC6). Souffle de feu 7d6. PV 110."},
     {name:"Dragon d'Amethyste Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
     {name:"Dragon d'Amethyste Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
     {name:"Dragon d'Amethyste Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Dragon d'Amethyste Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
-    {name:"Dragon d'Argent Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
-    {name:"Dragon d'Argent Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
+    {name:"Dragon d'Argent Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon métallique (RC16). Souffle glacial 12d8 ou gaz paralysant. 3 Actions légendaires. PV 243."},
+    {name:"Dragon d'Argent Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon d'argent légendaire (RC23). Souffle glacial 12d8. PV 487."},
     {name:"Dragon d'Argent Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon d'Argent Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
+    {name:"Dragon d'Argent Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon d'argent (RC9). Souffle glacial 10d8. PV 168."},
     {name:"Dragon d'Emeraude Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
     {name:"Dragon d'Emeraude Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
     {name:"Dragon d'Emeraude Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Dragon d'Emeraude Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
     {name:"Dragon d'Ombre Rouge Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
-    {name:"Dragon d'Or Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
-    {name:"Dragon d'Or Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
+    {name:"Dragon d'Or Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon métallique bienveillant (RC17). Souffles feu 12d6 ou gaz d'affaiblissement. 3 Actions légendaires. PV 256."},
+    {name:"Dragon d'Or Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon d'or légendaire (RC24). Souffle de feu 13d6. PV 546."},
     {name:"Dragon d'Or Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon d'Or Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
-    {name:"Dragon de Bronze Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
-    {name:"Dragon de Bronze Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
+    {name:"Dragon d'Or Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon d'or bienveillant (RC10). Souffle de feu 10d6. PV 178."},
+    {name:"Dragon de Bronze Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon amphibie (RC15). Souffles foudre 12d10 ou repoussement. 3 Actions légendaires. PV 212."},
+    {name:"Dragon de Bronze Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon de bronze légendaire (RC22). Souffle foudre 16d10. PV 444."},
     {name:"Dragon de Bronze Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon de Bronze Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
+    {name:"Dragon de Bronze Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon de bronze amphibie (RC8). Souffle de foudre 8d10. PV 142."},
     {name:"Dragon de Cristal Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
     {name:"Dragon de Cristal Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
     {name:"Dragon de Cristal Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Dragon de Cristal Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
-    {name:"Dragon de Cuivre Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 18. PV 195 (18d12). Attaque +15."},
-    {name:"Dragon de Cuivre Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 20. PV 290 (24d20). Attaque +15."},
+    {name:"Dragon de Cuivre Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon espiègle (RC14). Souffles acide 12d8 ou ralentissement. 3 Actions légendaires. PV 184."},
+    {name:"Dragon de Cuivre Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon de cuivre légendaire (RC21). Souffle acide 14d8. PV 350."},
     {name:"Dragon de Cuivre Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon de Cuivre Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
+    {name:"Dragon de Cuivre Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon de cuivre (RC7). Souffle acide 9d8. PV 119."},
     {name:"Dragon de Saphir Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
     {name:"Dragon de Saphir Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
     {name:"Dragon de Saphir Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
@@ -4993,35 +5053,35 @@ const COMPENDIUM_DATA = {
     {name:"Dragon des Profondeurs Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
     {name:"Dragon Fantome",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
     {name:"Dragon Feerique",cr:"2",type:"Dragon",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Dragon Noir Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon noir adulte légendaire. Amphibie. Souffle d'acide (ligne 18m, 14d8 acide). 3 actions légendaires."},
-    {name:"Dragon Noir Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon noir ancien. Souffle d'acide (ligne 27m, 20d8 acide). Présence terrifiante."},
+    {name:"Dragon Noir Adulte",cr:"14",type:"Dragon",size:"TG",hp:"195 (18d12)",ac:"18",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon d'acide (RC14). Souffle d'acide 12d8 en ligne 18m. Amphibie. 3 Actions légendaires. PV 195."},
+    {name:"Dragon Noir Ancien",cr:"20",type:"Dragon",size:"Gig",hp:"290 (24d20)",ac:"20",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon noir légendaire (RC21). Souffle d'acide 14d8. PV 367."},
     {name:"Dragon Noir Dragonnet",cr:"2",type:"Dragon",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Dragon Noir Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon noir adolescent. Amphibie. Souffle d'acide (ligne 9m, 11d8 acide). Sorts."},
+    {name:"Dragon Noir Jeune",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon noir (RC7). Souffle d'acide 11d8 en ligne 15m. Amphibie. PV 127."},
     {name:"Dragon Pierre de Lune Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 19. PV 240 (21d12). Attaque +15."},
     {name:"Dragon Pierre de Lune Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
     {name:"Dragon Pierre de Lune Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Dragon Pierre de Lune Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
-    {name:"Dragon Rouge Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon rouge adulte légendaire. Souffle de feu (cône 18m, 18d6 feu). Sorts. 3 actions légendaires."},
-    {name:"Dragon Rouge Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon rouge ancien légendaire. Souffle de feu (cône 27m, 24d6 feu). Présence terrifiante. 3 actions légendaires."},
+    {name:"Dragon Rouge Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon du feu (RC17). Souffle de feu 18d6 en cône 18m. 3 Actions légendaires. PV 256."},
+    {name:"Dragon Rouge Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon rouge légendaire (RC24). Souffle de feu 26d6 en cône 24m. PV 546."},
     {name:"Dragon Rouge Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon Rouge Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon rouge adolescent. Souffle de feu (cône 9m, 16d6 feu). Sorts. Vol."},
-    {name:"Dragon Tortue",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon-tortue géant. Amphibie. Carapace (CA 20). Souffle de vapeur (cône 18m, CON DD18, 15d6 feu)."},
+    {name:"Dragon Rouge Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon rouge (RC10). Souffle de feu 16d6 en cône 9m. PV 178."},
+    {name:"Dragon Tortue",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon aquatique blindé (RC17). Souffle de vapeur 15d6 en cône 18m (JdS CON DD18). Amphibie. PV 341."},
     {name:"Dragon Tortue Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 21. PV 350 (27d20). Attaque +15."},
     {name:"Dragon Tortue Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Dragon Tortue Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 17. PV 135 (14d10). Attaque +13."},
-    {name:"Dragon Vert Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon vert adulte légendaire. Amphibie. Souffle de poison (cône 18m, 16d6 poison). 3 actions légendaires."},
-    {name:"Dragon Vert Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon vert ancien. Souffle de poison (cône 27m, 22d6 poison). Présence terrifiante."},
+    {name:"Dragon Vert Adulte",cr:"17",type:"Dragon",size:"TG",hp:"240 (21d12)",ac:"19",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Jeune dragon vert (RC2). Souffle de poison 3d6. PV 38."},
+    {name:"Dragon Vert Ancien",cr:"23",type:"Dragon",size:"Gig",hp:"350 (27d20)",ac:"21",speed:"9m, vol 18m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Dragon vert légendaire (RC22). Souffle de poison 22d6. PV 385."},
     {name:"Dragon Vert Dragonnet",cr:"3",type:"Dragon",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Dragon Vert Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon vert. Amphibie. Souffle de poison (cône 9m, 12d6 poison). Sorts."},
+    {name:"Dragon Vert Jeune",cr:"10",type:"Dragon",size:"G",hp:"135 (14d10)",ac:"17",speed:"9m, vol 18m",attacks:"Attaque +13",traits:"—",source:"MM",desc:"Dragon vert (RC8). Souffle de poison 12d6 en cône 9m. PV 136."},
     {name:"Dragonnel",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
     {name:"Drake Gardien",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"FTD",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Drakeide de Bahamut",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"FTD",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Drakeide de Sardior",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"FTD",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Drakeide de Tiamat",cr:"30",type:"Monstruosité",size:"M",hp:"666 (36d8)",ac:"25",speed:"9m",attacks:"Attaque +15",traits:"—",source:"FTD",desc:"Monstruosité. Vitesse 9m. CA 25. PV 666 (36d8). Attaque +15."},
     {name:"Draquelion",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 11. PV 13 (3d8). Attaque +2."},
-    {name:"Dretch",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon mineur puant. Nuage de bile (recharge 1-2) : CON DD11, empoisonné et incapable d'agir. Résistance au froid/feu/foudre."},
-    {name:"Drider",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Drow-araignée. Lance des sorts de druide. Marche sur les toiles. Déplacement araignée. Multi-attaque : morsure venimeuse (1d4 perforant + 2d8 poison) + épée longue. Sort inné."},
-    {name:"Drow",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Elfe des profondeurs. Magie des drows (Lumières dansantes, Feux follets, Ténèbres 1/jour). Résistance à la magie. Sensibilité à la lumière solaire. Épée courte + arbalète de poing (venin soporifique)."},
+    {name:"Dretch",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon minuscule (RC1/4). Flatulences nauséeuses (JdS CON DD11 ou désavantagé 1 min). Morsure +2 (1d6). Griffes +2 (2d4). PV 18."},
+    {name:"Drider",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mi-drow mi-araignée (RC6). Sorts de drow. Toile +6 (4d6+3, entrave). Morsure +6 (1d4+3 perforant + 2d8 poison). Escalade et toiles. PV 123."},
+    {name:"Drow",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Elfe des profondeurs (RC1/4). Résistance magique. Magie innée (danses des lumières, ténèbres, lévitation). Sensible à la lumière solaire (désavantage). Rapière +4, arc court +4 (1d6+2 + poison). PV 13."},
     {name:"Drow Arachnomancien",cr:"2",type:"Humanoïde",size:"G",hp:"45 (6d10)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 14. PV 45 (6d10). Attaque +5."},
     {name:"Drow Capitaine de Maison",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Drow Consort Favori",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
@@ -5033,8 +5093,8 @@ const COMPENDIUM_DATA = {
     {name:"Drow Pretresse de Lolth",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Druide",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Druide du Givre",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
-    {name:"Dryade",cr:"2",type:"Fée",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fée des forêts. Magie innée (Charme des animaux, Passage sans trace, Changement de forme, Porte des forêts). Charme (SAG DD14). Parler aux arbres et plantes."},
-    {name:"Duergar",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Nain gris des profondeurs. Résistance à la magie. Agrandissement (force doublée, dégâts doublés, 1 min). Invisibilité. Sensibilité à la lumière solaire."},
+    {name:"Dryade",cr:"2",type:"Fée",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fée arboricole (RC1). Charme (JdS SAG DD14). Fusion avec les arbres (téléportation via arbres). Parler aux plantes et animaux. Sorts innés. PV 22."},
+    {name:"Duergar",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Nain des profondeurs (RC1). Résistance charme/empoisonnement/paralysie. Agrandissement 1/jour. Invisibilité 1/jour. Désavantage en pleine lumière. Hachette de guerre +4. PV 26."},
     {name:"Duergar Amelame",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Duergar Despote",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Duergar Gardepierre",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
@@ -5071,7 +5131,7 @@ const COMPENDIUM_DATA = {
     {name:"Elric",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Elu du Dragon",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
     {name:"Empyreen",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Céleste. Vitesse 9m. CA 14. PV 65 (8d8). Attaque +7."},
-    {name:"Enlaceur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Plante piège tentaculaire. Faux tentacule : agrippé (évasion DD15). Tire les créatures vers sa bouche centrale. Jusqu'à 6 tentacules simultanés."},
+    {name:"Enlaceur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Se confond avec le sol (RC5). 8 tentacules +7 (1d6+4, agrippe et retient). Morsure +7 (4d6+4). Peut parler 2 langues. PV 114."},
     {name:"Epaulard",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Epee Volante",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, vol 18m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Arme animée. Antimagie. Attaque de rapière."},
     {name:"Epouvantail",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5092,8 +5152,8 @@ const COMPENDIUM_DATA = {
     {name:"Esprit Follet",cr:"1",type:"Fée",size:"P",hp:"33 (5d6)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Petite fée. Flèche somnifère (CON DD10). Invisibilité. Voir alignement."},
     {name:"Etrangleur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Etrilleur de Crane de Myrkul",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant crânien de Myrkul. Regard de mort. Drain de vie."},
-    {name:"Ettercap",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, escalade 9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Araignée-humanoïde. Marche sur les toiles. Morsure venimeuse (CON DD11, empoisonné). Toile (recharge 5-6) : entravé, FOR DD11. Tissage de toiles."},
-    {name:"Ettin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Géant à deux têtes. Deux cerveaux : désavantage aux jets d'attaque cachée. 2 attaques avec masses d'armes différentes par tête."},
+    {name:"Ettercap",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, escalade 9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Araignée humanoïde (RC2). Morsure +4 (1d8+2 perforant + JdS CON DD11 ou empoisonné). Toile Recharge 4-6 (entrave JdS DEX DD13). PV 44."},
+    {name:"Ettin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Géant à 2 têtes (RC4). Jamais surpris. Massue +7 (2d8+4). Hache +7 (2d6+4). Veille permanente. PV 85."},
     {name:"Evanescent",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Expert en Arts Martiaux",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Expert NIV 1",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
@@ -5131,7 +5191,7 @@ const COMPENDIUM_DATA = {
     {name:"Garde",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde soldat de base. Lance 1d6+1. Armure légère. Bouclier (+2 CA)."},
     {name:"Gardien Anime",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Statue protectrice animée. Sensibilité antimagie. 2 attaques de poing."},
     {name:"Gargantua",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Gargouille",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Statue animée de pierre. Apparence de pierre. 2 attaques : griffes+morsure. Immunité au poison/psychique."},
+    {name:"Gargouille",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Statue de pierre animée (RC2). Fausse apparence (ressemble à une gargouille inanimée). Vol 18m. 4 attaques : morsure+griffes×2+cornes. PV 52."},
     {name:"Garou Chacal",cr:"1/2",type:"Humanoïde (métamorphe)",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde (métamorphe). Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Gauth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Gazer",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 22 (4d6). Attaque +2."},
@@ -5173,19 +5233,19 @@ const COMPENDIUM_DATA = {
     {name:"Githzerai Illumine",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Githzerai Moine",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Githzerai Zerth",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
-    {name:"Glabrezu",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon majeur trompeur. 4 bras (2 pinces géantes + 2 humains). Pince : 2d10+9 contondant. Sorts innés (Confusion, Ténèbres, Métamorphose, Vœu). Résistance à la magie."},
+    {name:"Glabrezu",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon puissant (RC9). Télékinésie (soulève/déplace 500kg). Confusion (JdS SAG DD16 ou actions aléatoires). Sorts innés. Pinces +9 (2d10+5, agrippe). 3 Actions légendaires. PV 157."},
     {name:"Gladiateur",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Glasya",cr:"22",type:"Monstruosité",size:"M",hp:"330 (26d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 21. PV 330 (26d8). Attaque +15."},
-    {name:"Gnoll",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde hyène. Rampage : si tue avec morsure, déplace-toi et mords à nouveau (action bonus). Lance + morsure."},
+    {name:"Gnoll",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde hyène (RC1/2). Frénésie de sang (attaque bonus lance si créature tombe à 0 PV dans 9m). Lance +4, morsure +4, hachette +4. PV 22."},
     {name:"Gnoll Carnasseur",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Gnoll Chasseur",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Gnoll Croc de Yeenoghu",cr:"23",type:"Humanoïde",size:"G",hp:"350 (27d10)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 21. PV 350 (27d10). Attaque +15."},
     {name:"Gnoll Desseche",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Gnoll Seigneur de Meute",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
-    {name:"Gnome des Profondeurs Svirfnebelin",cr:"26",type:"Monstruosité",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 22. PV 420 (30d6). Attaque +15."},
-    {name:"Gobelin",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Petit humanoïde malin. Fuite agile : Foncer/Désengager AB. Attaque sournoise si allié adjacent."},
+    {name:"Gnome des Profondeurs Svirfnebelin",cr:"26",type:"Monstruosité",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Gnome des profondeurs (RC1/2). Camouflage. Sorts innés (cécité, fusion dans la pierre). PV 16."},
+    {name:"Gobelin",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Petit humanoïde (RC1/4). Esquive agile (Foncer/Se désengager en AB). Cimeterre +4 (1d6+2). Arc court +4 (1d6+2). PV 7."},
     {name:"Gobelin Chef",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 22. PV 420 (30d6). Attaque +15."},
-    {name:"Gobelours",cr:"26",type:"Humanoïde",size:"M",hp:"420 (30d8)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Grand humanoïde poilu. Attaque surprise : 2d6 extra si surprise. Portée allongée (2m). Massue : 2d6+2 contondant."},
+    {name:"Gobelours",cr:"26",type:"Humanoïde",size:"M",hp:"420 (30d8)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Grand humanoïde (RC1). Attaque surprise (+2d6 si cible n'a pas encore agi). Bras longs (+1.5m portée). Masse +3 (2d6+1). PV 27."},
     {name:"Gobelours Chef",cr:"26",type:"Humanoïde",size:"M",hp:"420 (30d8)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 22. PV 420 (30d8). Attaque +15."},
     {name:"Golem d'Argile",cr:"1",type:"Artificiel",size:"M",hp:"33 (5d8)",ac:"14",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Golem résistant aux armes. Frénésie si blessé. Maldiction réduisant PV max. Immunité acide/poison."},
     {name:"Golem de Bois",cr:"1",type:"Artificiel",size:"M",hp:"33 (5d8)",ac:"14",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Artificiel. Vitesse 9m. CA 14. PV 33 (5d8). Attaque +4."},
@@ -5196,9 +5256,9 @@ const COMPENDIUM_DATA = {
     {name:"Golem de Pierre",cr:"1",type:"Artificiel",size:"M",hp:"33 (5d8)",ac:"14",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Golem de roche. Immunité non-magiques. Ralentissement (recharge 5-6, SAG DD17). 2 attaques de poing."},
     {name:"Golem Dracosseux",cr:"1",type:"Artificiel",size:"M",hp:"33 (5d8)",ac:"14",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Artificiel. Vitesse 9m. CA 14. PV 33 (5d8). Attaque +4."},
     {name:"Goliath Geantise",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
-    {name:"Gorgone",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Bœuf de métal. Armure naturelle épaisse. Charge : 2d10+5 contondant + FOR DD16 ou renversé. Souffle pétrifiant (recharge 5-6) : CON DD13, pétrifié."},
+    {name:"Gorgone",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Taureau blindé (RC5). Charge (2d10+5 + JdS FOR DD16 ou à terre). Souffle pétrifiant Recharge 5-6 (JdS CON DD13 ou pétrifié). PV 114."},
     {name:"Goristro",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Goule",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant dévoreur. Griffes paralysantes (CON DD10, paralysé 1 min). Morsure : 2d6+2 perforant. Immunité au charme et à la peur."},
+    {name:"Goule",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant (RC1). Griffes +4 (2d4+2 tranchant, JdS CON DD10 ou paralysé sauf Elfes). Morsure +2 (2d6+2). Immunité au sommeil/charme. PV 22."},
     {name:"Goulu",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Grand Dracosire Chromatique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"FTD",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Grand Dracosire Diamantin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"FTD",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5210,11 +5270,11 @@ const COMPENDIUM_DATA = {
     {name:"Grell",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Grenouille",cr:"0",type:"Bête",size:"P",hp:"4 (1d6)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 9. PV 4 (1d6). Attaque +2."},
     {name:"Grenouille Geante",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
-    {name:"Grick",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Ver-pieuvre de caverne. Résistance aux armes non-magiques. Morsure (2d6+2) + tentacules (2d6+2). Cambouflage rocheux."},
+    {name:"Grick",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité (RC2). Camouflage (désavantage Perception vs lui en terrain rocheux). Tentacules +4 (2d6+2 tranchant). Bec +4 (1d6+2 perforant). PV 27."},
     {name:"Grick Dominant",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Griffe Rampante",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Griffecendre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Griffon",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Lion-aigle. Détection des chevaux. Griffes agrippantes : 2d6+4 (deux attaques). Morsure : 2d8+4."},
+    {name:"Griffon",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstre mi-lion mi-aigle (RC2). Serres +6 (2d6+4, agrippe). Bec +6 (1d8+4). Vol 24m. PV 59."},
     {name:"Grung",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 22 (4d6). Attaque +2."},
     {name:"Grung Guerrier d'Elite",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 22 (4d6). Attaque +2."},
     {name:"Grung Sauvageon",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 22 (4d6). Attaque +2."},
@@ -5230,9 +5290,9 @@ const COMPENDIUM_DATA = {
     {name:"Gueule Abyssale",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Gueule de Grolantor",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Gueule de Yeenoghu",cr:"23",type:"Monstruosité",size:"M",hp:"350 (27d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 21. PV 350 (27d8). Attaque +15."},
-    {name:"Gynosphinx",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Sphinge savante. Sorts de clerc niv.9. Rugissement (3/jour) : terreur puis paralysie. 3 actions légendaires. Immunité psychique."},
+    {name:"Gynosphinx",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Sphinx femelle (RC11). Sorts. Téléportation. 3 Actions légendaires. Griffes +9 (2d8+6). PV 136."},
     {name:"Halaster Blackcloak",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"WDH",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Harpie",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstre femme-oiseau. Chant enchanteur : SAG DD11, charmé et contrôlé. Griffes : 2d4+1. Massue : 2d4+1. Vol 12m."},
+    {name:"Harpie",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité (RC1). Chant ensorceleur (JdS SAG DD11 ou charmé + se déplace vers). Serres +4 (1d6+2 tranchant). Masse +4 (2d4+2). PV 38."},
     {name:"Heraut des Tempetes",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Heritier de Grolantor",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"BGG",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Heritier de Memnor",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"BGG",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5241,11 +5301,11 @@ const COMPENDIUM_DATA = {
     {name:"Heritier de Surtur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"BGG",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Heritier de Thrym",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"BGG",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Heritier des Profondeurs",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"BGG",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Hezrou",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon amphibien puant. Puanteur (CON DD14, empoisonné). Force pure (2d8+5 morsure, 2d6+5 griffes). Résistance à la magie. Immunité poison."},
+    {name:"Hezrou",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon (RC8). Corps démoniaque (venin toujours actif autour). Résistances démoniques. Résistance magique. 3 attaques : morsure+griffes×2. PV 136."},
     {name:"Hippocampe",cr:"1",type:"Monstruosité",size:"TP",hp:"33 (5d4)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 33 (5d4). Attaque +4."},
     {name:"Hippocampe Geant",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
-    {name:"Hippogriffe",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Cheval-griffon. Charge : si 9m+ de déplacement, 2d6+4 extra. Griffes : 2d6+4. Morsure : 1d8+4."},
-    {name:"Hobgobelin",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde militaire. Avantage si allié adjacent. Martial : longue épée + arc long. Résistance aux sorts (1/tour, si 5e niv+)."},
+    {name:"Hippogriffe",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité (RC1). Serres +5 (2d6+3, agrippe). Bec +5 (1d10+3). Vol 18m. PV 19."},
+    {name:"Hobgobelin",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde martial (RC1/2). Formation martiale (+1d6 dégâts si allié adjacent). Épée longue +3 (1d8+1). Arc long +3 (1d8+1). PV 11."},
     {name:"Hobgobelin Capitaine",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 22. PV 420 (30d6). Attaque +15."},
     {name:"Hobgobelin Devastateur",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Hobgobelin d'élite. Armure lourde. Tactique supérieure. Épée longue+1."},
     {name:"Hobgobelin Ombre de Fer",cr:"26",type:"Humanoïde",size:"P",hp:"420 (30d6)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 22. PV 420 (30d6). Attaque +15."},
@@ -5260,7 +5320,7 @@ const COMPENDIUM_DATA = {
     {name:"Huldin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Hurleur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Hutijin",cr:"22",type:"Monstruosité",size:"M",hp:"330 (26d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 21. PV 330 (26d8). Attaque +15."},
-    {name:"Hydre",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Serpent à têtes multiples. Commence avec 5 têtes. Si tête tranchée, 2 nouvelles repoussent à la fin du tour (sauf si brûlées). Chaque tête mord : 1d10+4 perforant."},
+    {name:"Hydre",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité à 5 têtes (RC8). Chaque tête coupée = 2 nouvelles si non cautérisées (feu/acide ce tour). 5 morsures +8 (1d10+5 chacune). PV 172."},
     {name:"Hydroloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Hyene",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Hyene Geante",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
@@ -5278,13 +5338,13 @@ const COMPENDIUM_DATA = {
     {name:"Kender Escarmoucheur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Kenku",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Ki Rin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Kobold",cr:"1/4",type:"Humanoïde",size:"P",hp:"13 (3d6)",ac:"12",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde reptilien peureux. Troupeau : avantage si allié adjacent. Sensibilité à la lumière solaire. Lance + arbalète."},
+    {name:"Kobold",cr:"1/4",type:"Humanoïde",size:"P",hp:"13 (3d6)",ac:"12",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Petit reptile (RC1/8). Tactique de meute (avantage si allié adjacent à la cible). Sensible à la lumière (désavantage). Dague +4 (1d4+2). Lance +4 (1d6+2). PV 5."},
     {name:"Kobold Aile",cr:"1/4",type:"Humanoïde",size:"P",hp:"13 (3d6)",ac:"12",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 12. PV 13 (3d6). Attaque +2."},
     {name:"Kobold Ecu Dragon",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
     {name:"Kobold Ensorceleur des Ecailles",cr:"1/4",type:"Humanoïde",size:"P",hp:"13 (3d6)",ac:"12",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 12. PV 13 (3d6). Attaque +2."},
     {name:"Kobold Inventeur",cr:"1/4",type:"Humanoïde",size:"P",hp:"13 (3d6)",ac:"12",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 12. PV 13 (3d6). Attaque +2."},
     {name:"Korred",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Kraken",cr:"13",type:"Monstruosité",size:"Gig",hp:"180 (17d20)",ac:"18",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité légendaire des abysses. Résistance à la magie. Immunité aux dégâts électriques. 10 tentacules (agrippé, évasion DD18, 3d6+10). Avaler. Tempête de foudre (recharge 5-6). 3 actions légendaires."},
+    {name:"Kraken",cr:"13",type:"Monstruosité",size:"Gig",hp:"180 (17d20)",ac:"18",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Titan marin légendaire (RC23). Tentacules 9m +17 (3d6+10, agrippe, écrase). Encre obscurcissante. Avalement. 3 actions légendaires. PV 472."},
     {name:"Kruthik Adulte",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Kruthik Jeune",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Kruthik Seigneur de la Ruche",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
@@ -5295,7 +5355,7 @@ const COMPENDIUM_DATA = {
     {name:"Lame en Peine Commandant",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Lame en Peine Guerrier",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Lame Nocturne",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Lamie",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstre femme-lion. Regard affaiblissant : CHA DD13, sous malédiction (désavantage STR). Sorts innés (Illusion de prestidigitation, Charme-personne, Métamorphose). Griffes + dague."},
+    {name:"Lamie",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité magicienne (RC4). Drain de Sagesse permanent (JdS CON DD13, -1d6 SAG, max 8). Sorts. Griffes +5 (2d10+3). PV 97."},
     {name:"Lekhet",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Lemure",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Diable le plus faible. Immunité feu/poison. Toucher corrompu. Se reconstituent hors des enfers."},
     {name:"Leucrotta",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5304,8 +5364,8 @@ const COMPENDIUM_DATA = {
     {name:"Lezard",cr:"1",type:"Monstruosité",size:"TP",hp:"33 (5d4)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 33 (5d4). Attaque +4."},
     {name:"Lezard Geant",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
     {name:"Liane Meurtriere",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Liche",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant légendaire puissant. Résistance à la magie. Sorts puissants (magicien niv.18). Toucher paralysant (CON DD18, 3d6 froid). Vol, vision dans le noir 36m. Aura de corruption. 3 actions légendaires."},
-    {name:"Licorne",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Créature magique bénie. Résistance à la magie. Sabots magiques : 2d8+6 contondant. Corne magique : 1d8+6 perçant. Sorts innés (Lumière du jour, Passe-muraille). Charge. Guérison sacrée (3d8+3 PV soins). 3 actions légendaires."},
+    {name:"Liche",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant archimage (RC21). Phylactère (ressuscite en 1d10 jours). Sorts niveau 9. Toucher glacé +12 (3d8+5 froid). 3 Actions légendaires. Aura de terreur. PV 135."},
+    {name:"Licorne",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Céleste (RC5). Charge (Corne +9, 2d8+5 radiant + 2d8 bonus). Corne sacrée (Soins 2d8+5). Téléportation 24m (3/jour). PV 67."},
     {name:"Lierre Musque Jaune",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Lierreux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Lievre",cr:"1",type:"Monstruosité",size:"TP",hp:"33 (5d4)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 13. PV 33 (5d4). Attaque +4."},
@@ -5326,7 +5386,7 @@ const COMPENDIUM_DATA = {
     {name:"Magicien Invocateur",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Magicien Necromant",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Magicien Transmutateur",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
-    {name:"Magmatique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Élémentaire de lave. Immunité au feu. Corps brûlant (2d6 feu au contact). Mort explosive : 2d6 feu à 3m si tué. Pseudopode (2d6+3 contondant + 3d6 feu)."},
+    {name:"Magmatique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Élémentaire primitif (RC1/2). Corps brûlant (1d6 feu au contact). Immunité feu. Poing +4 (1d4+2 contondant + 3d6 feu). PV 9."},
     {name:"Maitre des Ames",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Maitre Voleur",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m, vol 18m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m, vol 18m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Maldryn",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5336,10 +5396,10 @@ const COMPENDIUM_DATA = {
     {name:"Mane",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon le plus faible. Immunité feu/poison. Griffes acides. Nuage toxique à la mort."},
     {name:"Manshoon",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"WDH",desc:"Archimage légendaire. Clone de Manshoon. Sorts de magicien niv.18. Résistance à la magie."},
     {name:"Mante Obscure",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Raie des cavernes. Fausse apparence. Étouffement (aveuglé)."},
-    {name:"Manteleur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Raie du plafond plus grande. Fausse apparence de manteau. Enroule sa victime : aveuglé, entravé, subir ses dégâts."},
-    {name:"Manticore",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Lion-humain-scorpion ailé. Épines : 1d8+2 perforant, portée 36m (6 épines, recharge après repos court). Vol 18m. Morsure + griffes."},
+    {name:"Manteleur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Aberration (RC2). Se camoufle en manteau ou cape. Rugissement (JdS CHA DD13 ou effrayé/inapte). Morsure +5 (2d6+3 perforant). PV 45."},
+    {name:"Manticore",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité (RC3). Salve d'épines : 1 à 4 épines (Recharge 5-6), +5 (1d8+3 perforant chacune). Griffes +5 (2d6+3). Morsure +5 (1d8+3). PV 68."},
     {name:"Maride",cr:"5",type:"Élémentaire",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Génie de l'eau. Nage 18m. Sorts innés (Mur d'eau, Nappe de brouillard). Multiattaque. Cône d'eau."},
-    {name:"Marilith",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon serpent aux 6 bras. 6 attaques d'épée longue. Queue : agrippée. Parades réactives (+5 CA). Téléportation. Résistance à la magie."},
+    {name:"Marilith",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démone à 6 bras (RC16). 7 attaques (6 épées +9, 2d8+5 chacune + queue +9). Parades réactives (+5 CA par réaction). Téléportation 36m. 3 Actions légendaires. PV 189."},
     {name:"Maruth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Mastodonte de Boue",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Mastodonte de Brume",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5360,21 +5420,21 @@ const COMPENDIUM_DATA = {
     {name:"Mercenaire de Bois Noir",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Merregon",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MTF",desc:"Diable soldat. Armure de plaques. Hallebarde (1d10+4). Obéissance absolue."},
     {name:"Merrenoloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Merrow",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, nage 12m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Ogre aquatique marin. Amphibie. Nage 12m. Harpon (1d6+5 perforant, tire la cible vers lui). Griffes + morsure."},
+    {name:"Merrow",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, nage 12m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Humanoïde (RC2). Harpon +6 (2d6+4, tire la cible de 6m vers lui si raté JdS STR DD14). Morsure +6 (1d8+4). Amphibie. PV 45."},
     {name:"Mez Arate",cr:"0",type:"Bête",size:"P",hp:"4 (1d6)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 9. PV 4 (1d6). Attaque +2."},
     {name:"Mezzoloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Miirym",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Mille Pattes Geant",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
-    {name:"Mimique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Créature métamorphe trompeuse. Fausse apparence (ressemble à objet). Corps adhésif : agrippé (FOR DD13). Pseudopode + morsure. Immunité à l'acide."},
+    {name:"Mimique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Métamorphe (RC5). Adhésif (agrippé JdS FOR DC13 pour se libérer). Fausse apparence (imite meubles/sols). Pseudopode +5 (2d8+3 contondant + agrippé). Morsure +5 (3d8+3 perforant + 2d8 acide). PV 58."},
     {name:"Mimique de Magot",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Minotaure",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Bête en labyrinthe. Charge : 2d8+5 perçant extra + FOR DD14 ou renversé. Attaque de piétinement si à terre. Hache à deux mains + cornes."},
-    {name:"Moisissure Violette",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Champignon parasite. Nuage de spores (CON DD10, 2d8 nécrotique)."},
+    {name:"Minotaure",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Squelette de minotaure (RC2). Charge (2d8+4 + JdS FOR ou à terre). PV 67."},
+    {name:"Moisissure Violette",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Plante (RC1/4). Spores nécrotiques (JdS CON DD12 ou 2d8 nécrotique). PV 18."},
     {name:"Moloch",cr:"22",type:"Monstruosité",size:"M",hp:"330 (26d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Archidiable. Résistance à la magie. Légendaire. Sorts puissants."},
     {name:"Molosse",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Molosse des Ombres",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Molosse des Ombres Dominant",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Molydee",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Momie",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant maudit. Putréfaction de momie (toucher, CON DD12 : malédiction qui réduit PV max chaque heure). Vulnérable au feu. Immunité poison/nécrotique."},
+    {name:"Momie",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant (RC3). Pourrissement de momie (JdS CON DD12 ou maladie réduisant PV max de 10/tour). Frappe desséchante +5 (2d6+3 contondant + 3d6 nécrotique). PV 58."},
     {name:"Monodrone",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Morbilleux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Morkoth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5392,7 +5452,7 @@ const COMPENDIUM_DATA = {
     {name:"Naga Gardien",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Serpent magique bon. Sorts (clerc niv.9). Morsure venimeuse (CON DD15). Se reconstituent."},
     {name:"Naga Osseux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Nagpa",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Nalfeshnie",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon porc-humanoïde. Téléportation. Sorts innés. Aurore mortelle (3/jour) : prismes de lumière aveuglante + dégâts radiants. Résistance à la magie."},
+    {name:"Nalfeshnie",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon puissant (RC13). Danse lumineuse chaotique (JdS SAG DD16 ou action aléatoire). Résistance magique. Sorts. 4 attaques (morsure+griffes×3). 3 Actions légendaires. PV 184."},
     {name:"Narzugon",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MTF",desc:"Diable cavalier. Monte un destrier infernal. Lance +1 enflammée. Sorts innés."},
     {name:"Necromite de Myrkul",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Necrophage",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant des tombes. Griffes paralysantes (CON DD13, paralysé 1 min). Morsure (1d6+3)."},
@@ -5424,7 +5484,7 @@ const COMPENDIUM_DATA = {
     {name:"Occultiste de l'Archifee",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Occultiste du Fielon",cr:"5",type:"Fiélon",size:"M",hp:"78 (9d8)",ac:"15",speed:"9m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Fiélon. Vitesse 9m. CA 15. PV 78 (9d8). Attaque +8."},
     {name:"Occultiste du Grand Ancien",cr:"2",type:"Humanoïde",size:"G",hp:"45 (6d10)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 14. PV 45 (6d10). Attaque +5."},
-    {name:"Ogre",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Géant primitif. Grande massue : 2d8+6 contondant. Grande javeline : 2d6+6 perçant. Peut saisir et frapper."},
+    {name:"Ogre",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Géant (RC2). Massue +6 (2d8+4 contondant). Javeline +6 (2d6+4 perforant). PV 59."},
     {name:"Ogre Balistard",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 52 (7d10). Attaque +6."},
     {name:"Ogre Brise Portail",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 52 (7d10). Attaque +6."},
     {name:"Ogre Brute a Chaines",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 52 (7d10). Attaque +6."},
@@ -5433,10 +5493,10 @@ const COMPENDIUM_DATA = {
     {name:"Oie Geante",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
     {name:"Oinoloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Olhydra",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Ombre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant incorporel. Incorporel. Drain de force (DEX DD13, réduction FOR permanente jusqu'au repos long). Crée des ombres si tuées à 0 STR. Résistance à la plupart des dégâts."},
+    {name:"Ombre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Mort-vivant incorporel (RC1/2). Traversée des objets. Drain de Force +4 (2d6+2 nécrotique, réd. FOR, meurt si FOR=0). Se cache en pleine obscurité. PV 16."},
     {name:"Ombre Ancienne",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 52 (7d10). Attaque +6."},
     {name:"Ombre Venerable",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Oni",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Géant humanoïde. Sorts innés (Charme-personne, Ténèbres, Métamorphose, Invisibilité supérieure, Cône de froid, Invocation de sort). Vol 9m. Régénération (10 PV/tour)."},
+    {name:"Oni",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Géant (RC7). Régénération 10 PV/tour. Sorts (obscurité, charme, sommeil, vol). Métamorphe. Glaive +8 (2d10+4+2d8 froid). PV 110."},
     {name:"Orateur du Dragon",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
     {name:"Orc",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Orc Chef de Guerre",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
@@ -5448,13 +5508,13 @@ const COMPENDIUM_DATA = {
     {name:"Orcus",cr:"23",type:"Humanoïde",size:"M",hp:"350 (27d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 21. PV 350 (27d8). Attaque +15."},
     {name:"Orog",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Orthon",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Otyugh",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Aberration poubelle. Vision limitée. Tentacules : 1d8+4+enserre+attire. Morsure : 2d8+4 + maladie (CON DD15). Télépathie."},
+    {name:"Otyugh",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Aberration (RC5). Tentacules +6 (1d8+3, agrippe, entrave). Morsure +6 (2d8+3 + maladie JdS CON DD15). Télépathie limitée 36m. PV 114."},
     {name:"Ours Brun",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 11. PV 13 (3d8). Attaque +2."},
     {name:"Ours Garou",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Lycanthrope ursidé. Immunité armes non-argent. Morsure contaminante. Robuste."},
     {name:"Ours Hibou",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Monstruosité forestière. Critique 19-20 (arrache membre). Griffes (2d6+5). Morsure (1d10+5)."},
     {name:"Ours Noir",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 11. PV 13 (3d8). Attaque +2."},
     {name:"Ours Polaire",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 11. PV 13 (3d8). Attaque +2."},
-    {name:"Oxydeur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Insecte qui ronge les métaux. Détection du métal. Antennes corrosives : métal métallique réduit (CA armes -1 permanent). Morsure."},
+    {name:"Oxydeur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité (RC1/2). Antennes rouillantes (fer/acier touché se corrode). Détruit les armes. Attaque de ferraille +3 (1d6+1 contondant, corrode). PV 29."},
     {name:"Panthere",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Particules d'Avarice",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Pegase",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Cheval ailé céleste. Vol 24m. Sabots (2d6+4). Sensibilité au bien/mal."},
@@ -5480,16 +5540,16 @@ const COMPENDIUM_DATA = {
     {name:"Pretre de Guerre",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Pretre du Kraken",cr:"1",type:"Humanoïde",size:"Gig",hp:"33 (5d20)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 33 (5d20). Attaque +4."},
     {name:"Protege du Dragon",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon. Vitesse 9m, vol 18m. CA 15. PV 100 (11d10). Attaque +10."},
-    {name:"Pseudodragon",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Mini-dragon magique. Queue venimeuse (CON DD11, somnolence ou inconscient). Résistance à la magie. Télépathie. Peut être familier."},
+    {name:"Pseudodragon",cr:"7",type:"Dragon",size:"G",hp:"100 (11d10)",ac:"15",speed:"9m, vol 18m",attacks:"Attaque +10",traits:"—",source:"MM",desc:"Dragon de taille TP (RC1/4). Résistance magique. Dard venimeux (JdS CON DD11 ou empoisonné/inconscient). Peut servir de familier (lien télépathique). PV 7."},
     {name:"Pteranodon",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Reptile volant. Vol 18m. Morsure (2d6+3 perçant)."},
     {name:"Quadrone",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Quaggoth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Quaggoth Serviteur des Spores",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Quasit",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Démon mineur espion. Résistance à la magie. Changement de forme (chauves-souris/souris/crapaud). Griffes empoisonnées (CON DD10, affaibli 1 min). Invisibilité."},
+    {name:"Quasit",cr:"1/2",type:"Monstruosité",size:"P",hp:"22 (4d6)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Démon minuscule (RC1). Métamorphe (bat/mille-pattes/crapaud). Dard +4 (1d4+3, JdS CON DD10 ou effrayé 1 min). Invisibilité (volonté). Résistance magique. PV 7."},
     {name:"Quetzalcoatlus",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Racine Diabolique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Raie Manta de Recif",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Rakshasa",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fiélon métamorphe. Résistance aux sorts niv.1-6. Sorts innés (Détection des pensées, Nuage mental, Domination de personne, Anneau des vœux). Griffes maudissantes. Immunité aux armes non-magiques."},
+    {name:"Rakshasa",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fiélon (RC13). Immunisé aux sorts niv.1-6. Sorts. Griffes +7 (2d6+3 tranchant + malédiction permanente si raté JdS SAG DD15). Métamorphe. PV 110."},
     {name:"Rat",cr:"0",type:"Bête",size:"P",hp:"4 (1d6)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 9. PV 4 (1d6). Attaque +2."},
     {name:"Rat Crane",cr:"0",type:"Bête",size:"P",hp:"4 (1d6)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 9. PV 4 (1d6). Attaque +2."},
     {name:"Rat Garou",cr:"0",type:"Bête",size:"P",hp:"4 (1d6)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Lycanthrope rongeur. Immunité armes non-argent. Morsure contaminante. Furtif."},
@@ -5511,7 +5571,7 @@ const COMPENDIUM_DATA = {
     {name:"Resinieux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Revenant",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Rhinoceros",cr:"5",type:"Bête",size:"TG",hp:"78 (9d12)",ac:"14",speed:"12m",attacks:"Attaque +8",traits:"—",source:"MM",desc:"Bête. Vitesse 12m. CA 14. PV 78 (9d12). Attaque +8."},
-    {name:"Roc",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Oiseau géant légendaire. Envergure 18m+. Griffes agrippantes : 4d8+9 (évasion DD26). Morsure : 4d12+9. Vol 36m. 3 actions légendaires."},
+    {name:"Roc",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Bête de légende (RC11). Serres +13 (4d6+9, agrippe). Bec +13 (4d8+9). PV 248."},
     {name:"Roi Reine Lezard",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Rothe",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Rothe des Profondeurs",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5523,13 +5583,13 @@ const COMPENDIUM_DATA = {
     {name:"Sahuagin",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m, nage 12m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde requin. Frénésie sanguine (avantage si cible blessée). Télépathie avec requins. Morsure + griffes. Amphibie."},
     {name:"Sahuagin Baron",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m, nage 12m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Chef sahuagin. 3 attaques. Frénésie sanguine. Armure et tactique."},
     {name:"Sahuagin Pretresse",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m, nage 12m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m, nage 12m. CA 13. PV 22 (4d8). Attaque +2."},
-    {name:"Salamandre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Élémentaire mi-serpent de feu. Corps brûlant (1d10 feu). Queue constriction (2d6+4+1d10 feu). Lance ardente : 2d6+4+3d6 feu."},
+    {name:"Salamandre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Élémentaire de feu (RC5). Corps brûlant (1d6 feu au contact). Pique de feu +7 (1d6+3 perforant + 1d8+3 feu). Constriction +7 (2d6+3 contondant + 1d8+3 feu). PV 90."},
     {name:"Salamandre du Givre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Sanglier",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête agressive. Charge : si 6m+, 1d6+3 extra + FOR DD13 ou renversé. Implacable (si réduit à 0 PV, JdS CON DD10 pour rester à 1 PV). Défenses 1d8+3."},
     {name:"Sanglier Garou",cr:"1/4",type:"Bête",size:"M",hp:"13 (3d8)",ac:"11",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Lycanthrope porcin. Immunité armes non-argent. Morsure contaminante. Charge (2d6+4 défenses)."},
     {name:"Sanglier Geant",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Sanglier géant. Charge puissante. 2d6+5 défenses. Implacable."},
     {name:"Sanuya",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Satyre",cr:"2",type:"Fée",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fée mi-chèvre. Résistance à la magie. Corne de bélier (1d4+2). Flûte magique (Sommeil, Terreur, ou Charme). Épée courte."},
+    {name:"Satyre",cr:"2",type:"Fée",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fée (RC1/2). Résistance magique (avantage JdS vs sorts). Cornes +2 (2d6+2). Dague +5 (1d4+3). PV 31."},
     {name:"Scarabee de Feu Geant",cr:"9",type:"Géant",size:"TG",hp:"125 (13d12)",ac:"16",speed:"9m",attacks:"Attaque +12",traits:"—",source:"MM",desc:"Géant. Vitesse 9m. CA 16. PV 125 (13d12). Attaque +12."},
     {name:"Scarabee de Magot",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Scorpion",cr:"0",type:"Bête",size:"TP",hp:"4 (1d4)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Bête. Vitesse 9m. CA 9. PV 4 (1d4). Attaque +2."},
@@ -5562,7 +5622,7 @@ const COMPENDIUM_DATA = {
     {name:"Slaad Rouge",cr:"3",type:"Aberration",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Aberration. Vitesse 9m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Slaad Tetard",cr:"3",type:"Aberration",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Aberration. Vitesse 9m. CA 14. PV 52 (7d8). Attaque +6."},
     {name:"Slaad Vert",cr:"3",type:"Aberration",size:"M",hp:"52 (7d8)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Aberration. Vitesse 9m. CA 14. PV 52 (7d8). Attaque +6."},
-    {name:"Solar",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Archange solaire légendaire. Résistance à la magie. Sorts puissants (clerc niv.20). Épée à deux mains : 4d6+8+6d8 radiant. Arc : 2d8+8 radiant + 3d8 radiant supplémentaires. Regénération. 3 actions légendaires."},
+    {name:"Solar",cr:"4",type:"Céleste",size:"M",hp:"65 (8d8)",ac:"14",speed:"9m",attacks:"Attaque +7",traits:"—",source:"MM",desc:"Ange légendaire (RC21). Sorts. Épée +15 (5d8+8 tranchant + 6d8 radiant). Arc +15 (2d6+8 perforant + 6d8 radiant+foudre). Régénération 15 PV. 3 Actions légendaires. PV 243."},
     {name:"Sombrelin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Sombrelin Aine",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Sorcemort",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
@@ -5570,21 +5630,21 @@ const COMPENDIUM_DATA = {
     {name:"Sorcemort Necrophage",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Souffle Anime",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Spectateur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Spectre",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant incorporel. Drain de vie (3d6+3 nécrotique, réduit PV max). Incorporel. Sensibilité lumière solaire. Résistance armes non-argent non-magiques."},
+    {name:"Spectre",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant incorporel (RC1). Drain de PV (2d6 nécrotique, réduit PV max). Immunité aux armes non-magiques. Traversée des objets. PV 22."},
     {name:"Spectrifie",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant. Vitesse 9m. CA 13. PV 33 (5d8). Attaque +4."},
     {name:"Spore Gazeuse",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Squelette",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant osseux. Immunité poison/psychique. Épée courte ou arc court. Le type le plus commun de mort-vivant."},
+    {name:"Squelette",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant (RC1/4). Vulnérable contondant. Épée courte +4 (1d6+2). Arc court +4 (1d6+2). PV 13."},
     {name:"Squelette de Cheval de Guerre",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Destrier mort-vivant. Immunité poison/psychique. Résistance non-magiques. Sabots puissants."},
     {name:"Squelette de Minotaure",cr:"3",type:"Mort-vivant",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Mort-vivant. Vitesse 9m. CA 14. PV 52 (7d10). Attaque +6."},
     {name:"Strahd Von Zarovich",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"CoS",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Strige",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Succube",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Démon séducteur. Changement de forme. Charme (SAG DD15, charmé 24h). Baiser drainant (réduit PV max). Sorts innés. Résistance à la magie."},
-    {name:"Sylvanien",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Arbre vivant légendaire. Immunité aux armes non-magiques non-percutantes. Deux attaques de coup (3d6+6). Peut devenir inconscient (apparence de tronc). Résistance."},
+    {name:"Succube",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Fiélon (RC4). Charme (JdS SAG DD15 ou charmé, vulnérable au baiser). Baiser vampirique (5d10+5 nécrotique). Vol. Métamorphe. Invisibilité. PV 66."},
+    {name:"Sylvanien",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Plante géante (RC9). Fausse apparence (ressemble à un arbre). Frappe +10 (3d6+6 contondant). Piétinement +10 (4d6+6, JdS DEX DD19 ou à terre). PV 138."},
     {name:"Tabaxi Chasseur",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tabaxi Menestrel",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tanarukk",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tapis Etouffant",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Tapis animé tueur. Étouffement (DEX DD15, aveuglé). Coup contondant."},
-    {name:"Tarasque",cr:"13",type:"Monstruosité",size:"Gig",hp:"180 (17d20)",ac:"18",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstre légendaire indestructible. Immunité feu/poison. Résistance aux armes non-magiques. Carapace réfléchissante (sorts reflétés). 5 attaques. Morsure (4d12+10). Avalement. 3 actions légendaires."},
+    {name:"Tarasque",cr:"13",type:"Monstruosité",size:"Gig",hp:"180 (17d20)",ac:"18",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité légendaire (RC30). Immunité à presque tout. Carapace réfléchissante (les sorts à effets ponctuels rebondissent). Avalement. Régénération 30 PV. 3 Actions légendaires. PV 676."},
     {name:"Temoin Psychique",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tendriculaire",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tenebreux",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5600,7 +5660,7 @@ const COMPENDIUM_DATA = {
     {name:"Tlincalli",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Torte",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Torte Druide",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
-    {name:"Torve",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Bête chtonique. Griffes : 1d6+3. Perception des vibrations."},
+    {name:"Torve",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Aberration (RC2). Dominance mentale (JdS SAG DD14 ou sous contrôle). Immunité aux armes. PV 45."},
     {name:"Tourmente Venerable",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Traqueur de Baphomet",cr:"23",type:"Monstruosité",size:"M",hp:"350 (27d8)",ac:"21",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 21. PV 350 (27d8). Attaque +15."},
     {name:"Traqueur Diamantin",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5612,7 +5672,7 @@ const COMPENDIUM_DATA = {
     {name:"Triton du Feu Occultiste d'Imix",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde. Vitesse 9m. CA 13. PV 22 (4d8). Attaque +2."},
     {name:"Tritsir",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Troglodyte",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Troll",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Géant régénérant. Régénération 10 PV/tour (annulée par acide ou feu). Flair. 3 attaques : morsure + 2 griffes. Abominable résistance."},
+    {name:"Troll",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Géant (RC5). Régénération 10 PV/tour (stoppé par feu ou acide). Griffes +7 (2d6+4 tranchant). Morsure +7 (1d6+4 perforant). PV 84."},
     {name:"Troll Putride",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Troll Sanguinaire",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Troll Spectral",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant. Vitesse 9m. CA 13. PV 33 (5d8). Attaque +4."},
@@ -5620,11 +5680,11 @@ const COMPENDIUM_DATA = {
     {name:"Truite Tetevide",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tyramort",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Tyrannoeil",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Tyrannosaure",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Roi des dinosaures. Morsure massive : 4d12+7 perçant. Coup de queue : 3d8+7 contondant. 2 attaques."},
+    {name:"Tyrannosaure",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Bête (RC8). Morsure +10 (4d12+7 perforant). Piétinement +10 (4d10+7 contondant, JdS DEX DC14 ou à terre). PV 136."},
     {name:"Ulitharid",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Ultroloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Vajra Safahr",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"WDH",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Vampire",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant légendaire. Charme (SAG DD17). Morsure vampirique (réduit PV max, guérit le vampire). Régénération 20 PV/tour. Escalade araignée. Brume. 3 actions légendaires. Faiblesses classiques (ail/soleil/eau courante)."},
+    {name:"Vampire",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant légendaire (RC13). Régénération 20 PV. Morsure (3d6+4 perforant + 3d6 nécrotique, drain PV max). Charme (JdS SAG DD17). Forme de brume. 3 Actions légendaires. PV 144."},
     {name:"Vampirien",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Vampyrannoeil",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Vargouille",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5642,13 +5702,13 @@ const COMPENDIUM_DATA = {
     {name:"Veteran",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Humanoïde guerrier expérimenté. 2 attaques d'épée longue (1d8+3). Arbalète lourde 1d10+1. Armure moyenne."},
     {name:"Viplo",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Vissepince",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Vrock",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Démon vautour. Vol 12m. Spores explosives (cloud de spores toxiques, CON DD14). Cri étourdissant (1/tour, CON DD14, étourdi jusqu'à fin tour). 2 griffes + bec."},
+    {name:"Vrock",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Démon-vautour (RC9). Spores (JdS CON DD14 ou 5d10 poison sur 5 rounds). Choc de tonnerre (Recharge 5-6, zone 6m). Serres +6 (2d10+5). PV 104."},
     {name:"Wastrilith",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
     {name:"Wersten Kern",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Wiverne",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon-wiverne ailé. Vol 24m. Dard venimeux (2d6+4 perçant + CON DD15, 7d6 poison). Morsure + griffes."},
-    {name:"Worg",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Grand loup-monstre. Meute. Morsure : 2d6+3 perçant + renversé (FOR DD13)."},
+    {name:"Wiverne",cr:"3",type:"Monstruosité",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Dragon (RC6). Queue venimeuse +7 (2d6+4 perforant + 7d6 poison JdS CON DD15). Serres +7 (2d6+4). Morsure +7 (2d6+4). Vol 24m. PV 110."},
+    {name:"Worg",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstre lupin intelligent (RC1). Morsure +5 (2d6+3 perforant, JdS FOR DD13 ou à terre). PV 26."},
     {name:"Xiximantre",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Xorn",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, fouissement 6m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Élémentaire de terre trisymétrique. Passage dans la roche. Détection des métaux précieux. Griffes (3d6+5) + morsure (4d6+5). 3 attaques."},
+    {name:"Xorn",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m, fouissement 6m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Élémentaire de terre (RC5). Traverse la roche. Trésor-odorat (détecte métal/gemmes 18m). 3 griffes +6 (1d6+4) + morsure +6 (3d6+4). PV 73."},
     {name:"Xvart",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Petit humanoïde aux yeux rouges serviteur de Raxivort. Fuite agile. Couteau."},
     {name:"Xvart Occultiste de Raxivort",cr:"1/2",type:"Humanoïde",size:"M",hp:"22 (4d8)",ac:"13",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Xvart lanceur de sorts. Sorts d'invocation. Serviteur de Raxivort."},
     {name:"Yagnoloth",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
@@ -5668,7 +5728,7 @@ const COMPENDIUM_DATA = {
     {name:"Zaratan",cr:"0",type:"Bête",size:"P",hp:"4 (1d6)",ac:"9",speed:"9m",attacks:"Attaque +2",traits:"—",source:"MM",desc:"Tortue géante quasi-immortelle. Carapace légendaire. Nage. Actions légendaires."},
     {name:"Zariel",cr:"26",type:"Monstruosité",size:"M",hp:"420 (30d8)",ac:"22",speed:"9m",attacks:"Attaque +15",traits:"—",source:"MM",desc:"Archidiable ange déchu. Vol. Sorts puissants. 3 actions légendaires."},
     {name:"Zocalo",cr:"2",type:"Monstruosité",size:"M",hp:"45 (6d8)",ac:"14",speed:"9m",attacks:"Attaque +5",traits:"—",source:"MM",desc:"Monstruosité. Vitesse 9m. CA 14. PV 45 (6d8). Attaque +5."},
-    {name:"Zombi",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant lent. Implacable : si réduit à 0 PV, JdS CON DD5 ou survivre à 1 PV (1 fois). Massue + morsure. Lent mais inépuisable."},
+    {name:"Zombi",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant (RC1/4). Ténacité (JdS CON DD5 si tombé à 0 PV = reste à 1 PV). Vulnérable contondant selon version. Assommoir +3 (1d6+1 contondant). PV 22."},
     {name:"Zombi Musque Jaune",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant. Vitesse 9m. CA 13. PV 33 (5d8). Attaque +4."},
     {name:"Zombi Ogre",cr:"3",type:"Mort-vivant",size:"G",hp:"52 (7d10)",ac:"14",speed:"9m",attacks:"Attaque +6",traits:"—",source:"MM",desc:"Mort-vivant. Vitesse 9m. CA 14. PV 52 (7d10). Attaque +6."},
     {name:"Zombi Rothe",cr:"1",type:"Mort-vivant",size:"M",hp:"33 (5d8)",ac:"13",speed:"9m",attacks:"Attaque +4",traits:"—",source:"MM",desc:"Mort-vivant. Vitesse 9m. CA 13. PV 33 (5d8). Attaque +4."},
@@ -6701,6 +6761,228 @@ window._removeFamiliar = async (charId) => {
   await updateDoc(doc(db, 'characters', charId), { familiar: null });
 };
 
+
+// ══════════════════════════════════════════════════════════════
+// FORMES PRÉPARÉES (Druide / Rôdeur / Invocateur)
+// ══════════════════════════════════════════════════════════════
+
+window._formPickerCRFilter = null;
+window._formPickerTypeFilter = null;
+window._formPickerData = [];
+
+window._openFormPicker = (charId) => {
+  const el = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🐾</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  // Déterminer le RC max druide pour le personnage actif
+  const d = window._currentSheetData;
+  let wsMaxCr = null;
+  if (d) {
+    const cls = getClasses(d);
+    const druidClass = cls.find(c => c.name === 'Druide');
+    if (druidClass) {
+      const lvl = druidClass.level;
+      if      (lvl >= 8) wsMaxCr = 4;
+      else if (lvl >= 4) wsMaxCr = 1;
+      else if (lvl >= 2) wsMaxCr = 0.25;
+    }
+  }
+
+  const crValues = ['0','1/8','1/4','1/2','1','2','3','4','5','6','8','9','10','12','17','20','30'];
+  const crBtns = crValues.map(cr =>
+    `<button class="spell-filter-chip form-cr-btn" data-cr="${cr}" onclick="window._toggleFormCR('${charId}','${cr}',this)">RC ${cr}</button>`
+  ).join('');
+
+  const crVal = cr => {
+    if (!cr || cr === '?') return 999;
+    if (cr.includes('/')) { const p = cr.split('/'); return parseInt(p[0])/parseInt(p[1]); }
+    return parseFloat(cr) || 0;
+  };
+
+  el.innerHTML = `
+    <h3 class="step-title">🐾 Choisir une forme ou invocation</h3>
+    ${wsMaxCr !== null ? `<div class="ws-info-bar" style="margin-bottom:10px">🐻 RC max forme sauvage actuel : <strong>${wsMaxCr <= 0.25 ? '1/4' : wsMaxCr <= 0.5 ? '1/2' : wsMaxCr}</strong> — Les créatures au-dessus sont marquées en orange</div>` : ''}
+    <div class="field-group"><input id="form_search" type="text" placeholder="Rechercher (nom ou type)…" oninput="window._filterFormPicker('${charId}')"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px" id="form_cr_filters">${crBtns}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="form_type_filters"></div>
+    <div id="form_picker_list" class="comp-list" style="max-height:42vh;overflow-y:auto"></div>
+    <button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Annuler</button>
+  `;
+
+  window._formPickerCRFilter = null;
+  window._formPickerTypeFilter = null;
+  window._formWsMaxCr = wsMaxCr;
+  _buildFormTypeFilters(charId);
+  _updateFormPickerList(charId);
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
+function _buildFormTypeFilters(charId) {
+  const allMonsters = getAllResourcesForCategory('monster');
+  const types = [...new Set(allMonsters.map(m => m.type || ''))].filter(Boolean).sort();
+  const bar = document.getElementById('form_type_filters');
+  if (!bar) return;
+  bar.innerHTML = types.map(t =>
+    `<button class="spell-filter-chip form-type-btn" data-type="${t}" onclick="window._toggleFormType('${charId}','${t}',this)">${t}</button>`
+  ).join('');
+}
+
+window._toggleFormCR = (charId, cr, btn) => {
+  if (window._formPickerCRFilter === cr) {
+    window._formPickerCRFilter = null;
+    document.querySelectorAll('#form_cr_filters .spell-filter-chip').forEach(b => b.classList.remove('active'));
+  } else {
+    window._formPickerCRFilter = cr;
+    document.querySelectorAll('#form_cr_filters .spell-filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  _updateFormPickerList(charId);
+};
+
+window._toggleFormType = (charId, type, btn) => {
+  if (window._formPickerTypeFilter === type) {
+    window._formPickerTypeFilter = null;
+    document.querySelectorAll('#form_type_filters .spell-filter-chip').forEach(b => b.classList.remove('active'));
+  } else {
+    window._formPickerTypeFilter = type;
+    document.querySelectorAll('#form_type_filters .spell-filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  _updateFormPickerList(charId);
+};
+
+window._filterFormPicker = (charId) => _updateFormPickerList(charId);
+
+function _updateFormPickerList(charId) {
+  const q = (document.getElementById('form_search')?.value || '').toLowerCase();
+  const allMonsters = getAllResourcesForCategory('monster');
+
+  const crVal = cr => {
+    if (!cr || cr === '?') return 999;
+    if (String(cr).includes('/')) { const p = String(cr).split('/'); return parseInt(p[0])/parseInt(p[1]); }
+    return parseFloat(cr) || 0;
+  };
+
+  let filtered = [...allMonsters];
+  if (q) filtered = filtered.filter(m => (m.name||'').toLowerCase().includes(q) || (m.type||'').toLowerCase().includes(q));
+  if (window._formPickerCRFilter) filtered = filtered.filter(m => String(m.cr||'') === window._formPickerCRFilter);
+  if (window._formPickerTypeFilter) filtered = filtered.filter(m => m.type === window._formPickerTypeFilter);
+  filtered.sort((a,b) => crVal(a.cr) - crVal(b.cr) || (a.name||'').localeCompare(b.name||'','fr'));
+
+  window._formPickerData = filtered;
+  const list = document.getElementById('form_picker_list');
+  if (!list) return;
+
+  const maxCr = window._formWsMaxCr;
+
+  const shown = filtered.slice(0, 60);
+  list.innerHTML = shown.map((m, idx) => {
+    const over = maxCr !== null && crVal(m.cr) > maxCr;
+    return `<div class="comp-card form-pick-card ${over ? 'form-pick-over-cr' : ''}" data-idx="${idx}" style="cursor:pointer">
+      <div class="comp-card-main" style="pointer-events:none">
+        <div class="comp-card-name">${m.name||'?'} ${over ? '<span style="color:#e67e22;font-size:0.7rem;font-weight:600">▲ RC trop élevé</span>' : ''}</div>
+        <div class="comp-card-sub">RC ${m.cr||'?'} · ${m.type||''} · Taille ${m.size||'?'} · CA ${m.ac||'?'} · PV ${m.hp||'?'}</div>
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:#888;text-align:center;margin:20px;font-style:italic">Aucune créature trouvée</p>';
+
+  if (filtered.length > 60) list.innerHTML += `<p style="color:#888;text-align:center;font-size:0.78rem">+${filtered.length-60} créatures — affinez la recherche</p>`;
+
+  list.onclick = async (e) => {
+    const card = e.target.closest('.form-pick-card');
+    if (!card) return;
+    const idx = parseInt(card.dataset.idx);
+    const m = window._formPickerData?.[idx];
+    if (!m) return;
+
+    const snap = await getDoc(doc(db, 'characters', charId));
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const forms = [...(d.prepared_forms || [])];
+    // Éviter les doublons
+    if (!forms.find(f => f.name === m.name)) {
+      forms.push({
+        name: m.name, cr: m.cr||'?', type: m.type||'', size: m.size||'M',
+        hp: m.hp||'?', ac: m.ac||'?', speed: m.speed||'?',
+        attacks: m.attacks||'—', traits: m.traits||'—', desc: m.desc||'', source: m.source||'MM'
+      });
+      await updateDoc(doc(db, 'characters', charId), { prepared_forms: forms });
+    }
+    window._closeForge();
+    document.getElementById('forgeNext').style.display = '';
+  };
+}
+
+window._removePreparedForm = async (charId, index) => {
+  const snap = await getDoc(doc(db, 'characters', charId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  const forms = [...(d.prepared_forms || [])];
+  forms.splice(index, 1);
+  await updateDoc(doc(db, 'characters', charId), { prepared_forms: forms });
+};
+
+window._openFormDetail = (charId, index) => {
+  const d = window._currentSheetData;
+  if (!d) return;
+  const f = (d.prepared_forms || [])[index];
+  if (!f) return;
+
+  const el = document.getElementById('forgeContent');
+  document.getElementById('forgeProgress').innerHTML = '<div class="progress-step active">🐾</div>';
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+
+  const crVal = cr => {
+    if (!cr || cr === '?') return 999;
+    if (String(cr).includes('/')) { const p = String(cr).split('/'); return parseInt(p[0])/parseInt(p[1]); }
+    return parseFloat(cr) || 0;
+  };
+
+  // Vérif RC max druide
+  const classes = getClasses(d);
+  const druidClass = classes.find(c => c.name === 'Druide');
+  let wsNote = '';
+  if (druidClass) {
+    const lvl = druidClass.level;
+    let maxCr = 0;
+    if      (lvl >= 8) maxCr = 4;
+    else if (lvl >= 4) maxCr = 1;
+    else if (lvl >= 2) maxCr = 0.25;
+    if (crVal(f.cr) > maxCr) {
+      wsNote = `<div class="ws-info-bar ws-warn" style="margin-bottom:10px">⚠ RC ${f.cr} dépasse votre RC max de forme sauvage actuel</div>`;
+    }
+  }
+
+  el.innerHTML = `
+    <div class="rd-sheet">
+      <div class="rd-title">${f.name||'?'}</div>
+      <div class="rd-subtitle">${f.type||'Créature'} de taille ${_sizeLabel(f.size)}</div>
+      <div class="rd-separator"></div>
+      <div class="rd-props">
+        <div class="rd-prop"><span class="rd-prop-label">Rang de dangerosité :</span> <strong>${f.cr||'—'}</strong></div>
+        <div class="rd-prop"><span class="rd-prop-label">Classe d'armure :</span> ${f.ac||'—'}</div>
+        <div class="rd-prop"><span class="rd-prop-label">Points de vie :</span> ${f.hp||'—'}</div>
+        <div class="rd-prop"><span class="rd-prop-label">Vitesse :</span> ${f.speed||'—'}</div>
+      </div>
+      <div class="rd-separator"></div>
+      ${f.attacks && f.attacks !== '—' ? `<div class="rd-block"><div class="rd-block-title">Attaques</div><div class="rd-block-text">${f.attacks}</div></div>` : ''}
+      ${f.traits && f.traits !== '—' ? `<div class="rd-block"><div class="rd-block-title">Traits</div><div class="rd-block-text">${f.traits}</div></div>` : ''}
+      ${f.desc ? `<div class="rd-separator"></div><div class="rd-desc">${f.desc}</div>` : ''}
+      <div class="rd-separator"></div>
+      <div class="rd-tags"><span class="rd-source-tag">${f.source||'MM'}</span></div>
+    </div>
+    ${wsNote}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn-prev" onclick="window._removePreparedForm('${charId}',${index});window._closeForge();document.getElementById('forgeNext').style.display=''">🗑 Retirer</button>
+      <button class="btn-prev" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>
+    </div>
+  `;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+};
+
 // ── Toggle inspiration (simple click, works for player + GM) ──
 window._toggleInspiration = async (charId) => {
   const snap = await getDoc(doc(db, "characters", charId));
@@ -7673,6 +7955,19 @@ nav button:last-child { color:#884444; }
 .familiar-detail { font-family:'Crimson Pro'; font-size:0.82rem; color:#444; margin-bottom:3px; }
 .familiar-detail-label { font-weight:700; color:var(--red); }
 .familiar-desc { font-family:'Crimson Pro'; font-size:0.82rem; color:#555; font-style:italic; margin-top:5px; line-height:1.5; }
+
+
+/* Formes préparées */
+.ws-info-bar { background:#fdf3e3; border:1px solid #f0c070; border-radius:4px; padding:6px 10px; font-family:'Crimson Pro'; font-size:0.82rem; color:#7a5500; margin-bottom:6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.ws-info-sep { color:#c8a060; }
+.ws-warn { background:#fff3e0; border-color:#e67e22; color:#c0392b; }
+.form-known-list { }
+.form-known-item { }
+.form-cr-badge { font-family:'Cinzel'; font-size:0.62rem; color:#fff; background:var(--ink); border-radius:3px; padding:2px 6px; margin-right:8px; white-space:nowrap; min-width:36px; text-align:center; }
+.form-over-cr .form-cr-badge { background:#e67e22; }
+.form-over-cr { background:#fff8f0; }
+.form-over-cr:hover { background:#fff0e0 !important; }
+.form-pick-over-cr { border-left:3px solid #e67e22 !important; }
 
 /* Responsive */
 @media(max-width:1100px) {
