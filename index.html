@@ -1459,19 +1459,368 @@ function getCharacterCharges(d) {
 }
  
 const BACKGROUNDS = {
-  "Acolyte":{ skills:["Intuition","Religion"], lang:2, equipment:"Symbole sacré, livre de prières, 5 bâtonnets d'encens, vêtements d'apparat, 15po", feature:"Abri des fidèles" },
-  "Criminel":{ skills:["Tromperie","Discrétion"], tools:["Outils de voleur","Jeu d'un type"], equipment:"Pied-de-biche, vêtements sombres à capuchon, 15po", feature:"Contact avec le milieu criminel" },
-  "Héros du Peuple":{ skills:["Dressage","Survie"], tools:["Outils d'artisan","Véhicules terrestres"], equipment:"Outils d'artisan, pelle, pot en fer, vêtements de paysan, 10po", feature:"Hospitalité rustique" },
-  "Noble":{ skills:["Histoire","Persuasion"], tools:["Jeu d'un type"], lang:1, equipment:"Tenue de belle facture, bague à armoiries, lettre de recommandation, 25po", feature:"Privilège de position" },
-  "Sage":{ skills:["Arcanes","Histoire"], lang:2, equipment:"Bouteille d'encre noire, plume, petit couteau, lettre d'un défunt collègue, vêtements d'érudit, 10po", feature:"Chercheur" },
-  "Soldat":{ skills:["Athletisme","Intimidation"], tools:["Jeu d'un type","Véhicules terrestres"], equipment:"Insigne militaire, trophée d'un ennemi vaincu, ossements à jouer, vêtements communs, 10po", feature:"Statut militaire" },
-  "Vagabond":{ skills:["Athletisme","Survie"], lang:2, equipment:"Bâton, piège à machoires, trophées de chasse, vêtements de voyage, 10po", feature:"Marcheur des chemins" },
-  "Charlatan":{ skills:["Tromperie","Escamotage"], tools:["Kit de déguisement","Kit de faux-semblants"], equipment:"Tenue de bonne facture, fiole de colle, 15po", feature:"Fausse identité" },
-  "Artiste":{ skills:["Acrobaties","Performance"], tools:["Déguisement","Un instrument de musique"], equipment:"Instrument de musique, cadeau d'un admirateur, costume, 15po", feature:"Par acclamation populaire" },
-  "Marin":{ skills:["Athletisme","Perception"], tools:["Outils de navigateur","Véhicules nautiques"], equipment:"Gourdin, 50 pieds de corde de soie, porte-bonheur, vêtements communs, 10po", feature:"Passage gratuit sur un navire" },
-  "Étranger":{ skills:["Intuition","Religion"], lang:2, equipment:"Habit exotique, 10 gemmes de valeur, 5 po", feature:"Connaissance de la terre d'origine" }
+  // ── Player's Handbook (PHB) ───────────────────────────────────
+  "Acolyte": {
+    source:"PHB", skills:["Intuition","Religion"], lang:2,
+    equipment:"Symbole sacré, livre de prières, 5 bâtonnets d'encens, vêtements d'apparat, 15 po",
+    feature:"Abri des fidèles: refuge et soins gratuits dans les temples de votre foi"
+  },
+  "Charlatan": {
+    source:"PHB", skills:["Tromperie","Escamotage"], tools:["Kit de déguisement","Kit de faux-semblants"],
+    equipment:"Tenue de bonne facture, fiole de colle, lettres de recommandation, 15 po",
+    feature:"Fausse identité: vous possédez une seconde identité complète (papiers, contacts)"
+  },
+  "Criminel": {
+    source:"PHB", skills:["Tromperie","Discrétion"], tools:["Jeu d'un type","Outils de voleur"],
+    equipment:"Pied-de-biche, vêtements sombres à capuchon, 15 po",
+    feature:"Contact avec le milieu criminel: réseau de criminels, informateurs et receleurs"
+  },
+  "Espion": {
+    source:"PHB", skills:["Tromperie","Discrétion"], tools:["Jeu d'un type","Outils de voleur"],
+    equipment:"Tenue sombre, outils de voleur, 15 po",
+    feature:"Contact criminel spécialisé dans l'espionnage et le renseignement"
+  },
+  "Artiste": {
+    source:"PHB", skills:["Acrobaties","Performance"], tools:["Kit de déguisement","Un instrument de musique"],
+    equipment:"Instrument de musique, cadeau d'un admirateur, costume, 15 po",
+    feature:"Par acclamation populaire: toujours bienvenu dans les tavernes et salles de spectacle"
+  },
+  "Gladiateur": {
+    source:"PHB", skills:["Acrobaties","Performance"], tools:["Kit de déguisement","Arme exotique (trident ou filet)"],
+    equipment:"Arme inhabituelle, costume de scène, cadeau d'un admirateur, 15 po",
+    feature:"Par acclamation populaire: célèbre dans les arènes, accès aux coulisses"
+  },
+  "Héros du Peuple": {
+    source:"PHB", skills:["Dressage","Survie"], tools:["Outils d'artisan","Véhicules terrestres"],
+    equipment:"Outils d'artisan, pelle, pot en fer, vêtements de paysan, 10 po",
+    feature:"Hospitalité rustique: les gens du commun vous cachent et vous nourrissent gratuitement"
+  },
+  "Artisan de guilde": {
+    source:"PHB", skills:["Intuition","Persuasion"], tools:["Outils d'artisan (un type)"], lang:1,
+    equipment:"Outils d'artisan, lettre de recommandation de la guilde, habit de voyage, 15 po",
+    feature:"Appartenance à une guilde: aide juridique, hébergement et recommandations"
+  },
+  "Marchand de guilde": {
+    source:"PHB", skills:["Intuition","Persuasion"], tools:["Outils de navigateur"], lang:1,
+    equipment:"Outils de navigateur, lettre de la guilde des marchands, 15 po",
+    feature:"Appartenance à une guilde marchande: crédit et réseau commercial"
+  },
+  "Ermite": {
+    source:"PHB", skills:["Médecine","Religion"], tools:["Kit d'herboriste"], lang:1,
+    equipment:"Étui de parchemin avec vos notes, couverture, kit d'herboriste, habits communs, 5 po",
+    feature:"Découverte: vous avez percé un grand secret (cosmique, divin ou naturel)"
+  },
+  "Noble": {
+    source:"PHB", skills:["Histoire","Persuasion"], tools:["Jeu d'un type"], lang:1,
+    equipment:"Tenue de belle facture, bague à armoiries, parchemin de généalogie, 25 po",
+    feature:"Privilège de position: les gens vous respectent et vous accordent des faveurs"
+  },
+  "Chevalier": {
+    source:"PHB", skills:["Histoire","Persuasion"], tools:["Jeu d'un type"], lang:1,
+    equipment:"Tenue de belle facture, bague à armoiries, 25 po",
+    feature:"Serviteurs: 3 serviteurs loyaux qui vous accompagnent (commoners)"
+  },
+  "Hors-la-loi": {
+    source:"PHB", skills:["Athletisme","Survie"], tools:["Instrument de musique"], lang:1,
+    equipment:"Bâton, piège à mâchoires, trophées de chasse, vêtements de voyage, 10 po",
+    feature:"Marcheur des chemins: vous trouvez toujours eau, nourriture et un abri"
+  },
+  "Sage": {
+    source:"PHB", skills:["Arcanes","Histoire"], lang:2,
+    equipment:"Bouteille d'encre noire, plume, petit couteau, lettre d'un défunt collègue, vêtements d'érudit, 10 po",
+    feature:"Chercheur: vous savez où trouver l'information (bibliothèques, sages, archives)"
+  },
+  "Marin": {
+    source:"PHB", skills:["Athletisme","Perception"], tools:["Outils de navigateur","Véhicules nautiques"],
+    equipment:"Gourdin, 50 pieds de corde de soie, porte-bonheur, vêtements communs, 10 po",
+    feature:"Passage gratuit sur un navire: vous et vos alliés voyagez par bateau gratuitement"
+  },
+  "Pirate": {
+    source:"PHB", skills:["Athletisme","Perception"], tools:["Outils de navigateur","Véhicules nautiques"],
+    equipment:"Gourdin, 50 pieds de corde, mauvais oeil, vêtements communs, 10 po",
+    feature:"Mauvaise réputation: la peur vous précède dans les ports"
+  },
+  "Soldat": {
+    source:"PHB", skills:["Athletisme","Intimidation"], tools:["Jeu d'un type","Véhicules terrestres"],
+    equipment:"Insigne militaire, trophée d'un ennemi, ossements à jouer, vêtements communs, 10 po",
+    feature:"Statut militaire: les soldats vous respectent et obtempèrent à vos ordres"
+  },
+  "Gamin des rues": {
+    source:"PHB", skills:["Escamotage","Discrétion"], tools:["Kit de déguisement","Outils de voleur"],
+    equipment:"Petit couteau, plan du quartier, rat apprivoisé, souvenir d'enfance, vêtements communs, 10 po",
+    feature:"Gamin des rues: vous connaissez les passages secrets, égouts et refuges de la ville"
+  },
+
+  // ── Sword Coast Adventurer's Guide (SCAG) ────────────────────
+  "Garde de la ville": {
+    source:"SCAG", skills:["Athletisme","Intuition"], lang:2,
+    equipment:"Uniforme de garde, paire de menottes, lettre de recommandation, 10 po",
+    feature:"Tuteur de la ville: les autorités locales vous font confiance et partagent des informations"
+  },
+  "Artisan clanique": {
+    source:"SCAG", skills:["Histoire","Intuition"], tools:["Outils d'artisan (un type)"], lang:1,
+    equipment:"Outils d'artisan, emblème de clan, gemme d'une valeur de 10 po, vêtements de voyage, 5 po",
+    feature:"Protégé du clan: logement et assistance gratuits dans les communautés naines"
+  },
+  "Érudit cloîtré": {
+    source:"SCAG", skills:["Histoire"], lang:2,
+    equipment:"Carnets de notes, plume et encre, lettre d'introduction, vêtements d'érudit, 10 po",
+    feature:"Accès à la bibliothèque: vous pouvez accéder à presque toutes les grandes bibliothèques"
+  },
+  "Courtisan": {
+    source:"SCAG", skills:["Intuition","Persuasion"], lang:2,
+    equipment:"Tenue de cour, parchemins, 5 po",
+    feature:"Accès à la cour: vous connaissez les protocoles et avez accès aux nobles et aux cours"
+  },
+  "Agent de faction": {
+    source:"SCAG", skills:["Intuition"], lang:2,
+    equipment:"Badge de faction, pamphlets de propagande, vêtements communs, 15 po",
+    feature:"Réseau de sécurité de la faction: autres membres vous aident et vous cachent"
+  },
+  "Grand voyageur": {
+    source:"SCAG", skills:["Intuition","Perception"], tools:["Instrument de musique"], lang:1,
+    equipment:"Vêtements de votre pays d'origine, bijou de voyage, cartographie, 10 po",
+    feature:"Tout est exotique: vous pouvez vivre aux crochets de la curiosité que vous suscitez"
+  },
+  "Chevalier d'ordre": {
+    source:"SCAG", skills:["Persuasion"], lang:2,
+    equipment:"Uniforme de l'ordre, insigne, carnet de voyage, 10 po",
+    feature:"Voix d'autorité: les gens ordinaires vous obéissent; accès aux chefs militaires"
+  },
+  "Vétéran mercenaire": {
+    source:"SCAG", skills:["Athletisme","Persuasion"], tools:["Jeu d'un type","Véhicules terrestres"],
+    equipment:"Uniforme de compagnie, insigne, contrat de mission terminée, 10 po",
+    feature:"Mercenaire bien établi: vous connaissez les compagnies mercenaires et leurs employeurs"
+  },
+  "Chercheur de sorts": {
+    source:"SCAG", skills:["Arcanes","Histoire"], lang:2,
+    equipment:"Livre de sorts basique, carnets de recherche, vêtements d'érudit, 10 po",
+    feature:"Chercheur de sorts: savez qui contacter pour trouver des sorts rares ou oubliés"
+  },
+
+  // ── Xanathar's Guide to Everything (XGTE) ────────────────────
+  "Anthropologue": {
+    source:"XGTE", skills:["Intuition","Religion"], lang:2,
+    equipment:"Livre de notes, vêtements de voyage, 10 po",
+    feature:"Compréhension des cultures: vous assimilez rapidement les cultures et pouvez vous fondre"
+  },
+  "Archéologue": {
+    source:"XGTE", skills:["Histoire","Survie"], tools:["Instrument de cartographie ou navigateur"], lang:1,
+    equipment:"Kit d'archéologue, carnet de terrain, 25 po",
+    feature:"Connaissance des dangers de donjons: identifier les pièges et trouver les passages"
+  },
+
+  // ── Guildmaster's Guide to Ravnica (GGtR) ────────────────────
+  "Fonctionnaire azorius": {
+    source:"GGtR", skills:["Intuition","Persuasion"], lang:2,
+    equipment:"Insigne d'autorité légale, collection de lois, 10 po",
+    feature:"Autorité légale: vous pouvez invoquer la loi pour arrêter et interroger les suspects"
+  },
+  "Légionnaire boros": {
+    source:"GGtR", skills:["Athletisme","Persuasion"], tools:["Instrument de musique","Véhicules terrestres"],
+    equipment:"Uniforme de la Légion, insigne militaire, 10 po",
+    feature:"Caserne et repas: logement et nourriture gratuits dans toute caserne Boros"
+  },
+  "Agent dimir": {
+    source:"GGtR", skills:["Tromperie","Discrétion"], tools:["Kit de déguisement","Outils de voleur"],
+    equipment:"Tenue noire, message crypté, 10 po",
+    feature:"Fausse identité dimir: identité de couverture parfaite, réseau d'informateurs"
+  },
+  "Agent golgari": {
+    source:"GGtR", skills:["Nature","Survie"], tools:["Kit d'empoisonneur"], lang:1,
+    equipment:"Outils de jardinage, fiole de poison, 10 po",
+    feature:"Passage souterrain: accès aux tunnels et sanctuaires golgaris sous la ville"
+  },
+  "Anarch gruul": {
+    source:"GGtR", skills:["Athletisme","Survie"], tools:["Instrument de musique"], lang:1,
+    equipment:"Peau d'animal, os rituels, 10 po",
+    feature:"Incontrôlable: vous effrayez les gens civilisés et êtes accueilli dans les camps gruul"
+  },
+  "Chercheur izzet": {
+    source:"GGtR", skills:["Arcanes","Histoire"], tools:["Outils d'artisan (alchimie)"], lang:1,
+    equipment:"Kit de laboratoire de poche, expérience en cours, 10 po",
+    feature:"Soutien du laboratoire: accès aux laboratoires et à l'équipement izzet"
+  },
+  "Initié orzhov": {
+    source:"GGtR", skills:["Religion","Persuasion"], tools:["Jeu d'un type"], lang:1,
+    equipment:"Tenue ornée, symbole sacré, 10 po",
+    feature:"Droit au vestige: vous pouvez hériter des dettes ou ressources d'un ancêtre mort"
+  },
+  "Médecin simic": {
+    source:"GGtR", skills:["Médecine","Nature"], tools:["Kit d'herboriste"], lang:1,
+    equipment:"Kit médical simic, spécimen de créature modifiée, 10 po",
+    feature:"Chercheur de terrain: hébergement dans les cliniques et vivaria simics"
+  },
+  "Punk rakdos": {
+    source:"GGtR", skills:["Acrobaties","Performance"], tools:["Kit de déguisement","Instrument de musique"],
+    equipment:"Costume de scène, entrées pour spectacles, 10 po",
+    feature:"Passage gratuit aux spectacles: bienvenu dans tous les lieux de divertissement rakdos"
+  },
+  "Mage selesnya": {
+    source:"GGtR", skills:["Nature","Persuasion"], tools:["Outils d'herboriste"], lang:1,
+    equipment:"Symbole de la conclave, graines sacrées, 10 po",
+    feature:"Connexion à la Toile: communication avec les membres de la Conclave à portée de voix"
+  },
+
+  // ── Mythic Odysseys of Theros (MOoT) ─────────────────────────
+  "Athlète": {
+    source:"MOoT", skills:["Acrobaties","Athletisme"], tools:["Instrument de musique"], lang:1,
+    equipment:"Tenue de compétition, invitation à une agora, 10 po",
+    feature:"Favori des dieux: un dieu particulier vous accorde des petits signes de faveur"
+  },
+  "Citoyen": {
+    source:"MOoT", skills:["Intuition","Persuasion"], tools:["Outils d'artisan (un type)"], lang:1,
+    equipment:"Vêtements de qualité, objet lié à votre profession, 15 po",
+    feature:"Connexion civique: vous connaissez les gens en place dans votre polis"
+  },
+  "Sage de l'oracle": {
+    source:"MOoT", skills:["Histoire","Religion"], lang:2,
+    equipment:"Carnets de prophéties, robes de cérémonie, 15 po",
+    feature:"Présages: les gens viennent vous consulter et vous offrent gîte et couvert"
+  },
+
+  // ── Tomb of Annihilation (ToA) ────────────────────────────────
+  "Anthropologue (ToA)": {
+    source:"ToA", skills:["Intuition","Religion"], lang:2,
+    equipment:"Livre de notes de terrain, vêtements locaux, 10 po",
+    feature:"Adapté aux cultures: intégrer n'importe quelle culture après une semaine d'observation"
+  },
+  "Archéologue (ToA)": {
+    source:"ToA", skills:["Histoire","Survie"], tools:["Outils de cartographe ou navigateur"], lang:1,
+    equipment:"Kit de fouille, pique à glace, carnet, 25 po",
+    feature:"Œil historique: reconnaître l'âge et l'origine d'artefacts et ruines"
+  },
+
+  // ── Explorer's Guide to Wildemount (EGtW) ────────────────────
+  "Grinner": {
+    source:"EGtW", skills:["Tromperie","Performance"], tools:["Kit de déguisement","Instrument de musique"],
+    equipment:"Déguisement, symbole de la Guilde des murmures, 15 po",
+    feature:"Réseau de renseignement: contact dans presque toutes les villes de Wildemount"
+  },
+  "Opératif du Myriade": {
+    source:"EGtW", skills:["Tromperie","Discrétion"], tools:["Kit de déguisement","Outils de voleur"],
+    equipment:"Deux déguisements, codes du Myriade, 10 po",
+    feature:"Connexion criminelle: réseau du Myriade dans l'Empire Dwendalien"
+  },
+  "Acolyte luxonborn": {
+    source:"EGtW", skills:["Intuition","Religion"], lang:2,
+    equipment:"Symbole de la Lumière, livre de prières de la Luxon, 15 po",
+    feature:"Abri des fidèles de la Lumière: accueil dans les temples de la Luxon"
+  },
+
+  // ── Eberron: Rising from the Last War (ERftLW) ───────────────
+  "Marque d'artisan": {
+    source:"ERftLW", skills:["Histoire","Persuasion"], tools:["Outils d'artisan (un type)"], lang:1,
+    equipment:"Outils d'artisan, clé d'accès à une chambre forte de maison, 15 po",
+    feature:"Ressources de la maison draconique: accès aux services et crédit de votre maison"
+  },
+
+  // ── Wild Beyond the Witchlight (WBtW) ────────────────────────
+  "Perdu dans les fées": {
+    source:"WBtW", skills:["Survie"], tools:["Instrument de musique"], lang:2,
+    equipment:"Objet de votre enfance, vêtements déchirés, 8 po",
+    feature:"Connexion aux fées: vous reconnaissez les portails de fée et pouvez en pressentir un proche"
+  },
+  "Émissaire des fées": {
+    source:"WBtW", skills:["Arcanes","Nature"], lang:2,
+    equipment:"Lettre de recommandation d'une fée, vêtements élégants, 10 po",
+    feature:"Message des Féeries: vous pouvez envoyer des messages aux créatures féeriques via rêves"
+  },
+
+  // ── Ghosts of Saltmarsh (GoS) ─────────────────────────────────
+  "Pêcheur": {
+    source:"GoS", skills:["Histoire","Survie"], tools:["Véhicules nautiques"],
+    equipment:"Kit de pêche, chapeau imperméable, vêtements de pêcheur, 10 po",
+    feature:"Prise du marin: vous trouvez toujours un passage en bateau ou de la nourriture de mer"
+  },
+  "Contrebandier": {
+    source:"GoS", skills:["Athletisme","Discrétion"], tools:["Outils de navigateur","Véhicules nautiques"],
+    equipment:"Tenue sombre, faux manifeste de cargaison, 15 po",
+    feature:"Contacts sous-marins: réseau de receleurs et de repaires côtiers discrets"
+  },
+  "Marine": {
+    source:"GoS", skills:["Athletisme","Survie"], tools:["Outils de navigateur","Véhicules nautiques"],
+    equipment:"Uniforme, insigne militaire, rapport de mission, 10 po",
+    feature:"Corps des marines: les soldats côtiers vous respectent et partagent leurs informations"
+  },
+
+  // ── Acquisitions Incorporated (AI) ───────────────────────────
+  "Aventurier célèbre": {
+    source:"AI", skills:["Persuasion","Performance"], tools:["Kit de déguisement"], lang:1,
+    equipment:"Tenue distinctive, insignes de gloire, 15 po",
+    feature:"Héritage de gloire: les gens reconnaissent votre nom et vous traitent avec déférence"
+  },
+  "Marchand raté": {
+    source:"AI", skills:["Intuition","Persuasion"], tools:["Outils de navigateur"], lang:1,
+    equipment:"Lettre de créance annulée, vêtements usés qui étaient luxueux, 10 po",
+    feature:"Réseau commercial: vous connaissez encore marchands, fournisseurs et acheteurs"
+  },
+  "Joueur": {
+    source:"AI", skills:["Tromperie","Perspicacité"], tools:["Jeu de dés","Jeu de cartes"],
+    equipment:"Jeux de hasard, dés pipés, 10 po",
+    feature:"Ne jamais savoir quand s'arrêter: vous trouvez toujours une partie et pouvez emprunter"
+  },
+
+  // ── Spelljammer: Adventures in Space (SAiS) ──────────────────
+  "Voyageur astral": {
+    source:"SAiS", skills:["Histoire","Survie"], tools:["Outils de navigateur"], lang:1,
+    equipment:"Carte des plans, carnet de voyage, vêtements exotiques, 10 po",
+    feature:"Connaissance des plans: vous savez vous orienter dans les plans et connaissez les portails"
+  },
+
+  // ── Strixhaven: A Curriculum of Chaos (SaCoC) ────────────────
+  "Étudiant de Lorehold": {
+    source:"SaCoC", skills:["Histoire","Religion"], tools:["Outils de calligraphie"], lang:1,
+    equipment:"Outils académiques, notes de cours, uniforme d'étudiant, 10 po",
+    feature:"Ressources universitaires: accès aux bibliothèques et aux professeurs de Strixhaven"
+  },
+  "Étudiant de Prismari": {
+    source:"SaCoC", skills:["Acrobaties","Performance"], tools:["Instrument de musique"], lang:1,
+    equipment:"Outils artistiques, carnet de croquis, uniforme d'étudiant, 10 po",
+    feature:"Accès aux ateliers de Prismari et aux ressources créatives"
+  },
+  "Étudiant de Quandrix": {
+    source:"SaCoC", skills:["Arcanes","Nature"], tools:["Outils de navigation"], lang:1,
+    equipment:"Carnet de mathématiques, outils académiques, uniforme d'étudiant, 10 po",
+    feature:"Accès aux laboratoires de Quandrix et aux recherches en cours"
+  },
+  "Étudiant de Silverquill": {
+    source:"SaCoC", skills:["Persuasion","Intimidation"], tools:["Matériel de calligraphie"], lang:1,
+    equipment:"Plume magique, outils académiques, uniforme d'étudiant, 10 po",
+    feature:"Tribune réservée: accès aux débats et aux cercles littéraires de Silverquill"
+  },
+  "Étudiant de Witherbloom": {
+    source:"SaCoC", skills:["Médecine","Nature"], tools:["Kit d'herboriste"], lang:1,
+    equipment:"Kit d'herboriste, spécimen biologique, uniforme d'étudiant, 10 po",
+    feature:"Accès aux serres et laboratoires de Witherbloom"
+  },
+
+  // ── Baldur's Gate: Descent into Avernus (BGDiA) ──────────────
+  "Sans visage": {
+    source:"BGDiA", skills:["Tromperie","Intimidation"], tools:["Kit de déguisement"], lang:1,
+    equipment:"Déguisement principal, tenue de personnage public, 10 po",
+    feature:"Dual personae: deux identités complètes; seuls vos alliés les plus proches connaissent la vérité"
+  },
+
+  // ── Dragonlance: Shadow of the Dragon Queen (DSotDQ) ─────────
+  "Combattant de la résistance": {
+    source:"DSotDQ", skills:["Discrétion","Survie"], tools:["Outils de cartographe"], lang:1,
+    equipment:"Insigne secret de la résistance, vêtements de voyage, 10 po",
+    feature:"Contact résistance: réseau de cellules de résistance prêtes à vous aider"
+  },
+  "Réfugié de la guerre des dragons": {
+    source:"DSotDQ", skills:["Intuition","Survie"], lang:2,
+    equipment:"Souvenir de votre foyer perdu, cartes de la région, vêtements communs, 10 po",
+    feature:"Solidarité des réfugiés: les communautés de réfugiés vous aident et partagent l'information"
+  },
+
+  // ── Étranger ─────────────────────────────────────────────────
+  "Étranger": {
+    source:"PHB", skills:["Intuition","Religion"], lang:2,
+    equipment:"Habit exotique, bijou de votre culture, carnet de voyage, 5 po",
+    feature:"Connaissance de la terre d'origine: expertise unique sur votre culture et ses contacts"
+  }
 };
- 
 const ALIGNMENTS = ["Loyal Bon","Neutre Bon","Chaotique Bon","Loyal Neutre","Neutre","Chaotique Neutre","Loyal Mauvais","Neutre Mauvais","Chaotique Mauvais"];
 const SKILLS_LIST = [
   {name:"Acrobaties",stat:"dex"},{name:"Arcanes",stat:"int"},{name:"Athletisme",stat:"str"},
