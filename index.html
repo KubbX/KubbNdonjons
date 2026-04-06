@@ -32,10 +32,12 @@ let activeCharUnsubscribe = null;
 // DONNÉES D&D 5E
 // ============================================================
 const RACES = {
-  "Humain": { source:"PHB", stats:{str:1,dex:1,con:1,int:1,wis:1,cha:1}, speed:9, traits:["Polyvalent: +1 à toutes les caractéristiques","Langues supplémentaires"] },
+  // ── PHB 2014 ──────────────────────────────────────────────────
+  "Humain": { source:"PHB", stats:{str:1,dex:1,con:1,int:1,wis:1,cha:1}, speed:9,
+    traits:["Polyvalent: +1 à toutes les caractéristiques","Langues supplémentaires"] },
   "Elfe": { source:"PHB", speed:9, traits:["Ascendance féerique","Transe","Maîtrise des armes elfiques"],
     subraces:{
-      "Haut-Elfe":{ stats:{dex:2,int:1}, traits:["Sort mineur supplémentaire","Maîtrise des armes elfiques"] },
+      "Haut-Elfe":{ stats:{dex:2,int:1}, traits:["Sort mineur de magicien supplémentaire","Maîtrise des armes elfiques"] },
       "Elfe des bois":{ stats:{dex:2,wis:1}, traits:["Cachette naturelle","Foulée rapide (vitesse 10.5m)"] },
       "Drow":{ stats:{dex:2,cha:1}, traits:["Vision dans le noir supérieure (36m)","Sensibilité à la lumière solaire","Magie des drows"] }
     }
@@ -52,21 +54,191 @@ const RACES = {
       "Halfelin robuste":{ stats:{dex:2,con:1}, traits:["Robustesse halfeline: résistance au poison"] }
     }
   },
-  "Gnome": { source:"PHB", speed:7.5, traits:["Vision dans le noir (18m)","Ruse gnome (avantage INT, SAG, CHA vs magie)"],
+  "Gnome": { source:"PHB", speed:7.5, traits:["Vision dans le noir (18m)","Ruse gnome (avantage INT/SAG/CHA vs magie)"],
     subraces:{
       "Gnome des forêts":{ stats:{int:2,dex:1}, traits:["Illusionniste naturel","Communication avec les petits animaux"] },
       "Gnome des roches":{ stats:{int:2,con:1}, traits:["Connaissances artificielles","Mémoire artificielle"] }
     }
   },
-  "Semi-Elfe": { source:"PHB", stats:{cha:2}, bonusStats:2, speed:9, traits:["Vision dans le noir (18m)","Ascendance féerique","Polyvalent: +1 à 2 caractéristiques au choix","2 maîtrises de compétences supplémentaires"] },
-  "Semi-Orque": { source:"PHB", stats:{str:2,con:1}, speed:9, traits:["Vision dans le noir (18m)","Menaçant","Endurance implacable","Attaques sauvages"] },
-  "Tieffelin": { source:"PHB", stats:{int:1,cha:2}, speed:9, traits:["Vision dans le noir (18m)","Résistance infernale","Héritage infernal (sorts)"] },
-  "Dragonné": { source:"PHB", stats:{str:2,cha:1}, speed:9, traits:["Ascendance draconique (choisir un type de dragon)","Souffle","Résistance aux dégâts"] },
-  "Githyanki": { source:"MotM", stats:{int:2,str:1}, speed:9, traits:["Psionique Gith","Télékinesie psionique","Saut psionique"] },
-  "Féral Tieffelin": { source:"MTF", stats:{int:2,dex:1}, speed:9, traits:["Vision dans le noir (18m)","Résistance infernale","Magie infernale férale"] }
+  "Semi-Elfe": { source:"PHB", stats:{cha:2}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Ascendance féerique","Polyvalent: +1 à 2 caractéristiques au choix","2 maîtrises de compétences supplémentaires"] },
+  "Semi-Orque": { source:"PHB", stats:{str:2,con:1}, speed:9,
+    traits:["Vision dans le noir (18m)","Menaçant","Endurance implacable","Attaques sauvages"] },
+  "Tieffelin": { source:"PHB", stats:{int:1,cha:2}, speed:9,
+    traits:["Vision dans le noir (18m)","Résistance infernale","Héritage infernal (sorts)"] },
+  "Dragonné": { source:"PHB", stats:{str:2,cha:1}, speed:9,
+    traits:["Ascendance draconique (choisir un type de dragon)","Arme de souffle","Résistance aux dégâts correspondants"] },
+
+  // ── Volo's Guide to Monsters (VGtM) ──────────────────────────
+  "Aasimar": { source:"VGtM", stats:{wis:1,cha:2}, speed:9,
+    traits:["Vision dans le noir (18m)","Résistance nécrotique et radiante","Soins célestes (d4×BM PV, 1/repos long)","Révélation céleste niv.3"],
+    subraces:{
+      "Aasimar protecteur":{ stats:{wis:1,cha:2}, traits:["Ailes spectrales niv.3: vol 9m pendant 1 min"] },
+      "Aasimar vengeur":{ stats:{str:1,cha:2}, traits:["Némésis niv.3: vitesse +4.5m, dégâts nécrotiques supp."] },
+      "Aasimar déchu":{ stats:{con:1,cha:2}, traits:["Forme infernale niv.3: dégâts nécrotiques en aura 3m"] }
+    }
+  },
+  "Tabaxi": { source:"VGtM", stats:{dex:2,cha:1}, speed:9,
+    traits:["Vision dans le noir (18m)","Griffes (1d4+FOR)","Furtivité féline (double BM Discrétion)","Escalade (vitesse d'escalade = vitesse marche)","Poussée féline: vitesse ×2 pendant 1 tour (1/repos court)"] },
+  "Triton": { source:"VGtM", stats:{str:1,con:1,cha:1}, speed:9,
+    traits:["Amphibie (respirer eau et air)","Maîtrise des profondeurs","Magie du contrôle de l'eau (sorts gratuits)","Emprisonnement des eaux et du vent"] },
+  "Kenku": { source:"VGtM", stats:{dex:2,wis:1}, speed:9,
+    traits:["Mimétisme expert (imiter sons et voix)","Maîtrises kenku (2 compétences)","Ambidextre (avantage DEX si attaque avec 2 armes légères)"] },
+  "Kobold": { source:"VGtM", stats:{dex:2,con:2}, speed:9,
+    traits:["Vision dans le noir (18m)","Sensibilité à la lumière solaire","Pack Tactique (avantage si allié adjacent)","Profusion kobold"] },
+  "Gobelin": { source:"VGtM", stats:{dex:2,con:1}, speed:9,
+    traits:["Vision dans le noir (18m)","Petite taille","Fuite agile (Foncer/Se désengager en action bonus)","Furie des petits: dégâts max si touché une créature de taille S ou M"] },
+  "Hobgobelin": { source:"VGtM", stats:{con:2,int:1}, speed:9,
+    traits:["Vision dans le noir (18m)","Formation martiale (armures légères/moyennes, armes martiales)","Économie de guerre (ajouter BM à un jet raté, 1/repos court)"] },
+  "Bugbear": { source:"VGtM", stats:{str:2,dex:1}, speed:9,
+    traits:["Vision dans le noir (18m)","Portée longue (portée mêlée +1.5m)","Attaque surprise (1d6 supp. si surprise)","Puissant: taille G pour charge/poussée"] },
+  "Yuan-ti Malison": { source:"VGtM", stats:{int:1,cha:2}, speed:9,
+    traits:["Immunité au poison","Résistance magique (avantage JdS vs sorts)","Magie venimeuse (sorts innés)","Suggestion (1/repos long)"] },
+  "Firbolg": { source:"VGtM", stats:{wis:2,str:1}, speed:9,
+    traits:["Détection de magie (sorts innés)","Magie des firbolg (invisibilité 1/repos court, parler aux bêtes/plantes)","Dissimulation de jambes (Petite taille pour magie)","Puissant (FOR ×2 poids)"] },
+  "Lizardfolk": { source:"VGtM", stats:{con:2,wis:1}, speed:9,
+    traits:["Amphibie","Mâchoire naturelle (1d6+FOR)","Peau cuirassée (CA = 13+DEX sans armure)","Affamé: manger un mort pour 3d6+CON PV temp (1/repos court)","Compétences instinctives (2 au choix)"] },
+  "Goliath": { source:"VGtM", stats:{str:2,con:1}, speed:9,
+    traits:["Puissance des pierres (réduire dégâts de 1d12+CON, 1/repos court)","Taille athlétique (FOR ×2 poids/poussée)","Endurance de la montagne (avantage JdS vs température extrême)","Compétitif naturel (suivre scores des alliés)"] },
+
+  // ── Mordenkainen Presents: Monsters of the Multiverse (MotM) ──
+  "Githyanki": { source:"MotM", stats:{int:2,str:1}, speed:9,
+    traits:["Psionique Gith (Mage armor, Misty Step, Plane Shift innés)","Télékinesie psionique (Déplacer objets)","Saut psionique"] },
+  "Githzerai": { source:"MotM", stats:{int:2,wis:1}, speed:9,
+    traits:["Protection psionique (avantage JdS charme/peur)","Détection psionique (Detect thoughts inné)","Vitesse psionique (Misty Step, Haste innés haut niveau)"] },
+  "Aasimar (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Résistance nécrotique et radiante","Soins célestes","Révélation céleste niv.3 (ailes, aura lumineuse ou nécromancie)"] },
+  "Eladrin": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Ascendance féerique","Transe (repos long en 4h)","Pas de la fée (Misty Step 1/repos court)","Présence saisonnière (charme/terreur 1/repos court)"],
+    subraces:{
+      "Printemps":{ stats:{dex:1,cha:1}, traits:["Aura de joie: charmer les créatures proches"] },
+      "Été":{ stats:{str:1,cha:1}, traits:["Aura de bravoure: terrifier les ennemis"] },
+      "Automne":{ stats:{con:1,wis:1}, traits:["Aura de paix: partager les soins"] },
+      "Hiver":{ stats:{int:1,wis:1}, traits:["Aura de tristesse: réduire vitesse des ennemis"] }
+    }
+  },
+  "Elfe marin": { source:"MotM", stats:{dex:2,con:1}, speed:9,
+    traits:["Ascendance féerique","Transe","Vision dans le noir (18m)","Enfant de la mer (nage 9m, respiration aquatique)","Ami de la mer (parler aux créatures marines)"] },
+  "Shadar-kai": { source:"MotM", stats:{dex:2,wis:1}, speed:9,
+    traits:["Ascendance féerique","Transe","Vision dans le noir (18m)","Nécroportail (Misty Step suivi de résistance tous dégâts 1 round, 1/repos long)","Résistance nécrotique"] },
+  "Duergar": { source:"MotM", stats:{con:2,str:1}, speed:7.5,
+    traits:["Vision supérieure dans le noir (36m)","Résistance aux charmes/poisons","Résilience naine","Agrandissement/Invisibilité psioniques (1/repos long chacun)"] },
+  "Gnome des profondeurs (Svirfneblin)": { source:"MotM", stats:{int:2,dex:1}, speed:7.5,
+    traits:["Avantage aux jets de discrétion","Vision supérieure dans le noir (36m)","Camouflage gnome (invisibilité 1/repos long)","Ruse gnome"] },
+  "Kobold (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Pack Tactique (avantage si allié adjacent à la cible)","Rusé kobold: ajouter BM à un jet raté (1/repos court)"] },
+  "Gobelin (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Fuite agile (Foncer/Se désengager AB)","Furie des petits (dégâts max sur blessure)","Nibble (regagner PV après attaque)"] },
+  "Hobgobelin (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Formation martiale","Économie de guerre (BM à jet raté, 1/repos court)","Férocité hobgobeline"] },
+  "Bugbear (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Portée longue (+1.5m mêlée)","Attaque surprise (1d6 si surprise)","Puissant (FOR ×2 charges)"] },
+  "Yuan-ti (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Immunité au poison et à la condition empoisonnée","Résistance magique (avantage JdS vs sorts)","Sorts innés (Poison Spray, Suggestion, Plante entravante)"] },
+  "Firbolg (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Détection magique","Discours des firbolg (parler aux bêtes/plantes)","Invisible dans la nature (1/repos court)","Puissant (FOR ×2)"] },
+  "Minotaure": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Charge (si 3m+ de course: +2d6 dégâts + JdS FOR ou repoussé)","Cornes naturelles (attaque 1d6+FOR)","Mémoire du labyrinthe (ne peut se perdre)","Puissant (FOR ×2)"] },
+  "Centaure": { source:"MotM", stats:{}, bonusStats:2, speed:12,
+    traits:["Sabot (attaque 1d6+FOR)","Charge (Sabot +2d6 si 9m+ de course)","Equin Build (taille G pour charge/poussée, ne peut monter)","Trample (renverser si charge réussit)"] },
+  "Triton (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Amphibie","Contrôle eau/air (sorts innés)","Emissaire des profondeurs","Gardien des profondeurs (résistance au froid)"] },
+  "Tabaxi (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Griffes (1d6+DEX)","Double compétence (Discrétion+Perception)","Poussée féline (vitesse ×2, 1/repos court)","Escalade"] },
+  "Tortle": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Carapace naturelle (CA = 17 sans armure)","Défensive en boule (action: CA 19, immobile)","Griffes naturelles (1d6+FOR)","Hold Breath (1 heure)"] },
+  "Kenku (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Expert des sens (double BM Perception/Intuition)","Mimétisme parfait (sons et voix vus dans les 24h)","Entraînement kenku (2 compétences/outils)"] },
+  "Shifter": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Dérive (action bonus: gains PV temp et trait selon sous-race pendant 1 min, 1/repos court)"],
+    subraces:{
+      "Biter":{ stats:{str:1}, traits:["Morsure naturelle (1d6+FOR)","En dérive: régénérer PV"] },
+      "Longtooth":{ stats:{str:1}, traits:["Canines (1d6+FOR)","En dérive: attaque supp AB"] },
+      "Swiftstride":{ stats:{dex:1,cha:1}, traits:["En dérive: +1.5m vitesse, réaction déplacement si cible attaque"] },
+      "Wildhunt":{ stats:{wis:1}, traits:["En dérive: ne peut être surpris, avantage tous JdS FOR/DEX/CON"] }
+    }
+  },
+  "Changelin": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Changement de forme (modifier apparence, voix, taille: petit ou moyen)","Maîtrise instinctive (Tromperie + Perspicacité)","Esprit insaisissable (avantage JdS charme, ne peut être endormi magiquement)"] },
+  "Kalashtar": { source:"MotM", stats:{wis:1,cha:2}, speed:9,
+    traits:["Double esprits (avantage JdS SAG, résistance psychique)","Lien mental (télépathie 18m avec créature consentante)","Incarnation du bien (ne peut être possédé)"] },
+  "Lizardfolk (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Amphibie","Mâchoire naturelle (1d6+FOR)","Peau cuirassée (CA=13+DEX)","Astucieux (maîtriser compétence+outil après 10 min d'observation)","Affamé (régénérer PV)"] },
+  "Goliath (MotM)": { source:"MotM", stats:{}, bonusStats:2, speed:9,
+    traits:["Puissance des pierres (réduire dégâts 1d12+CON, 1/repos court)","Taille athlétique (FOR ×2)","Endurance de montagne","Compétitif"] },
+
+  // ── Eberron: Rising from the Last War (ERftLW) ────────────────
+  "Warforged": { source:"ERftLW", stats:{con:2}, bonusStats:1, speed:9,
+    traits:["Corps intégré (CA = 11+DEX sans armure, pas de besoins vitaux naturels)","Résistance aux maladies/poisons","Repos en 6h inactif","Intégration d'outils (1 outil intégré)","Composite spécialisé (1 armure légère/moyenne intégrée optionnelle)"] },
+
+  // ── Génasi (EEPC / MotM) ───────────────────────────────────────
+  "Génasi de l'air": { source:"EEPC", stats:{dex:2,con:1}, speed:9,
+    traits:["Respiration illimitée (respirer n'importe quoi)","Décharge de foudre (Gust, Feuille morte, Pied-de-foudre innés)","Corps conducteur: résistance à la foudre"] },
+  "Génasi de la terre": { source:"EEPC", stats:{str:1,con:2}, speed:9,
+    traits:["Marche sur la pierre (ignorer terrain difficile rocheux)","Fusion avec la terre (Passage sans trace, Façonnage de la pierre innés)","Corps de pierre: résistance acide"] },
+  "Génasi du feu": { source:"EEPC", stats:{int:1,con:2}, speed:9,
+    traits:["Vision dans le noir (18m)","Illumination naturelle (lumière vive 1.5m)","Corps flamboyant: résistance au feu","Innés (Mains brûlantes, Peau d'écorce de feu)"] },
+  "Génasi de l'eau": { source:"EEPC", stats:{wis:1,con:2}, speed:9,
+    traits:["Amphibie","Vitesse de nage 9m","Contrôle de l'eau (Façonnage de l'eau, Purification des eaux innés)","Corps aqueux: résistance acide"] },
+
+  // ── Planeshift / Ravnica / Theros ─────────────────────────────
+  "Simic Hybrid": { source:"GGtR", stats:{con:2}, bonusStats:1, speed:9,
+    traits:["Corps modifié niv.1 (choisir adaptation: branchies, griffes, pince, écailles)","Corps modifié niv.5 (2e adaptation: peau caméléon, tentacules, queue de baleine)"] },
+  "Vedalken": { source:"GGtR", stats:{int:2,wis:1}, speed:9,
+    traits:["Acuité vedalken (maîtrise Arcanes + 2 compétences INT/SAG/CHA)","Calme inébranlable (avantage JdS vs charme/peur si non maîtrisé)","Partiellement amphibie (30 min sous l'eau)"] },
+  "Loxodon": { source:"GGtR", stats:{con:2,wis:1}, speed:9,
+    traits:["Puissant (taille G pour charge/poussée)","Trompe naturelle (grappin gratuit, portée 1.5m)","Odorat aiguisé (avantage Perception odorat)","Maçonnerie naturelle (PV max +1/niveau)"] },
+  "Satyre": { source:"MOT", stats:{cha:2,dex:1}, speed:10.5,
+    traits:["Résistance magique (avantage JdS vs sorts)","Mémoire de la fête (maîtrise Persuasion + instrument de musique)","Ruade (1d4+FOR, renverser, 1/tour)","Joyeux de nature: avantage Discrétion/Performance"] },
+  "Leonin": { source:"MOT", stats:{str:2,con:1}, speed:10.5,
+    traits:["Vision dans le noir (18m)","Griffes (1d4+DEX, course libre)","Rugissement héroïque (bonus Initiative + avantage vs peur, 1/repos court)","Maîtrise (Athlétisme + Intimidation)"] },
+  "Minotaure (Theros)": { source:"MOT", stats:{str:2,con:1}, speed:9,
+    traits:["Cornes (1d6+FOR)","Charge (si 3m+: +2d6 + JdS FOR)","Mémoire du labyrinthe (navigation parfaite)","Puissant"] },
+
+  // ── Domains of Dread (Van Richten's) ────────────────────────
+  "Dhampir": { source:"VRGtR", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Morsure vampirique (1d4 nécrotique, soigne la moitié, 1/repos court)","Escalade araignée (vitesse escalade = marche)","Résistance nécrotique"] },
+  "Hexblood": { source:"VRGtR", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Malédiction d'hexsang (Hexe inné)","Présage de la sorcière (Prestidigitation inné)","Présents de la folie (envoi objet et conscience dans sommeil, 1/repos long)"] },
+  "Reborn": { source:"VRGtR", stats:{}, bonusStats:2, speed:9,
+    traits:["Survivant (résistance poison, avantage vs peur/charme/épuisement)","Connaissances fragmentées (1 outil ou langue/repos long)","Fonctions vitales réduites (peu de besoins)","Souvenir du traumatisme"] },
+
+  // ── Wild Beyond the Witchlight ────────────────────────────────
+  "Fairy": { source:"WBtW", stats:{}, bonusStats:2, speed:9,
+    traits:["Vol (9m, ne peut porter d'armure lourde)","Magie des fées (Prestidigitation, Détection de magie, Faerie Fire innés)","Petite taille","Réduction (prendre la taille Très Petite momentanément)"] },
+  "Harengon": { source:"WBtW", stats:{}, bonusStats:2, speed:9,
+    traits:["Chance du lapin (ajouter d4 aux jets DEX, 1/repos long)","Saut lunaire (sauter très haut sans action)","Sûr de ses pieds (avantage Acrobaties vs être renversé)","Odorat affûté (avantage Perception olfactive)"] },
+
+  // ── Strixhaven ────────────────────────────────────────────────
+  "Owlin": { source:"SCC", stats:{}, bonusStats:2, speed:9,
+    traits:["Vol (9m, ne peut porter d'armure lourde)","Vision dans le noir (36m)","Silence des plumes (avantage Discrétion)","Petite ou moyenne taille"] },
+
+  // ── Spelljammer ───────────────────────────────────────────────
+  "Astral Elf": { source:"AAG", stats:{}, bonusStats:2, speed:9,
+    traits:["Ascendance féerique","Transe","Vision dans le noir (18m)","Sort mineur inné","Connaissance cosmique (maîtrise Histoire ou Arcanes + langue au repos long)"] },
+  "Autognome": { source:"AAG", stats:{}, bonusStats:2, speed:9,
+    traits:["Armure intégrée (CA=13+DEX)","Résistance aux poisons","Ne dort pas (garde vigilance en repos)","Réparation (1d8 PV temp, 1/repos long)","Sort mineur inné"] },
+  "Giff": { source:"AAG", stats:{}, bonusStats:2, speed:9,
+    traits:["Puissant","Maîtrise des armes à feu","Regain de détermination (réussir JdS raté, 1/repos court)","Torpille hydrostatique (nager, push, immobiliser)"] },
+  "Hadozee": { source:"AAG", stats:{}, bonusStats:2, speed:9,
+    traits:["Parachute de peau (chute: 0 dégâts si vitesse ≥ 1.5m)","Glisse de peau (voler 6m si chute)","Escalade (vitesse = marche)"] },
+  "Plasmoid": { source:"AAG", stats:{}, bonusStats:2, speed:9,
+    traits:["Amphibie","Corps amorphe (s'insinuer dans espaces de 2.5cm)","Résistance acide et venin","Vision dans le noir (18m)","Pseudopode (grappin gratuit, portée 1.5m)"] },
+  "Thri-kreen": { source:"AAG", stats:{}, bonusStats:2, speed:9,
+    traits:["Vision dans le noir (18m)","Vision secondaire (détecter invisibilité)","Camouflage mantis (changer couleur peau, Discrétion)","4 bras (tenir 2 boucliers+armes, action bonus secondaire)","Griffes secondaires (1d6+FOR)"] },
+
+  // ── Dragonlance ───────────────────────────────────────────────
+  "Kender": { source:"DSotDQ", stats:{}, bonusStats:2, speed:9,
+    traits:["Intrépide (avantage JdS vs peur, immunité panique magique)","Intimidation de kender (Terrifier 1/repos court)","Poches de kender (trouver objet utile 1/repos court)"] },
+
+  // ── Tieffelins variants ───────────────────────────────────────
+  "Féral Tieffelin": { source:"MTF", stats:{int:2,dex:1}, speed:9,
+    traits:["Vision dans le noir (18m)","Résistance au feu","Magie infernale férale (Légèreté, Porte des enfers innés)"] },
+
+  // ── PHB 2014 autres ───────────────────────────────────────────
+  "Githyanki (PHB)": { source:"PHB", stats:{int:2,str:1}, speed:9,
+    traits:["Résistance psionique (avantage JdS charme/peur)","Psionique Gith (Mage Armor, Misty Step, Plane Shift innés niv.1/3/5)"] }
 };
- 
-// ASI_LEVELS par classe — niveaux où on gagne ASI/Don
 const ASI_LEVELS = {
   default: [4,8,12,16,19],
   "Guerrier": [4,6,8,12,14,16,19],
@@ -6777,7 +6949,7 @@ nav button:last-child { color:#884444; }
 .combat-val { font-size:1.3rem; color:#fff; font-weight:600; cursor:pointer; }
 .combat-sub { font-size:0.78rem; color:#a89060; }
  
-.sheet-body { display:grid; grid-template-columns:200px 1fr 260px; gap:0; }
+.sheet-body { display:grid; grid-template-columns:300px 1fr 390px; gap:0; }
 .sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid #d4c4a0; }
 .sheet-col-right { border-right:none; }
 .sheet-section { margin-bottom:14px; background:#fff; border:1px solid #ddd; border-radius:3px; overflow:hidden; }
@@ -7016,6 +7188,9 @@ nav button:last-child { color:#884444; }
 .familiar-desc { font-family:'Crimson Pro'; font-size:0.82rem; color:#555; font-style:italic; margin-top:5px; line-height:1.5; }
 
 /* Responsive */
+@media(max-width:1100px) {
+  .sheet-body { grid-template-columns:240px 1fr 300px; }
+}
 @media(max-width:900px) {
   .sheet-body { grid-template-columns:1fr; }
   .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid #d4c4a0; }
