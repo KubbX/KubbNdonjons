@@ -2816,7 +2816,6 @@ function renderCharSheet(id, d) {
         </div>
       </div>`;
       })()}
-    </div>
  
       <!-- Formes préparées (Druide / Rôdeur) -->
       ${(()=>{
@@ -2913,6 +2912,7 @@ function renderCharSheet(id, d) {
           </div>`;
         })()}
       </div>
+    </div>
 
     <!-- COLONNE DROITE -->
     <div class="sheet-col-right">
@@ -8211,10 +8211,9 @@ nav button:last-child { color:#884444; }
 .forms-toggle-arrow { display:inline-block; transition:transform 0.22s ease; font-style:normal; margin-left:4px; }
 .forms-section-open .forms-toggle-arrow { transform:rotate(90deg); }
 .forms-count-badge { font-family:'Crimson Pro'; font-size:0.72rem; font-weight:normal; background:rgba(255,255,255,0.18); border-radius:10px; padding:1px 7px; margin-left:6px; letter-spacing:0; opacity:0.85; }
-.forms-collapsible-body { display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.28s ease; overflow:hidden; }
-.forms-section-open .forms-collapsible-body { grid-template-rows:1fr; }
-.forms-collapsible-inner { min-height:0; padding:0 10px; }
-.forms-section-open .forms-collapsible-inner { padding:6px 10px 8px; }
+.forms-collapsible-body { max-height:0; overflow:hidden; transition:max-height 0.28s ease, padding 0.28s ease; padding:0; }
+.forms-section-open .forms-collapsible-body { max-height:1200px; padding:6px 10px 8px; }
+.forms-collapsible-inner { }
 
 /* Responsive */
 @media(max-width:1100px) {
