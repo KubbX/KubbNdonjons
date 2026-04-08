@@ -6265,7 +6265,26 @@ function _renderSpellDetail(r) {
   return html;
 }
 
+function _statMod(val) {
+  const v = parseInt(val) || 10;
+  const m = Math.floor((v - 10) / 2);
+  return (m >= 0 ? '+' : '') + m;
+}
+
 function _renderMonsterDetail(r) {
+  const hasStats = r.str || r.dex || r.con || r.int || r.wis || r.cha;
+  const statBlock = hasStats ? `
+    <div class="rd-stat-block">
+      ${[['FOR','str'],['DEX','dex'],['CON','con'],['INT','int'],['SAG','wis'],['CHA','cha']].map(([lbl,key]) => {
+        const val = r[key] || 10;
+        return `<div class="rd-stat-cell">
+          <span class="rd-stat-abbr">${lbl}</span>
+          <span class="rd-stat-val">${val}</span>
+          <span class="rd-stat-mod">(${_statMod(val)})</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   let html = `
     <div class="rd-title">${r.name||'?'}</div>
     <div class="rd-subtitle">${r.type||'Créature'} de taille ${_sizeLabel(r.size)}</div>
@@ -6274,14 +6293,20 @@ function _renderMonsterDetail(r) {
       <div class="rd-prop"><span class="rd-prop-label">Classe d'armure :</span> ${r.ac||'—'}</div>
       <div class="rd-prop"><span class="rd-prop-label">Points de vie :</span> ${r.hp||'—'}</div>
       <div class="rd-prop"><span class="rd-prop-label">Vitesse :</span> ${r.speed||'—'}</div>
-    </div>
-    <div class="rd-separator"></div>
-    <div class="rd-props">
       <div class="rd-prop"><span class="rd-prop-label">Rang de dangerosité :</span> ${r.cr||'—'}</div>
     </div>
+    ${statBlock}
     <div class="rd-separator"></div>`;
-  if (r.attacks) html += `<div class="rd-block"><div class="rd-block-title">Attaques</div><div class="rd-block-text">${r.attacks}</div></div>`;
-  if (r.traits && r.traits !== '—') html += `<div class="rd-block"><div class="rd-block-title">Traits</div><div class="rd-block-text">${r.traits}</div></div>`;
+  if (r.saves && r.saves !== '—')        html += `<div class="rd-block"><div class="rd-block-title">Jets de sauvegarde</div><div class="rd-block-text">${r.saves}</div></div>`;
+  if (r.skills && r.skills !== '—')      html += `<div class="rd-block"><div class="rd-block-title">Compétences</div><div class="rd-block-text">${r.skills}</div></div>`;
+  if (r.resistances && r.resistances !== '—') html += `<div class="rd-block"><div class="rd-block-title">Résistances</div><div class="rd-block-text">${r.resistances}</div></div>`;
+  if (r.immunities && r.immunities !== '—')   html += `<div class="rd-block"><div class="rd-block-title">Immunités</div><div class="rd-block-text">${r.immunities}</div></div>`;
+  if (r.vulnerabilities && r.vulnerabilities !== '—') html += `<div class="rd-block"><div class="rd-block-title">Vulnérabilités</div><div class="rd-block-text">${r.vulnerabilities}</div></div>`;
+  if (r.senses && r.senses !== '—')      html += `<div class="rd-block"><div class="rd-block-title">Sens</div><div class="rd-block-text">${r.senses}</div></div>`;
+  if (r.languages && r.languages !== '—') html += `<div class="rd-block"><div class="rd-block-title">Langues</div><div class="rd-block-text">${r.languages}</div></div>`;
+  if (r.attacks)                          html += `<div class="rd-block"><div class="rd-block-title">Attaques</div><div class="rd-block-text">${r.attacks}</div></div>`;
+  if (r.traits && r.traits !== '—')       html += `<div class="rd-block"><div class="rd-block-title">Traits</div><div class="rd-block-text">${r.traits}</div></div>`;
+  if (r.legendary && r.legendary !== '—') html += `<div class="rd-block"><div class="rd-block-title">Actions légendaires</div><div class="rd-block-text">${r.legendary}</div></div>`;
   if (r.desc) html += `<div class="rd-separator"></div><div class="rd-desc">${r.desc}</div>`;
   html += `<div class="rd-separator"></div><div class="rd-tags"><span class="rd-source-tag">${r.source||'MM'}</span></div>`;
   return html;
@@ -8170,6 +8195,13 @@ nav button:last-child { color:#884444; }
 .rd-block { margin:8px 0; }
 .rd-block-title { font-family:'Cinzel'; font-size:0.8rem; color:var(--red); font-weight:600; margin-bottom:2px; letter-spacing:0.5px; }
 .rd-block-text { font-family:'Crimson Pro'; font-size:0.88rem; color:#444; line-height:1.5; }
+
+/* Monster stat block */
+.rd-stat-block { display:grid; grid-template-columns:repeat(6,1fr); gap:2px; background:#e8d8b8; padding:2px; margin:8px 0; border-radius:2px; }
+.rd-stat-cell { background:#fdf6e3; text-align:center; padding:4px 2px; }
+.rd-stat-abbr { font-family:'Cinzel'; font-size:0.58rem; color:var(--red); letter-spacing:1px; display:block; }
+.rd-stat-val  { font-family:'Crimson Pro'; font-size:0.95rem; font-weight:700; color:var(--ink); line-height:1.2; }
+.rd-stat-mod  { font-family:'Crimson Pro'; font-size:0.78rem; color:#666; }
 .rd-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; align-items:center; }
 .rd-tag { background:var(--red); color:#fff; font-family:'Crimson Pro'; font-size:0.78rem; padding:3px 12px; border-radius:3px; }
 .rd-source-tag { background:#f0e8d8; color:#888; font-family:'Crimson Pro'; font-size:0.75rem; font-style:italic; padding:3px 10px; border-radius:3px; border:1px solid #d4c4a0; }
