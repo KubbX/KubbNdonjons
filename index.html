@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion</title>
+<title>Grimoire — RPG Companion V1.40</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -3053,6 +3053,7 @@ window._openLevelUp = async (charId) => {
   document.getElementById('forgeNext').style.display = 'none';
   window._lvlupCharData = d;
   window._lvlupCharId = charId;
+  window._lvlupRolledHp = '';
 
   let html = `<h3 class="step-title">\u2B06 Montée de niveau</h3>`;
   html += `<div class="info-box" style="margin-bottom:14px"><strong>${d.name}</strong> — Niveau total : <strong>${tLvl}</strong><br>Classes : <strong>${classesDisplayFull(d)}</strong>${d.xp !== undefined ? `<br>XP : ${d.xp||0} / ${XP_THRESHOLDS[tLvl]||'—'}` : ''}</div>`;
@@ -3086,7 +3087,11 @@ window._renderLevelUpDetails = () => {
   let hpGain, hpText;
   if (hpMode === 'average') { hpGain = Math.ceil(clData.hd/2)+1+conMod; hpText = `${Math.ceil(clData.hd/2)+1}+${conMod}(CON) = <strong>${hpGain}</strong>`; }
   else if (hpMode === 'max') { hpGain = clData.hd+conMod; hpText = `${clData.hd}+${conMod}(CON) = <strong>${hpGain}</strong>`; }
-  else { hpText = `1d${clData.hd}+${conMod}(CON) = <strong>aléatoire</strong>`; hpGain = null; }
+  else {
+    const prevRoll = window._lvlupRolledHp || '';
+    hpText = `1d${clData.hd}+${conMod}(CON) — <button type="button" class="btn-gm-action" style="padding:3px 10px;font-size:0.75rem" onclick="window._rollLevelUpHp(${clData.hd})">🎲 Lancer 1d${clData.hd}</button> <input type="number" id="lvlup_hp_roll" min="1" max="${clData.hd}" placeholder="1-${clData.hd}" value="${prevRoll}" style="width:60px;padding:3px 6px;margin-left:6px" oninput="window._updateRolledHpPreview(${clData.hd},${conMod})"> <span id="lvlup_hp_roll_total" style="margin-left:8px;font-weight:600">${prevRoll?`= <strong>${Math.max(1,parseInt(prevRoll)+conMod)}</strong> PV`:''}</span>`;
+    hpGain = null;
+  }
 
   let html = `<div class="lvlup-section"><div class="lvlup-header">\uD83D\uDCCA Résumé</div><div class="lvlup-body">`;
   if (isMulticlass) html += `<div style="color:var(--gold);font-weight:600;margin-bottom:6px">\u2694 Nouveau multiclassage en ${chosenClass}</div>`;
@@ -3151,6 +3156,23 @@ window._renderLevelUpDetails = () => {
   }
 
   document.getElementById('lvlup_details').innerHTML = html;
+};
+
+window._rollLevelUpHp = (hd) => {
+  const roll = Math.floor(Math.random()*hd)+1;
+  window._lvlupRolledHp = String(roll);
+  const inp = document.getElementById('lvlup_hp_roll');
+  if (inp) { inp.value = roll; inp.dispatchEvent(new Event('input')); }
+};
+window._updateRolledHpPreview = (hd, conMod) => {
+  const inp = document.getElementById('lvlup_hp_roll');
+  if (!inp) return;
+  let v = parseInt(inp.value);
+  if (isNaN(v)) { document.getElementById('lvlup_hp_roll_total').innerHTML = ''; window._lvlupRolledHp=''; return; }
+  if (v < 1) v = 1; if (v > hd) v = hd;
+  window._lvlupRolledHp = String(v);
+  const total = Math.max(1, v + conMod);
+  document.getElementById('lvlup_hp_roll_total').innerHTML = `= <strong>${total}</strong> PV`;
 };
 
 window._updateSubclassPreview = () => {
@@ -3258,7 +3280,16 @@ window._confirmLevelUp = async (charId) => {
   let hpGain;
   if (hpMode === 'average') hpGain = Math.ceil(clData.hd/2)+1+conMod;
   else if (hpMode === 'max') hpGain = clData.hd+conMod;
-  else hpGain = Math.floor(Math.random()*clData.hd)+1+conMod;
+  else {
+    const rollInp = document.getElementById('lvlup_hp_roll');
+    let rolled = parseInt(rollInp?.value);
+    if (isNaN(rolled) || rolled < 1) {
+      // No manual entry: roll automatically
+      rolled = Math.floor(Math.random()*clData.hd)+1;
+    }
+    rolled = Math.min(clData.hd, Math.max(1, rolled));
+    hpGain = rolled + conMod;
+  }
   hpGain = Math.max(1, hpGain);
 
   const info = gatherLevelUpInfo(chosenClass, newClassLevel, d);
@@ -3344,8 +3375,279 @@ window._removeGMWatch = (id) => {
   if(gmWatches[id]) { gmWatches[id](); delete gmWatches[id]; }
   const card = document.getElementById(`gm_${id}`);
   if(card) card.remove();
+  if (window._combatState && window._combatState.active) {
+    window._combatState.combatants = window._combatState.combatants.filter(c => !(c.kind==='pc' && c.refId===id));
+    window._combatRender();
+  }
 };
- 
+
+// ============================================================
+// COMBAT TRACKER (V1.40)
+// ============================================================
+window._combatState = { active:false, round:0, turnIndex:0, combatants:[], monsterSel:{} };
+
+function _combatParseHp(hpStr) {
+  if (typeof hpStr === 'number') return hpStr;
+  if (!hpStr) return 1;
+  const m = String(hpStr).match(/(\d+)/);
+  return m ? parseInt(m[1]) : 1;
+}
+function _combatParseDexFromMonster(m) {
+  if (m.dex) { const v = parseInt(m.dex); if (!isNaN(v)) return v; }
+  return 10;
+}
+function _combatMod(score) { return Math.floor((score-10)/2); }
+
+window._combatStart = () => {
+  if (window._combatState.active) {
+    if (!confirm('Un combat est déjà en cours. Le réinitialiser ?')) return;
+  }
+  window._combatState = { active:true, round:1, turnIndex:0, combatants:[], monsterSel:{}, _sorted:false };
+  window._combatSyncPcs(true);
+  window._combatRender();
+};
+
+window._combatEnd = () => {
+  if (!confirm('Terminer le combat en cours ?')) return;
+  window._combatState = { active:false, round:0, turnIndex:0, combatants:[], monsterSel:{} };
+  window._combatRender();
+};
+
+window._combatSyncPcs = (silent) => {
+  if (!window._combatState.active) { if(!silent) alert('Démarrez un combat d\'abord.'); return; }
+  const existingPcIds = new Set(window._combatState.combatants.filter(c=>c.kind==='pc').map(c=>c.refId));
+  Object.keys(gmWatches).forEach(async (id) => {
+    if (existingPcIds.has(id)) return;
+    try {
+      const snap = await getDoc(doc(db,'characters',id));
+      if (!snap.exists()) return;
+      const d = snap.data();
+      const stats = d.stats || {};
+      window._combatState.combatants.push({
+        kind:'pc', refId:id, name:d.name||'PJ',
+        sub:`${d.race||''} ${classesDisplayFull(d)} (Niv.${totalLevel(d)})`.trim(),
+        init:'', initBonus:_combatMod(stats.dex||10),
+        hp:d.hp||0, hpMax:d.hpMax||0, ac:d.ac||10, dead:false
+      });
+      window._combatRender();
+    } catch(e) { console.warn(e); }
+  });
+  if (!silent) window._combatRender();
+};
+
+window._combatOpenMonsterPicker = () => {
+  if (!window._combatState.active) { alert('Démarrez un combat d\'abord.'); return; }
+  window._combatState.monsterSel = {};
+  document.getElementById('combatMonsterOverlay').style.display = 'flex';
+  document.getElementById('combatMonsterSearch').value = '';
+  window._combatRenderMonsterList();
+};
+
+window._combatRenderMonsterList = () => {
+  const q = (document.getElementById('combatMonsterSearch')?.value||'').toLowerCase();
+  let monsters = [];
+  try { monsters = (typeof getAllResourcesForCategory === 'function') ? getAllResourcesForCategory('monster') : []; } catch(e) {}
+  if (!monsters || !monsters.length) monsters = COMPENDIUM_DATA.monster || [];
+  const filtered = q ? monsters.filter(m => (m.name||'').toLowerCase().includes(q) || (m.type||'').toLowerCase().includes(q)) : monsters;
+  const shown = filtered.slice(0, 80);
+  const list = document.getElementById('combatMonsterList');
+  if (!list) return;
+  const sel = window._combatState.monsterSel;
+  list.innerHTML = shown.map((m,i) => {
+    const key = 'm_'+i;
+    const checked = sel[key] ? 'checked' : '';
+    const qty = sel[key]?.qty || 1;
+    return `<label class="combat-monster-pick ${sel[key]?'selected':''}">
+      <input type="checkbox" ${checked} onchange="window._combatToggleMonsterSel('${key}', this.checked)">
+      <div style="flex:1">
+        <div class="mname">${m.name}</div>
+        <div class="mmeta">RC ${m.cr||'?'} · ${m.type||'?'} · PV ${m.hp||'?'} · CA ${m.ac||'?'}</div>
+      </div>
+      <input type="number" class="mqty" min="1" max="20" value="${qty}" onclick="event.stopPropagation()" oninput="window._combatSetMonsterQty('${key}', this.value)" placeholder="Qté">
+    </label>`;
+  }).join('') || '<p style="color:#888;text-align:center;font-style:italic">Aucune créature trouvée</p>';
+  window._combatMonsterShown = shown;
+  if (filtered.length > 80) list.innerHTML += `<p style="color:#888;text-align:center;font-size:0.78rem">${filtered.length-80} créatures supplémentaires — affinez la recherche</p>`;
+  document.getElementById('combatMonsterSelCount').textContent = `${Object.keys(sel).length} sélection(s)`;
+};
+
+window._combatToggleMonsterSel = (key, checked) => {
+  const sel = window._combatState.monsterSel;
+  if (checked) { if (!sel[key]) sel[key] = { qty:1 }; }
+  else { delete sel[key]; }
+  document.getElementById('combatMonsterSelCount').textContent = `${Object.keys(sel).length} sélection(s)`;
+};
+window._combatSetMonsterQty = (key, val) => {
+  const sel = window._combatState.monsterSel;
+  if (!sel[key]) sel[key] = {};
+  sel[key].qty = Math.max(1, parseInt(val)||1);
+};
+
+window._combatAddSelectedMonsters = () => {
+  const sel = window._combatState.monsterSel;
+  const shown = window._combatMonsterShown || [];
+  Object.keys(sel).forEach(key => {
+    const idx = parseInt(key.replace('m_',''));
+    const m = shown[idx];
+    if (!m) return;
+    const qty = sel[key].qty||1;
+    const existingCount = window._combatState.combatants.filter(c => c.kind==='monster' && c.baseName===m.name).length;
+    for (let i=0; i<qty; i++) {
+      const num = existingCount + i + 1;
+      const dexScore = _combatParseDexFromMonster(m);
+      const hp = _combatParseHp(m.hp);
+      window._combatState.combatants.push({
+        kind:'monster', baseName:m.name,
+        name: (qty>1 || existingCount>0) ? `${m.name} ${num}` : m.name,
+        sub:`RC ${m.cr||'?'} · ${m.type||'?'}`,
+        init:'', initBonus:_combatMod(dexScore),
+        hp:hp, hpMax:hp, ac:parseInt(m.ac)||10, dead:false
+      });
+    }
+  });
+  document.getElementById('combatMonsterOverlay').style.display = 'none';
+  window._combatState.monsterSel = {};
+  window._combatRender();
+};
+
+window._combatSetInit = (idx, val) => {
+  const c = window._combatState.combatants[idx]; if (!c) return;
+  c.init = val === '' ? '' : (parseInt(val)||0);
+};
+window._combatRollInit = (idx) => {
+  const c = window._combatState.combatants[idx]; if (!c) return;
+  const roll = Math.floor(Math.random()*20)+1;
+  c.init = roll + (c.initBonus||0);
+  window._combatRender();
+};
+window._combatRollAllInit = () => {
+  window._combatState.combatants.forEach(c => {
+    if (c.init === '' || c.init == null) {
+      const roll = Math.floor(Math.random()*20)+1;
+      c.init = roll + (c.initBonus||0);
+    }
+  });
+  window._combatSortByInit();
+  window._combatState._sorted = true;
+  window._combatRender();
+};
+window._combatSortByInit = () => {
+  const currentUid = window._combatState.combatants[window._combatState.turnIndex]?._uid;
+  window._combatState.combatants.forEach((c,i)=>{ if(!c._uid) c._uid='c'+Date.now()+'_'+i+'_'+Math.random(); });
+  window._combatState.combatants.sort((a,b) => {
+    const ai = a.init===''||a.init==null ? -999 : a.init;
+    const bi = b.init===''||b.init==null ? -999 : b.init;
+    if (bi !== ai) return bi - ai;
+    return (b.initBonus||0)-(a.initBonus||0);
+  });
+  if (currentUid) {
+    const newIdx = window._combatState.combatants.findIndex(c=>c._uid===currentUid);
+    if (newIdx >= 0) window._combatState.turnIndex = newIdx;
+  }
+};
+window._combatNextTurn = () => {
+  const cs = window._combatState;
+  if (!cs.combatants.length) return;
+  if (!cs._sorted) { window._combatSortByInit(); cs._sorted = true; }
+  const n = cs.combatants.length;
+  let next = cs.turnIndex;
+  for (let i=0; i<n; i++) {
+    next = (next+1)%n;
+    if (next === 0) cs.round++;
+    if (!cs.combatants[next].dead) break;
+  }
+  cs.turnIndex = next;
+  window._combatRender();
+};
+
+window._combatRemoveCombatant = (idx) => {
+  window._combatState.combatants.splice(idx,1);
+  if (window._combatState.turnIndex >= window._combatState.combatants.length) window._combatState.turnIndex = 0;
+  window._combatRender();
+};
+window._combatHpDelta = (idx, delta) => {
+  const c = window._combatState.combatants[idx]; if (!c) return;
+  const inputEl = document.getElementById(`combat_hpdelta_${idx}`);
+  let amount = parseInt(inputEl?.value);
+  if (isNaN(amount) || amount === 0) amount = 1;
+  amount = Math.abs(amount);
+  c.hp = Math.max(0, Math.min(c.hpMax, c.hp + (delta*amount)));
+  c.dead = c.hp <= 0;
+  if (c.kind === 'pc' && c.refId) {
+    updateDoc(doc(db,'characters',c.refId), { hp: c.hp }).catch(e=>console.warn(e));
+  }
+  if (inputEl) inputEl.value = '';
+  window._combatRender();
+};
+
+window._combatRender = () => {
+  const cs = window._combatState;
+  const body = document.getElementById('combatBody');
+  const startBtn = document.getElementById('combatStartBtn');
+  const addBtn = document.getElementById('combatAddMonsterBtn');
+  const syncBtn = document.getElementById('combatSyncPcsBtn');
+  const nextBtn = document.getElementById('combatNextBtn');
+  const endBtn = document.getElementById('combatEndBtn');
+  const roundLbl = document.getElementById('combatRoundLabel');
+  if (!body) return;
+  if (!cs.active) {
+    body.innerHTML = '<p style="color:#888;font-style:italic;margin:10px 14px">Aucun combat en cours. Cliquez sur « Nouveau combat » pour démarrer.</p>';
+    startBtn.style.display = '';
+    addBtn.style.display = 'none';
+    syncBtn.style.display = 'none';
+    nextBtn.style.display = 'none';
+    endBtn.style.display = 'none';
+    roundLbl.style.display = 'none';
+    return;
+  }
+  startBtn.style.display = 'none';
+  addBtn.style.display = '';
+  syncBtn.style.display = '';
+  nextBtn.style.display = '';
+  endBtn.style.display = '';
+  roundLbl.style.display = '';
+  roundLbl.textContent = `Round ${cs.round}`;
+
+  if (!cs.combatants.length) {
+    body.innerHTML = '<p style="color:#888;font-style:italic;margin:10px 14px">Aucun combattant. Ajoutez des créatures ou synchronisez les PJ suivis.</p>';
+    return;
+  }
+
+  let html = '<div class="combat-headers"><div>Init.</div><div>Combattant</div><div>PV</div><div>CA</div><div style="text-align:center">Dégâts/Soin</div><div></div></div>';
+  cs.combatants.forEach((c, idx) => {
+    const isActive = idx === cs.turnIndex && cs._sorted;
+    const cls = `combat-row ${c.kind==='pc'?'combat-pc':''} ${isActive?'combat-active':''} ${c.dead?'combat-dead':''}`;
+    const initVal = c.init===''||c.init==null?'':c.init;
+    const bonusStr = (c.initBonus>=0?'+':'')+c.initBonus;
+    const hpColor = c.hp<=0?'#f44336':c.hp<c.hpMax/3?'#ff9800':'#4caf50';
+    html += `<div class="${cls}">
+      <div class="combat-init-cell" title="Bonus init: ${bonusStr}">
+        <input type="number" value="${initVal}" placeholder="${bonusStr}" onchange="window._combatSetInit(${idx}, this.value)">
+        <button style="padding:1px 4px;font-size:0.65rem;margin-top:2px;cursor:pointer;border:1px solid #d4c4a0;background:#fff;border-radius:3px;display:block;width:50px" onclick="window._combatRollInit(${idx})" title="Lancer 1d20${bonusStr}">🎲</button>
+      </div>
+      <div class="combat-name-cell">
+        ${isActive?'▶ ':''}${c.name}
+        <span class="combat-type">${c.kind==='pc'?'⚔ PJ':'👹 Créature'} · ${c.sub||''}</span>
+      </div>
+      <div class="combat-hp-cell">
+        <strong style="color:${hpColor}">${c.hp}</strong>/<span style="color:#888">${c.hpMax}</span>
+      </div>
+      <div class="combat-ac-cell">CA ${c.ac}</div>
+      <div class="combat-mod-cell">
+        <input id="combat_hpdelta_${idx}" type="number" placeholder="±" title="Quantité">
+        <button onclick="window._combatHpDelta(${idx},1)" title="Soigner">+</button>
+        <button onclick="window._combatHpDelta(${idx},-1)" title="Dégâts">−</button>
+      </div>
+      <button class="btn-remove" onclick="window._combatRemoveCombatant(${idx})" title="Retirer">✕</button>
+    </div>`;
+  });
+  html += `<div style="padding:8px 14px;display:flex;gap:8px;background:#f9f4ea;border-top:1px solid #d4c4a0;align-items:center">
+    <button class="btn-gm-action" onclick="window._combatRollAllInit()">🎲 Lancer init. manquantes & trier</button>
+    <span style="margin-left:auto;font-size:0.78rem;color:#666">${cs.combatants.length} combattant(s)</span>
+  </div>`;
+  body.innerHTML = html;
+};
+
 function renderGMCard(id, d) {
   const monitor = document.getElementById('gmMonitor');
   let card = document.getElementById(`gm_${id}`);
@@ -8060,6 +8362,39 @@ nav button:last-child { color:#884444; }
 #tab-gm h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.3rem; margin-bottom:16px; letter-spacing:3px; }
 .gm-search { display:flex; gap:8px; margin-bottom:20px; }
 .gm-search input { background:#2a1a0a; border-color:#555; color:#ddd; max-width:420px; }
+
+/* Combat tracker */
+.combat-panel { background:var(--parch); border:1px solid var(--gold); border-radius:4px; margin-bottom:20px; overflow:hidden; }
+.combat-header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(135deg,var(--ink),#3d2010); color:var(--gold); flex-wrap:wrap; }
+.combat-title { font-family:'Cinzel'; font-size:1rem; font-weight:700; }
+.combat-round { background:var(--gold); color:var(--ink); padding:3px 10px; border-radius:10px; font-family:'Cinzel'; font-size:0.78rem; font-weight:700; }
+.combat-header-actions { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+.combat-body { padding:6px 0; }
+.combat-row { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid #e0d0b0; font-family:'Crimson Pro'; font-size:0.85rem; }
+.combat-row.combat-active { background:#fff3d6; border-left:4px solid var(--gold); }
+.combat-row.combat-pc { background:#eaf4ea; }
+.combat-row.combat-pc.combat-active { background:#dfeed6; }
+.combat-row.combat-dead { opacity:0.45; text-decoration:line-through; }
+.combat-init-cell input { width:50px; padding:4px 6px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; font-family:'Cinzel'; font-weight:700; }
+.combat-name-cell { font-weight:600; }
+.combat-name-cell .combat-type { display:block; font-size:0.7rem; color:#888; font-weight:400; font-style:italic; }
+.combat-hp-cell input { width:55px; padding:3px 5px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; }
+.combat-hp-cell { display:flex; gap:3px; align-items:center; }
+.combat-ac-cell { text-align:center; color:#666; font-size:0.78rem; }
+.combat-mod-cell { display:flex; gap:3px; }
+.combat-mod-cell input { width:45px; padding:3px 4px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; font-size:0.78rem; }
+.combat-mod-cell button { padding:2px 5px; font-size:0.7rem; cursor:pointer; border:1px solid #d4c4a0; background:#fff; border-radius:3px; }
+.combat-mod-cell button:hover { background:var(--gold); color:#fff; }
+.combat-row .btn-remove { padding:2px 6px; font-size:0.78rem; }
+.combat-headers { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; padding:6px 14px; background:#f0e8d8; font-family:'Cinzel'; font-size:0.7rem; color:var(--ink); font-weight:700; text-transform:uppercase; border-bottom:1px solid #d4c4a0; }
+.combat-monster-pick { display:flex; align-items:center; gap:10px; padding:8px; border-bottom:1px solid #eee; cursor:pointer; }
+.combat-monster-pick:hover { background:#f9f4ea; }
+.combat-monster-pick.selected { background:#fff3d6; }
+.combat-monster-pick input[type=checkbox] { margin:0; }
+.combat-monster-pick .mname { font-family:'Cinzel'; font-size:0.85rem; flex:1; }
+.combat-monster-pick .mmeta { font-size:0.72rem; color:#888; }
+.combat-monster-pick .mqty { width:50px; padding:3px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; }
+
 #gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
 .gm-card { background:var(--parch); border:1px solid var(--gold); border-radius:4px; overflow:hidden; }
 .gm-card-header { padding:12px 14px; background:linear-gradient(135deg, var(--ink), #3d2010);
@@ -8353,8 +8688,45 @@ nav button:last-child { color:#884444; }
       <input id="gmSearchId" type="text" placeholder="Coller l'ID du personnage à surveiller">
       <button class="btn-gold" onclick="window._watchChar()">AJOUTER</button>
     </div>
+
+    <!-- Combat tracker -->
+    <div id="combatPanel" class="combat-panel">
+      <div class="combat-header">
+        <span class="combat-title">⚔ Combat</span>
+        <span id="combatRoundLabel" class="combat-round" style="display:none"></span>
+        <div class="combat-header-actions">
+          <button id="combatStartBtn" class="btn-gold" onclick="window._combatStart()">Nouveau combat</button>
+          <button id="combatAddMonsterBtn" class="btn-gm-action" style="display:none" onclick="window._combatOpenMonsterPicker()">+ Créature</button>
+          <button id="combatSyncPcsBtn" class="btn-gm-action" style="display:none" onclick="window._combatSyncPcs()">↻ Synchroniser PJ</button>
+          <button id="combatNextBtn" class="btn-gm-action" style="display:none" onclick="window._combatNextTurn()">Tour suivant ▶</button>
+          <button id="combatEndBtn" class="btn-gm-action dmg" style="display:none" onclick="window._combatEnd()">Terminer</button>
+        </div>
+      </div>
+      <div id="combatBody" class="combat-body">
+        <p style="color:#888;font-style:italic;margin:10px 14px">Aucun combat en cours. Cliquez sur « Nouveau combat » pour démarrer.</p>
+      </div>
+    </div>
+
     <div id="gmMonitor">
       <p style="color:#666;font-style:italic">Collez l'ID d'une fiche pour la surveiller en temps réel. Plusieurs personnages peuvent être affichés simultanément.</p>
+    </div>
+  </div>
+
+  <!-- Monster picker overlay for combat -->
+  <div id="combatMonsterOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--parch);border:2px solid var(--gold);border-radius:6px;width:min(640px,92vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:14px 18px;background:linear-gradient(135deg,var(--ink),#3d2010);color:var(--gold);font-family:'Cinzel';display:flex;justify-content:space-between;align-items:center">
+        <span>Choisir des créatures</span>
+        <button class="btn-remove" onclick="document.getElementById('combatMonsterOverlay').style.display='none'">✕</button>
+      </div>
+      <div style="padding:12px 18px;border-bottom:1px solid #d4c4a0">
+        <input id="combatMonsterSearch" type="text" placeholder="Rechercher une créature..." oninput="window._combatRenderMonsterList()" style="width:100%;padding:8px;border:1px solid #d4c4a0;border-radius:3px;font-family:'Crimson Pro'">
+      </div>
+      <div id="combatMonsterList" style="flex:1;overflow-y:auto;padding:10px 18px"></div>
+      <div style="padding:10px 18px;border-top:1px solid #d4c4a0;display:flex;justify-content:space-between;align-items:center;background:#f9f4ea">
+        <span id="combatMonsterSelCount" style="font-size:0.85rem;color:#666">0 sélection(s)</span>
+        <button class="btn-gold" onclick="window._combatAddSelectedMonsters()">Ajouter au combat</button>
+      </div>
     </div>
   </div>
   <!-- Éditeur de descriptions Firestore -->
