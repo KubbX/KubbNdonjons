@@ -2830,32 +2830,41 @@ function renderCharSheet(id, d) {
           else if (lvl >= 2) wsMaxCr = '1/4';
           else wsMaxCr = '0';
         }
+        const hasforms = forms.length > 0;
+        const sectionId = 'forms-section-' + id;
         return `
-      <div class="sheet-section">
-        <div class="section-title">${label} <button class="section-add-btn" onclick="window._openFormPicker('${id}')">+ Compendium</button></div>
-        ${isDruid ? `<div class="ws-info-bar">
-          <span class="ws-info-item">🐻 RC max forme sauvage : <strong>${wsMaxCr}</strong></span>
-          <span class="ws-info-sep">·</span>
-          <span class="ws-info-item">🌊 Vol dès niv.8 · Nage dès niv.4</span>
-        </div>` : ''}
-        <div class="form-known-list">
-          ${forms.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic;font-size:0.82rem">Aucune forme — utilisez + Compendium pour en ajouter</div>' : ''}
-          ${Object.entries(byType).map(([type, list]) => `
-          <div class="spell-level-group">
-            <div class="spell-level-header">${type}</div>
-            ${list.map((f, fi) => {
-              const realIdx = forms.indexOf(f);
-              const overCR = isDruid && wsMaxCr !== '—' && crVal(f.cr) > crVal(wsMaxCr);
-              return `<div class="spell-known-item form-known-item ${overCR ? 'form-over-cr' : ''}">
-                <div class="form-cr-badge">RC ${f.cr||'?'}</div>
-                <div class="spell-known-main" onclick="window._openFormDetail('${id}',${realIdx})">
-                  <strong>${f.name||'?'}</strong>
-                  <span class="spell-known-meta">${f.type||''} · Taille ${f.size||'?'} · CA ${f.ac||'?'} · PV ${f.hp||'?'} · ${f.speed||'?'}</span>
-                </div>
-                <button class="inv-remove-btn" onclick="window._removePreparedForm('${id}',${realIdx})">✕</button>
-              </div>`;
-            }).join('')}
-          </div>`).join('')}
+      <div class="sheet-section ${hasforms ? 'forms-section-open' : ''}" id="${sectionId}">
+        <div class="section-title forms-section-title" onclick="(function(el){el.classList.toggle('forms-section-open')})(document.getElementById('${sectionId}'))">
+          <span>${label}${forms.length > 0 ? `<span class='forms-count-badge'>${forms.length}</span>` : ''} <i class='forms-toggle-arrow'>▶</i></span>
+          <button class="section-add-btn" onclick="event.stopPropagation();window._openFormPicker('${id}')">+ Compendium</button>
+        </div>
+        <div class="forms-collapsible-body">
+          <div class="forms-collapsible-inner">
+            ${isDruid ? `<div class="ws-info-bar">
+              <span class="ws-info-item">🐻 RC max forme sauvage : <strong>${wsMaxCr}</strong></span>
+              <span class="ws-info-sep">·</span>
+              <span class="ws-info-item">🌊 Vol dès niv.8 · Nage dès niv.4</span>
+            </div>` : ''}
+            <div class="form-known-list">
+              ${forms.length === 0 ? '<div style="padding:4px 0 2px;color:#aaa;font-style:italic;font-size:0.82rem">Aucune forme — utilisez + Compendium pour en ajouter</div>' : ''}
+              ${Object.entries(byType).map(([type, list]) => `
+              <div class="spell-level-group">
+                <div class="spell-level-header">${type}</div>
+                ${list.map((f, fi) => {
+                  const realIdx = forms.indexOf(f);
+                  const overCR = isDruid && wsMaxCr !== '—' && crVal(f.cr) > crVal(wsMaxCr);
+                  return `<div class="spell-known-item form-known-item ${overCR ? 'form-over-cr' : ''}">
+                    <div class="form-cr-badge">RC ${f.cr||'?'}</div>
+                    <div class="spell-known-main" onclick="window._openFormDetail('${id}',${realIdx})">
+                      <strong>${f.name||'?'}</strong>
+                      <span class="spell-known-meta">${f.type||''} · Taille ${f.size||'?'} · CA ${f.ac||'?'} · PV ${f.hp||'?'} · ${f.speed||'?'}</span>
+                    </div>
+                    <button class="inv-remove-btn" onclick="window._removePreparedForm('${id}',${realIdx})">✕</button>
+                  </div>`;
+                }).join('')}
+              </div>`).join('')}
+            </div>
+          </div>
         </div>
       </div>`;
       })()}
@@ -8197,6 +8206,16 @@ nav button:last-child { color:#884444; }
 .form-over-cr { background:#fff8f0; }
 .form-over-cr:hover { background:#fff0e0 !important; }
 .form-pick-over-cr { border-left:3px solid #e67e22 !important; }
+/* Collapsible forms section */
+.forms-section-title { cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between; }
+.forms-section-title:hover { filter:brightness(1.15); }
+.forms-toggle-arrow { display:inline-block; transition:transform 0.22s ease; font-style:normal; margin-left:4px; }
+.forms-section-open .forms-toggle-arrow { transform:rotate(90deg); }
+.forms-count-badge { font-family:'Crimson Pro'; font-size:0.72rem; font-weight:normal; background:rgba(255,255,255,0.18); border-radius:10px; padding:1px 7px; margin-left:6px; letter-spacing:0; opacity:0.85; }
+.forms-collapsible-body { display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.28s ease; overflow:hidden; }
+.forms-section-open .forms-collapsible-body { grid-template-rows:1fr; }
+.forms-collapsible-inner { min-height:0; padding:0 10px; }
+.forms-section-open .forms-collapsible-inner { padding:6px 10px 8px; }
 
 /* Responsive */
 @media(max-width:1100px) {
