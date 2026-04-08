@@ -3570,17 +3570,49 @@ window._combatRemoveCombatant = (idx) => {
   if (window._combatState.turnIndex >= window._combatState.combatants.length) window._combatState.turnIndex = 0;
   window._combatRender();
 };
-window._combatHpDelta = (idx, delta) => {
+window._combatHpDelta = async (idx, delta) => {
   const c = window._combatState.combatants[idx]; if (!c) return;
   const inputEl = document.getElementById(`combat_hpdelta_${idx}`);
   let amount = parseInt(inputEl?.value);
   if (isNaN(amount) || amount === 0) amount = 1;
   amount = Math.abs(amount);
-  c.hp = Math.max(0, Math.min(c.hpMax, c.hp + (delta*amount)));
-  c.dead = c.hp <= 0;
+
   if (c.kind === 'pc' && c.refId) {
-    updateDoc(doc(db,'characters',c.refId), { hp: c.hp }).catch(e=>console.warn(e));
+    // For PCs: apply via Firestore with tmpHp absorption + concentration check
+    try {
+      const snap = await getDoc(doc(db,'characters',c.refId));
+      if (snap.exists()) {
+        const d = snap.data();
+        if (delta > 0) {
+          // Heal
+          const newHp = Math.min(d.hpMax || c.hpMax, (d.hp||0) + amount);
+          await updateDoc(doc(db,'characters',c.refId), { hp: newHp });
+          c.hp = newHp;
+        } else {
+          // Damage with tmpHp absorption
+          let remaining = amount;
+          let tmpHp = d.tmpHp || 0;
+          let hp = d.hp || 0;
+          if (tmpHp > 0) {
+            const absorbed = Math.min(tmpHp, remaining);
+            tmpHp -= absorbed;
+            remaining -= absorbed;
+          }
+          hp = Math.max(0, hp - remaining);
+          await updateDoc(doc(db,'characters',c.refId), { hp, tmpHp });
+          c.hp = hp;
+          // Concentration check if applicable
+          if ((d.conditions||[]).includes('concentrating') && d.concentratingOn && amount > 0 && typeof window._triggerConcentrationCheck === 'function') {
+            window._triggerConcentrationCheck(c.refId, amount, d);
+          }
+        }
+      }
+    } catch(e) { console.warn(e); }
+  } else {
+    // Monsters: simple local update
+    c.hp = Math.max(0, Math.min(c.hpMax, c.hp + (delta*amount)));
   }
+  c.dead = c.hp <= 0;
   if (inputEl) inputEl.value = '';
   window._combatRender();
 };
