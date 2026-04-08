@@ -6993,6 +6993,14 @@ window._openFormDetail = (charId, index) => {
     }
   }
 
+  const _fStatBlock = (() => {
+    if (!f.str && !f.dex && !f.con && !f.int && !f.wis && !f.cha) return '';
+    return `<div class="rd-stat-block">${[['FOR','str'],['DEX','dex'],['CON','con'],['INT','int'],['SAG','wis'],['CHA','cha']].map(([lbl,key]) => {
+      const val = f[key] || 10;
+      return `<div class="rd-stat-cell"><span class="rd-stat-abbr">${lbl}</span><span class="rd-stat-val">${val}</span><span class="rd-stat-mod">(${_statMod(val)})</span></div>`;
+    }).join('')}</div>`;
+  })();
+
   el.innerHTML = `
     <div class="rd-sheet">
       <div class="rd-title">${f.name||'?'}</div>
@@ -7004,9 +7012,18 @@ window._openFormDetail = (charId, index) => {
         <div class="rd-prop"><span class="rd-prop-label">Points de vie :</span> ${f.hp||'—'}</div>
         <div class="rd-prop"><span class="rd-prop-label">Vitesse :</span> ${f.speed||'—'}</div>
       </div>
+      ${_fStatBlock}
       <div class="rd-separator"></div>
+      ${f.saves && f.saves !== '—' ? `<div class="rd-block"><div class="rd-block-title">Jets de sauvegarde</div><div class="rd-block-text">${f.saves}</div></div>` : ''}
+      ${f.skills && f.skills !== '—' ? `<div class="rd-block"><div class="rd-block-title">Compétences</div><div class="rd-block-text">${f.skills}</div></div>` : ''}
+      ${f.resistances && f.resistances !== '—' ? `<div class="rd-block"><div class="rd-block-title">Résistances</div><div class="rd-block-text">${f.resistances}</div></div>` : ''}
+      ${f.immunities && f.immunities !== '—' ? `<div class="rd-block"><div class="rd-block-title">Immunités</div><div class="rd-block-text">${f.immunities}</div></div>` : ''}
+      ${f.vulnerabilities && f.vulnerabilities !== '—' ? `<div class="rd-block"><div class="rd-block-title">Vulnérabilités</div><div class="rd-block-text">${f.vulnerabilities}</div></div>` : ''}
+      ${f.senses && f.senses !== '—' ? `<div class="rd-block"><div class="rd-block-title">Sens</div><div class="rd-block-text">${f.senses}</div></div>` : ''}
+      ${f.languages && f.languages !== '—' ? `<div class="rd-block"><div class="rd-block-title">Langues</div><div class="rd-block-text">${f.languages}</div></div>` : ''}
       ${f.attacks && f.attacks !== '—' ? `<div class="rd-block"><div class="rd-block-title">Attaques</div><div class="rd-block-text">${f.attacks}</div></div>` : ''}
       ${f.traits && f.traits !== '—' ? `<div class="rd-block"><div class="rd-block-title">Traits</div><div class="rd-block-text">${f.traits}</div></div>` : ''}
+      ${f.legendary && f.legendary !== '—' ? `<div class="rd-block"><div class="rd-block-title">Actions légendaires</div><div class="rd-block-text">${f.legendary}</div></div>` : ''}
       ${f.desc ? `<div class="rd-separator"></div><div class="rd-desc">${f.desc}</div>` : ''}
       <div class="rd-separator"></div>
       <div class="rd-tags"><span class="rd-source-tag">${f.source||'MM'}</span></div>
@@ -7115,7 +7132,7 @@ window._editorOpen = async (docId) => {
   fieldsEl.innerHTML = '';
   const extraFields = {
     spell:   ['time','range','duration','components'],
-    monster: ['hp','ac','speed','attacks','traits'],
+    monster: ['cr','hp','ac','speed','str','dex','con','int','wis','cha','saves','skills','resistances','immunities','vulnerabilities','senses','languages','attacks','traits','legendary'],
     feat:    ['prereq','source'],
     item:    ['cost','rarity','source'],
     armor:   ['ac','cost','stealth','strength','source'],
@@ -7126,7 +7143,12 @@ window._editorOpen = async (docId) => {
     components:'Composantes', hp:'PV', ac:'CA', speed:'Vitesse', attacks:'Attaques',
     traits:'Traits', prereq:'Prérequis', source:'Source', cost:'Coût', rarity:'Rareté',
     stealth:'Discrétion', strength:'Force req.', damage:'Dégâts', properties:'Propriétés',
-    skills:'Compétences', tools:'Outils', feature:'Aptitude' };
+    skills:'Compétences', tools:'Outils', feature:'Aptitude',
+    saves:'Jets de sauvegarde', resistances:'Résistances', immunities:'Immunités',
+    vulnerabilities:'Vulnérabilités', senses:'Sens', languages:'Langues',
+    legendary:'Actions légendaires',
+    str:'FOR', dex:'DEX', con:'CON', int:'INT', wis:'SAG', cha:'CHA',
+    cr:'RC', skills:'Compétences' };
   (extraFields[cat] || []).forEach(key => {
     const val = r[key];
     if (!val || val === '—') return;
