@@ -6246,6 +6246,45 @@ window._resetCompendium = async () => {
   alert("Compendium réinitialisé !");
 };
 
+// V1.40 — Re-sync d'une catégorie : pousse vers Firestore les entrées du
+// code source qui sont absentes. Ne touche pas aux entrées existantes
+// (homebrew ou système modifié) ni au flag de seed global.
+window._resyncCompendiumCategory = async (catId) => {
+  const sourceItems = COMPENDIUM_DATA[catId] || [];
+  if (!sourceItems.length) { alert("Aucune donnée source pour cette catégorie."); return; }
+  // Lire ce qui est actuellement dans Firestore pour cette catégorie
+  const colRef = collection(db, colName(catId));
+  let existingIds = new Set();
+  try {
+    const snap = await getDocs(colRef);
+    snap.forEach(d => existingIds.add(d.id));
+  } catch(e) { console.warn(e); alert("Erreur de lecture Firestore."); return; }
+
+  let pushed = 0;
+  const promises = [];
+  for (const item of sourceItems) {
+    const docId = makeDocId(item.name, true);
+    if (existingIds.has(docId)) continue; // déjà présent, on ne touche pas
+    const ref = doc(db, colName(catId), docId);
+    promises.push(setDoc(ref, {
+      ...item,
+      type: catId,
+      owner: "system",
+      source: item.source || "PHB",
+      createdAt: new Date().toISOString()
+    }, { merge: false }));
+    pushed++;
+  }
+  if (!pushed) { alert(`Catégorie « ${catId} » : tout est déjà synchronisé (${sourceItems.length} entrées source, ${existingIds.size} dans Firestore).`); return; }
+  try {
+    await Promise.all(promises);
+    alert(`Catégorie « ${catId} » : ${pushed} entrée(s) ajoutée(s) à Firestore.`);
+  } catch(e) {
+    console.error(e);
+    alert("Erreur lors de la synchronisation : " + (e.message||e));
+  }
+};
+
 // ============================================================
 // COMPENDIUM — RENDU UI
 // ============================================================
@@ -8748,6 +8787,7 @@ nav button:last-child { color:#884444; }
         <input id="compSearch" type="text" placeholder="Rechercher..." oninput="window._compFilter()">
         <div id="compSortControl" class="comp-sort-wrap" style="display:none"></div>
         <button class="btn-gold" onclick="window._openAddResource()">+ AJOUTER</button>
+        <button class="section-add-btn" style="padding:8px 12px;font-size:0.65rem" onclick="window._resyncCompendiumCategory(window._currentCompCategory)" title="Pousser vers Firestore les entrées du code source manquantes pour cette catégorie">↻ Sync catégorie</button>
         <button class="section-add-btn" style="padding:8px 12px;font-size:0.65rem" onclick="window._resetCompendium()" title="Réinitialiser les données de base">↻ Reset</button>
       </div>
       <div id="compSpellFilters" style="display:none">
