@@ -2510,6 +2510,11 @@ function renderCharSheet(id, d) {
         <div class="combat-label">PV</div>
         <div class="combat-val editable" data-field="hp" data-type="number">${d.hp}</div>
         <div class="combat-sub">/ <span class="editable inline-edit" data-field="hpMax" data-type="number">${d.hpMax}</span></div>
+        <div class="sheet-hp-delta" onclick="event.stopPropagation()">
+          <input type="number" id="sheetHpDelta_${id}" class="sheet-hp-delta-input" placeholder="±" title="Quantité de PV">
+          <button type="button" class="sheet-hp-delta-btn heal" onclick="window._sheetHpDelta('${id}',1)" title="Soigner">+</button>
+          <button type="button" class="sheet-hp-delta-btn dmg" onclick="window._sheetHpDelta('${id}',-1)" title="Dégâts">−</button>
+        </div>
       </div>
       <div class="combat-box">
         <div class="combat-label">PV Temporaires</div>
@@ -3459,7 +3464,7 @@ window._combatRenderMonsterList = () => {
     const qty = sel[key]?.qty || 1;
     return `<label class="combat-monster-pick ${sel[key]?'selected':''}">
       <input type="checkbox" ${checked} onchange="window._combatToggleMonsterSel('${key}', this.checked)">
-      <div style="flex:1">
+      <div class="mpinfo">
         <div class="mname">${m.name}</div>
         <div class="mmeta">RC ${m.cr||'?'} · ${m.type||'?'} · PV ${m.hp||'?'} · CA ${m.ac||'?'}</div>
       </div>
@@ -3825,6 +3830,35 @@ window._gmDamage = async (id) => {
 window._saveGMNotes = async (id) => {
   const notes = document.getElementById(`gmnotes_${id}`)?.value||'';
   await updateDoc(doc(db, "characters", id), {gmNotes: notes});
+};
+
+// V1.40 — HP delta on character sheet (mirrors GM screen heal/damage)
+window._sheetHpDelta = async (id, sign) => {
+  const inp = document.getElementById(`sheetHpDelta_${id}`);
+  const val = Math.abs(parseInt(inp?.value)||0);
+  if (val === 0) { if (inp) inp.focus(); return; }
+  const snap = await getDoc(doc(db, "characters", id));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  if (sign > 0) {
+    const newHp = Math.min(d.hpMax || 0, (d.hp||0) + val);
+    await updateDoc(doc(db, "characters", id), { hp: newHp });
+  } else {
+    let remaining = val;
+    let tmpHp = d.tmpHp || 0;
+    let hp = d.hp || 0;
+    if (tmpHp > 0) {
+      const absorbed = Math.min(tmpHp, remaining);
+      tmpHp -= absorbed;
+      remaining -= absorbed;
+    }
+    hp = Math.max(0, hp - remaining);
+    await updateDoc(doc(db, "characters", id), { hp, tmpHp });
+    if ((d.conditions||[]).includes('concentrating') && d.concentratingOn && val > 0) {
+      window._triggerConcentrationCheck(id, val, d);
+    }
+  }
+  if (inp) inp.value = '';
 };
  
 // Wizard nav
@@ -7708,10 +7742,13 @@ startInlineEdit = async function(el, charId, charData) {
     if (el.querySelector('input')) return;
     const currentHp = charData.hp || 0;
     const orig = el.innerHTML;
-    el.innerHTML = `<div style="display:flex;align-items:center;gap:4px">
-      <button class="pb-btn" style="width:22px;height:22px;font-size:0.8rem;color:#f44336;border-color:#f44336" onclick="window._adjustHp('${charId}',-1,event)">−</button>
-      <input type="number" value="${currentHp}" class="inline-input" style="width:50px;text-align:center">
-      <button class="pb-btn" style="width:22px;height:22px;font-size:0.8rem;color:#4caf50;border-color:#4caf50" onclick="window._adjustHp('${charId}',1,event)">+</button>
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center">
+      <input type="number" value="${currentHp}" class="inline-input" style="width:50px;text-align:center" title="PV actuels">
+      <div style="display:flex;align-items:center;gap:3px;margin-left:4px">
+        <input type="number" id="hpAdj_${charId}" class="inline-input" placeholder="±" style="width:42px;text-align:center" title="Quantité à ajouter/retirer" onclick="event.stopPropagation()">
+        <button class="pb-btn" style="width:24px;height:24px;font-size:0.85rem;color:#4caf50;border-color:#4caf50" onclick="window._adjustHp('${charId}',1,event)" title="Soigner">+</button>
+        <button class="pb-btn" style="width:24px;height:24px;font-size:0.85rem;color:#f44336;border-color:#f44336" onclick="window._adjustHp('${charId}',-1,event)" title="Blesser">−</button>
+      </div>
     </div>`;
     const input = el.querySelector('input');
     input.focus();
@@ -8296,6 +8333,12 @@ nav button:last-child { color:#884444; }
 .combat-label { font-size:0.6rem; font-family:'Cinzel'; color:#a89060; letter-spacing:1px; display:block; }
 .combat-val { font-size:1.3rem; color:#fff; font-weight:600; cursor:pointer; }
 .combat-sub { font-size:0.78rem; color:#a89060; }
+.sheet-hp-delta { display:flex; gap:3px; justify-content:center; margin-top:6px; }
+.sheet-hp-delta-input { width:42px !important; padding:3px 4px !important; margin:0 !important; font-size:0.78rem !important; text-align:center; background:rgba(255,255,255,0.95) !important; color:var(--ink) !important; border:1px solid rgba(184,134,11,0.5) !important; border-radius:3px !important; }
+.sheet-hp-delta-btn { width:24px; height:24px; padding:0; font-size:0.95rem; font-weight:700; cursor:pointer; border:1px solid rgba(184,134,11,0.5); border-radius:3px; background:rgba(255,255,255,0.92); color:var(--ink); line-height:1; }
+.sheet-hp-delta-btn.heal { background:#4caf50; color:#fff; border-color:#3d8b40; }
+.sheet-hp-delta-btn.dmg { background:#e74c3c; color:#fff; border-color:#b3372b; }
+.sheet-hp-delta-btn:hover { filter:brightness(1.1); }
  
 .sheet-body { display:grid; grid-template-columns:300px 1fr 390px; gap:0; align-items:start; }
 .sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid #d4c4a0; }
@@ -8387,13 +8430,14 @@ nav button:last-child { color:#884444; }
 .combat-mod-cell button:hover { background:var(--gold); color:#fff; }
 .combat-row .btn-remove { padding:2px 6px; font-size:0.78rem; }
 .combat-headers { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; padding:6px 14px; background:#f0e8d8; font-family:'Cinzel'; font-size:0.7rem; color:var(--ink); font-weight:700; text-transform:uppercase; border-bottom:1px solid #d4c4a0; }
-.combat-monster-pick { display:flex; align-items:center; gap:10px; padding:8px; border-bottom:1px solid #eee; cursor:pointer; }
+.combat-monster-pick { display:flex; align-items:center; gap:12px; padding:8px 10px; border-bottom:1px solid #eee; cursor:pointer; }
 .combat-monster-pick:hover { background:#f9f4ea; }
 .combat-monster-pick.selected { background:#fff3d6; }
-.combat-monster-pick input[type=checkbox] { margin:0; }
-.combat-monster-pick .mname { font-family:'Cinzel'; font-size:0.85rem; flex:1; }
-.combat-monster-pick .mmeta { font-size:0.72rem; color:#888; }
-.combat-monster-pick .mqty { width:50px; padding:3px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; }
+.combat-monster-pick input[type=checkbox] { width:18px !important; height:18px !important; min-width:18px !important; max-width:18px !important; flex:0 0 18px !important; margin:0 !important; padding:0 !important; box-sizing:border-box !important; appearance:auto !important; -webkit-appearance:checkbox !important; }
+.combat-monster-pick .mpinfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.combat-monster-pick .mname { font-family:'Cinzel'; font-size:0.9rem; color:var(--ink); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.combat-monster-pick .mmeta { font-family:'Crimson Pro'; font-size:0.78rem; color:#888; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.combat-monster-pick .mqty { width:55px !important; flex:0 0 55px !important; padding:5px !important; margin:0 !important; border:1px solid #d4c4a0; border-radius:3px; text-align:center; font-family:'Cinzel'; }
 
 #gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
 .gm-card { background:var(--parch); border:1px solid var(--gold); border-radius:4px; overflow:hidden; }
