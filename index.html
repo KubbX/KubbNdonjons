@@ -2637,6 +2637,24 @@ function renderCharSheet(id, d) {
         <div class="passive-row"><span>Investigation passive</span><strong>${10 + skillBonus('Investigation')}</strong></div>
         <div class="passive-row"><span>Intuition passive</span><strong>${10 + skillBonus('Intuition')}</strong></div>
       </div>
+
+      <!-- Informations générales -->
+      <div class="sheet-section">
+        <div class="section-title">Informations</div>
+        <div class="info-grid">
+          <div class="info-row"><span>Âge</span><span class="editable inline-edit" data-field="age" data-type="text">${d.age||'—'}</span></div>
+          <div class="info-row"><span>Genre</span><span class="editable inline-edit" data-field="gender" data-type="text">${d.gender||'—'}</span></div>
+          <div class="info-row"><span>Alignement</span><span class="editable inline-edit" data-field="alignment" data-type="text">${d.alignment||'—'}</span></div>
+          <div class="info-row"><span>XP</span><span class="editable inline-edit" data-field="xp" data-type="number">${d.xp||0}</span></div>
+          <div class="info-row"><span>Historique</span><span>${d.background||'—'}</span></div>
+        </div>
+      </div>
+
+      <!-- Maîtrises & Langues -->
+      <div class="sheet-section">
+        <div class="section-title">Maîtrises & Langues</div>
+        <div class="editable block-edit" data-field="profLang" data-type="textarea">${d.profLang||'Commun'}</div>
+      </div>
     </div>
  
     <!-- COLONNE CENTRALE -->
@@ -2869,79 +2887,7 @@ function renderCharSheet(id, d) {
       </div>`;
       })()}
 
-    <!-- COLONNE DROITE -->
-    <div class="sheet-col-right">
-      <!-- Informations générales -->
-      <div class="sheet-section">
-        <div class="section-title">Informations</div>
-        <div class="info-grid">
-          <div class="info-row"><span>Âge</span><span class="editable inline-edit" data-field="age" data-type="text">${d.age||'—'}</span></div>
-          <div class="info-row"><span>Genre</span><span class="editable inline-edit" data-field="gender" data-type="text">${d.gender||'—'}</span></div>
-          <div class="info-row"><span>Alignement</span><span class="editable inline-edit" data-field="alignment" data-type="text">${d.alignment||'—'}</span></div>
-          <div class="info-row"><span>XP</span><span class="editable inline-edit" data-field="xp" data-type="number">${d.xp||0}</span></div>
-          <div class="info-row"><span>Historique</span><span>${d.background||'—'}</span></div>
-        </div>
-      </div>
- 
-      <!-- Personnalité -->
-      <div class="sheet-section">
-        <div class="section-title">Personnalité</div>
-        <div class="rp-block">
-          <label>Traits de personnalité</label>
-          <div class="editable block-edit" data-field="personality" data-type="textarea">${d.personality||'—'}</div>
-        </div>
-        <div class="rp-block">
-          <label>Idéaux</label>
-          <div class="editable block-edit" data-field="ideals" data-type="textarea">${d.ideals||'—'}</div>
-        </div>
-        <div class="rp-block">
-          <label>Liens</label>
-          <div class="editable block-edit" data-field="bonds" data-type="textarea">${d.bonds||'—'}</div>
-        </div>
-        <div class="rp-block">
-          <label>Défauts</label>
-          <div class="editable block-edit" data-field="flaws" data-type="textarea">${d.flaws||'—'}</div>
-        </div>
-      </div>
- 
-      <!-- Aptitudes & Traits -->
-      <div class="sheet-section">
-        <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
-        <div class="features-list">
-          ${(d.traits||[]).map(t=>`<div class="feature-item">• ${t}</div>`).join('')}
-          ${(d.features||[]).map((f,i)=>`
-          <div class="feature-item feature-item-removable">
-            <div><strong>${f.name}${f.src?' <small style="color:#999">('+f.src+')</small>':''}:</strong> ${f.desc}</div>
-            ${f.src==='Compendium'||f.src==='Don'?`<button class="inv-remove-btn" onclick="window._removeFeature('${id}',${i})">✕</button>`:''}
-          </div>`).join('')}
-        </div>
-        <div class="field-group" style="margin-top:8px">
-          <label>Autres aptitudes</label>
-          <div class="editable block-edit" data-field="extraFeatures" data-type="textarea">${d.extraFeatures||'—'}</div>
-        </div>
-      </div>
- 
-      <!-- Maîtrises & Langues -->
-      <div class="sheet-section">
-        <div class="section-title">Maîtrises & Langues</div>
-        <div class="editable block-edit" data-field="profLang" data-type="textarea">${d.profLang||'Commun'}</div>
-      </div>
- 
-      <!-- Apparence & Histoire -->
-      <div class="sheet-section">
-        <div class="section-title">Apparence & Histoire</div>
-        <div class="rp-block">
-          <label>Apparence physique</label>
-          <div class="editable block-edit" data-field="appearance" data-type="textarea">${d.appearance||'—'}</div>
-        </div>
-        <div class="rp-block">
-          <label>Histoire du personnage</label>
-          <div class="editable block-edit" data-field="backstory" data-type="textarea">${d.backstory||'—'}</div>
-        </div>
-      </div>
- 
-
-      <!-- Familier -->
+          <!-- Familier -->
       <div class="sheet-section">
         <div class="section-title">Familier <button class="section-add-btn" onclick="window._openFamiliarPicker('${id}')">+ Choisir</button></div>
         ${(()=>{
@@ -2966,6 +2912,59 @@ function renderCharSheet(id, d) {
             <div style="font-size:0.7rem;color:#aaa;margin-top:4px;font-style:italic">${fam.source||'MM'}</div>
           </div>`;
         })()}
+      </div>
+
+    <!-- COLONNE DROITE -->
+    <div class="sheet-col-right">
+      <!-- Aptitudes & Traits -->
+      <div class="sheet-section">
+        <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
+        <div class="features-list">
+          ${(d.traits||[]).map(t=>`<div class="feature-item">• ${t}</div>`).join('')}
+          ${(d.features||[]).map((f,i)=>`
+          <div class="feature-item feature-item-removable">
+            <div><strong>${f.name}${f.src?' <small style="color:#999">('+f.src+')</small>':''}: </strong>${f.desc}</div>
+            ${f.src==='Compendium'||f.src==='Don'?`<button class="inv-remove-btn" onclick="window._removeFeature('${id}',${i})">✕</button>`:''}
+          </div>`).join('')}
+        </div>
+        <div class="field-group" style="margin-top:8px">
+          <label>Autres aptitudes</label>
+          <div class="editable block-edit" data-field="extraFeatures" data-type="textarea">${d.extraFeatures||'—'}</div>
+        </div>
+      </div>
+
+      <!-- Personnalité -->
+      <div class="sheet-section">
+        <div class="section-title">Personnalité</div>
+        <div class="rp-block">
+          <label>Traits de personnalité</label>
+          <div class="editable block-edit" data-field="personality" data-type="textarea">${d.personality||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Idéaux</label>
+          <div class="editable block-edit" data-field="ideals" data-type="textarea">${d.ideals||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Liens</label>
+          <div class="editable block-edit" data-field="bonds" data-type="textarea">${d.bonds||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Défauts</label>
+          <div class="editable block-edit" data-field="flaws" data-type="textarea">${d.flaws||'—'}</div>
+        </div>
+      </div>
+
+      <!-- Apparence & Histoire -->
+      <div class="sheet-section">
+        <div class="section-title">Apparence & Histoire</div>
+        <div class="rp-block">
+          <label>Apparence physique</label>
+          <div class="editable block-edit" data-field="appearance" data-type="textarea">${d.appearance||'—'}</div>
+        </div>
+        <div class="rp-block">
+          <label>Histoire du personnage</label>
+          <div class="editable block-edit" data-field="backstory" data-type="textarea">${d.backstory||'—'}</div>
+        </div>
       </div>
 
       <!-- Notes -->
