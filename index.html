@@ -8805,6 +8805,249 @@ nav button:last-child { color:#884444; }
       <button class="btn-gold" onclick="window._watchChar()">AJOUTER</button>
     </div>
 
+    <!-- ══════════════════════════════════════════════════
+         MODULE AMBIANCE SONORE
+    ══════════════════════════════════════════════════ -->
+    <div id="soundPanel" style="background:linear-gradient(135deg,#2a1a0a,#3d2010);border:1px solid var(--gold);border-radius:6px;margin-bottom:18px;overflow:hidden">
+      <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(212,180,120,0.3);cursor:pointer" onclick="window._toggleSoundPanel()">
+        <span style="font-family:'Cinzel';font-size:0.85rem;color:var(--gold);letter-spacing:1px">🎵 AMBIANCE SONORE</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span id="soundStatus" style="font-family:'Crimson Pro';font-size:0.8rem;color:#aaa;font-style:italic">Inactif</span>
+          <span id="soundPanelChevron" style="color:var(--gold);font-size:0.8rem">▾</span>
+        </div>
+      </div>
+
+      <div id="soundPanelBody" style="padding:14px 16px">
+        <!-- Ligne 1 : Thème + Ambiance -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div style="flex:1;min-width:140px">
+            <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:5px">THÈME</label>
+            <select id="soundTheme" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:#1a0f05;color:#e8dcc0">
+              <option value="taverne">🍺 Taverne</option>
+              <option value="ville">🏰 Ville</option>
+              <option value="foret">🌲 Forêt</option>
+              <option value="desert">🏜️ Désert</option>
+              <option value="donjon">⛏️ Donjon</option>
+              <option value="mer">⚓ Mer / Port</option>
+              <option value="temple">⛩️ Temple</option>
+              <option value="caverne">🕳️ Caverne</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:140px">
+            <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:5px">AMBIANCE</label>
+            <select id="soundMood" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:#1a0f05;color:#e8dcc0">
+              <option value="normal">😐 Normale</option>
+              <option value="joyeux">😄 Joyeuse</option>
+              <option value="sombre">🌑 Sombre</option>
+              <option value="mysterieux">🔮 Mystérieuse</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;justify-content:flex-end;gap:5px">
+            <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:flex;align-items:center;gap:6px">
+              VOL
+              <input type="range" id="soundVolume" min="0" max="1" step="0.05" value="0.5" oninput="window._soundSetVolume()" style="width:80px;accent-color:var(--gold)">
+            </label>
+          </div>
+        </div>
+
+        <!-- Ligne 2 : Boutons principaux -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button id="btnSoundPlay" onclick="window._soundPlay()" class="btn-gold" style="flex:1;min-width:100px">▶ Jouer</button>
+          <button id="btnSoundStop" onclick="window._soundStop()" class="btn-gm-action" style="flex:1;min-width:100px">⏹ Arrêter</button>
+          <button id="btnSoundCombat" onclick="window._soundCombatToggle()" class="btn-gm-action dmg" style="flex:1;min-width:100px">⚔ Combat</button>
+        </div>
+
+        <!-- Ligne 3 : Effets sonores ponctuels -->
+        <div>
+          <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:7px">EFFETS SONORES</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button onclick="window._soundSfx('sword')" class="btn-gm-action" title="Coup d'épée" style="font-size:1.1rem;padding:6px 10px">⚔️</button>
+            <button onclick="window._soundSfx('arrow')" class="btn-gm-action" title="Flèche" style="font-size:1.1rem;padding:6px 10px">🏹</button>
+            <button onclick="window._soundSfx('spell')" class="btn-gm-action" title="Sort magique" style="font-size:1.1rem;padding:6px 10px">✨</button>
+            <button onclick="window._soundSfx('door')" class="btn-gm-action" title="Porte qui grince" style="font-size:1.1rem;padding:6px 10px">🚪</button>
+            <button onclick="window._soundSfx('thunder')" class="btn-gm-action" title="Tonnerre" style="font-size:1.1rem;padding:6px 10px">⚡</button>
+            <button onclick="window._soundSfx('chest')" class="btn-gm-action" title="Coffre" style="font-size:1.1rem;padding:6px 10px">📦</button>
+            <button onclick="window._soundSfx('coin')" class="btn-gm-action" title="Pièces" style="font-size:1.1rem;padding:6px 10px">💰</button>
+            <button onclick="window._soundSfx('scream')" class="btn-gm-action" title="Cri" style="font-size:1.1rem;padding:6px 10px">😱</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    // ══════════════════════════════════════════════════
+    // MODULE AMBIANCE SONORE — KubbNd V1.41
+    // Sons CC0 / Domaine public via Freesound & OpenGameArt
+    // ══════════════════════════════════════════════════
+    (function() {
+      // ── Bibliothèque de sons ──────────────────────
+      // Musiques d'ambiance : playlists par thème + mood
+      // On utilise des fichiers audio libres hébergés sur des CDN publics
+      const AMBIENT = {
+        taverne: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-medieval-tavern-ambience-1763.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-happy-medieval-music-2848.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-mystery-ambience-503.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-ambience-2863.mp3"],
+        },
+        ville: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-busy-medieval-market-ambience-366.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-cheerful-medieval-fair-ambience-2849.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-city-ambience-452.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-city-night-ambience-2855.mp3"],
+        },
+        foret: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-forest-birds-ambience-1210.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-birds-singing-in-the-morning-2852.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-forest-ambience-2847.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-spooky-forest-ambience-2862.mp3"],
+        },
+        desert: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-desert-wind-ambience-1200.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-light-wind-ambience-2850.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dry-desert-wind-ambience-451.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-eerie-wind-ambience-2861.mp3"],
+        },
+        donjon: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-stone-dungeon-ambience-2846.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-light-dungeon-ambience-2851.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-dungeon-ambience-458.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-dungeon-ambience-2860.mp3"],
+        },
+        mer: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-ocean-waves-ambience-1189.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-harbor-ambience-2853.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-stormy-sea-ambience-453.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-deep-ocean-ambience-2859.mp3"],
+        },
+        temple: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-temple-ambience-2845.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-sacred-bells-ambience-2854.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-temple-ambience-457.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mystical-temple-ambience-2858.mp3"],
+        },
+        caverne: {
+          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-cave-drips-ambience-1207.mp3"],
+          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-underground-stream-ambience-2856.mp3"],
+          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-cave-ambience-454.mp3"],
+          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-cave-ambience-2857.mp3"],
+        },
+      };
+
+      // Musiques de combat par thème
+      const COMBAT_TRACKS = {
+        taverne:  "https://assets.mixkit.co/sfx/preview/mixkit-epic-battle-music-2843.mp3",
+        ville:    "https://assets.mixkit.co/sfx/preview/mixkit-epic-battle-music-2843.mp3",
+        foret:    "https://assets.mixkit.co/sfx/preview/mixkit-fierce-battle-drums-2842.mp3",
+        desert:   "https://assets.mixkit.co/sfx/preview/mixkit-fierce-battle-drums-2842.mp3",
+        donjon:   "https://assets.mixkit.co/sfx/preview/mixkit-dark-battle-music-2841.mp3",
+        mer:      "https://assets.mixkit.co/sfx/preview/mixkit-epic-battle-music-2843.mp3",
+        temple:   "https://assets.mixkit.co/sfx/preview/mixkit-dark-battle-music-2841.mp3",
+        caverne:  "https://assets.mixkit.co/sfx/preview/mixkit-dark-battle-music-2841.mp3",
+      };
+
+      // Effets sonores ponctuels (CC0)
+      const SFX = {
+        sword:   "https://assets.mixkit.co/sfx/preview/mixkit-sword-slash-whoosh-1489.mp3",
+        arrow:   "https://assets.mixkit.co/sfx/preview/mixkit-arrow-whoosh-1491.mp3",
+        spell:   "https://assets.mixkit.co/sfx/preview/mixkit-magic-spell-charged-2849.mp3",
+        door:    "https://assets.mixkit.co/sfx/preview/mixkit-opening-a-creaky-wooden-door-2836.mp3",
+        thunder: "https://assets.mixkit.co/sfx/preview/mixkit-thunder-and-rain-2878.mp3",
+        chest:   "https://assets.mixkit.co/sfx/preview/mixkit-opening-a-chest-2837.mp3",
+        coin:    "https://assets.mixkit.co/sfx/preview/mixkit-coins-handling-1939.mp3",
+        scream:  "https://assets.mixkit.co/sfx/preview/mixkit-human-scream-2848.mp3",
+      };
+
+      // ── État ─────────────────────────────────────
+      let ambientAudio = null;
+      let isCombatMode = false;
+      let isPlaying = false;
+      let currentVolume = 0.5;
+
+      // ── Helpers ───────────────────────────────────
+      function getTheme() { return document.getElementById('soundTheme')?.value || 'foret'; }
+      function getMood()  { return document.getElementById('soundMood')?.value  || 'normal'; }
+
+      function setStatus(txt, color='#aaa') {
+        const el = document.getElementById('soundStatus');
+        if (el) { el.textContent = txt; el.style.color = color; }
+      }
+
+      function loadAmbient(url) {
+        if (ambientAudio) {
+          ambientAudio.pause();
+          ambientAudio.src = '';
+          ambientAudio = null;
+        }
+        ambientAudio = new Audio(url);
+        ambientAudio.loop = true;
+        ambientAudio.volume = currentVolume;
+        ambientAudio.play().catch(() => setStatus('⚠ Cliquer ▶ pour autoriser le son', '#e09050'));
+      }
+
+      // ── API publique ──────────────────────────────
+      window._soundPlay = function() {
+        isPlaying = true;
+        const theme = getTheme();
+        const mood  = getMood();
+        const url = isCombatMode
+          ? COMBAT_TRACKS[theme] || COMBAT_TRACKS.foret
+          : (AMBIENT[theme]?.[mood]?.[0] || AMBIENT.foret.normal[0]);
+        loadAmbient(url);
+        if (isPlaying) {
+          const moodLabel = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[mood]||mood;
+          const themeLabel = document.getElementById('soundTheme')?.options[document.getElementById('soundTheme')?.selectedIndex]?.text || theme;
+          setStatus(isCombatMode ? `⚔ Combat — ${themeLabel}` : `▶ ${themeLabel} · ${moodLabel}`, '#7ec87e');
+        }
+      };
+
+      window._soundStop = function() {
+        isPlaying = false;
+        isCombatMode = false;
+        if (ambientAudio) { ambientAudio.pause(); ambientAudio.currentTime = 0; }
+        document.getElementById('btnSoundCombat')?.classList.remove('active-combat');
+        setStatus('Inactif');
+      };
+
+      window._soundApply = function() {
+        if (isPlaying) window._soundPlay();
+      };
+
+      window._soundSetVolume = function() {
+        currentVolume = parseFloat(document.getElementById('soundVolume')?.value || 0.5);
+        if (ambientAudio) ambientAudio.volume = currentVolume;
+      };
+
+      window._soundCombatToggle = function() {
+        isCombatMode = !isCombatMode;
+        const btn = document.getElementById('btnSoundCombat');
+        if (btn) {
+          btn.textContent = isCombatMode ? '✅ Combat ON' : '⚔ Combat';
+          btn.style.background = isCombatMode ? 'var(--red)' : '';
+        }
+        if (isPlaying) window._soundPlay();
+        else window._soundPlay(); // démarrer si pas encore lancé
+      };
+
+      window._soundSfx = function(key) {
+        const url = SFX[key];
+        if (!url) return;
+        const sfx = new Audio(url);
+        sfx.volume = Math.min(1, currentVolume * 1.5);
+        sfx.play().catch(() => {});
+      };
+
+      window._toggleSoundPanel = function() {
+        const body = document.getElementById('soundPanelBody');
+        const chev = document.getElementById('soundPanelChevron');
+        if (!body) return;
+        const open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        if (chev) chev.textContent = open ? '▸' : '▾';
+      };
+    })();
+    </script>
+
     <!-- Combat tracker -->
     <div id="combatPanel" class="combat-panel">
       <div class="combat-header">
