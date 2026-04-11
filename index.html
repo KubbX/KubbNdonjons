@@ -8877,94 +8877,30 @@ nav button:last-child { color:#884444; }
     <script>
     // ══════════════════════════════════════════════════
     // MODULE AMBIANCE SONORE — KubbNd V1.41
-    // Sons CC0 / Domaine public via Freesound & OpenGameArt
+    // 100% Web Audio API — aucun fichier externe
     // ══════════════════════════════════════════════════
     (function() {
-      // ── Bibliothèque de sons ──────────────────────
-      // Musiques d'ambiance : playlists par thème + mood
-      // On utilise des fichiers audio libres hébergés sur des CDN publics
-      const AMBIENT = {
-        taverne: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-medieval-tavern-ambience-1763.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-happy-medieval-music-2848.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-mystery-ambience-503.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-ambience-2863.mp3"],
-        },
-        ville: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-busy-medieval-market-ambience-366.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-cheerful-medieval-fair-ambience-2849.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-city-ambience-452.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-city-night-ambience-2855.mp3"],
-        },
-        foret: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-forest-birds-ambience-1210.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-birds-singing-in-the-morning-2852.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-forest-ambience-2847.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-spooky-forest-ambience-2862.mp3"],
-        },
-        desert: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-desert-wind-ambience-1200.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-light-wind-ambience-2850.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dry-desert-wind-ambience-451.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-eerie-wind-ambience-2861.mp3"],
-        },
-        donjon: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-stone-dungeon-ambience-2846.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-light-dungeon-ambience-2851.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-dungeon-ambience-458.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-dungeon-ambience-2860.mp3"],
-        },
-        mer: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-ocean-waves-ambience-1189.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-harbor-ambience-2853.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-stormy-sea-ambience-453.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-deep-ocean-ambience-2859.mp3"],
-        },
-        temple: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-temple-ambience-2845.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-sacred-bells-ambience-2854.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-temple-ambience-457.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mystical-temple-ambience-2858.mp3"],
-        },
-        caverne: {
-          normal:     ["https://assets.mixkit.co/sfx/preview/mixkit-cave-drips-ambience-1207.mp3"],
-          joyeux:     ["https://assets.mixkit.co/sfx/preview/mixkit-underground-stream-ambience-2856.mp3"],
-          sombre:     ["https://assets.mixkit.co/sfx/preview/mixkit-dark-cave-ambience-454.mp3"],
-          mysterieux: ["https://assets.mixkit.co/sfx/preview/mixkit-mysterious-cave-ambience-2857.mp3"],
-        },
-      };
 
-      // Musiques de combat par thème
-      const COMBAT_TRACKS = {
-        taverne:  "https://assets.mixkit.co/sfx/preview/mixkit-epic-battle-music-2843.mp3",
-        ville:    "https://assets.mixkit.co/sfx/preview/mixkit-epic-battle-music-2843.mp3",
-        foret:    "https://assets.mixkit.co/sfx/preview/mixkit-fierce-battle-drums-2842.mp3",
-        desert:   "https://assets.mixkit.co/sfx/preview/mixkit-fierce-battle-drums-2842.mp3",
-        donjon:   "https://assets.mixkit.co/sfx/preview/mixkit-dark-battle-music-2841.mp3",
-        mer:      "https://assets.mixkit.co/sfx/preview/mixkit-epic-battle-music-2843.mp3",
-        temple:   "https://assets.mixkit.co/sfx/preview/mixkit-dark-battle-music-2841.mp3",
-        caverne:  "https://assets.mixkit.co/sfx/preview/mixkit-dark-battle-music-2841.mp3",
-      };
-
-      // Effets sonores ponctuels (CC0)
-      const SFX = {
-        sword:   "https://assets.mixkit.co/sfx/preview/mixkit-sword-slash-whoosh-1489.mp3",
-        arrow:   "https://assets.mixkit.co/sfx/preview/mixkit-arrow-whoosh-1491.mp3",
-        spell:   "https://assets.mixkit.co/sfx/preview/mixkit-magic-spell-charged-2849.mp3",
-        door:    "https://assets.mixkit.co/sfx/preview/mixkit-opening-a-creaky-wooden-door-2836.mp3",
-        thunder: "https://assets.mixkit.co/sfx/preview/mixkit-thunder-and-rain-2878.mp3",
-        chest:   "https://assets.mixkit.co/sfx/preview/mixkit-opening-a-chest-2837.mp3",
-        coin:    "https://assets.mixkit.co/sfx/preview/mixkit-coins-handling-1939.mp3",
-        scream:  "https://assets.mixkit.co/sfx/preview/mixkit-human-scream-2848.mp3",
-      };
-
-      // ── État ─────────────────────────────────────
-      let ambientAudio = null;
+      // ── Contexte audio global ─────────────────────
+      let AC = null;           // AudioContext
+      let masterGain = null;   // gain maître
+      let activeNodes = [];    // tous les noeuds actifs (pour stop propre)
+      let loopTimers = [];     // setInterval/setTimeout à nettoyer
       let isCombatMode = false;
       let isPlaying = false;
       let currentVolume = 0.5;
 
-      // ── Helpers ───────────────────────────────────
+      function getAC() {
+        if (!AC) {
+          AC = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = AC.createGain();
+          masterGain.gain.value = currentVolume;
+          masterGain.connect(AC.destination);
+        }
+        if (AC.state === 'suspended') AC.resume();
+        return AC;
+      }
+
       function getTheme() { return document.getElementById('soundTheme')?.value || 'foret'; }
       function getMood()  { return document.getElementById('soundMood')?.value  || 'normal'; }
 
@@ -8973,90 +8909,474 @@ nav button:last-child { color:#884444; }
         if (el) { el.textContent = txt; el.style.color = color; }
       }
 
-      // ── Contexte audio (déblocage navigateur) ─────
-      let audioCtxUnlocked = false;
+      // ── Utilitaires Web Audio ─────────────────────
 
-      function unlockAudioContext() {
-        // Crée un contexte silencieux pour "débloquer" l'autoplay policy
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const buf = ctx.createBuffer(1, 1, 22050);
-          const src = ctx.createBufferSource();
+      // Bruit blanc filtré (vent, pluie, mer...)
+      function makeNoise(type='bandpass', freq=800, Q=1, vol=0.3, fadeIn=2) {
+        const ac = getAC();
+        const bufSize = ac.sampleRate * 4;
+        const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+        const src = ac.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+
+        const filter = ac.createBiquadFilter();
+        filter.type = type;
+        filter.frequency.value = freq;
+        filter.Q.value = Q;
+
+        const gain = ac.createGain();
+        gain.gain.setValueAtTime(0, ac.currentTime);
+        gain.gain.linearRampToValueAtTime(vol, ac.currentTime + fadeIn);
+
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        src.start();
+        activeNodes.push(src, gain);
+        return { src, gain, filter };
+      }
+
+      // LFO pour moduler un paramètre (trémolo, pulsations)
+      function makeLFO(target, rate=0.1, depth=0.1, base=0.3) {
+        const ac = getAC();
+        const osc = ac.createOscillator();
+        const lfoGain = ac.createGain();
+        osc.frequency.value = rate;
+        lfoGain.gain.value = depth;
+        osc.connect(lfoGain);
+        lfoGain.connect(target);
+        target.setValueAtTime(base, ac.currentTime);
+        osc.start();
+        activeNodes.push(osc, lfoGain);
+        return osc;
+      }
+
+      // Oscillateur tonal avec fade
+      function makeTone(freq, type='sine', vol=0.05, fadeIn=3, detune=0) {
+        const ac = getAC();
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.detune.value = detune;
+        gain.gain.setValueAtTime(0, ac.currentTime);
+        gain.gain.linearRampToValueAtTime(vol, ac.currentTime + fadeIn);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        activeNodes.push(osc, gain);
+        return { osc, gain };
+      }
+
+      // Nappe harmonique (accord de plusieurs oscillateurs)
+      function makeChord(freqs, vol=0.04, fadeIn=4, type='sine') {
+        return freqs.map(f => makeTone(f, type, vol, fadeIn));
+      }
+
+      // Goutte d'eau / impact ponctuel répété aléatoirement
+      function makeDrip(minInterval=3, maxInterval=8, freq=800, vol=0.15) {
+        const ac = getAC();
+        function drip() {
+          if (!isPlaying) return;
+          const osc = ac.createOscillator();
+          const env = ac.createGain();
+          osc.frequency.value = freq + Math.random() * 200;
+          osc.type = 'sine';
+          env.gain.setValueAtTime(vol, ac.currentTime);
+          env.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.3);
+          osc.connect(env);
+          env.connect(masterGain);
+          osc.start();
+          osc.stop(ac.currentTime + 0.35);
+          const next = (minInterval + Math.random() * (maxInterval - minInterval)) * 1000;
+          const t = setTimeout(drip, next);
+          loopTimers.push(t);
+        }
+        const t = setTimeout(drip, Math.random() * 2000);
+        loopTimers.push(t);
+      }
+
+      // Craquement de feu
+      function makeFire(vol=0.25) {
+        // Bruit basse fréquence = crépitement
+        makeNoise('lowpass', 250, 0.8, vol * 0.6, 2);
+        // Bruit mid = chaleur
+        makeNoise('bandpass', 600, 2, vol * 0.3, 3);
+        // LFO sur le volume pour simuler les flammes
+        const ac = getAC();
+        const lfoOsc = ac.createOscillator();
+        const lfoG = ac.createGain();
+        lfoOsc.frequency.value = 3 + Math.random();
+        lfoG.gain.value = 0.08;
+        lfoOsc.connect(lfoG);
+        lfoG.connect(masterGain.gain);
+        lfoOsc.start();
+        activeNodes.push(lfoOsc, lfoG);
+      }
+
+      // Pluie
+      function makeRain(intensity=0.4) {
+        makeNoise('highpass', 4000, 0.5, intensity * 0.5, 3);
+        makeNoise('bandpass', 1200, 1, intensity * 0.3, 2);
+        makeNoise('lowpass',  300,  1, intensity * 0.2, 4);
+      }
+
+      // Vent
+      function makeWind(intensity=0.35, pitch=400) {
+        const n = makeNoise('bandpass', pitch, 3, intensity, 4);
+        makeLFO(n.filter.frequency, 0.05, pitch * 0.3, pitch);
+        makeLFO(n.gain.gain, 0.08, intensity * 0.4, intensity * 0.6);
+      }
+
+      // Nappe de cordes médiévales simple
+      function makeStringDrone(root=110, mood='normal') {
+        const moodIntervals = {
+          normal:     [1, 1.5, 2, 3],
+          joyeux:     [1, 1.25, 1.5, 2, 2.5],
+          sombre:     [1, 1.189, 1.5, 1.782],
+          mysterieux: [1, 1.125, 1.5, 1.682],
+        };
+        const ratios = moodIntervals[mood] || moodIntervals.normal;
+        const freqs = ratios.map(r => root * r);
+        makeChord(freqs, 0.025, 5, 'triangle');
+        // Octave basse
+        makeTone(root / 2, 'sine', 0.03, 4);
+      }
+
+      // Battements de tambour de guerre (combat)
+      function makeBattleDrums() {
+        const ac = getAC();
+        let beat = 0;
+        const bpm = 140;
+        const interval = (60 / bpm) * 1000;
+
+        function drum() {
+          if (!isPlaying) return;
+          const osc = ac.createOscillator();
+          const env = ac.createGain();
+          const isAccent = (beat % 4 === 0);
+          osc.frequency.setValueAtTime(isAccent ? 80 : 60, ac.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(30, ac.currentTime + 0.15);
+          osc.type = 'sine';
+          env.gain.setValueAtTime(isAccent ? 0.8 : 0.5, ac.currentTime);
+          env.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.2);
+          osc.connect(env);
+          env.connect(masterGain);
+          osc.start();
+          osc.stop(ac.currentTime + 0.25);
+          beat++;
+          loopTimers.push(setTimeout(drum, interval));
+        }
+        drum();
+
+        // Cymbale / raclement métallique
+        function cymbal() {
+          if (!isPlaying) return;
+          const bufSize = ac.sampleRate * 0.08;
+          const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+          const src = ac.createBufferSource();
           src.buffer = buf;
-          src.connect(ctx.destination);
-          src.start(0);
-          ctx.close();
-          audioCtxUnlocked = true;
-        } catch(e) {}
+          const hpf = ac.createBiquadFilter();
+          hpf.type = 'highpass'; hpf.frequency.value = 6000;
+          const env = ac.createGain();
+          env.gain.setValueAtTime(0.25, ac.currentTime);
+          env.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08);
+          src.connect(hpf); hpf.connect(env); env.connect(masterGain);
+          src.start(); src.stop(ac.currentTime + 0.1);
+          loopTimers.push(setTimeout(cymbal, interval * 2));
+        }
+        loopTimers.push(setTimeout(cymbal, interval / 2));
       }
 
-      function loadAndPlay(url) {
-        return new Promise((resolve, reject) => {
-          if (ambientAudio) {
-            ambientAudio.pause();
-            ambientAudio.src = '';
-            ambientAudio = null;
+      // Mélodie de combat (ostinato simple)
+      function makeBattleMelody(mood) {
+        const ac = getAC();
+        const scale = mood === 'sombre' || mood === 'mysterieux'
+          ? [110, 123.5, 130.8, 146.8, 164.8, 174.6, 195.9]   // mineur
+          : [110, 123.5, 138.6, 146.8, 164.8, 185.0, 207.6];   // dorien
+        let idx = 0;
+        const bpm = 140;
+        const noteLen = (60 / bpm) * 500;
+
+        function note() {
+          if (!isPlaying) return;
+          const freq = scale[idx % scale.length];
+          const osc = ac.createOscillator();
+          const env = ac.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.value = freq * 2;
+          env.gain.setValueAtTime(0.06, ac.currentTime);
+          env.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + noteLen / 1000 * 0.8);
+          osc.connect(env); env.connect(masterGain);
+          osc.start(); osc.stop(ac.currentTime + noteLen / 1000);
+          idx++;
+          loopTimers.push(setTimeout(note, noteLen));
+        }
+        loopTimers.push(setTimeout(note, 500));
+      }
+
+      // ── RECETTES PAR THÈME + AMBIANCE ────────────
+
+      const RECIPES = {
+        taverne: {
+          normal:     (m) => { makeFire(0.2); makeNoise('lowpass',200,1,0.15,3); makeStringDrone(130, m); },
+          joyeux:     (m) => { makeFire(0.15); makeStringDrone(164, m); makeChord([261,329,392,523],0.03,5,'triangle'); },
+          sombre:     (m) => { makeFire(0.3); makeNoise('lowpass',150,1,0.2,3); makeStringDrone(110, m); },
+          mysterieux: (m) => { makeFire(0.2); makeStringDrone(98, m); makeNoise('bandpass',300,3,0.1,5); },
+        },
+        ville: {
+          normal:     (m) => { makeWind(0.1,200); makeNoise('bandpass',600,2,0.15,3); makeStringDrone(130,m); },
+          joyeux:     (m) => { makeWind(0.08,300); makeStringDrone(164,m); makeChord([261,329,392],0.03,4,'triangle'); },
+          sombre:     (m) => { makeWind(0.2,150); makeRain(0.2); makeStringDrone(110,m); },
+          mysterieux: (m) => { makeWind(0.15,200); makeStringDrone(98,m); makeNoise('bandpass',400,4,0.08,5); },
+        },
+        foret: {
+          normal:     (m) => { makeWind(0.15,500); makeNoise('highpass',3000,0.5,0.1,4); makeStringDrone(146,m); },
+          joyeux:     (m) => { makeWind(0.1,600); makeNoise('highpass',4000,0.5,0.15,3); makeStringDrone(164,m); makeChord([329,415,494],0.025,5,'sine'); },
+          sombre:     (m) => { makeWind(0.25,300); makeRain(0.2); makeStringDrone(110,m); },
+          mysterieux: (m) => { makeWind(0.2,400); makeNoise('bandpass',800,2,0.08,5); makeStringDrone(98,m); makeDrip(5,12,600,0.1); },
+        },
+        desert: {
+          normal:     (m) => { makeWind(0.3,300); makeNoise('bandpass',200,1,0.1,5); makeStringDrone(130,m); },
+          joyeux:     (m) => { makeWind(0.2,400); makeStringDrone(146,m); makeChord([293,370,440],0.025,5,'triangle'); },
+          sombre:     (m) => { makeWind(0.4,200); makeStringDrone(110,m); makeNoise('lowpass',150,1,0.15,4); },
+          mysterieux: (m) => { makeWind(0.35,250); makeStringDrone(98,m); makeDrip(8,20,400,0.08); },
+        },
+        donjon: {
+          normal:     (m) => { makeDrip(4,10,900,0.2); makeNoise('lowpass',100,1,0.12,4); makeStringDrone(110,m); },
+          joyeux:     (m) => { makeDrip(6,15,700,0.15); makeStringDrone(130,m); makeNoise('lowpass',150,1,0.1,4); },
+          sombre:     (m) => { makeDrip(3,8,800,0.25); makeNoise('lowpass',80,1,0.2,3); makeStringDrone(82,m); makeWind(0.1,100); },
+          mysterieux: (m) => { makeDrip(2,6,1000,0.2); makeNoise('bandpass',200,2,0.1,4); makeStringDrone(73,m); makeWind(0.15,80); },
+        },
+        mer: {
+          normal:     (m) => { makeNoise('lowpass',400,1,0.4,5); makeLFO(masterGain.gain, 0.06, 0.1, 0.5); makeStringDrone(130,m); },
+          joyeux:     (m) => { makeNoise('lowpass',500,1,0.3,4); makeWind(0.15,600); makeStringDrone(146,m); makeChord([293,370,440],0.025,5,'sine'); },
+          sombre:     (m) => { makeNoise('lowpass',300,1,0.5,4); makeWind(0.3,200); makeRain(0.3); makeStringDrone(110,m); },
+          mysterieux: (m) => { makeNoise('lowpass',350,1,0.4,5); makeWind(0.2,150); makeStringDrone(98,m); makeDrip(10,25,300,0.08); },
+        },
+        temple: {
+          normal:     (m) => { makeNoise('lowpass',150,1,0.08,5); makeStringDrone(130,m); makeChord([65,97.5,130,195],0.03,6,'sine'); },
+          joyeux:     (m) => { makeStringDrone(164,m); makeChord([261,329,392,523],0.035,5,'sine'); makeNoise('lowpass',200,1,0.06,5); },
+          sombre:     (m) => { makeNoise('lowpass',100,1,0.12,4); makeStringDrone(82,m); makeChord([55,82.4,110,164.8],0.03,6,'sine'); },
+          mysterieux: (m) => { makeNoise('bandpass',150,3,0.1,5); makeStringDrone(73,m); makeChord([55,73.4,110,146.8],0.028,7,'sine'); makeDrip(8,20,500,0.12); },
+        },
+        caverne: {
+          normal:     (m) => { makeDrip(3,8,900,0.2); makeNoise('lowpass',80,1,0.1,4); makeWind(0.1,80); makeStringDrone(82,m); },
+          joyeux:     (m) => { makeDrip(5,12,700,0.15); makeNoise('lowpass',120,1,0.1,4); makeStringDrone(110,m); },
+          sombre:     (m) => { makeDrip(2,6,800,0.25); makeNoise('lowpass',60,1,0.18,3); makeWind(0.2,60); makeStringDrone(55,m); },
+          mysterieux: (m) => { makeDrip(1.5,5,1000,0.22); makeNoise('bandpass',120,3,0.1,4); makeWind(0.15,70); makeStringDrone(49,m); },
+        },
+      };
+
+      // ── COMBAT ────────────────────────────────────
+      function startCombat(theme, mood) {
+        // Ambiance de fond atténuée
+        const recipe = RECIPES[theme]?.[mood] || RECIPES.foret.sombre;
+        recipe(mood);
+        // Attenuate master for ambiance layer
+        masterGain.gain.setValueAtTime(currentVolume * 0.4, AC.currentTime);
+        // Tambours + mélodie par-dessus
+        makeBattleDrums();
+        makeBattleMelody(mood);
+        // Remonter le volume global progressivement
+        masterGain.gain.linearRampToValueAtTime(currentVolume, AC.currentTime + 2);
+      }
+
+      // ── ARRÊT PROPRE ──────────────────────────────
+      function stopAll(fadeTime=1.5) {
+        loopTimers.forEach(t => clearTimeout(t));
+        loopTimers = [];
+        if (masterGain && AC) {
+          masterGain.gain.linearRampToValueAtTime(0, AC.currentTime + fadeTime);
+        }
+        setTimeout(() => {
+          activeNodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch(e){} });
+          activeNodes = [];
+          if (masterGain && AC) {
+            masterGain.gain.cancelScheduledValues(AC.currentTime);
+            masterGain.gain.value = currentVolume;
           }
-          const audio = new Audio();
-          audio.loop = true;
-          audio.volume = currentVolume;
-          audio.preload = 'auto';
-          audio.crossOrigin = 'anonymous';
-
-          audio.addEventListener('canplaythrough', () => {
-            ambientAudio = audio;
-            audio.play().then(resolve).catch(reject);
-          }, { once: true });
-
-          audio.addEventListener('error', (e) => reject(e), { once: true });
-          audio.src = url;
-          audio.load();
-        });
+        }, (fadeTime + 0.1) * 1000);
       }
 
-      function getLabels() {
-        const themeEl = document.getElementById('soundTheme');
-        const moodEl  = document.getElementById('soundMood');
-        const themeLabel = themeEl?.options[themeEl?.selectedIndex]?.text || getTheme();
-        const moodLabel  = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[getMood()] || getMood();
-        return { themeLabel, moodLabel };
-      }
+      // ── EFFETS SONORES PROCÉDURAUX ────────────────
+      const SFX_FN = {
+        sword: () => {
+          const ac = getAC();
+          // Whoosh + métal
+          const buf = ac.createBuffer(1, ac.sampleRate * 0.4, ac.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 2);
+          const src = ac.createBufferSource(); src.buffer = buf;
+          const hpf = ac.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=1500;
+          const g = ac.createGain(); g.gain.value = currentVolume * 2;
+          src.connect(hpf); hpf.connect(g); g.connect(ac.destination);
+          src.start();
+          // Clang métallique
+          const osc = ac.createOscillator(); const env2 = ac.createGain();
+          osc.frequency.value = 1200; osc.type='triangle';
+          env2.gain.setValueAtTime(currentVolume*0.4, ac.currentTime);
+          env2.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.3);
+          osc.connect(env2); env2.connect(ac.destination);
+          osc.start(); osc.stop(ac.currentTime+0.35);
+        },
+        arrow: () => {
+          const ac = getAC();
+          const buf = ac.createBuffer(1, ac.sampleRate*0.3, ac.sampleRate);
+          const d = buf.getChannelData(0);
+          for (let i=0; i<d.length; i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.15));
+          const src=ac.createBufferSource(); src.buffer=buf;
+          const bpf=ac.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=2500; bpf.Q.value=0.5;
+          const g=ac.createGain(); g.gain.value=currentVolume*1.5;
+          src.connect(bpf); bpf.connect(g); g.connect(ac.destination); src.start();
+        },
+        spell: () => {
+          const ac = getAC();
+          // Shimmer montant
+          [523,659,784,1047,1319].forEach((f,i) => {
+            const osc=ac.createOscillator(); const env=ac.createGain();
+            osc.frequency.value=f; osc.type='sine';
+            env.gain.setValueAtTime(0,ac.currentTime+i*0.06);
+            env.gain.linearRampToValueAtTime(currentVolume*0.15, ac.currentTime+i*0.06+0.08);
+            env.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+i*0.06+0.5);
+            osc.connect(env); env.connect(ac.destination);
+            osc.start(ac.currentTime+i*0.06); osc.stop(ac.currentTime+i*0.06+0.6);
+          });
+          // Bruit magique
+          const buf=ac.createBuffer(1,ac.sampleRate*0.6,ac.sampleRate);
+          const dat=buf.getChannelData(0);
+          for(let i=0;i<dat.length;i++) dat[i]=(Math.random()*2-1)*0.3*Math.sin(i/dat.length*Math.PI);
+          const src=ac.createBufferSource(); src.buffer=buf;
+          const hpf=ac.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=3000;
+          const g=ac.createGain(); g.gain.value=currentVolume*0.5;
+          src.connect(hpf); hpf.connect(g); g.connect(ac.destination); src.start();
+        },
+        door: () => {
+          const ac = getAC();
+          // Grincement = oscillateur glissant + bruit
+          const osc=ac.createOscillator(); const env=ac.createGain();
+          osc.type='sawtooth';
+          osc.frequency.setValueAtTime(180, ac.currentTime);
+          osc.frequency.linearRampToValueAtTime(90, ac.currentTime+1.2);
+          env.gain.setValueAtTime(currentVolume*0.3, ac.currentTime);
+          env.gain.linearRampToValueAtTime(currentVolume*0.15, ac.currentTime+1.2);
+          env.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+1.5);
+          osc.connect(env); env.connect(ac.destination);
+          osc.start(); osc.stop(ac.currentTime+1.6);
+          // Impact initial
+          const buf=ac.createBuffer(1,ac.sampleRate*0.1,ac.sampleRate);
+          const d=buf.getChannelData(0);
+          for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.1));
+          const src=ac.createBufferSource(); src.buffer=buf;
+          const lpf=ac.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=400;
+          const g=ac.createGain(); g.gain.value=currentVolume*1.5;
+          src.connect(lpf); lpf.connect(g); g.connect(ac.destination); src.start();
+        },
+        thunder: () => {
+          const ac = getAC();
+          // Rumble basse fréquence
+          const buf=ac.createBuffer(1,ac.sampleRate*2.5,ac.sampleRate);
+          const d=buf.getChannelData(0);
+          for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(Math.sin(i/d.length*Math.PI),0.3);
+          const src=ac.createBufferSource(); src.buffer=buf;
+          const lpf=ac.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=200;
+          const g=ac.createGain();
+          g.gain.setValueAtTime(0,ac.currentTime);
+          g.gain.linearRampToValueAtTime(currentVolume*2, ac.currentTime+0.1);
+          g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+2.5);
+          src.connect(lpf); lpf.connect(g); g.connect(ac.destination); src.start();
+          // Crack initial (bruit blanc court)
+          const buf2=ac.createBuffer(1,ac.sampleRate*0.05,ac.sampleRate);
+          const d2=buf2.getChannelData(0);
+          for(let i=0;i<d2.length;i++) d2[i]=Math.random()*2-1;
+          const src2=ac.createBufferSource(); src2.buffer=buf2;
+          const g2=ac.createGain(); g2.gain.value=currentVolume*3;
+          src2.connect(g2); g2.connect(ac.destination); src2.start();
+        },
+        chest: () => {
+          const ac = getAC();
+          // Grincement de coffre + impact sourd
+          const osc=ac.createOscillator(); const env=ac.createGain();
+          osc.type='sawtooth'; osc.frequency.setValueAtTime(120,ac.currentTime);
+          osc.frequency.linearRampToValueAtTime(60,ac.currentTime+0.8);
+          env.gain.setValueAtTime(currentVolume*0.25,ac.currentTime);
+          env.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.9);
+          osc.connect(env); env.connect(ac.destination); osc.start(); osc.stop(ac.currentTime+1);
+          // Impact sourd
+          const osc2=ac.createOscillator(); const env2=ac.createGain();
+          osc2.type='sine'; osc2.frequency.setValueAtTime(60,ac.currentTime+0.8);
+          osc2.frequency.exponentialRampToValueAtTime(20,ac.currentTime+1.2);
+          env2.gain.setValueAtTime(currentVolume*0.6,ac.currentTime+0.8);
+          env2.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+1.3);
+          osc2.connect(env2); env2.connect(ac.destination); osc2.start(ac.currentTime+0.8); osc2.stop(ac.currentTime+1.4);
+        },
+        coin: () => {
+          const ac = getAC();
+          const count = 6 + Math.floor(Math.random()*6);
+          for(let i=0;i<count;i++) {
+            const t = ac.currentTime + i*0.06 + Math.random()*0.04;
+            const freq = 1800 + Math.random()*600;
+            const osc=ac.createOscillator(); const env=ac.createGain();
+            osc.type='sine'; osc.frequency.value=freq;
+            env.gain.setValueAtTime(currentVolume*0.3,t);
+            env.gain.exponentialRampToValueAtTime(0.001,t+0.15);
+            osc.connect(env); env.connect(ac.destination);
+            osc.start(t); osc.stop(t+0.18);
+          }
+        },
+        scream: () => {
+          const ac = getAC();
+          // Cri synthétique
+          const osc=ac.createOscillator(); const env=ac.createGain();
+          osc.type='sawtooth';
+          osc.frequency.setValueAtTime(300,ac.currentTime);
+          osc.frequency.linearRampToValueAtTime(500,ac.currentTime+0.3);
+          osc.frequency.linearRampToValueAtTime(350,ac.currentTime+0.8);
+          env.gain.setValueAtTime(0,ac.currentTime);
+          env.gain.linearRampToValueAtTime(currentVolume*0.4,ac.currentTime+0.05);
+          env.gain.linearRampToValueAtTime(currentVolume*0.3,ac.currentTime+0.8);
+          env.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+1.1);
+          const hpf=ac.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=400;
+          osc.connect(hpf); hpf.connect(env); env.connect(ac.destination);
+          osc.start(); osc.stop(ac.currentTime+1.2);
+          // Vibrato
+          const lfo=ac.createOscillator(); const lfoG=ac.createGain();
+          lfo.frequency.value=6; lfoG.gain.value=15;
+          lfo.connect(lfoG); lfoG.connect(osc.frequency); lfo.start(); lfo.stop(ac.currentTime+1.2);
+        },
+      };
 
-      // ── API publique ──────────────────────────────
+      // ── API PUBLIQUE ──────────────────────────────
       window._soundPlay = function() {
-        // Débloque le contexte audio dès le premier clic utilisateur
-        if (!audioCtxUnlocked) unlockAudioContext();
-
+        stopAll(0.5);
         isPlaying = true;
-        const theme = getTheme();
-        const mood  = getMood();
-        const url = isCombatMode
-          ? (COMBAT_TRACKS[theme] || COMBAT_TRACKS.foret)
-          : (AMBIENT[theme]?.[mood]?.[0] || AMBIENT.foret.normal[0]);
-
-        setStatus('⏳ Chargement…', '#aaa');
-
-        loadAndPlay(url).then(() => {
-          const { themeLabel, moodLabel } = getLabels();
-          setStatus(
-            isCombatMode ? `⚔ Combat — ${themeLabel}` : `▶ ${themeLabel} · ${moodLabel}`,
-            '#7ec87e'
-          );
-        }).catch((err) => {
-          console.warn('Audio play failed:', err);
-          setStatus('⚠ Erreur de lecture (vérifier la connexion)', '#e05050');
-          isPlaying = false;
-        });
+        setTimeout(() => {
+          if (!isPlaying) return;
+          getAC();
+          masterGain.gain.value = currentVolume;
+          const theme = getTheme();
+          const mood  = getMood();
+          const recipe = isCombatMode
+            ? () => startCombat(theme, mood)
+            : (RECIPES[theme]?.[mood] || RECIPES.foret.normal);
+          recipe(mood);
+          const themeEl = document.getElementById('soundTheme');
+          const themeLabel = themeEl?.options[themeEl?.selectedIndex]?.text || theme;
+          const moodLabel = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[mood]||mood;
+          setStatus(isCombatMode ? `⚔ Combat — ${themeLabel}` : `▶ ${themeLabel} · ${moodLabel}`, '#7ec87e');
+        }, 600);
       };
 
       window._soundStop = function() {
         isPlaying = false;
         isCombatMode = false;
-        if (ambientAudio) {
-          ambientAudio.pause();
-          ambientAudio.currentTime = 0;
-          ambientAudio = null;
-        }
+        stopAll(1.5);
         const btn = document.getElementById('btnSoundCombat');
         if (btn) { btn.textContent = '⚔ Combat'; btn.style.background = ''; }
         setStatus('Inactif');
@@ -9068,7 +9388,7 @@ nav button:last-child { color:#884444; }
 
       window._soundSetVolume = function() {
         currentVolume = parseFloat(document.getElementById('soundVolume')?.value || 0.5);
-        if (ambientAudio) ambientAudio.volume = currentVolume;
+        if (masterGain) masterGain.gain.value = currentVolume;
       };
 
       window._soundCombatToggle = function() {
@@ -9078,18 +9398,13 @@ nav button:last-child { color:#884444; }
           btn.textContent = isCombatMode ? '✅ Combat ON' : '⚔ Combat';
           btn.style.background = isCombatMode ? 'var(--red)' : '';
         }
-        // Le bouton Combat est toujours un clic utilisateur direct → on peut jouer
         window._soundPlay();
       };
 
       window._soundSfx = function(key) {
-        if (!audioCtxUnlocked) unlockAudioContext();
-        const url = SFX[key];
-        if (!url) return;
-        const sfx = new Audio(url);
-        sfx.crossOrigin = 'anonymous';
-        sfx.volume = Math.min(1, currentVolume * 1.5);
-        sfx.play().catch(() => {});
+        getAC();
+        const fn = SFX_FN[key];
+        if (fn) fn();
       };
 
       window._toggleSoundPanel = function() {
@@ -9100,6 +9415,7 @@ nav button:last-child { color:#884444; }
         body.style.display = open ? 'none' : 'block';
         if (chev) chev.textContent = open ? '▸' : '▾';
       };
+
     })();
     </script>
 
