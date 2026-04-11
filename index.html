@@ -8973,39 +8973,92 @@ nav button:last-child { color:#884444; }
         if (el) { el.textContent = txt; el.style.color = color; }
       }
 
-      function loadAmbient(url) {
-        if (ambientAudio) {
-          ambientAudio.pause();
-          ambientAudio.src = '';
-          ambientAudio = null;
-        }
-        ambientAudio = new Audio(url);
-        ambientAudio.loop = true;
-        ambientAudio.volume = currentVolume;
-        ambientAudio.play().catch(() => setStatus('⚠ Cliquer ▶ pour autoriser le son', '#e09050'));
+      // ── Contexte audio (déblocage navigateur) ─────
+      let audioCtxUnlocked = false;
+
+      function unlockAudioContext() {
+        // Crée un contexte silencieux pour "débloquer" l'autoplay policy
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const buf = ctx.createBuffer(1, 1, 22050);
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(ctx.destination);
+          src.start(0);
+          ctx.close();
+          audioCtxUnlocked = true;
+        } catch(e) {}
+      }
+
+      function loadAndPlay(url) {
+        return new Promise((resolve, reject) => {
+          if (ambientAudio) {
+            ambientAudio.pause();
+            ambientAudio.src = '';
+            ambientAudio = null;
+          }
+          const audio = new Audio();
+          audio.loop = true;
+          audio.volume = currentVolume;
+          audio.preload = 'auto';
+          audio.crossOrigin = 'anonymous';
+
+          audio.addEventListener('canplaythrough', () => {
+            ambientAudio = audio;
+            audio.play().then(resolve).catch(reject);
+          }, { once: true });
+
+          audio.addEventListener('error', (e) => reject(e), { once: true });
+          audio.src = url;
+          audio.load();
+        });
+      }
+
+      function getLabels() {
+        const themeEl = document.getElementById('soundTheme');
+        const moodEl  = document.getElementById('soundMood');
+        const themeLabel = themeEl?.options[themeEl?.selectedIndex]?.text || getTheme();
+        const moodLabel  = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[getMood()] || getMood();
+        return { themeLabel, moodLabel };
       }
 
       // ── API publique ──────────────────────────────
       window._soundPlay = function() {
+        // Débloque le contexte audio dès le premier clic utilisateur
+        if (!audioCtxUnlocked) unlockAudioContext();
+
         isPlaying = true;
         const theme = getTheme();
         const mood  = getMood();
         const url = isCombatMode
-          ? COMBAT_TRACKS[theme] || COMBAT_TRACKS.foret
+          ? (COMBAT_TRACKS[theme] || COMBAT_TRACKS.foret)
           : (AMBIENT[theme]?.[mood]?.[0] || AMBIENT.foret.normal[0]);
-        loadAmbient(url);
-        if (isPlaying) {
-          const moodLabel = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[mood]||mood;
-          const themeLabel = document.getElementById('soundTheme')?.options[document.getElementById('soundTheme')?.selectedIndex]?.text || theme;
-          setStatus(isCombatMode ? `⚔ Combat — ${themeLabel}` : `▶ ${themeLabel} · ${moodLabel}`, '#7ec87e');
-        }
+
+        setStatus('⏳ Chargement…', '#aaa');
+
+        loadAndPlay(url).then(() => {
+          const { themeLabel, moodLabel } = getLabels();
+          setStatus(
+            isCombatMode ? `⚔ Combat — ${themeLabel}` : `▶ ${themeLabel} · ${moodLabel}`,
+            '#7ec87e'
+          );
+        }).catch((err) => {
+          console.warn('Audio play failed:', err);
+          setStatus('⚠ Erreur de lecture (vérifier la connexion)', '#e05050');
+          isPlaying = false;
+        });
       };
 
       window._soundStop = function() {
         isPlaying = false;
         isCombatMode = false;
-        if (ambientAudio) { ambientAudio.pause(); ambientAudio.currentTime = 0; }
-        document.getElementById('btnSoundCombat')?.classList.remove('active-combat');
+        if (ambientAudio) {
+          ambientAudio.pause();
+          ambientAudio.currentTime = 0;
+          ambientAudio = null;
+        }
+        const btn = document.getElementById('btnSoundCombat');
+        if (btn) { btn.textContent = '⚔ Combat'; btn.style.background = ''; }
         setStatus('Inactif');
       };
 
@@ -9025,14 +9078,16 @@ nav button:last-child { color:#884444; }
           btn.textContent = isCombatMode ? '✅ Combat ON' : '⚔ Combat';
           btn.style.background = isCombatMode ? 'var(--red)' : '';
         }
-        if (isPlaying) window._soundPlay();
-        else window._soundPlay(); // démarrer si pas encore lancé
+        // Le bouton Combat est toujours un clic utilisateur direct → on peut jouer
+        window._soundPlay();
       };
 
       window._soundSfx = function(key) {
+        if (!audioCtxUnlocked) unlockAudioContext();
         const url = SFX[key];
         if (!url) return;
         const sfx = new Audio(url);
+        sfx.crossOrigin = 'anonymous';
         sfx.volume = Math.min(1, currentVolume * 1.5);
         sfx.play().catch(() => {});
       };
