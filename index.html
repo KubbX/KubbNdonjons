@@ -9352,30 +9352,150 @@ nav button:last-child { color:#884444; }
         },
       };
 
+      // ── BIBLIOTHÈQUE DE FICHIERS LOCAUX ──────────
+      // Ajoutez autant de variantes que vous voulez par ambiance.
+      // Un fichier est choisi aléatoirement à chaque lancement.
+      // Format : './sounds/ambiance/nom_du_fichier.mp3'
+      const SOUND_FILES = {
+        taverne: {
+          normal:     ['./sounds/ambiance/taverne_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/taverne_normal.mp3'],
+          sombre:     ['./sounds/ambiance/taverne_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/taverne_sombre.mp3'],
+        },
+        ville: {
+          normal:     ['./sounds/ambiance/ville_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/ville_normal.mp3'],
+          sombre:     ['./sounds/ambiance/ville_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/ville_sombre.mp3'],
+        },
+        foret: {
+          normal:     ['./sounds/ambiance/foret_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/foret_normal.mp3'],
+          sombre:     ['./sounds/ambiance/foret_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/foret_sombre.mp3'],
+        },
+        desert: {
+          normal:     ['./sounds/ambiance/desert_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/desert_normal.mp3'],
+          sombre:     ['./sounds/ambiance/desert_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/desert_sombre.mp3'],
+        },
+        donjon: {
+          normal:     ['./sounds/ambiance/donjon_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/donjon_normal.mp3'],
+          sombre:     ['./sounds/ambiance/donjon_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/donjon_sombre.mp3'],
+        },
+        mer: {
+          normal:     ['./sounds/ambiance/mer_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/mer_normal.mp3'],
+          sombre:     ['./sounds/ambiance/mer_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/mer_sombre.mp3'],
+        },
+        temple: {
+          normal:     ['./sounds/ambiance/temple_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/temple_normal.mp3'],
+          sombre:     ['./sounds/ambiance/temple_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/temple_sombre.mp3'],
+        },
+        caverne: {
+          normal:     ['./sounds/ambiance/caverne_normal.mp3'],
+          joyeux:     ['./sounds/ambiance/caverne_normal.mp3'],
+          sombre:     ['./sounds/ambiance/caverne_sombre.mp3'],
+          mysterieux: ['./sounds/ambiance/caverne_sombre.mp3'],
+        },
+        combat: {
+          normal:     ['./sounds/combat/combat_normal.mp3'],
+          sombre:     ['./sounds/combat/combat_sombre.mp3'],
+        },
+      };
+
+      // Pioche un fichier au hasard dans un tableau
+      function pickRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+      }
+
+      // Lecture d'un fichier audio en boucle via Web Audio API
+      let currentAudioSource = null;
+
+      function playFile(url, onSuccess, onError) {
+        const ac = getAC();
+        fetch(url)
+          .then(r => {
+            if (!r.ok) throw new Error('Fichier introuvable');
+            return r.arrayBuffer();
+          })
+          .then(buf => ac.decodeAudioData(buf))
+          .then(decoded => {
+            if (!isPlaying) return;
+            if (currentAudioSource) {
+              try { currentAudioSource.stop(); } catch(e) {}
+            }
+            const src = ac.createBufferSource();
+            src.buffer = decoded;
+            src.loop = true;
+            src.connect(masterGain);
+            src.start();
+            currentAudioSource = src;
+            activeNodes.push(src);
+            if (onSuccess) onSuccess();
+          })
+          .catch(err => { if (onError) onError(err); });
+      }
+
       // ── API PUBLIQUE ──────────────────────────────
       window._soundPlay = function() {
-        stopAll(0.5);
+        stopAll(0.3);
         isPlaying = true;
-        setTimeout(() => {
-          if (!isPlaying) return;
-          getAC();
-          masterGain.gain.value = currentVolume;
-          const theme = getTheme();
-          const mood  = getMood();
-          const recipe = isCombatMode
-            ? () => startCombat(theme, mood)
-            : (RECIPES[theme]?.[mood] || RECIPES.foret.normal);
-          recipe(mood);
-          const themeEl = document.getElementById('soundTheme');
-          const themeLabel = themeEl?.options[themeEl?.selectedIndex]?.text || theme;
-          const moodLabel = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[mood]||mood;
-          setStatus(isCombatMode ? `⚔ Combat — ${themeLabel}` : `▶ ${themeLabel} · ${moodLabel}`, '#7ec87e');
-        }, 600);
+        currentAudioSource = null;
+
+        const ac = getAC();
+        masterGain.gain.value = currentVolume;
+
+        const theme = getTheme();
+        const mood  = getMood();
+        const themeEl = document.getElementById('soundTheme');
+        const themeLabel = themeEl?.options[themeEl?.selectedIndex]?.text || theme;
+        const moodLabel = {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[mood] || mood;
+
+        if (isCombatMode) {
+          // Combat : choisir normal ou sombre selon le mood
+          const combatMood = (mood === 'sombre' || mood === 'mysterieux') ? 'sombre' : 'normal';
+          const urls = SOUND_FILES.combat[combatMood] || SOUND_FILES.combat.normal;
+          const url = pickRandom(urls);
+          setStatus('⏳ Chargement…', '#aaa');
+          playFile(url,
+            () => setStatus(`⚔ Combat — ${themeLabel}`, '#e07070'),
+            () => {
+              // Fallback procédural si fichier absent
+              startCombat(theme, mood);
+              setStatus(`⚔ Combat — ${themeLabel} (procédural)`, '#e07070');
+            }
+          );
+        } else {
+          const urls = SOUND_FILES[theme]?.[mood] || SOUND_FILES.foret.normal;
+          const url = pickRandom(urls);
+          setStatus('⏳ Chargement…', '#aaa');
+          playFile(url,
+            () => setStatus(`▶ ${themeLabel} · ${moodLabel}`, '#7ec87e'),
+            () => {
+              // Fallback procédural si fichier absent
+              const recipe = RECIPES[theme]?.[mood] || RECIPES.foret.normal;
+              recipe(mood);
+              setStatus(`▶ ${themeLabel} · ${moodLabel} (procédural)`, '#aaa');
+            }
+          );
+        }
       };
 
       window._soundStop = function() {
         isPlaying = false;
         isCombatMode = false;
+        if (currentAudioSource) {
+          try { currentAudioSource.stop(); } catch(e) {}
+          currentAudioSource = null;
+        }
         stopAll(1.5);
         const btn = document.getElementById('btnSoundCombat');
         if (btn) { btn.textContent = '⚔ Combat'; btn.style.background = ''; }
