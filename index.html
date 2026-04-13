@@ -8906,75 +8906,78 @@ nav button:last-child { color:#884444; }
       // IDs récupérés depuis l'API Syrinscape (soundsets gratuits)
       // Format : [moodId, moodId2, ...] — un ID est choisi aléatoirement
       // Tu peux compléter ces IDs depuis ton interface Syrinscape
+      // ── Mood IDs Syrinscape (vérifiés) ──────────
+      // Chaque tableau peut contenir plusieurs IDs → sélection aléatoire
       const MOOD_MAP = {
         taverne: {
-          normal:     [6039],   // Medieval Tavern - Tavern Ambience
-          joyeux:     [6040],   // Medieval Tavern - Lively Tavern
-          sombre:     [6041],   // Medieval Tavern - Quiet Corner
-          mysterieux: [6042],   // Medieval Tavern - Late Night
+          normal:     [69],      // Friendly Tavern
+          joyeux:     [69],      // Friendly Tavern
+          sombre:     [748294],  // Dungeon Depths (fallback sombre)
+          mysterieux: [748294],
         },
         foret: {
-          normal:     [1025],   // Dark Forest - Forest Ambience
-          joyeux:     [1026],   // Dark Forest - Daytime Forest
-          sombre:     [1027],   // Dark Forest - Night Forest
-          mysterieux: [1028],   // Dark Forest - Spooky Forest
+          normal:     [565152],  // Forest
+          joyeux:     [565152],
+          sombre:     [565152],
+          mysterieux: [565152],
         },
         donjon: {
-          normal:     [180],    // The Dungeon - Basic Dungeon
-          joyeux:     [181],    // The Dungeon - Busy Dungeon
-          sombre:     [182],    // The Dungeon - Dark Dungeon
-          mysterieux: [183],    // The Dungeon - Ancient Dungeon
+          normal:     [748294],  // Dungeon Depths
+          joyeux:     [748294],
+          sombre:     [748294],
+          mysterieux: [748294],
         },
         ville: {
-          normal:     [2010],   // Olde Towne - Town Day
-          joyeux:     [2011],   // Olde Towne - Market
-          sombre:     [2012],   // Olde Towne - Town Night
-          mysterieux: [2013],   // Olde Towne - Deserted Streets
+          normal:     [15112],   // Bustling Port Town
+          joyeux:     [15112],
+          sombre:     [15112],
+          mysterieux: [15112],
         },
         desert: {
-          normal:     [3005],   // Desert - Desert Day
-          joyeux:     [3006],   // Desert - Desert Wind
-          sombre:     [3007],   // Desert - Desert Night
-          mysterieux: [3008],   // Desert - Sandstorm
+          normal:     [831],     // Desert
+          joyeux:     [831],
+          sombre:     [831],
+          mysterieux: [831],
         },
         mer: {
-          normal:     [4001],   // Age of Sail - Calm Seas
-          joyeux:     [4002],   // Age of Sail - Busy Port
-          sombre:     [4003],   // Age of Sail - Storm
-          mysterieux: [4004],   // Age of Sail - Fog
+          normal:     [15112],   // Bustling Port Town
+          joyeux:     [15112],
+          sombre:     [15112],
+          mysterieux: [15112],
         },
         temple: {
-          normal:     [5001],   // Temple - Sacred Space
-          joyeux:     [5002],   // Temple - Celebration
-          sombre:     [5003],   // Temple - Dark Ritual
-          mysterieux: [5004],   // Temple - Ancient Temple
+          normal:     [1270],    // Bell Monk Temple
+          joyeux:     [1270],
+          sombre:     [1270],
+          mysterieux: [1270],
         },
         caverne: {
-          normal:     [180],    // Fallback: Dungeon
-          joyeux:     [181],
-          sombre:     [182],
-          mysterieux: [183],
+          normal:     [779267],  // Cave
+          joyeux:     [779267],
+          sombre:     [779267],
+          mysterieux: [779267],
         },
       };
 
-      // Moods de combat par ambiance
+      // Moods de combat (même ID pour toutes les ambiances pour l'instant)
       const COMBAT_MOODS = {
-        normal:     [7001],   // Combat - Battle
-        joyeux:     [7002],   // Combat - Skirmish
-        sombre:     [7003],   // Combat - Dark Battle
-        mysterieux: [7003],
+        normal:     [696964],  // Orc Battle
+        joyeux:     [696964],
+        sombre:     [696964],
+        mysterieux: [696964],
       };
 
-      // Effets sonores (Element IDs Syrinscape)
+      // Effets sonores — pour l'instant on utilise le même soundset combat
+      // Tu pourras affiner avec de vrais Element IDs plus tard
       const SFX_MAP = {
-        sword:   [209],   // Sword swing
-        arrow:   [210],   // Arrow whoosh
-        spell:   [211],   // Magic spell
-        door:    [212],   // Creaky door
-        thunder: [213],   // Thunder crack
-        chest:   [214],   // Chest open
-        coin:    [215],   // Coins
-        scream:  [216],   // Human scream
+        sword:   [696964],
+        arrow:   [696964],
+        spell:   [696964],
+        door:    [748294],
+        thunder: [831],
+        chest:   [748294],
+        coin:    [69],
+        scream:  [696964],
       };
 
       // ── État ─────────────────────────────────────
