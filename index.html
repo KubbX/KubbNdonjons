@@ -8808,9 +8808,6 @@ nav button:last-child { color:#884444; }
     <!-- ══════════════════════════════════════════════════
          MODULE AMBIANCE SONORE — Syrinscape
     ══════════════════════════════════════════════════ -->
-    <script src="https://syrinscape.com/integration.js"></script>
-    <script src="https://syrinscape.com/player.js"></script>
-
     <div id="soundPanel" style="background:linear-gradient(135deg,#2a1a0a,#3d2010);border:1px solid var(--gold);border-radius:6px;margin-bottom:18px;overflow:hidden">
       <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(212,180,120,0.3);cursor:pointer" onclick="window._toggleSoundPanel()">
         <span style="font-family:'Cinzel';font-size:0.85rem;color:var(--gold);letter-spacing:1px">🎵 AMBIANCE SONORE — Syrinscape</span>
@@ -9030,12 +9027,18 @@ nav button:last-child { color:#884444; }
         }).catch(() => {});
       }
 
-      // ── Initialisation Syrinscape Player ─────────
-      function initPlayer() {
-        if (typeof syrinscape === 'undefined' || !syrinscape.player) {
-          setStatus('⚠ Syrinscape non chargé', '#e05050');
-          return;
-        }
+      // ── Chargement dynamique + init Syrinscape ───
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = src;
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('Impossible de charger ' + src));
+          document.head.appendChild(s);
+        });
+      }
+
+      function startSyrinscape() {
         syrinscape.player.init({
           async configure() {
             syrinscape.config.token = SYRIN_TOKEN;
@@ -9045,7 +9048,7 @@ nav button:last-child { color:#884444; }
             playerReady = true;
             document.getElementById('syrinActivateCta').style.display = 'none';
             document.getElementById('syrinInterface').style.display = 'block';
-            setStatus('Prêt', '#7ec87e');
+            setStatus('✅ Prêt', '#7ec87e');
           },
           onInactive() {
             playerReady = false;
@@ -9055,25 +9058,39 @@ nav button:last-child { color:#884444; }
       }
 
       // ── API PUBLIQUE ──────────────────────────────
-      window._syrinActivate = function() {
-        // Déclenche l'initialisation du player (nécessite un vrai clic utilisateur)
-        if (typeof syrinscape !== 'undefined' && syrinscape.player) {
-          initPlayer();
-        } else {
-          // Les scripts sont peut-être encore en chargement
-          setStatus('⏳ Chargement…', '#aaa');
-          setTimeout(() => {
-            if (typeof syrinscape !== 'undefined' && syrinscape.player) {
-              initPlayer();
-            } else {
-              setStatus('⚠ Impossible de charger Syrinscape (vérifier la connexion)', '#e05050');
-            }
-          }, 2000);
+      window._syrinActivate = async function() {
+        const btn = document.querySelector('#syrinActivateCta button');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Chargement…'; }
+        setStatus('⏳ Chargement des scripts…', '#aaa');
+
+        try {
+          // Charger les scripts Syrinscape si pas encore chargés
+          if (typeof window.syrinscape === 'undefined') {
+            await loadScript('https://syrinscape.com/integration.js');
+          }
+          if (typeof window.syrinscape === 'undefined' || !window.syrinscape.player) {
+            await loadScript('https://syrinscape.com/player.js');
+          }
+
+          // Petite pause pour laisser le temps aux scripts de s'initialiser
+          await new Promise(r => setTimeout(r, 300));
+
+          if (typeof window.syrinscape === 'undefined' || !window.syrinscape.player) {
+            throw new Error('Syrinscape player non disponible après chargement');
+          }
+
+          setStatus('⏳ Connexion à Syrinscape…', '#aaa');
+          startSyrinscape();
+
+        } catch(err) {
+          console.error('Syrinscape load error:', err);
+          setStatus('⚠ Erreur : ' + err.message, '#e05050');
+          if (btn) { btn.disabled = false; btn.textContent = '🔊 Réessayer'; }
         }
       };
 
       window._soundPlay = function() {
-        if (!playerReady) { setStatus('⚠ Cliquer sur "Activer" d'abord', '#e09050'); return; }
+        if (!playerReady) { setStatus('⚠ Cliquer sur "Activer" d\'abord', '#e09050'); return; }
         isPlaying = true;
         const theme = getTheme();
         const mood  = getMood();
