@@ -2676,7 +2676,7 @@ function renderCharSheet(id, d) {
  
       <!-- Compétences -->
       <div class="sheet-section">
-        <div class="section-title">Compétences <small style="color:#a89060;font-family:'Crimson Pro';letter-spacing:0">(clic pour maîtrise)</small></div>
+        <div class="section-title">Compétences <small style="color:var(--muted-gold);font-family:'Crimson Pro';letter-spacing:0">(clic pour maîtrise)</small></div>
         <div class="skill-list">
           ${SKILLS_LIST.map(sk=>{
             const prof = d.skillProficiencies?.[sk.name];
@@ -2841,7 +2841,7 @@ function renderCharSheet(id, d) {
 
         <!-- Emplacements de pacte (Occultiste) -->
         ${ss.pactSlots ? `
-        <div class="spell-slots-section" style="border-top:1px solid #e0d0b0">
+        <div class="spell-slots-section" style="border-top:1px solid var(--surface-alt)">
           <div class="combat-label" style="padding:4px 10px">Pacte (niv.${ss.pactSlots.level})</div>
           <div class="spell-slots-grid">
             <div class="spell-slot-box">
@@ -3715,7 +3715,7 @@ window._combatRender = () => {
     html += `<div class="${cls}">
       <div class="combat-init-cell" title="Bonus init: ${bonusStr}">
         <input type="number" value="${initVal}" placeholder="${bonusStr}" onchange="window._combatSetInit(${idx}, this.value)">
-        <button style="padding:1px 4px;font-size:0.65rem;margin-top:2px;cursor:pointer;border:1px solid #d4c4a0;background:#fff;border-radius:3px;display:block;width:50px" onclick="window._combatRollInit(${idx})" title="Lancer 1d20${bonusStr}">🎲</button>
+        <button style="padding:1px 4px;font-size:0.65rem;margin-top:2px;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:3px;display:block;width:50px" onclick="window._combatRollInit(${idx})" title="Lancer 1d20${bonusStr}">🎲</button>
       </div>
       <div class="combat-name-cell">
         ${isActive?'▶ ':''}${c.name}
@@ -3733,7 +3733,7 @@ window._combatRender = () => {
       <button class="btn-remove" onclick="window._combatRemoveCombatant(${idx})" title="Retirer">✕</button>
     </div>`;
   });
-  html += `<div style="padding:8px 14px;display:flex;gap:8px;background:#f9f4ea;border-top:1px solid #d4c4a0;align-items:center">
+  html += `<div style="padding:8px 14px;display:flex;gap:8px;background:var(--surface-soft);border-top:1px solid var(--line);align-items:center">
     <button class="btn-gm-action" onclick="window._combatRollAllInit()">🎲 Lancer init. manquantes & trier</button>
     <span style="margin-left:auto;font-size:0.78rem;color:#666">${cs.combatants.length} combattant(s)</span>
   </div>`;
@@ -7562,7 +7562,7 @@ window._editorSearch = () => {
     const descPreview = hasDesc ? r.desc.substring(0, 80) + '…' : '— pas de description —';
     return `<div class="comp-card editor-list-item" data-docid="${r._docId}"
         onclick="window._editorOpen('${r._docId}')"
-        style="cursor:pointer;border-left:3px solid ${hasDesc ? '#4caf50' : '#e0c880'}">
+        style="cursor:pointer;border-left:3px solid ${hasDesc ? '#4caf50' : 'var(--line-gold)'}">
       <div class="comp-card-main" style="pointer-events:none">
         <div class="comp-card-name">${r.name||'?'}</div>
         <div class="comp-card-sub" style="color:${hasDesc ? '#888' : '#e67e22'}">${descPreview}</div>
@@ -8240,6 +8240,7 @@ window._saveNewResource = async (catId) => {
 </script>
  
 <style>
+/* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
   --parch: #f4ece1;
   --parch2: #ede0c8;
@@ -8252,6 +8253,122 @@ window._saveNewResource = async (catId) => {
   --bg2: #231508;
   --border: rgba(184,134,11,0.3);
   --shadow: 0 4px 20px rgba(0,0,0,0.4);
+  --surface: #f0e8d8;
+  --surface-soft: #f9f4ea;
+  --surface-alt: #e0d0b0;
+  --surface-hi: #fff8ee;
+  --line: #d4c4a0;
+  --line-gold: #e0c880;
+  --muted-gold: #a89060;
+  --brown: #3d2010;
+  --brown-dark: #2a1a0a;
+}
+
+/* ===== Thèmes sélectionnables par le joueur (teintes uniquement) ===== */
+html[data-theme="sylvestre"] {
+  --parch: #e9efe3;
+  --parch2: #dde7d3;
+  --ink: #1b2a1c;
+  --gold: #5e8c3a;
+  --gold-light: #7faa4c;
+  --red: #7a3520;
+  --red-light: #9a4a2e;
+  --bg: #0c1610;
+  --bg2: #122016;
+  --border: rgba(94,140,58,0.30);
+  --surface: #e4ecdc;
+  --surface-soft: #eef3e9;
+  --surface-alt: #d2ddc6;
+  --surface-hi: #f3f8ef;
+  --line: #bccbae;
+  --line-gold: #c2d2a0;
+  --muted-gold: #8a9a6a;
+  --brown: #1f3a24;
+  --brown-dark: #15281a;
+}
+html[data-theme="arcane"] {
+  --parch: #ece6f2;
+  --parch2: #e1d8ec;
+  --ink: #271c30;
+  --gold: #8b5fc0;
+  --gold-light: #a87fd6;
+  --red: #8b2f6b;
+  --red-light: #a8487f;
+  --bg: #120b1a;
+  --bg2: #1a1024;
+  --border: rgba(139,95,192,0.32);
+  --surface: #e8e0f0;
+  --surface-soft: #f1ecf6;
+  --surface-alt: #d8cce4;
+  --surface-hi: #f6f2fb;
+  --line: #c9bcd6;
+  --line-gold: #cdbce0;
+  --muted-gold: #9a8aaa;
+  --brown: #3a2452;
+  --brown-dark: #2a1a3c;
+}
+html[data-theme="saphir"] {
+  --parch: #e7edf3;
+  --parch2: #dae3ee;
+  --ink: #18222e;
+  --gold: #3f7db0;
+  --gold-light: #5f9bd0;
+  --red: #8b3a3a;
+  --red-light: #a85050;
+  --bg: #0a1018;
+  --bg2: #0f1824;
+  --border: rgba(63,125,176,0.32);
+  --surface: #e4ebf2;
+  --surface-soft: #eef3f8;
+  --surface-alt: #d2dde8;
+  --surface-hi: #f3f7fb;
+  --line: #bcc8d6;
+  --line-gold: #bcccdc;
+  --muted-gold: #8a9aaa;
+  --brown: #1f3a52;
+  --brown-dark: #16293c;
+}
+html[data-theme="cendre"] {
+  --parch: #efe9e3;
+  --parch2: #e4dcd2;
+  --ink: #241c16;
+  --gold: #a8743a;
+  --gold-light: #c8924c;
+  --red: #a01828;
+  --red-light: #c0303f;
+  --bg: #141210;
+  --bg2: #1c1714;
+  --border: rgba(160,24,40,0.30);
+  --surface: #ebe4dc;
+  --surface-soft: #f3eee8;
+  --surface-alt: #ddd2c6;
+  --surface-hi: #f7f2ec;
+  --line: #cabfb2;
+  --line-gold: #d0bf9a;
+  --muted-gold: #a08a6a;
+  --brown: #3a241c;
+  --brown-dark: #281a14;
+}
+html[data-theme="givre"] {
+  --parch: #e7eef2;
+  --parch2: #d8e6ec;
+  --ink: #14222a;
+  --gold: #2f9bb0;
+  --gold-light: #4fbdd0;
+  --red: #a83a4a;
+  --red-light: #c4505f;
+  --bg: #08161a;
+  --bg2: #0e2026;
+  --border: rgba(47,155,176,0.32);
+  --surface: #e2edf1;
+  --surface-soft: #eef5f8;
+  --surface-alt: #cfe0e6;
+  --surface-hi: #f2f9fb;
+  --line: #bcd2da;
+  --line-gold: #bcd6dc;
+  --muted-gold: #7a9aa6;
+  --brown: #1f4a52;
+  --brown-dark: #163a40;
 }
  
 * { box-sizing: border-box; margin:0; padding:0; }
@@ -8275,7 +8392,7 @@ textarea { resize:vertical; }
 #appScreen { min-height:100vh; }
 nav { background: var(--bg2); padding:0 20px; display:flex; justify-content:center; gap:4px; position:sticky; top:0; z-index:100;
   border-bottom: 2px solid var(--gold); box-shadow:0 2px 12px rgba(0,0,0,0.5); }
-nav button { background:transparent; color:#a89060; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem;
+nav button { background:transparent; color:var(--muted-gold); border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem;
   padding:14px 18px; letter-spacing:2px; transition:all 0.2s; border-bottom:3px solid transparent; }
 nav button:hover { color:var(--gold-light); }
 nav button.nav-active { color:var(--gold); border-bottom:3px solid var(--gold); }
@@ -8306,7 +8423,7 @@ nav button:last-child { color:#884444; }
 .btn-rest-long:hover { background:linear-gradient(135deg, #5050a0, #3a3a8e); transform:translateY(-1px); }
 
 /* Cast dialog */
-.cast-section { margin-top:14px; padding:12px; background:#fff8ee; border:1px solid #e0c880; border-radius:4px; }
+.cast-section { margin-top:14px; padding:12px; background:var(--surface-hi); border:1px solid var(--line-gold); border-radius:4px; }
 .cast-header { font-family:'Cinzel'; font-size:0.78rem; color:var(--gold); letter-spacing:1px; margin-bottom:10px; }
 .cast-slots { display:flex; flex-wrap:wrap; gap:8px; }
 .cast-slot-btn { background:#fff; border:2px solid var(--gold); border-radius:4px; padding:8px 12px; cursor:pointer;
@@ -8324,7 +8441,7 @@ nav button:last-child { color:#884444; }
 
 /* Rest hit dice */
 .rest-hd-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0;
-  border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
+  border-bottom:1px solid var(--surface); font-size:0.88rem; }
 
 /* ── CONDITIONS ── */
 .conditions-grid-sheet { display:flex; flex-wrap:wrap; gap:4px; margin-top:10px; padding:0 2px; }
@@ -8341,7 +8458,7 @@ nav button:last-child { color:#884444; }
   font-size:0.82rem; border-top:1px solid rgba(155,89,182,0.3); display:flex; align-items:center; }
 
 /* GM conditions */
-.gm-conditions { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; align-items:center; background:#f9f4ea; border-top:1px solid #e0d0b0; }
+.gm-conditions { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; align-items:center; background:var(--surface-soft); border-top:1px solid var(--surface-alt); }
 .cond-badge { width:26px; height:26px; border-radius:50%; border:2px solid var(--gold); display:inline-flex;
   align-items:center; justify-content:center; font-size:0.8rem; cursor:pointer; transition:all 0.15s;
   background:rgba(184,134,11,0.15); }
@@ -8363,34 +8480,34 @@ nav button:last-child { color:#884444; }
 .charge-bar-fill { height:100%; border-radius:2px; transition:width 0.3s; }
 
 /* GM card charges */
-.gm-charges-row { display:flex; flex-wrap:wrap; gap:4px; padding:5px 14px; background:#f0e8d8; border-top:1px solid #e0d0b0; }
+.gm-charges-row { display:flex; flex-wrap:wrap; gap:4px; padding:5px 14px; background:var(--surface); border-top:1px solid var(--surface-alt); }
 .gm-class-cond { background:var(--gold); color:#fff; font-size:0.68rem; padding:2px 8px; border-radius:10px;
   font-family:'Cinzel'; letter-spacing:0.5px; }
-.gm-charge { background:#fff; border:1px solid #d4c4a0; border-radius:3px; padding:2px 6px; font-size:0.72rem; }
+.gm-charge { background:#fff; border:1px solid var(--line); border-radius:3px; padding:2px 6px; font-size:0.72rem; }
 .gm-charge-empty { background:#ffebee; border-color:#f44336; color:#f44336; }
-.gm-spellslots { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; background:#f0e8d8; }
-.gm-slot { background:#fff; border:1px solid #d4c4a0; border-radius:3px; padding:2px 6px; font-size:0.7rem; font-family:'Cinzel'; color:var(--ink); }
+.gm-spellslots { display:flex; flex-wrap:wrap; gap:4px; padding:6px 14px; background:var(--surface); }
+.gm-slot { background:#fff; border:1px solid var(--line); border-radius:3px; padding:2px 6px; font-size:0.7rem; font-family:'Cinzel'; color:var(--ink); }
 .gm-slot-pact { border-color:#9b59b6; color:#9b59b6; }
 
 /* Condition picker (GM popup) */
 .cond-picker-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
-.cond-picker-item { display:flex; align-items:center; gap:8px; padding:8px 10px; background:#fff; border:1px solid #d4c4a0;
+.cond-picker-item { display:flex; align-items:center; gap:8px; padding:8px 10px; background:#fff; border:1px solid var(--line);
   border-radius:3px; cursor:pointer; transition:all 0.15s; }
 .cond-picker-item:hover { border-color:var(--gold); }
-.cond-picker-active { background:#fff8ee; border-color:var(--gold); border-width:2px; }
+.cond-picker-active { background:var(--surface-hi); border-color:var(--gold); border-width:2px; }
 .cond-picker-icon { font-size:1.2rem; }
 .cond-picker-name { font-size:0.82rem; }
 
 /* Concentration roll result — removed, using simple maintain/lose dialog */
 
 /* ── LEVEL UP DETAILS ── */
-.lvlup-section { background:#fff; border:1px solid #d4c4a0; border-radius:4px; margin:12px 0; overflow:hidden; }
-.lvlup-header { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
+.lvlup-section { background:#fff; border:1px solid var(--line); border-radius:4px; margin:12px 0; overflow:hidden; }
+.lvlup-header { background:linear-gradient(90deg, var(--ink), var(--brown)); color:var(--gold); font-family:'Cinzel';
   font-size:0.72rem; letter-spacing:1.5px; padding:7px 12px; }
 .lvlup-body { padding:10px 14px; }
-.lvlup-row { display:flex; justify-content:space-between; padding:4px 0; font-size:0.88rem; border-bottom:1px solid #f0e8d8; }
+.lvlup-row { display:flex; justify-content:space-between; padding:4px 0; font-size:0.88rem; border-bottom:1px solid var(--surface); }
 .lvlup-row:last-child { border-bottom:none; }
-.lvlup-feature { margin:6px 0; padding:6px 10px; background:#fff8ee; border-left:3px solid var(--gold); border-radius:2px; }
+.lvlup-feature { margin:6px 0; padding:6px 10px; background:var(--surface-hi); border-left:3px solid var(--gold); border-radius:2px; }
 .lvlup-feature strong { color:var(--ink); font-size:0.88rem; }
 .lvlup-feature-desc { font-size:0.82rem; color:#555; margin-top:2px; line-height:1.4; }
 .lvlup-select { width:100%; }
@@ -8398,7 +8515,7 @@ nav button:last-child { color:#884444; }
 /* ── LIST TAB ── */
 #tab-list { background:var(--parch); min-height:100vh; padding:30px 20px; max-width:700px; margin:auto; }
 #tab-list h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:20px; letter-spacing:3px; }
-.char-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); margin:10px 0;
+.char-card { background:#fff; border:1px solid var(--line); border-left:4px solid var(--gold); margin:10px 0;
   border-radius:3px; overflow:hidden; transition:box-shadow 0.2s; }
 .char-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.15); }
 .char-card-main { padding:15px 18px; cursor:pointer; }
@@ -8406,7 +8523,7 @@ nav button:last-child { color:#884444; }
 .char-card-name { font-family:'Cinzel'; font-size:1.05rem; color:var(--ink); }
 .char-card-info { color:#666; font-size:0.88rem; margin:3px 0; }
 .char-card-stats { color:#888; font-size:0.82rem; }
-.char-card-id { padding:8px 18px; background:#f9f4ea; border-top:1px solid #e8d8b8; display:flex; align-items:center; justify-content:space-between; }
+.char-card-id { padding:8px 18px; background:var(--surface-soft); border-top:1px solid #e8d8b8; display:flex; align-items:center; justify-content:space-between; }
 .char-card-id small { color:#999; font-size:0.72rem; font-family:monospace; }
  
 /* ── WIZARD ── */
@@ -8428,7 +8545,7 @@ nav button:last-child { color:#884444; }
 .field-group { margin:12px 0; }
 .field-group label { display:block; font-size:0.78rem; font-family:'Cinzel'; letter-spacing:1px; color:#666; margin-bottom:4px; }
 .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.info-box { background:#fff8ee; border:1px solid #e0c880; padding:10px 14px; border-radius:3px; font-size:0.82rem;
+.info-box { background:var(--surface-hi); border:1px solid var(--line-gold); padding:10px 14px; border-radius:3px; font-size:0.82rem;
   line-height:1.6; color:#555; }
 .pb-header { margin:8px 0; color:var(--gold); font-family:'Cinzel'; font-size:0.82rem; }
 .pb-grid { display:flex; flex-direction:column; gap:6px; }
@@ -8441,24 +8558,24 @@ nav button:last-child { color:#884444; }
 .pb-mod { color:#888; font-size:0.82rem; }
 .skill-check-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; }
 .skill-check { display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer; padding:3px; border-radius:2px; }
-.skill-check:hover { background:#f0e8d8; }
+.skill-check:hover { background:var(--surface); }
 .skill-check input { width:auto; }
 .summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-.summary-section { background:#fff8ee; border:1px solid #e0c880; padding:12px; border-radius:3px; }
+.summary-section { background:var(--surface-hi); border:1px solid var(--line-gold); padding:12px; border-radius:3px; }
 .summary-section h4 { font-family:'Cinzel'; font-size:0.78rem; color:var(--gold); margin-bottom:8px; }
 .summary-section p { font-size:0.85rem; margin:3px 0; }
 .stat-mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-.stat-mini { background:white; border:1px solid #d4c4a0; border-radius:3px; padding:4px; text-align:center; }
+.stat-mini { background:white; border:1px solid var(--line); border-radius:3px; padding:4px; text-align:center; }
 .stat-mini-name { font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); display:block; }
 .stat-mini-val { font-size:1rem; font-weight:600; display:block; }
 .stat-mini-mod { font-size:0.78rem; color:#666; display:block; }
-.forge-footer { padding:14px 24px; background:#f0e8d8; border-top:1px solid #d4c4a0; display:flex; justify-content:space-between; align-items:center; }
+.forge-footer { padding:14px 24px; background:var(--surface); border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
 .btn-prev { background:transparent; border:1px solid #aaa; color:#666; padding:10px 20px; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem; border-radius:3px; }
 .btn-prev:hover { border-color:var(--ink); color:var(--ink); }
  
 /* ── CHARACTER SHEET ── */
 #tab-sheet { background:var(--parch); min-height:100vh; }
-.sheet-header { background:linear-gradient(135deg, var(--ink) 0%, #3d2010 100%); padding:18px 24px; border-bottom:3px solid var(--gold); }
+.sheet-header { background:linear-gradient(135deg, var(--ink) 0%, var(--brown) 100%); padding:18px 24px; border-bottom:3px solid var(--gold); }
 .sheet-header-top { display:flex; align-items:center; gap:16px; }
 .sheet-avatar-wrap { position:relative; cursor:pointer; flex-shrink:0; }
 .sheet-avatar { width:72px; height:72px; border-radius:50%; border:3px solid var(--gold); object-fit:cover; display:block; transition:opacity 0.2s; }
@@ -8473,9 +8590,9 @@ nav button:last-child { color:#884444; }
 .combat-box { background:rgba(255,255,255,0.08); border:1px solid rgba(184,134,11,0.4); border-radius:4px;
   padding:6px 12px; text-align:center; min-width:70px; }
 .combat-box.inspired { background:rgba(184,134,11,0.2); }
-.combat-label { font-size:0.6rem; font-family:'Cinzel'; color:#a89060; letter-spacing:1px; display:block; }
+.combat-label { font-size:0.6rem; font-family:'Cinzel'; color:var(--muted-gold); letter-spacing:1px; display:block; }
 .combat-val { font-size:1.3rem; color:#fff; font-weight:600; cursor:pointer; }
-.combat-sub { font-size:0.78rem; color:#a89060; }
+.combat-sub { font-size:0.78rem; color:var(--muted-gold); }
 .sheet-hp-delta { display:flex; gap:3px; justify-content:center; margin-top:6px; }
 .sheet-hp-delta-input { width:42px !important; padding:3px 4px !important; margin:0 !important; font-size:0.78rem !important; text-align:center; background:rgba(255,255,255,0.95) !important; color:var(--ink) !important; border:1px solid rgba(184,134,11,0.5) !important; border-radius:3px !important; }
 .sheet-hp-delta-btn { width:24px; height:24px; padding:0; font-size:0.95rem; font-weight:700; cursor:pointer; border:1px solid rgba(184,134,11,0.5); border-radius:3px; background:rgba(255,255,255,0.92); color:var(--ink); line-height:1; }
@@ -8484,10 +8601,10 @@ nav button:last-child { color:#884444; }
 .sheet-hp-delta-btn:hover { filter:brightness(1.1); }
  
 .sheet-body { display:grid; grid-template-columns:300px 1fr 390px; gap:0; align-items:start; }
-.sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid #d4c4a0; }
+.sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid var(--line); }
 .sheet-col-right { border-right:none; }
 .sheet-section { margin-bottom:14px; background:#fff; border:1px solid #ddd; border-radius:3px; overflow:hidden; }
-.section-title { background:linear-gradient(90deg, var(--ink), #3d2010); color:var(--gold); font-family:'Cinzel';
+.section-title { background:linear-gradient(90deg, var(--ink), var(--brown)); color:var(--gold); font-family:'Cinzel';
   font-size:0.65rem; letter-spacing:2px; padding:5px 10px; }
 .stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#eee; padding:1px; }
 .stat-box { background:#fff; padding:8px 4px; text-align:center; min-width:0; }
@@ -8502,7 +8619,7 @@ nav button:last-child { color:#884444; }
 .save-name, .skill-name { color:#444; }
 .skill-name small { color:#999; }
 .passive-row { display:flex; justify-content:space-between; padding:5px 10px; font-size:0.85rem; }
-.passive-row:not(:last-child) { border-bottom:1px solid #f0e8d8; }
+.passive-row:not(:last-child) { border-bottom:1px solid var(--surface); }
  
 .hd-row { display:flex; gap:16px; padding:10px; }
 .death-saves { font-size:0.82rem; }
@@ -8514,20 +8631,20 @@ nav button:last-child { color:#884444; }
 .weapon-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
 .weapon-table th { background:var(--ink); color:var(--gold); font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; padding:5px 8px; }
 .weapon-table th:last-child { width:30px; }
-.weapon-table td { padding:6px 8px; border-bottom:1px solid #f0e8d8; }
+.weapon-table td { padding:6px 8px; border-bottom:1px solid var(--surface); }
 .weapon-table td:hover { background:#fffbf0; }
 .weapon-row-click { cursor:pointer; transition:background 0.15s; }
-.weapon-row-click:hover { background:#fff8ee !important; }
+.weapon-row-click:hover { background:var(--surface-hi) !important; }
  
 .coin-row { display:flex; gap:4px; padding:8px; }
-.coin-box { flex:1; background:#fff8ee; border:1px solid #e0c880; border-radius:3px; text-align:center; padding:6px 2px; }
+.coin-box { flex:1; background:var(--surface-hi); border:1px solid var(--line-gold); border-radius:3px; text-align:center; padding:6px 2px; }
 .coin-label { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); display:block; }
 .coin-val { font-size:0.95rem; font-weight:600; cursor:pointer; }
  
 .spell-stats { display:flex; gap:8px; padding:8px; }
 .spell-stat-box { flex:1; text-align:center; }
 .spell-slots { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:0 8px 8px; font-size:0.8rem; }
-.spell-level { background:#f9f4ea; border:1px solid #e0d0b0; border-radius:2px; padding:3px 5px; }
+.spell-level { background:var(--surface-soft); border:1px solid var(--surface-alt); border-radius:2px; padding:3px 5px; }
 .spell-lvl-num { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); display:block; }
  
 .rp-block { padding:6px 10px; }
@@ -8535,7 +8652,7 @@ nav button:last-child { color:#884444; }
 .features-list { padding:6px 10px; max-height:260px; overflow-y:auto; }
 .feature-item { font-size:0.82rem; margin:4px 0; color:#444; line-height:1.4; }
 .info-grid { padding:6px 10px; }
-.info-row { display:flex; justify-content:space-between; font-size:0.82rem; padding:3px 0; border-bottom:1px solid #f0e8d8; }
+.info-row { display:flex; justify-content:space-between; font-size:0.82rem; padding:3px 0; border-bottom:1px solid var(--surface); }
  
 /* Inline edit */
 .editable { cursor:pointer; border-radius:2px; transition:background 0.15s; }
@@ -8547,61 +8664,61 @@ nav button:last-child { color:#884444; }
 #tab-gm { background:var(--bg); min-height:100vh; padding:20px; }
 #tab-gm h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.3rem; margin-bottom:16px; letter-spacing:3px; }
 .gm-search { display:flex; gap:8px; margin-bottom:20px; }
-.gm-search input { background:#2a1a0a; border-color:#555; color:#ddd; max-width:420px; }
+.gm-search input { background:var(--brown-dark); border-color:#555; color:#ddd; max-width:420px; }
 
 /* Combat tracker */
 .combat-panel { background:var(--parch); border:1px solid var(--gold); border-radius:4px; margin-bottom:20px; overflow:hidden; }
-.combat-header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(135deg,var(--ink),#3d2010); color:var(--gold); flex-wrap:wrap; }
+.combat-header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(135deg,var(--ink),var(--brown)); color:var(--gold); flex-wrap:wrap; }
 .combat-title { font-family:'Cinzel'; font-size:1rem; font-weight:700; }
 .combat-round { background:var(--gold); color:var(--ink); padding:3px 10px; border-radius:10px; font-family:'Cinzel'; font-size:0.78rem; font-weight:700; }
 .combat-header-actions { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
 .combat-body { padding:6px 0; }
-.combat-row { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid #e0d0b0; font-family:'Crimson Pro'; font-size:0.85rem; }
+.combat-row { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid var(--surface-alt); font-family:'Crimson Pro'; font-size:0.85rem; }
 .combat-row.combat-active { background:#fff3d6; border-left:4px solid var(--gold); }
 .combat-row.combat-pc { background:#eaf4ea; }
 .combat-row.combat-pc.combat-active { background:#dfeed6; }
 .combat-row.combat-dead { opacity:0.45; text-decoration:line-through; }
-.combat-init-cell input { width:50px; padding:4px 6px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; font-family:'Cinzel'; font-weight:700; }
+.combat-init-cell input { width:50px; padding:4px 6px; border:1px solid var(--line); border-radius:3px; text-align:center; font-family:'Cinzel'; font-weight:700; }
 .combat-name-cell { font-weight:600; }
 .combat-name-cell .combat-type { display:block; font-size:0.7rem; color:#888; font-weight:400; font-style:italic; }
-.combat-hp-cell input { width:55px; padding:3px 5px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; }
+.combat-hp-cell input { width:55px; padding:3px 5px; border:1px solid var(--line); border-radius:3px; text-align:center; }
 .combat-hp-cell { display:flex; gap:3px; align-items:center; }
 .combat-ac-cell { text-align:center; color:#666; font-size:0.78rem; }
 .combat-mod-cell { display:flex; gap:3px; }
-.combat-mod-cell input { width:45px; padding:3px 4px; border:1px solid #d4c4a0; border-radius:3px; text-align:center; font-size:0.78rem; }
-.combat-mod-cell button { padding:2px 5px; font-size:0.7rem; cursor:pointer; border:1px solid #d4c4a0; background:#fff; border-radius:3px; }
+.combat-mod-cell input { width:45px; padding:3px 4px; border:1px solid var(--line); border-radius:3px; text-align:center; font-size:0.78rem; }
+.combat-mod-cell button { padding:2px 5px; font-size:0.7rem; cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:3px; }
 .combat-mod-cell button:hover { background:var(--gold); color:#fff; }
 .combat-row .btn-remove { padding:2px 6px; font-size:0.78rem; }
-.combat-headers { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; padding:6px 14px; background:#f0e8d8; font-family:'Cinzel'; font-size:0.7rem; color:var(--ink); font-weight:700; text-transform:uppercase; border-bottom:1px solid #d4c4a0; }
+.combat-headers { display:grid; grid-template-columns:60px 1fr 90px 90px 90px 30px; gap:8px; padding:6px 14px; background:var(--surface); font-family:'Cinzel'; font-size:0.7rem; color:var(--ink); font-weight:700; text-transform:uppercase; border-bottom:1px solid var(--line); }
 .combat-monster-pick { display:flex; align-items:center; gap:12px; padding:8px 10px; border-bottom:1px solid #eee; cursor:pointer; }
-.combat-monster-pick:hover { background:#f9f4ea; }
+.combat-monster-pick:hover { background:var(--surface-soft); }
 .combat-monster-pick.selected { background:#fff3d6; }
 .combat-monster-pick input[type=checkbox] { width:18px !important; height:18px !important; min-width:18px !important; max-width:18px !important; flex:0 0 18px !important; margin:0 !important; padding:0 !important; box-sizing:border-box !important; appearance:auto !important; -webkit-appearance:checkbox !important; }
 .combat-monster-pick .mpinfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .combat-monster-pick .mname { font-family:'Cinzel'; font-size:0.9rem; color:var(--ink); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .combat-monster-pick .mmeta { font-family:'Crimson Pro'; font-size:0.78rem; color:#888; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.combat-monster-pick .mqty { width:55px !important; flex:0 0 55px !important; padding:5px !important; margin:0 !important; border:1px solid #d4c4a0; border-radius:3px; text-align:center; font-family:'Cinzel'; }
+.combat-monster-pick .mqty { width:55px !important; flex:0 0 55px !important; padding:5px !important; margin:0 !important; border:1px solid var(--line); border-radius:3px; text-align:center; font-family:'Cinzel'; }
 
 #gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
 .gm-card { background:var(--parch); border:1px solid var(--gold); border-radius:4px; overflow:hidden; }
-.gm-card-header { padding:12px 14px; background:linear-gradient(135deg, var(--ink), #3d2010);
+.gm-card-header { padding:12px 14px; background:linear-gradient(135deg, var(--ink), var(--brown));
   display:flex; justify-content:space-between; align-items:flex-start; }
 .gm-card-name { font-family:'Cinzel'; color:var(--gold); font-size:1rem; }
-.gm-card-sub { color:#a89060; font-size:0.78rem; margin-top:2px; }
+.gm-card-sub { color:var(--muted-gold); font-size:0.78rem; margin-top:2px; }
 .btn-remove { background:transparent; border:1px solid #884444; color:#cc4444; padding:3px 8px;
   cursor:pointer; border-radius:2px; font-size:0.75rem; }
 .gm-hp-bar-wrap { height:8px; background:#eee; }
 .gm-hp-bar { height:100%; transition:width 0.5s ease, background 0.5s; }
-.gm-stats-row { display:flex; gap:8px; padding:10px 14px; background:#f9f4ea; }
+.gm-stats-row { display:flex; gap:8px; padding:10px 14px; background:var(--surface-soft); }
 .gm-stat { flex:1; text-align:center; }
 .gm-stat-label { display:block; font-family:'Cinzel'; font-size:0.58rem; color:var(--gold); }
 .gm-stat-val { font-size:1rem; font-weight:700; }
 .gm-chars-row { display:flex; padding:8px 14px; gap:4px; }
-.gm-char { flex:1; text-align:center; background:#fff; border:1px solid #e0d0b0; border-radius:3px; padding:4px 2px; }
+.gm-char { flex:1; text-align:center; background:#fff; border:1px solid var(--surface-alt); border-radius:3px; padding:4px 2px; }
 .gm-char-lbl { font-family:'Cinzel'; font-size:0.55rem; color:var(--gold); display:block; }
 .gm-char-val { font-size:0.95rem; font-weight:600; }
 .gm-char-mod { font-size:0.72rem; color:#888; }
-.gm-ds-row { padding:6px 14px; font-size:0.82rem; display:flex; align-items:center; gap:4px; background:#f0e8d8; }
+.gm-ds-row { padding:6px 14px; font-size:0.82rem; display:flex; align-items:center; gap:4px; background:var(--surface); }
 .gm-ds { display:inline-flex; width:18px; height:18px; border-radius:50%; border:1px solid #ccc; align-items:center; justify-content:center; font-size:0.7rem; }
 .gm-ds.success { background:#4caf50; color:#fff; border-color:#4caf50; }
 .gm-ds.fail { background:#f44336; color:#fff; border-color:#f44336; }
@@ -8612,9 +8729,9 @@ nav button:last-child { color:#884444; }
 .btn-gm-action.heal { background:#3a7a3a; color:#fff; }
 .btn-gm-action.dmg { background:var(--red); color:#fff; }
 .btn-gm-action:not(.heal):not(.dmg) { background:var(--gold); color:#fff; }
-.gm-notes-section { border-top:1px solid #e0d0b0; }
+.gm-notes-section { border-top:1px solid var(--surface-alt); }
 .gm-notes-header { padding:8px 14px; cursor:pointer; font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; display:flex; justify-content:space-between; align-items:center; user-select:none; transition:background 0.15s; }
-.gm-notes-header:hover { background:#f0e8d8; }
+.gm-notes-header:hover { background:var(--surface); }
 .gm-notes-chevron { font-size:0.8rem; }
 .gm-notes-body { padding:4px 14px 10px; }
 .gm-notes-area { width:100%; margin-top:4px; min-height:60px; }
@@ -8625,7 +8742,7 @@ nav button:last-child { color:#884444; }
 /* ── SPELL SLOTS ── */
 .spell-slots-section { padding:4px 0; }
 .spell-slots-grid { display:flex; flex-wrap:wrap; gap:6px; padding:4px 10px; }
-.spell-slot-box { background:#fff8ee; border:1px solid #e0d0b0; border-radius:3px; padding:5px 8px; text-align:center; min-width:70px; }
+.spell-slot-box { background:var(--surface-hi); border:1px solid var(--surface-alt); border-radius:3px; padding:5px 8px; text-align:center; min-width:70px; }
 .spell-slot-lvl { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); }
 .spell-slot-dots { display:flex; gap:3px; justify-content:center; margin:4px 0; }
 .spell-slot-dot { width:14px; height:14px; border-radius:50%; border:2px solid var(--gold); cursor:pointer; transition:all 0.15s; background:transparent; }
@@ -8636,8 +8753,8 @@ nav button:last-child { color:#884444; }
 .spell-slot-dot.pact.used { background:#ccc; border-color:#aaa; }
 .spell-slot-count { font-size:0.7rem; color:#888; }
 .spell-known-list { }
-.spell-level-group { border-top:1px solid #f0e8d8; }
-.spell-level-header { background:#f9f4ea; padding:4px 10px; font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); letter-spacing:1px; }
+.spell-level-group { border-top:1px solid var(--surface); }
+.spell-level-header { background:var(--surface-soft); padding:4px 10px; font-family:'Cinzel'; font-size:0.65rem; color:var(--gold); letter-spacing:1px; }
 .spell-known-item { display:flex; align-items:center; padding:4px 10px; border-bottom:1px solid #f8f0e0; }
 .spell-known-item:hover { background:#fffbf4; }
 .spell-known-main { flex:1; cursor:pointer; }
@@ -8652,7 +8769,7 @@ nav button:last-child { color:#884444; }
   padding:1px 8px; font-family:'Cinzel'; font-size:0.55rem; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
 .section-add-btn:hover { background:var(--gold); color:#fff; }
 .inv-list { display:flex; flex-direction:column; gap:3px; }
-.inv-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:#fff8ee;
+.inv-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:var(--surface-hi);
   border-left:3px solid var(--gold); border-radius:2px; font-size:0.82rem; }
 .inv-item-main { flex:1; }
 .inv-remove-btn { background:transparent; border:1px solid #cc4444; color:#cc4444; width:20px; height:20px;
@@ -8676,7 +8793,7 @@ nav button:last-child { color:#884444; }
 .comp-container { max-width:800px; margin:auto; padding:24px 20px; }
 .comp-container h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.4rem; margin-bottom:16px; letter-spacing:3px; }
 .comp-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
-.comp-cat-btn { background:#fff; border:1px solid #d4c4a0; color:var(--ink); padding:8px 14px; cursor:pointer;
+.comp-cat-btn { background:#fff; border:1px solid var(--line); color:var(--ink); padding:8px 14px; cursor:pointer;
   font-family:'Cinzel'; font-size:0.7rem; letter-spacing:1px; border-radius:3px; transition:all 0.2s; }
 .comp-cat-btn:hover { border-color:var(--gold); color:var(--gold); }
 .comp-cat-btn.comp-cat-active { background:var(--ink); color:var(--gold); border-color:var(--gold); }
@@ -8684,33 +8801,33 @@ nav button:last-child { color:#884444; }
 .comp-toolbar input { flex:1; min-width:140px; }
 .comp-sort-wrap { display:flex; align-items:center; gap:4px; }
 .comp-sort-label { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); letter-spacing:1px; white-space:nowrap; }
-.comp-sort-select { padding:5px 8px; border:1px solid #d4c4a0; border-radius:3px; font-family:'Crimson Pro'; font-size:0.82rem; background:#fff; color:var(--ink); cursor:pointer; }
+.comp-sort-select { padding:5px 8px; border:1px solid var(--line); border-radius:3px; font-family:'Crimson Pro'; font-size:0.82rem; background:#fff; color:var(--ink); cursor:pointer; }
 .comp-list { display:flex; flex-direction:column; gap:6px; }
 
 /* ── SPELL FILTERS ── */
-.spell-filters-bar { background:#f9f4ea; border:1px solid #e0d0b0; border-radius:4px; padding:10px 14px; margin-bottom:14px; }
+.spell-filters-bar { background:var(--surface-soft); border:1px solid var(--surface-alt); border-radius:4px; padding:10px 14px; margin-bottom:14px; }
 .spell-filters-picker { margin-bottom:10px; }
 .spell-filter-section { margin-bottom:8px; }
 .spell-filter-section-sm { flex:1; min-width:120px; }
 .spell-filter-label { font-family:'Cinzel'; font-size:0.6rem; color:var(--gold); letter-spacing:1px; margin-bottom:4px; }
 .spell-filter-chips { display:flex; flex-wrap:wrap; gap:4px; }
-.spell-filter-chip { padding:3px 10px; border:1px solid #d4c4a0; border-radius:14px; background:#fff; color:#666;
+.spell-filter-chip { padding:3px 10px; border:1px solid var(--line); border-radius:14px; background:#fff; color:#666;
   font-family:'Crimson Pro'; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
 .spell-filter-chip:hover { border-color:var(--gold); color:var(--ink); }
 .spell-filter-chip.active { background:var(--gold); color:#fff; border-color:var(--gold); }
 .spell-filter-chip.spell-filter-clear { background:transparent; border-style:dashed; color:#999; font-size:0.72rem; }
 .spell-filter-chip.spell-filter-clear:hover { color:var(--red); border-color:var(--red); }
 .spell-filter-row { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
-.spell-filter-select { width:100%; padding:4px 8px; border:1px solid #d4c4a0; border-radius:3px; font-family:'Crimson Pro';
+.spell-filter-select { width:100%; padding:4px 8px; border:1px solid var(--line); border-radius:3px; font-family:'Crimson Pro';
   font-size:0.82rem; background:#fff; color:var(--ink); }
 .spell-filter-toggles { display:flex; gap:6px; flex-wrap:wrap; }
-.spell-filter-toggle { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border:1px solid #d4c4a0;
+.spell-filter-toggle { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border:1px solid var(--line);
   border-radius:14px; background:#fff; font-family:'Crimson Pro'; font-size:0.78rem; color:#666; cursor:pointer; transition:all 0.15s; }
 .spell-filter-toggle:hover { border-color:var(--gold); }
 .spell-filter-toggle.active { background:var(--ink); color:var(--gold); border-color:var(--ink); }
 .spell-filter-toggle input { display:none; }
 .spell-filter-count { font-family:'Cinzel'; font-size:0.65rem; color:#888; text-align:right; margin-top:6px; letter-spacing:1px; }
-.comp-card { background:#fff; border:1px solid #d4c4a0; border-left:4px solid var(--gold); border-radius:3px;
+.comp-card { background:#fff; border:1px solid var(--line); border-left:4px solid var(--gold); border-radius:3px;
   display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:box-shadow 0.2s; }
 .comp-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.12); }
 .comp-card-main { padding:12px 16px; flex:1; }
@@ -8722,13 +8839,13 @@ nav button:last-child { color:#884444; }
   font-family:'Cinzel'; letter-spacing:1px; vertical-align:middle; margin-left:6px; }
 .comp-detail { margin:12px 0; }
 .comp-detail-grid { display:flex; flex-direction:column; gap:1px; }
-.comp-detail-row { display:flex; justify-content:space-between; padding:7px 10px; background:#fff8ee;
-  border-bottom:1px solid #f0e8d8; font-size:0.88rem; }
+.comp-detail-row { display:flex; justify-content:space-between; padding:7px 10px; background:var(--surface-hi);
+  border-bottom:1px solid var(--surface); font-size:0.88rem; }
 .comp-detail-label { font-family:'Cinzel'; font-size:0.72rem; color:var(--gold); letter-spacing:1px; min-width:120px; }
 .comp-detail-val { color:var(--ink); text-align:right; flex:1; }
 
 /* ── Resource detail sheet (D&D style) ── */
-.rd-sheet { background:#fff; border:1px solid #d4c4a0; border-top:4px solid var(--red); border-radius:0 0 4px 4px; padding:20px 22px; margin-bottom:8px; }
+.rd-sheet { background:#fff; border:1px solid var(--line); border-top:4px solid var(--red); border-radius:0 0 4px 4px; padding:20px 22px; margin-bottom:8px; }
 .rd-title { font-family:'Cinzel'; font-size:1.5rem; font-weight:700; color:var(--red); line-height:1.2; margin-bottom:2px; }
 .rd-subtitle { font-family:'Crimson Pro'; font-style:italic; font-size:0.92rem; color:#666; margin-bottom:6px; }
 .rd-separator { height:2px; background:linear-gradient(90deg, var(--red), transparent); margin:10px 0; border:none; opacity:0.5; }
@@ -8748,16 +8865,16 @@ nav button:last-child { color:#884444; }
 .rd-stat-mod  { font-family:'Crimson Pro'; font-size:0.78rem; color:#666; }
 .rd-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; align-items:center; }
 .rd-tag { background:var(--red); color:#fff; font-family:'Crimson Pro'; font-size:0.78rem; padding:3px 12px; border-radius:3px; }
-.rd-source-tag { background:#f0e8d8; color:#888; font-family:'Crimson Pro'; font-size:0.75rem; font-style:italic; padding:3px 10px; border-radius:3px; border:1px solid #d4c4a0; }
+.rd-source-tag { background:var(--surface); color:#888; font-family:'Crimson Pro'; font-size:0.75rem; font-style:italic; padding:3px 10px; border-radius:3px; border:1px solid var(--line); }
 
 /* Familier */
-.familiar-card { background:#fdf8f0; border:1px solid #d4c4a0; border-radius:6px; padding:10px 12px; margin-top:4px; }
+.familiar-card { background:#fdf8f0; border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin-top:4px; }
 .familiar-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
 .familiar-name { font-family:'Cinzel'; font-size:0.95rem; font-weight:700; color:var(--red); }
 .familiar-sub { font-family:'Crimson Pro'; font-size:0.8rem; color:#888; margin-top:1px; }
 .familiar-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px; }
-.familiar-stat { background:#fff; border:1px solid #e0d0b0; border-radius:4px; padding:4px 6px; text-align:center; font-size:0.82rem; }
-.familiar-stat-label { display:block; font-family:'Cinzel'; font-size:0.62rem; color:#a89060; letter-spacing:0.5px; margin-bottom:2px; }
+.familiar-stat { background:#fff; border:1px solid var(--surface-alt); border-radius:4px; padding:4px 6px; text-align:center; font-size:0.82rem; }
+.familiar-stat-label { display:block; font-family:'Cinzel'; font-size:0.62rem; color:var(--muted-gold); letter-spacing:0.5px; margin-bottom:2px; }
 .familiar-detail { font-family:'Crimson Pro'; font-size:0.82rem; color:#444; margin-bottom:3px; }
 .familiar-detail-label { font-weight:700; color:var(--red); }
 .familiar-desc { font-family:'Crimson Pro'; font-size:0.82rem; color:#555; font-style:italic; margin-top:5px; line-height:1.5; }
@@ -8767,7 +8884,7 @@ nav button:last-child { color:#884444; }
 /* ── Éditeur de descriptions ── */
 .editor-list-item { transition:background 0.15s, outline 0.15s; border-radius:3px; }
 .editor-list-item:hover { background:#fffbf4 !important; }
-#editorPanel { background:#fff; border:1px solid #d4c4a0; border-radius:4px; padding:16px; }
+#editorPanel { background:#fff; border:1px solid var(--line); border-radius:4px; padding:16px; }
 #editorDesc:focus { outline:2px solid var(--gold); border-color:var(--gold); }
 
 /* Formes préparées */
@@ -8797,7 +8914,7 @@ nav button:last-child { color:#884444; }
 }
 @media(max-width:900px) {
   .sheet-body { grid-template-columns:1fr; }
-  .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid #d4c4a0; }
+  .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid var(--line); }
   .summary-grid { grid-template-columns:1fr; }
   .stats-grid { grid-template-columns:repeat(6,1fr); }
 }
@@ -8809,6 +8926,15 @@ nav button:last-child { color:#884444; }
   .stats-grid { grid-template-columns:repeat(3,1fr); }
 }
 </style>
+<script>
+  // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
+  (function(){
+    try {
+      var t = localStorage.getItem('kubbnd-theme');
+      if (t && t !== 'parchemin') document.documentElement.setAttribute('data-theme', t);
+    } catch(e) {}
+  })();
+</script>
 </head>
 <body>
  
@@ -8822,6 +8948,7 @@ nav button:last-child { color:#884444; }
     <input id="authPass" type="password" placeholder="Mot de passe">
     <button class="btn-gold" style="width:100%;margin-top:8px" onclick="window._doLogin()">SE CONNECTER</button>
     <button style="background:none;border:none;width:100%;color:#888;font-size:0.78rem;margin-top:10px;cursor:pointer;font-family:'Crimson Pro'" onclick="window._doSignup()">Pas encore de compte ? Créer un accès</button>
+    <button style="background:none;border:none;width:100%;color:var(--gold);font-size:0.74rem;margin-top:6px;cursor:pointer;font-family:'Crimson Pro'" onclick="window._openThemePicker()">🎨 Choisir un thème</button>
   </div>
 </div>
  
@@ -8833,6 +8960,7 @@ nav button:last-child { color:#884444; }
     <button id="navCompendium" onclick="_showTab('tab-compendium')">COMPENDIUM</button>
     <button id="navGM" onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
     <button id="navEditor" onclick="_showTab('tab-editor')">ÉDITEUR</button>
+    <button onclick="window._openThemePicker()" title="Changer le thème de couleurs">🎨 THÈME</button>
     <button onclick="_doLogout()">QUITTER</button>
   </nav>
  
@@ -8880,7 +9008,7 @@ nav button:last-child { color:#884444; }
     <!-- ══════════════════════════════════════════════════
          MODULE AMBIANCE SONORE — Syrinscape
     ══════════════════════════════════════════════════ -->
-    <div id="soundPanel" style="background:linear-gradient(135deg,#2a1a0a,#3d2010);border:1px solid var(--gold);border-radius:6px;margin-bottom:18px;overflow:hidden">
+    <div id="soundPanel" style="background:linear-gradient(135deg,var(--brown-dark),var(--brown));border:1px solid var(--gold);border-radius:6px;margin-bottom:18px;overflow:hidden">
       <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(212,180,120,0.3);cursor:pointer" onclick="window._toggleSoundPanel()">
         <span style="font-family:'Cinzel';font-size:0.85rem;color:var(--gold);letter-spacing:1px">🎵 AMBIANCE SONORE — Syrinscape</span>
         <div style="display:flex;align-items:center;gap:12px">
@@ -8915,7 +9043,7 @@ nav button:last-child { color:#884444; }
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
             <div style="flex:1;min-width:140px">
               <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:5px">THÈME</label>
-              <select id="soundTheme" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:#1a0f05;color:#e8dcc0">
+              <select id="soundTheme" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:var(--bg);color:#e8dcc0">
                 <option value="taverne">🍺 Taverne</option>
                 <option value="ville">🏰 Ville</option>
                 <option value="foret">🌲 Forêt</option>
@@ -8928,7 +9056,7 @@ nav button:last-child { color:#884444; }
             </div>
             <div style="flex:1;min-width:140px">
               <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:5px">AMBIANCE</label>
-              <select id="soundMood" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:#1a0f05;color:#e8dcc0">
+              <select id="soundMood" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:var(--bg);color:#e8dcc0">
                 <option value="normal">😐 Normale</option>
                 <option value="joyeux">😄 Joyeuse</option>
                 <option value="sombre">🌑 Sombre</option>
@@ -9276,15 +9404,15 @@ nav button:last-child { color:#884444; }
   <!-- Monster picker overlay for combat -->
   <div id="combatMonsterOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center">
     <div style="background:var(--parch);border:2px solid var(--gold);border-radius:6px;width:min(640px,92vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
-      <div style="padding:14px 18px;background:linear-gradient(135deg,var(--ink),#3d2010);color:var(--gold);font-family:'Cinzel';display:flex;justify-content:space-between;align-items:center">
+      <div style="padding:14px 18px;background:linear-gradient(135deg,var(--ink),var(--brown));color:var(--gold);font-family:'Cinzel';display:flex;justify-content:space-between;align-items:center">
         <span>Choisir des créatures</span>
         <button class="btn-remove" onclick="document.getElementById('combatMonsterOverlay').style.display='none'">✕</button>
       </div>
-      <div style="padding:12px 18px;border-bottom:1px solid #d4c4a0">
-        <input id="combatMonsterSearch" type="text" placeholder="Rechercher une créature..." oninput="window._combatRenderMonsterList()" style="width:100%;padding:8px;border:1px solid #d4c4a0;border-radius:3px;font-family:'Crimson Pro'">
+      <div style="padding:12px 18px;border-bottom:1px solid var(--line)">
+        <input id="combatMonsterSearch" type="text" placeholder="Rechercher une créature..." oninput="window._combatRenderMonsterList()" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;font-family:'Crimson Pro'">
       </div>
       <div id="combatMonsterList" style="flex:1;overflow-y:auto;padding:10px 18px"></div>
-      <div style="padding:10px 18px;border-top:1px solid #d4c4a0;display:flex;justify-content:space-between;align-items:center;background:#f9f4ea">
+      <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:var(--surface-soft)">
         <span id="combatMonsterSelCount" style="font-size:0.85rem;color:#666">0 sélection(s)</span>
         <button class="btn-gold" onclick="window._combatAddSelectedMonsters()">Ajouter au combat</button>
       </div>
@@ -9300,7 +9428,7 @@ nav button:last-child { color:#884444; }
 
       <!-- Catégorie + Recherche -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-        <select id="editorCat" onchange="window._editorChangeCat()" style="font-family:'Crimson Pro';font-size:0.9rem;padding:6px 10px;border:1px solid #d4c4a0;border-radius:3px;background:#fff">
+        <select id="editorCat" onchange="window._editorChangeCat()" style="font-family:'Crimson Pro';font-size:0.9rem;padding:6px 10px;border:1px solid var(--line);border-radius:3px;background:#fff">
           <option value="spell">Sorts</option>
           <option value="monster">Monstres</option>
           <option value="feat">Dons</option>
@@ -9311,7 +9439,7 @@ nav button:last-child { color:#884444; }
         </select>
         <input id="editorSearch" type="text" placeholder="Rechercher par nom…"
           oninput="window._editorSearch()"
-          style="flex:1;min-width:200px;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 10px;border:1px solid #d4c4a0;border-radius:3px">
+          style="flex:1;min-width:200px;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 10px;border:1px solid var(--line);border-radius:3px">
         <span id="editorCount" style="font-family:'Crimson Pro';font-size:0.82rem;color:#888"></span>
       </div>
 
@@ -9338,7 +9466,7 @@ nav button:last-child { color:#884444; }
             <span id="editorDescLen" style="margin-left:8px;color:#aaa;font-family:'Crimson Pro';font-size:0.75rem;letter-spacing:0"></span>
           </label>
           <textarea id="editorDesc" rows="10"
-            style="width:100%;font-family:'Crimson Pro';font-size:0.88rem;line-height:1.6;padding:10px;border:1px solid #d4c4a0;border-radius:3px;resize:vertical;box-sizing:border-box"
+            style="width:100%;font-family:'Crimson Pro';font-size:0.88rem;line-height:1.6;padding:10px;border:1px solid var(--line);border-radius:3px;resize:vertical;box-sizing:border-box"
             oninput="window._editorDescInput()"
             placeholder="Collez ou saisissez ici la description complète du sort…"></textarea>
         </div>
@@ -9351,7 +9479,7 @@ nav button:last-child { color:#884444; }
         </div>
 
         <!-- Diff visuel -->
-        <div id="editorDiff" style="display:none;margin-top:12px;padding:10px;background:#fff8ee;border:1px solid #e0c880;border-radius:3px;font-family:'Crimson Pro';font-size:0.8rem;color:#666">
+        <div id="editorDiff" style="display:none;margin-top:12px;padding:10px;background:var(--surface-hi);border:1px solid var(--line-gold);border-radius:3px;font-family:'Crimson Pro';font-size:0.8rem;color:#666">
           <strong style="color:var(--gold)">Description actuelle dans Firebase :</strong>
           <div id="editorOrigDesc" style="margin-top:6px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
         </div>
@@ -9377,5 +9505,72 @@ nav button:last-child { color:#884444; }
   </div>
 </div>
  
+<!-- SÉLECTEUR DE THÈME -->
+<div id="themeOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)window._closeThemePicker()">
+  <div style="background:var(--parch);border:2px solid var(--gold);border-radius:10px;width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)">
+    <div style="padding:14px 18px;background:linear-gradient(135deg,var(--ink),var(--brown));color:var(--gold);font-family:'Cinzel';display:flex;justify-content:space-between;align-items:center">
+      <span>🎨 Thème de couleurs</span>
+      <button onclick="window._closeThemePicker()" style="background:none;border:none;color:var(--gold);font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto">
+      <p style="font-family:'Crimson Pro';font-size:0.82rem;color:#888;margin:0 0 14px">Chaque joueur choisit son thème : il est mémorisé sur cet appareil.</p>
+      <div id="themeGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const THEMES = [
+    { key:'parchemin',   name:'Parchemin',     desc:'Le grimoire classique', dots:['#f4ece1','#b8860b','#8b0000','#1a0f05'] },
+    { key:'sylvestre',   name:'Sylvestre',     desc:'Forêt & émeraude',      dots:['#e9efe3','#5e8c3a','#7a3520','#0c1610'] },
+    { key:'arcane',      name:'Arcane',        desc:'Améthyste mystique',    dots:['#ece6f2','#8b5fc0','#8b2f6b','#120b1a'] },
+    { key:'saphir',      name:'Saphir',        desc:'Royal & argent',        dots:['#e7edf3','#3f7db0','#8b3a3a','#0a1018'] },
+    { key:'cendre',      name:'Sang & Cendre', desc:'Sombre fantasy',        dots:['#efe9e3','#a8743a','#a01828','#141210'] },
+    { key:'givre',       name:'Givre',         desc:'Glacial & cristal',     dots:['#e7eef2','#2f9bb0','#a83a4a','#08161a'] },
+  ];
+
+  function current(){
+    try { return localStorage.getItem('kubbnd-theme') || 'parchemin'; } catch(e){ return 'parchemin'; }
+  }
+
+  window._applyTheme = function(key){
+    if (!key || key === 'parchemin') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', key);
+    try { localStorage.setItem('kubbnd-theme', key); } catch(e){}
+    renderGrid();
+  };
+
+  function renderGrid(){
+    const grid = document.getElementById('themeGrid');
+    if (!grid) return;
+    const cur = current();
+    grid.innerHTML = THEMES.map(function(t){
+      const active = t.key === cur;
+      const dots = t.dots.map(function(c){
+        return '<span style="width:18px;height:18px;border-radius:50%;background:'+c+';border:1px solid rgba(0,0,0,0.25);display:inline-block"></span>';
+      }).join('');
+      return ''
+        + '<button onclick="window._applyTheme(\''+t.key+'\')" style="'
+        +   'text-align:left;cursor:pointer;border-radius:8px;padding:12px 14px;'
+        +   'border:2px solid '+(active?'var(--gold)':'var(--line)')+';'
+        +   'background:'+(active?'var(--surface-hi)':'var(--surface)')+';'
+        +   'box-shadow:'+(active?'0 0 0 3px rgba(184,134,11,0.18)':'none')+';'
+        +   'display:flex;flex-direction:column;gap:8px;transition:border-color .15s,background .15s">'
+        +   '<div style="display:flex;justify-content:space-between;align-items:center">'
+        +     '<span style="font-family:\'Cinzel\';font-weight:700;color:var(--ink);font-size:0.95rem">'+t.name+'</span>'
+        +     (active?'<span style="color:var(--gold);font-size:0.85rem">✓ Actif</span>':'')
+        +   '</div>'
+        +   '<div style="display:flex;gap:6px">'+dots+'</div>'
+        +   '<span style="font-family:\'Crimson Pro\';font-size:0.8rem;color:#888;font-style:italic">'+t.desc+'</span>'
+        + '</button>';
+    }).join('');
+  }
+
+  window._openThemePicker = function(){ renderGrid(); const ov=document.getElementById('themeOverlay'); if(ov) ov.style.display='flex'; };
+  window._closeThemePicker = function(){ const ov=document.getElementById('themeOverlay'); if(ov) ov.style.display='none'; };
+})();
+</script>
+
 </body>
 </html>
