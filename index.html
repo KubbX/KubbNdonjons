@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.40</title>
+<title>Grimoire — RPG Companion V1.42</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -1867,15 +1867,63 @@ function buildHitDiceStr(d) {
 // ============================================================
 // AUTH
 // ============================================================
-window._doLogin = () => {
-  const e = document.getElementById('authEmail').value;
-  const p = document.getElementById('authPass').value;
-  signInWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.message));
+// Traduit les codes d'erreur Firebase en messages clairs (FR)
+function mapAuthError(err) {
+  const code = (err && err.code) ? err.code : '';
+  const M = {
+    'auth/invalid-email':          "Adresse email invalide.",
+    'auth/missing-email':          "Merci de saisir une adresse email.",
+    'auth/missing-password':       "Merci de saisir un mot de passe.",
+    'auth/weak-password':          "Mot de passe trop court (6 caractères minimum).",
+    'auth/email-already-in-use':   "Un compte existe déjà avec cet email. Utilise plutôt « Se connecter ».",
+    'auth/invalid-credential':     "Email ou mot de passe incorrect.",
+    'auth/wrong-password':         "Mot de passe incorrect.",
+    'auth/user-not-found':         "Aucun compte trouvé avec cet email.",
+    'auth/user-disabled':          "Ce compte a été désactivé.",
+    'auth/too-many-requests':      "Trop de tentatives. Réessaie dans quelques minutes.",
+    'auth/network-request-failed': "Problème de réseau. Vérifie ta connexion.",
+    'auth/operation-not-allowed':  "Connexion email/mot de passe non activée dans Firebase (Console → Authentication → Sign-in method).",
+  };
+  return M[code] || (err && err.message ? err.message : "Erreur inconnue.");
+}
+
+window._doLogin = async () => {
+  const e = (document.getElementById('authEmail').value || '').trim();
+  const p = document.getElementById('authPass').value || '';
+  if (!e || !p) { showAuthError("Email et mot de passe requis."); return; }
+  try {
+    await signInWithEmailAndPassword(auth, e, p);
+  } catch (err) {
+    console.error('[Auth] login:', err);
+    showAuthError(mapAuthError(err));
+  }
 };
-window._doSignup = () => {
-  const e = document.getElementById('authEmail').value;
-  const p = document.getElementById('authPass').value;
-  createUserWithEmailAndPassword(auth, e, p).catch(err => showAuthError(err.message));
+window._doSignup = async () => {
+  const e = (document.getElementById('authEmail').value || '').trim();
+  const p = document.getElementById('authPass').value || '';
+  if (!e || !p) { showAuthError("Email et mot de passe requis."); return; }
+  if (p.length < 6) { showAuthError("Mot de passe trop court (6 caractères minimum)."); return; }
+  showAuthError("");
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, e, p);
+    // Profil utilisateur : non bloquant (le compte existe déjà côté Auth même
+    // si cette écriture échoue). Sert aussi de test d'écriture Firestore :
+    // un échec "permission-denied" ici = problème de RÈGLES DE SÉCURITÉ.
+    try {
+      await setDoc(doc(db, "users", cred.user.uid), {
+        email: e,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (wErr) {
+      console.error('[Firestore] écriture du profil refusée:', wErr);
+      if (wErr.code === 'permission-denied') {
+        showAuthError("Compte créé, mais Firestore refuse l'écriture : corrige les règles de sécurité (voir la console développeur).");
+      }
+    }
+  } catch (err) {
+    console.error('[Auth] signup:', err);
+    showAuthError(mapAuthError(err));
+  }
 };
 window._doLogout = () => {
   compendiumUnsubscribes.forEach(u => u());
@@ -1885,8 +1933,8 @@ window._doLogout = () => {
  
 function showAuthError(msg) {
   const el = document.getElementById('authError');
-  el.textContent = msg;
-  el.style.display = 'block';
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
 }
  
 onAuthStateChanged(auth, user => {
@@ -1897,6 +1945,7 @@ onAuthStateChanged(auth, user => {
     loadCharacterList();
     loadCompendium();
   } else {
+    currentUid = null;
     document.getElementById('authScreen').style.display = 'flex';
     document.getElementById('appScreen').style.display = 'none';
   }
@@ -2440,6 +2489,12 @@ async function loadCharacterList() {
         </div>`;
       list.appendChild(card);
     });
+  }, (err) => {
+    console.error('[Firestore] characters onSnapshot:', err);
+    const list = document.getElementById('charList');
+    if (list && err.code === 'permission-denied') {
+      list.innerHTML = '<p style="color:#e07070;text-align:center;margin-top:30px">Accès Firestore refusé pour ce compte.<br>Vérifie les règles de sécurité (voir la console développeur).</p>';
+    }
   });
 }
  
@@ -6153,7 +6208,15 @@ function makeDocId(name, isSystem) {
 // Seed : injecter les données de base dans Firestore si pas déjà fait
 async function seedCompendiumIfNeeded() {
   if (compendiumSeeded) return;
-  const snap = await getDoc(doc(db, "meta", "compendium_seeded_v3")).catch(() => null);
+  let snap;
+  try {
+    snap = await getDoc(doc(db, "meta", "compendium_seeded_v3"));
+  } catch (err) {
+    // Refus de permission : NE PAS tenter de re-semer (échec en boucle).
+    // On laisse remonter l'erreur pour pouvoir informer l'utilisateur.
+    console.error('[Firestore] lecture du marqueur de seed refusée:', err);
+    throw err;
+  }
   if (snap && snap.exists()) { compendiumSeeded = true; return; }
 
   // Seed toutes les catégories avec des documents nommés
@@ -6199,8 +6262,17 @@ function loadCompendium() {
         if (document.getElementById('tab-compendium')?.classList.contains('active')) {
           renderCompendiumList(window._currentCompCategory || 'armor');
         }
+      }, (err) => {
+        console.error('[Firestore] compendium onSnapshot (' + cat.id + '):', err);
       });
       compendiumUnsubscribes.push(unsub);
+    }
+  }).catch((err) => {
+    console.error('[Firestore] compendium indisponible:', err);
+    const catsEl = document.getElementById('compCats');
+    if (catsEl && err.code === 'permission-denied' && !document.getElementById('compErr')) {
+      catsEl.insertAdjacentHTML('afterend',
+        '<p id="compErr" style="color:#e07070;margin:14px 0">Compendium inaccessible : Firestore refuse la lecture pour ce compte. Vérifie les règles de sécurité.</p>');
     }
   });
 }
@@ -8819,9 +8891,20 @@ nav button:last-child { color:#884444; }
 
       <div id="soundPanelBody" style="padding:14px 16px">
 
+        <!-- Console Syrinscape — accès direct aux interfaces complètes -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button onclick="window._openNova()" class="btn-gold" style="flex:1;min-width:150px" title="Gérer l'ensemble des sons dans l'interface complète Nova">🚀 Ouvrir Syrinscape Nova</button>
+          <button onclick="window._openShareAudio()" class="btn-gm-action" style="flex:1;min-width:150px" title="Récupérer le lien « Share Audio » à donner aux joueurs">🔗 Partager l'audio</button>
+        </div>
+        <p style="font-family:'Crimson Pro';font-size:0.75rem;color:#9a8e72;margin:-4px 0 12px;line-height:1.45">
+          <strong style="color:#c9b88a">Nova</strong> s'ouvre dans un nouvel onglet (session Syrinscape) pour piloter <em>tous</em> les sons.
+          Les boutons rapides ci-dessous pilotent le même moteur audio via l'API.
+        </p>
+        <hr style="border:none;border-top:1px solid rgba(212,180,120,0.2);margin:0 0 12px">
+
         <!-- CTA activation (avant premier clic) -->
         <div id="syrinActivateCta" style="text-align:center;padding:6px 0 10px">
-          <button class="btn-gold" onclick="window._syrinActivate()" style="width:100%">🔊 Activer le lecteur audio</button>
+          <button class="btn-gold" onclick="window._syrinActivate()" style="width:100%">🔊 Activer les contrôles rapides</button>
           <p style="font-family:'Crimson Pro';font-size:0.78rem;color:#aaa;margin-top:6px;font-style:italic">Un clic suffit pour autoriser le son dans le navigateur</p>
         </div>
 
@@ -9142,6 +9225,17 @@ nav button:last-child { color:#884444; }
         if (!playerReady) return;
         const ids = SFX_MAP[key];
         if (ids) playElement(pickRandom(ids));
+      };
+
+      // ── Accès direct aux interfaces Syrinscape complètes ──
+      // Nova ne peut pas être encapsulé dans une iframe (moteur audio à
+      // isolation cross-origin + session de connexion), on ouvre donc un onglet.
+      window._openNova = function() {
+        window.open('https://nova.syrinscape.com/', 'syrinscape_nova');
+      };
+      window._openShareAudio = function() {
+        // app.syrinscape.com = Web Player : menu ☰ → « Share Audio » pour le lien joueurs
+        window.open('https://app.syrinscape.com/', 'syrinscape_app');
       };
 
       window._toggleSoundPanel = function() {
