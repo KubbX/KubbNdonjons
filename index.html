@@ -2515,6 +2515,20 @@ function mod(score) { return Math.floor((score - 10) / 2); }
 function fmtMod(score) { const m = mod(score); return (m>=0?'+':'')+m; }
 function profBonus(level) { return PROF_BONUS[(level||1)-1] || 2; }
  
+// Icône + couleur d'une app de sort selon son école de magie
+function spellMeta(school) {
+  const s = (school || '').toLowerCase();
+  if (s.includes('évoc') || s.includes('evoc'))            return { icon:'🔥', color:'#c0392b' };
+  if (s.includes('invoc') || s.includes('conjur'))         return { icon:'🌀', color:'#cb7a1c' };
+  if (s.includes('transmu'))                               return { icon:'⚗️', color:'#168f78' };
+  if (s.includes('abjur'))                                 return { icon:'🛡️', color:'#2e74b5' };
+  if (s.includes('enchant'))                               return { icon:'💗', color:'#c2569c' };
+  if (s.includes('nécro') || s.includes('necro'))          return { icon:'💀', color:'#5f7a43' };
+  if (s.includes('illus'))                                 return { icon:'🎭', color:'#8e44ad' };
+  if (s.includes('divin'))                                 return { icon:'🔮', color:'#2196a0' };
+  return { icon:'✨', color:'#b8860b' };
+}
+
 function renderCharSheet(id, d) {
   window._currentSheetData = d;
   // Cache caster classes for spell filter auto-apply
@@ -2735,6 +2749,75 @@ function renderCharSheet(id, d) {
         </div>
       </div>
  
+      <!-- Équipement porté (paper doll) -->
+      ${(()=>{
+        const armors = d.inventory_armors||[];
+        const weapons = d.inventory_weapons||[];
+        const items = d.inventory_items||[];
+        const isShield = a => (a.type||'').toLowerCase().includes('bouclier');
+        const bodyIdx = armors.findIndex(a=>a.equipped && !isShield(a));
+        const shieldIdx = armors.findIndex(a=>a.equipped && isShield(a));
+        const eqW = weapons.map((w,i)=>({w,i})).filter(x=>x.w.equipped);
+        const mainW = eqW[0], offW = eqW[1];
+        const findItem = key => items.findIndex(it=>it.slot===key);
+
+        // Emplacement d'accessoire (objet assignable)
+        const acc = (key,ic,lb) => {
+          const idx = findItem(key);
+          const filled = idx>=0;
+          return `<button class="pd-slot ${filled?'filled':'empty'}" title="${lb}" onclick="window._pdSlotClick('${id}','${key}')">
+            <span class="pd-ic">${ic}</span>
+            <span class="pd-tx"><span class="pd-lb">${lb}</span><span class="pd-it">${filled?items[idx].name:'—'}</span></span>
+          </button>`;
+        };
+        // Emplacement d'équipement (arme/armure : clic = détail)
+        const eq = (ic,lb,name,click,filled) => `
+          <button class="pd-slot ${filled?'filled':'empty'}" title="${lb}" ${click?`onclick="${click}"`:''} ${filled?'':'style="cursor:default"'}>
+            <span class="pd-ic">${ic}</span>
+            <span class="pd-tx"><span class="pd-lb">${lb}</span><span class="pd-it">${filled?name:'—'}</span></span>
+          </button>`;
+
+        const bodySlot = eq('🦺','Armure', bodyIdx>=0?armors[bodyIdx].name:'', bodyIdx>=0?`window._showSheetArmorDetail('${id}',${bodyIdx})`:'', bodyIdx>=0);
+        const mainSlot = eq('🗡️','Main droite', mainW?mainW.w.name:'', mainW?`window._showSheetWeaponDetail('${id}',${mainW.i})`:'', !!mainW);
+        let leftIc='🛡️', leftName='', leftClick='', leftFilled=false;
+        if (shieldIdx>=0) { leftName=armors[shieldIdx].name; leftClick=`window._showSheetArmorDetail('${id}',${shieldIdx})`; leftFilled=true; }
+        else if (offW) { leftIc='🗡️'; leftName=offW.w.name; leftClick=`window._showSheetWeaponDetail('${id}',${offW.i})`; leftFilled=true; }
+        const leftSlot = eq(leftIc, 'Main gauche', leftName, leftClick, leftFilled);
+
+        return `
+      <div class="sheet-section">
+        <div class="section-title">Équipement porté</div>
+        <div class="pd-wrap">
+          <div class="pd-col">
+            ${acc('tete','🪖','Tête')}
+            ${acc('cou','📿','Amulette')}
+            ${acc('cape','🧥','Cape')}
+            ${bodySlot}
+            ${acc('mains','🧤','Mains')}
+          </div>
+          <figure class="pd-figure">
+            <svg viewBox="0 0 100 200" class="pd-svg" aria-hidden="true">
+              <circle class="body" cx="50" cy="20" r="14"/>
+              <path class="body" d="M50 35 C40 35 33 38 33 46 L30 64 C29 70 24 92 22 108 L31 110 C34 96 37 82 38 76 L38 120 C38 140 36 168 34 186 L46 186 C47 168 49 150 50 140 C51 150 53 168 54 186 L66 186 C64 168 62 140 62 120 L62 76 C63 82 66 96 69 110 L78 108 C76 92 71 70 70 64 L67 46 C67 38 60 35 50 35 Z"/>
+              <circle class="outline" cx="50" cy="20" r="14"/>
+              <path class="outline" d="M50 35 C40 35 33 38 33 46 L30 64 C29 70 24 92 22 108 L31 110 C34 96 37 82 38 76 L38 120 C38 140 36 168 34 186 L46 186 C47 168 49 150 50 140 C51 150 53 168 54 186 L66 186 C64 168 62 140 62 120 L62 76 C63 82 66 96 69 110 L78 108 C76 92 71 70 70 64 L67 46 C67 38 60 35 50 35 Z"/>
+            </svg>
+          </figure>
+          <div class="pd-col">
+            ${acc('anneau1','💍','Anneau')}
+            ${acc('anneau2','💍','Anneau')}
+            ${acc('ceinture','🟫','Ceinture')}
+            ${acc('bottes','🥾','Bottes')}
+          </div>
+        </div>
+        <div class="pd-hands">
+          ${leftSlot}
+          ${mainSlot}
+        </div>
+        <div style="padding:0 10px 8px;font-size:0.72rem;color:#999;font-style:italic">Astuce : clique un emplacement vide pour y placer un objet. Pour les armes/armures, utilise « Équiper » dans les listes ci-dessous.</div>
+      </div>`;
+      })()}
+
       <!-- Armes & Attaques -->
       <div class="sheet-section">
         <div class="section-title">Armes & Attaques <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','weapon')">+ Compendium</button></div>
@@ -2746,7 +2829,7 @@ function renderCharSheet(id, d) {
               <td>${w.name||'—'}</td>
               <td>${w.atk||'—'}</td>
               <td>${w.dmg||'—'}</td>
-              <td><button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
+              <td style="white-space:nowrap"><button class="inv-equip-btn ${w.equipped?'equipped':''}" title="${w.equipped?'Équipée (en main)':'Équiper (en main)'}" onclick="event.stopPropagation();window._toggleEquipWeapon('${id}',${i})">${w.equipped?'✓':'＋'}</button> <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
             </tr>`).join('')}
             ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — utilisez le Compendium pour en ajouter</td></tr>' : ''}
           </tbody>
@@ -2814,6 +2897,23 @@ function renderCharSheet(id, d) {
         const spellsByLvl = {};
         knownSpells.forEach(sp => { if(!spellsByLvl[sp.level]) spellsByLvl[sp.level]=[]; spellsByLvl[sp.level].push(sp); });
 
+        // Vue active (Applications / Liste) — conservée entre re-rendus
+        const spellView = window._spellView || 'apps';
+        // Grille d'applications par niveau
+        const spellAppsHtml = [0,1,2,3,4,5,6,7,8,9].map(lvl => {
+          const spells = spellsByLvl[lvl];
+          if (!spells || !spells.length) return '';
+          return `
+            <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
+            <div class="spell-app-grid">
+              ${spells.map((sp,si) => { const m = spellMeta(sp.school); return `
+              <button class="spell-app" style="--app:${m.color}" title="${sp.name}" onclick="window._openCastSpell('${id}',${lvl},${si})">
+                <span class="spell-app-icon">${m.icon}</span>
+                <span class="spell-app-name">${sp.name}</span>
+              </button>`; }).join('')}
+            </div>`;
+        }).join('');
+
         return `
       <div class="sheet-section">
         <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">+ Compendium</button></div>
@@ -2854,8 +2954,19 @@ function renderCharSheet(id, d) {
           </div>
         </div>` : ''}
 
-        <!-- Sorts connus/préparés groupés par niveau -->
-        <div class="spell-known-list">
+        <!-- Bascule Applications / Liste -->
+        <div class="spell-view-toggle">
+          <button class="svt-btn ${spellView==='apps'?'active':''}" data-v="apps" onclick="window._setSpellView('apps')">▦ Applications</button>
+          <button class="svt-btn ${spellView==='list'?'active':''}" data-v="list" onclick="window._setSpellView('list')">☰ Liste</button>
+        </div>
+
+        <!-- Vue Applications -->
+        <div data-spellview="apps" style="${spellView==='apps'?'':'display:none'}">
+          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : spellAppsHtml}
+        </div>
+
+        <!-- Vue Liste (sorts groupés par niveau) -->
+        <div class="spell-known-list" data-spellview="list" style="${spellView==='list'?'':'display:none'}">
           ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : ''}
           ${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
             const spells = spellsByLvl[lvl];
@@ -7876,6 +7987,76 @@ window._toggleEquipArmor = async (charId, index) => {
   await updateDoc(doc(db, "characters", charId), { inventory_armors: armors, ac: baseAc + shieldBonus });
 };
 
+// ── Équiper une arme (en main) ──
+window._toggleEquipWeapon = async (charId, index) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const weapons = [...(snap.data().inventory_weapons || [])];
+  const t = weapons[index];
+  if (!t) return;
+  if (!t.equipped && weapons.filter((w,i)=>i!==index && w.equipped).length >= 2) {
+    alert("Deux armes sont déjà en main (gauche et droite). Déséquipe-en une d'abord.");
+    return;
+  }
+  weapons[index] = { ...t, equipped: !t.equipped };
+  await updateDoc(doc(db, "characters", charId), { inventory_weapons: weapons });
+};
+
+// ── Bascule de vue des sorts (Applications / Liste) ──
+window._setSpellView = (v) => {
+  window._spellView = v;
+  document.querySelectorAll('[data-spellview]').forEach(el => {
+    el.style.display = (el.getAttribute('data-spellview') === v) ? '' : 'none';
+  });
+  document.querySelectorAll('.svt-btn').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+};
+
+// ── Paper doll : emplacements d'accessoires (objets de l'inventaire) ──
+const PD_SLOT_LABELS = { tete:'Tête', cou:'Amulette', cape:'Cape', mains:'Mains', anneau1:'Anneau (gauche)', anneau2:'Anneau (droite)', ceinture:'Ceinture', bottes:'Bottes' };
+window._pdClosePicker = () => { const el = document.getElementById('pdSlotPicker'); if (el) el.style.display = 'none'; };
+window._pdSlotClick = async (charId, slotKey) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const items = snap.data().inventory_items || [];
+  const current = items.findIndex(it => it.slot === slotKey);
+  let h = `<div style="padding:12px 16px;background:linear-gradient(135deg,var(--ink),var(--brown));color:var(--gold);font-family:'Cinzel';display:flex;justify-content:space-between;align-items:center">
+      <span>${PD_SLOT_LABELS[slotKey] || slotKey}</span>
+      <button onclick="window._pdClosePicker()" style="background:none;border:none;color:var(--gold);font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:10px 12px;overflow-y:auto">`;
+  if (current >= 0) {
+    h += `<button class="pd-pick-row" onclick="window._showSheetItemDetail('${charId}',${current});window._pdClosePicker()">👁️ Voir « ${items[current].name} »</button>`;
+    h += `<button class="pd-pick-row danger" onclick="window._pdClearSlot('${charId}','${slotKey}')">✖ Retirer de l'emplacement</button>`;
+    h += `<div class="pd-pick-sep">Remplacer par</div>`;
+  } else {
+    h += `<div class="pd-pick-sep">Placer un objet</div>`;
+  }
+  const assignable = items.map((it,i)=>({it,i})).filter(x => (!x.it.slot || x.it.slot === slotKey) && x.i !== current);
+  if (!assignable.length) {
+    h += `<div style="color:#999;font-style:italic;padding:6px 2px;font-size:0.86rem">Aucun objet disponible. Ajoute des objets dans la section « Objets &amp; Équipement ».</div>`;
+  } else {
+    assignable.forEach(x => { h += `<button class="pd-pick-row" onclick="window._pdSetSlot('${charId}',${x.i},'${slotKey}')">🎒 ${x.it.name}${x.it.qty>1?` ×${x.it.qty}`:''}</button>`; });
+  }
+  h += `</div>`;
+  document.getElementById('pdSlotPickerBox').innerHTML = h;
+  document.getElementById('pdSlotPicker').style.display = 'flex';
+};
+window._pdSetSlot = async (charId, itemIndex, slotKey) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const items = [...(snap.data().inventory_items || [])].map(it => (it.slot === slotKey ? (()=>{ const c={...it}; delete c.slot; return c; })() : it));
+  if (items[itemIndex]) items[itemIndex] = { ...items[itemIndex], slot: slotKey };
+  await updateDoc(doc(db, "characters", charId), { inventory_items: items });
+  window._pdClosePicker();
+};
+window._pdClearSlot = async (charId, slotKey) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const items = [...(snap.data().inventory_items || [])].map(it => { if (it.slot === slotKey) { const c={...it}; delete c.slot; return c; } return it; });
+  await updateDoc(doc(db, "characters", charId), { inventory_items: items });
+  window._pdClosePicker();
+};
+
 // ── Inline HP edit: absorb damage from tmpHp first ──
 // Override the default inline edit for hp field to handle tmpHp absorption
 const _origStartInlineEdit = startInlineEdit;
@@ -8292,6 +8473,41 @@ window._saveNewResource = async (catId) => {
 .sc-board-btn .del { position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; border:none; background:var(--red); color:#fff; font-size:0.7rem; cursor:pointer; display:none; line-height:1; }
 .sc-board-btn:hover .del { display:block; }
 .sc-muted { font-size:0.76rem; color:#9a8e72; font-style:italic; }
+
+/* ── Paper doll : équipement visuel ── */
+.pd-wrap { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; padding:8px 10px 2px; }
+.pd-col { display:flex; flex-direction:column; gap:6px; }
+.pd-figure { display:flex; align-items:center; justify-content:center; padding:4px; }
+.pd-svg { width:92px; height:auto; }
+.pd-svg .body { fill:var(--ink); opacity:0.10; }
+.pd-svg .outline { fill:none; stroke:var(--gold); stroke-width:1.4; opacity:0.55; }
+.pd-slot { display:flex; align-items:center; gap:7px; text-align:left; width:100%; padding:5px 8px; border:1px solid var(--line); border-radius:8px; background:var(--surface-soft); cursor:pointer; font-family:'Crimson Pro'; color:var(--ink); transition:border-color .12s, background .12s; }
+.pd-slot:hover { border-color:var(--gold); background:var(--surface-hi); }
+.pd-slot.filled { border-color:var(--gold); box-shadow:inset 0 0 0 1px rgba(184,134,11,0.25); }
+.pd-slot .pd-ic { font-size:1.1rem; line-height:1; flex:0 0 auto; width:20px; text-align:center; }
+.pd-slot .pd-tx { display:flex; flex-direction:column; min-width:0; flex:1; }
+.pd-slot .pd-lb { font-family:'Cinzel'; font-size:0.54rem; letter-spacing:0.5px; color:var(--gold); text-transform:uppercase; }
+.pd-slot .pd-it { font-size:0.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pd-slot.empty .pd-it { color:#aaa; font-style:italic; }
+.pd-hands { display:flex; gap:8px; padding:2px 10px 8px; }
+.pd-hands .pd-slot { flex:1; }
+
+/* ── Sorts en grille d'applications ── */
+.spell-view-toggle { display:flex; gap:6px; padding:8px 10px 2px; }
+.svt-btn { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:0.5px; padding:4px 11px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
+.svt-btn.active { background:var(--gold); color:#fff; border-color:var(--gold); }
+.spell-app-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:12px 8px; padding:8px 12px 14px; }
+.spell-app { display:flex; flex-direction:column; align-items:center; gap:5px; border:none; background:none; cursor:pointer; font-family:'Crimson Pro'; padding:0; }
+.spell-app-icon { width:54px; height:54px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:#fff; background-color:var(--app); background-image:linear-gradient(155deg, rgba(255,255,255,0.32), rgba(255,255,255,0) 46%, rgba(0,0,0,0.24)); box-shadow:0 3px 8px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.4); transition:transform .1s; }
+.spell-app:hover .spell-app-icon { transform:translateY(-2px); }
+.spell-app:active .spell-app-icon { transform:translateY(0); }
+.spell-app-name { font-size:0.72rem; line-height:1.12; text-align:center; color:var(--ink); max-width:78px; max-height:2.3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+/* ── Sélecteur d'emplacement (paper doll) ── */
+.pd-pick-row { display:block; width:100%; text-align:left; padding:9px 11px; margin-bottom:5px; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); color:var(--ink); cursor:pointer; font-family:'Crimson Pro'; font-size:0.9rem; }
+.pd-pick-row:hover { border-color:var(--gold); background:var(--surface-hi); }
+.pd-pick-row.danger { color:var(--red); border-color:rgba(139,0,0,0.3); }
+.pd-pick-sep { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; color:var(--gold); margin:8px 0 5px; text-transform:uppercase; }
 
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
@@ -9838,6 +10054,11 @@ nav button:last-child { color:#884444; }
   window._closeThemePicker = function(){ const ov=document.getElementById('themeOverlay'); if(ov) ov.style.display='none'; };
 })();
 </script>
+
+<!-- Paper doll : sélecteur d'emplacement -->
+<div id="pdSlotPicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)window._pdClosePicker()">
+  <div id="pdSlotPickerBox" style="background:var(--parch);border:2px solid var(--gold);border-radius:10px;width:min(360px,94vw);max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)"></div>
+</div>
 
 </body>
 </html>
