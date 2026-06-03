@@ -2529,6 +2529,17 @@ function spellMeta(school) {
   return { icon:'✨', color:'#b8860b' };
 }
 
+// Un bouclier s'équipe en main gauche (≠ armure de torse) — détection robuste.
+function isShieldItem(a){
+  const t=((a&&a.type)||'').toLowerCase(), n=((a&&a.name)||'').toLowerCase();
+  return t.includes('bouclier') || n.includes('bouclier') || /^\s*\+/.test((a&&a.ac)||'');
+}
+// Une arme à distance occupe l'emplacement « Distance ».
+function isRangedWeapon(w){
+  const t=((w&&w.type)||'').toLowerCase(), n=((w&&w.name)||'').toLowerCase();
+  return t.includes('distance') || t.includes('ranged') || n.includes('arc ') || n.startsWith('arc') || n.includes('arbal') || n.includes('fronde') || n.includes('pistolet') || n.includes('mousquet');
+}
+
 function renderCharSheet(id, d) {
   window._currentSheetData = d;
   window._currentSheetId = id;
@@ -2778,11 +2789,12 @@ function renderCharSheet(id, d) {
         const armors = d.inventory_armors||[];
         const weapons = d.inventory_weapons||[];
         const items = d.inventory_items||[];
-        const isShield = a => (a.type||'').toLowerCase().includes('bouclier');
-        const bodyIdx = armors.findIndex(a=>a.equipped && !isShield(a));
-        const shieldIdx = armors.findIndex(a=>a.equipped && isShield(a));
+        const bodyIdx = armors.findIndex(a=>a.equipped && !isShieldItem(a));
+        const shieldIdx = armors.findIndex(a=>a.equipped && isShieldItem(a));
         const eqW = weapons.map((w,i)=>({w,i})).filter(x=>x.w.equipped);
-        const mainW = eqW[0], offW = eqW[1];
+        const meleeW = eqW.filter(x=>!isRangedWeapon(x.w));
+        const rangedW = eqW.filter(x=>isRangedWeapon(x.w));
+        const mainW = meleeW[0], offW = meleeW[1], distW = rangedW[0];
         const findItem = key => items.findIndex(it=>it.slot===key);
 
         // Emplacement d'accessoire (objet assignable)
@@ -2807,6 +2819,7 @@ function renderCharSheet(id, d) {
         if (shieldIdx>=0) { leftName=armors[shieldIdx].name; leftClick=`window._showSheetArmorDetail('${id}',${shieldIdx})`; leftFilled=true; }
         else if (offW) { leftIc='🗡️'; leftName=offW.w.name; leftClick=`window._showSheetWeaponDetail('${id}',${offW.i})`; leftFilled=true; }
         const leftSlot = eq(leftIc, 'Main gauche', leftName, leftClick, leftFilled);
+        const distSlot = eq('🏹','Distance', distW?distW.w.name:'', distW?`window._showSheetWeaponDetail('${id}',${distW.i})`:'', !!distW);
 
         return `
       <div class="sheet-section">
@@ -2838,7 +2851,10 @@ function renderCharSheet(id, d) {
           ${leftSlot}
           ${mainSlot}
         </div>
-        <div style="padding:0 10px 8px;font-size:0.72rem;color:#999;font-style:italic">Astuce : clique un emplacement vide pour y placer un objet. Pour les armes/armures, utilise « Équiper » dans les listes ci-dessous.</div>
+        <div class="pd-hands pd-distance">
+          ${distSlot}
+        </div>
+        <div style="padding:0 10px 8px;font-size:0.72rem;color:#999;font-style:italic">Astuce : clique un emplacement vide pour y placer un objet. Pour les armes/armures, utilise « Équiper » dans les listes ci-dessous (une arme à distance ira dans l'emplacement Distance).</div>
       </div>`;
       })()}
 
@@ -3114,25 +3130,47 @@ function renderCharSheet(id, d) {
       <!-- Aptitudes & Traits -->
       <div class="sheet-section">
         <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
-        <div class="inv-list">
-          ${getClasses(d).filter(c=>d.subclasses&&d.subclasses[c.name]).map(c=>`
-          <div class="inv-item" onclick="window._showCard('subclass','${c.name}')" style="cursor:pointer" title="Voir la sous-classe">
-            <div class="inv-item-main"><strong>${d.subclasses[c.name]}</strong> <span style="color:#888">— Sous-classe (${c.name})</span></div>
-          </div>`).join('')}
-          ${d.background?`
-          <div class="inv-item" onclick="window._showCard('background',0)" style="cursor:pointer" title="Voir l'historique">
-            <div class="inv-item-main"><strong>${d.background}</strong> <span style="color:#888">— Historique</span></div>
-          </div>`:''}
-          ${(d.traits||[]).map((t,i)=>`
-          <div class="inv-item" onclick="window._showCard('trait',${i})" style="cursor:pointer" title="Voir le trait">
-            <div class="inv-item-main">${t}</div>
-          </div>`).join('')}
-          ${(d.features||[]).map((f,i)=>`
-          <div class="inv-item" onclick="window._showCard('feature',${i})" style="cursor:pointer" title="Voir le détail">
-            <div class="inv-item-main"><strong>${f.name}</strong>${f.src?` <span style="color:#999;font-size:0.76rem">(${f.src})</span>`:''}</div>
-            ${f.src==='Compendium'||f.src==='Don'?`<button class="inv-remove-btn" onclick="event.stopPropagation();window._removeFeature('${id}',${i})">✕</button>`:''}
-          </div>`).join('')}
-          ${!(d.traits||[]).length && !(d.features||[]).length && !d.background ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune aptitude — utilisez + Don ou montez de niveau.</div>' : ''}
+        <div class="feat-groups">
+          ${(()=>{
+            const feats = d.features || [];
+            const subNames = Object.values(d.subclasses||{}).filter(Boolean);
+            const isDon = f => f.src==='Don' || f.src==='Compendium' || (f.name||'').startsWith('Don:');
+            const isSubFeat = f => subNames.some(sn => (f.name||'').includes('('+sn+')'));
+            const idx = feats.map((f,i)=>({f,i}));
+            const donFeats   = idx.filter(x=> isDon(x.f));
+            const subFeats   = idx.filter(x=> !isDon(x.f) && isSubFeat(x.f));
+            const classFeats = idx.filter(x=> !isDon(x.f) && !isSubFeat(x.f));
+            const subCl = getClasses(d).filter(c=>d.subclasses&&d.subclasses[c.name]);
+
+            const card = (click, mainHtml, removeIdx) =>
+              `<div class="inv-item" onclick="${click}" style="cursor:pointer" title="Voir le détail">
+                <div class="inv-item-main">${mainHtml}</div>
+                ${removeIdx!=null?`<button class="inv-remove-btn" onclick="event.stopPropagation();window._removeFeature('${id}',${removeIdx})">✕</button>`:''}
+              </div>`;
+            const group = (label, count, inner) => count===0 ? '' :
+              `<div class="feat-group">
+                <div class="feat-group-head" onclick="this.parentNode.classList.toggle('open')">
+                  <span>${label}<span class="feat-count">${count}</span></span>
+                  <span class="feat-arrow">▶</span>
+                </div>
+                <div class="feat-group-body">${inner}</div>
+              </div>`;
+
+            let out = '';
+            out += group('Race', (d.traits||[]).length,
+              (d.traits||[]).map((t,i)=>card(`window._showCard('trait',${i})`, t)).join(''));
+            out += group('Historique', d.background?1:0,
+              d.background?card(`window._showCard('background',0)`, `<strong>${d.background}</strong>`):'');
+            out += group('Classe', classFeats.length,
+              classFeats.map(x=>card(`window._showCard('feature',${x.i})`, `<strong>${x.f.name}</strong>${x.f.src?` <span style="color:#999;font-size:0.74rem">(${x.f.src})</span>`:''}`)).join(''));
+            out += group('Sous-classe', subCl.length + subFeats.length,
+              subCl.map(c=>card(`window._showCard('subclass','${c.name}')`, `<strong>${d.subclasses[c.name]}</strong> <span style="color:#888">— ${c.name}</span>`)).join('')
+              + subFeats.map(x=>card(`window._showCard('feature',${x.i})`, `<strong>${x.f.name}</strong>`)).join(''));
+            out += group('Dons', donFeats.length,
+              donFeats.map(x=>card(`window._showCard('feature',${x.i})`, `<strong>${x.f.name}</strong>`, x.i)).join(''));
+
+            return out || '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune aptitude — utilisez + Don ou montez de niveau.</div>';
+          })()}
         </div>
         <div class="field-group" style="margin-top:8px">
           <label>Autres aptitudes (note libre)</label>
@@ -8057,29 +8095,28 @@ window._toggleEquipArmor = async (charId, index) => {
   const target = armors[index];
   if (!target) return;
   const wasEquipped = target.equipped;
-  
-  // Unequip all others first (only one non-shield can be equipped at a time)
-  const isShield = (target.type || '').toLowerCase().includes('bouclier');
+
+  // Un bouclier (main gauche) et une armure de torse sont indépendants :
+  // équiper l'un ne déséquipe que les autres du MÊME type.
+  const targetIsShield = isShieldItem(target);
   if (!wasEquipped) {
     armors.forEach((a, i) => {
-      if (i !== index) {
-        const aIsShield = (a.type || '').toLowerCase().includes('bouclier');
-        // If equipping a non-shield, unequip other non-shields; if equipping a shield, unequip other shields
-        if (isShield === aIsShield) a.equipped = false;
-      }
+      if (i !== index && isShieldItem(a) === targetIsShield) a.equipped = false;
     });
   }
   target.equipped = !wasEquipped;
 
-  // Recalculate AC
+  // Recalcul de la CA : armure de torse (base) + bouclier (bonus), cumulés.
   const stats = d.stats || { dex: 10 };
   const dexMod = mod(stats.dex || 10);
-  let baseAc = 10 + dexMod; // default unarmored
+  let baseAc = 10 + dexMod; // sans armure
   let shieldBonus = 0;
   armors.forEach(a => {
     if (!a.equipped) return;
-    const aIsShield = (a.type || '').toLowerCase().includes('bouclier');
-    if (aIsShield) { shieldBonus = 2; return; }
+    if (isShieldItem(a)) {
+      shieldBonus += parseInt(String(a.ac || '').replace(/[^0-9-]/g, '')) || 2;
+      return;
+    }
     const acStr = a.ac || '10';
     if (acStr.includes('mod DEX')) {
       const base = parseInt(acStr) || 10;
@@ -8093,16 +8130,22 @@ window._toggleEquipArmor = async (charId, index) => {
   await updateDoc(doc(db, "characters", charId), { inventory_armors: armors, ac: baseAc + shieldBonus });
 };
 
-// ── Équiper une arme (en main) ──
+// ── Équiper une arme (mêlée en main, ou à distance dans l'emplacement dédié) ──
 window._toggleEquipWeapon = async (charId, index) => {
   const snap = await getDoc(doc(db, "characters", charId));
   if (!snap.exists()) return;
   const weapons = [...(snap.data().inventory_weapons || [])];
   const t = weapons[index];
   if (!t) return;
-  if (!t.equipped && weapons.filter((w,i)=>i!==index && w.equipped).length >= 2) {
-    alert("Deux armes sont déjà en main (gauche et droite). Déséquipe-en une d'abord.");
-    return;
+  if (!t.equipped) {
+    if (isRangedWeapon(t)) {
+      // Une seule arme à distance équipée : déséquiper les autres à distance
+      weapons.forEach((w,i)=>{ if (i!==index && w.equipped && isRangedWeapon(w)) w.equipped = false; });
+    } else {
+      // Mêlée : maximum deux en main
+      const meleeEquipped = weapons.filter((w,i)=>i!==index && w.equipped && !isRangedWeapon(w)).length;
+      if (meleeEquipped >= 2) { alert("Deux armes de mêlée sont déjà en main. Déséquipe-en une d'abord."); return; }
+    }
   }
   weapons[index] = { ...t, equipped: !t.equipped };
   await updateDoc(doc(db, "characters", charId), { inventory_weapons: weapons });
@@ -8627,6 +8670,17 @@ window._saveNewResource = async (catId) => {
 
 /* ── Note personnelle d'objet (modale d'inventaire) ── */
 .item-note-input { width:100%; box-sizing:border-box; min-height:54px; margin:4px 0 6px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--surface-soft); color:var(--ink); font-family:'Crimson Pro'; font-size:0.88rem; resize:vertical; }
+
+/* ── Groupes d'aptitudes repliables (Race / Historique / Classe / Sous-classe / Dons) ── */
+.feat-groups { display:flex; flex-direction:column; gap:6px; }
+.feat-group { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--surface-soft); }
+.feat-group-head { display:flex; justify-content:space-between; align-items:center; padding:9px 11px; cursor:pointer; font-family:'Cinzel'; font-size:0.7rem; letter-spacing:0.5px; color:var(--ink); background:var(--surface); user-select:none; }
+.feat-group-head:hover { background:var(--surface-hi); }
+.feat-count { display:inline-block; min-width:16px; text-align:center; background:var(--gold); color:#fff; border-radius:9px; font-size:0.6rem; padding:1px 6px; margin-left:5px; font-family:'Crimson Pro'; }
+.feat-arrow { color:var(--gold); transition:transform .15s; font-size:0.7rem; }
+.feat-group.open .feat-arrow { transform:rotate(90deg); }
+.feat-group-body { display:none; padding:8px; flex-direction:column; gap:5px; }
+.feat-group.open .feat-group-body { display:flex; }
 
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
