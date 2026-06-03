@@ -8150,6 +8150,16 @@ window._setSpellView = (v) => {
 
 // ── Paper doll : emplacements d'accessoires (objets de l'inventaire) ──
 window._eqPulse = (el) => { if(!el) return; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); setTimeout(()=>{ try{ el.classList.remove('pulse'); }catch(e){} }, 540); };
+// Pulse au clic sur les éléments interactifs de la fiche
+(function(){
+  const SEL = '.inv-item, .spell-app, .feat-group-head, .svt-btn, .coin-box, .section-add-btn, .pd-pick-row';
+  document.addEventListener('click', function(e){
+    const t = (e.target && e.target.closest) ? e.target.closest(SEL) : null;
+    if (!t || !t.closest('#tab-sheet') || t.classList.contains('eqb')) return;
+    t.classList.remove('clkpulse'); void t.offsetWidth; t.classList.add('clkpulse');
+    setTimeout(function(){ try{ t.classList.remove('clkpulse'); }catch(_){} }, 470);
+  }, true);
+})();
 const PD_SLOT_LABELS = { capuche:'Capuche', tete:'Casque / Lunettes', cape:'Cape', vetements:'Vêtements', mains:'Gants', bottes:'Chaussures', ceinture:'Ceinture', cou:'Amulette', anneau1:'Anneau / Bijou', anneau2:'Anneau / Bijou', divers1:'Divers', divers2:'Divers', divers3:'Divers', divers4:'Divers', divers5:'Divers', divers6:'Divers' };
 window._pdClosePicker = () => { const el = document.getElementById('pdSlotPicker'); if (el) el.style.display = 'none'; };
 window._pdSlotClick = async (charId, slotKey) => {
@@ -8773,6 +8783,13 @@ window._saveNewResource = async (catId) => {
   100% { transform:scale(1);    box-shadow:0 4px 16px rgba(0,0,0,0.28), 0 0 0 18px rgba(212,160,23,0); } }
 @media (prefers-reduced-motion: reduce) { .eqg::before,.eqg::after{animation:none} .eqb.pulse{animation:none} }
 
+/* Pulse au clic (toute la fiche) */
+@keyframes clkpulse { 0%{transform:scale(1)} 38%{transform:scale(1.05)} 100%{transform:scale(1)} }
+.clkpulse { animation:clkpulse .45s ease; }
+@media (prefers-reduced-motion: reduce){ .clkpulse{animation:none} }
+/* Le panneau Équipement épouse sa carte (pas de liseré clair au-dessus) */
+.sheet-section .eqg { margin-top:0; border-top-left-radius:0; border-top-right-radius:0; }
+
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
   --parch: #f4ece1;
@@ -9107,7 +9124,11 @@ nav button:last-child { color:#884444; }
 .btn-prev:hover { border-color:var(--ink); color:var(--ink); }
  
 /* ── CHARACTER SHEET ── */
-#tab-sheet { background:var(--parch); min-height:100vh; }
+#tab-sheet { min-height:100vh;
+  background:
+    radial-gradient(55% 35% at 12% 4%, rgba(212,160,23,0.12), transparent 60%),
+    radial-gradient(50% 40% at 92% 98%, rgba(140,90,200,0.10), transparent 60%),
+    linear-gradient(160deg, var(--bg) 0%, var(--brown) 52%, var(--bg2) 100%); }
 .sheet-header { background:linear-gradient(135deg, var(--ink) 0%, var(--brown) 100%); padding:18px 24px; border-bottom:3px solid var(--gold); }
 .sheet-header-top { display:flex; align-items:center; gap:16px; }
 .sheet-avatar-wrap { position:relative; cursor:pointer; flex-shrink:0; }
@@ -9134,9 +9155,15 @@ nav button:last-child { color:#884444; }
 .sheet-hp-delta-btn:hover { filter:brightness(1.1); }
  
 .sheet-body { display:grid; grid-template-columns:300px 1fr 390px; gap:0; align-items:start; }
-.sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid var(--line); }
+.sheet-col-left, .sheet-col-center, .sheet-col-right { padding:16px; border-right:1px solid rgba(255,255,255,0.10); }
 .sheet-col-right { border-right:none; }
-.sheet-section { margin-bottom:14px; background:#fff; border:1px solid #ddd; border-radius:3px; overflow:hidden; }
+.sheet-section { margin-bottom:16px; border-radius:16px; overflow:hidden;
+  background:rgba(255,255,255,0.84);
+  -webkit-backdrop-filter:blur(9px) saturate(1.35); backdrop-filter:blur(9px) saturate(1.35);
+  border:1px solid rgba(255,255,255,0.55);
+  box-shadow:0 8px 26px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.5);
+  transition:box-shadow .3s ease; }
+.sheet-section:hover { box-shadow:0 12px 34px rgba(0,0,0,0.36), 0 0 22px -8px var(--gold), inset 0 1px 0 rgba(255,255,255,0.6); }
 .section-title { background:linear-gradient(90deg, var(--ink), var(--brown)); color:var(--gold); font-family:'Cinzel';
   font-size:0.65rem; letter-spacing:2px; padding:5px 10px; }
 .stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#eee; padding:1px; }
@@ -9447,7 +9474,7 @@ nav button:last-child { color:#884444; }
 }
 @media(max-width:900px) {
   .sheet-body { grid-template-columns:1fr; }
-  .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid var(--line); }
+  .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid rgba(255,255,255,0.10); }
   .summary-grid { grid-template-columns:1fr; }
   .stats-grid { grid-template-columns:repeat(6,1fr); }
 }
