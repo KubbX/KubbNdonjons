@@ -2540,6 +2540,59 @@ function isRangedWeapon(w){
   return t.includes('distance') || t.includes('ranged') || n.includes('arc ') || n.startsWith('arc') || n.includes('arbal') || n.includes('fronde') || n.includes('pistolet') || n.includes('mousquet');
 }
 
+// Bonus magique lu dans le nom (ex: « Armure de cuir +2 », « Arc long +1 ») → 2, 1 ; sinon 0
+function magicBonus(name){ const m = String(name||'').match(/\+(\d+)/); return m ? parseInt(m[1]) : 0; }
+
+// Calcul complet de la CA : base d'armure + plafond DEX + bonus magique d'armure + bouclier (base + magie)
+function computeAC(d){
+  const armors = (d && d.inventory_armors) || [];
+  const dexMod = mod(((d&&d.stats)||{}).dex || 10);
+  let base = 10 + dexMod, armorMagic = 0, shieldTotal = 0;
+  armors.forEach(a => {
+    if (!a || !a.equipped) return;
+    const mg = magicBonus(a.name);
+    if (isShieldItem(a)) {
+      let sBase = parseInt(String(a.ac||'').replace(/[^0-9]/g,'')); if (isNaN(sBase) || sBase<=0) sBase = 2;
+      shieldTotal += sBase + mg; return;
+    }
+    armorMagic += mg;
+    const acStr = String(a.ac || '10').toLowerCase();
+    if (acStr.includes('mod dex')) {
+      const b = parseInt(acStr) || 10;
+      if (acStr.includes('max')) { const cap = parseInt(acStr.split('max')[1]); base = b + Math.min(dexMod, isNaN(cap)?2:cap); }
+      else base = b + dexMod;
+    } else {
+      const p = parseInt(acStr);
+      base = (!isNaN(p) && p>0) ? p : (10 + dexMod);
+    }
+  });
+  return base + armorMagic + shieldTotal;
+}
+
+// Toucher & dégâts d'une arme : mod de carac + maîtrise + bonus magique (+N du nom) + bonus divers (styles/dons)
+function computeWeapon(d, w){
+  const stats = (d&&d.stats) || {};
+  const strM = mod(stats.str||10), dexM = mod(stats.dex||10);
+  const ranged = isRangedWeapon(w);
+  const finesse = ((w&&w.properties)||'').toLowerCase().includes('finesse');
+  const abil = (w&&w.abil) || 'auto';
+  const aMod = abil==='str' ? strM : abil==='dex' ? dexM : (ranged ? dexM : (finesse ? Math.max(strM,dexM) : strM));
+  const prof = (w&&w.prof===false) ? 0 : profBonus(totalLevel(d));
+  const magic = magicBonus(w&&w.name);
+  const atkExtra = parseInt(w&&w.atkExtra)||0, dmgExtra = parseInt(w&&w.dmgExtra)||0;
+  const atkTotal = aMod + prof + magic + atkExtra;
+  const dmgBonus = aMod + magic + dmgExtra;
+  const raw = (w&&(w.damage || w.dmg)) || '';
+  const dieM = String(raw).match(/\d+\s*d\s*\d+/i);
+  const die = dieM ? dieM[0].replace(/\s+/g,'') : '';
+  let dtype = String((w&&w.damage)||'').replace(/\d+\s*d\s*\d+/i,'').replace(/[+\-]\s*\d+/g,'').trim();
+  if (!dtype) dtype = String((w&&w.dmg)||'').replace(/\d+\s*d\s*\d+/i,'').replace(/[+\-]\s*\d+/g,'').trim();
+  const atkStr = (atkTotal>=0?'+':'') + atkTotal;
+  let dmgStr = die + (dmgBonus!==0 ? ((dmgBonus>=0?'+':'')+dmgBonus) : '');
+  dmgStr = (dmgStr + (dtype?(' '+dtype):'')).trim();
+  return { atk: atkStr, dmg: dmgStr || '—' };
+}
+
 function renderCharSheet(id, d) {
   window._currentSheetData = d;
   window._currentSheetId = id;
@@ -2852,13 +2905,13 @@ function renderCharSheet(id, d) {
         <table class="weapon-table">
           <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th><th></th></tr></thead>
           <tbody>
-            ${(d.inventory_weapons||[]).map((w,i)=>`
+            ${(d.inventory_weapons||[]).map((w,i)=>{ const cw = computeWeapon(d,w); return `
             <tr class="weapon-row-click" onclick="window._showSheetWeaponDetail('${id}',${i})">
               <td>${w.name||'—'}</td>
-              <td>${w.atk||'—'}</td>
-              <td>${w.dmg||'—'}</td>
+              <td>${cw.atk}</td>
+              <td>${cw.dmg}</td>
               <td style="white-space:nowrap"><button class="inv-equip-btn ${w.equipped?'equipped':''}" title="${w.equipped?'Équipée (en main)':'Équiper (en main)'}" onclick="event.stopPropagation();window._toggleEquipWeapon('${id}',${i})">${w.equipped?'✓':'＋'}</button> <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
-            </tr>`).join('')}
+            </tr>`;}).join('')}
             ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — utilisez le Compendium pour en ajouter</td></tr>' : ''}
           </tbody>
         </table>
@@ -4289,16 +4342,40 @@ window._showSheetWeaponDetail = async (charId, index) => {
   document.getElementById('forgeNext').style.display = 'none';
 
   const r = compWeapon || w;
+  const wm = { ...w, damage: w.damage || (compWeapon&&compWeapon.damage) || '', properties: w.properties || (compWeapon&&compWeapon.properties) || '' };
+  const cw = computeWeapon(d, wm);
+  const magic = magicBonus(w.name);
   let html = `<div class="rd-sheet">
     <div class="rd-title">${w.name||'?'}</div>
     <div class="rd-subtitle">${r.type||w.type||'Arme'}</div>
     <div class="rd-separator"></div>
     <div class="rd-props">
-      <div class="rd-prop"><span class="rd-prop-label">Bonus d'attaque :</span> ${w.atk||'—'}</div>
-      <div class="rd-prop"><span class="rd-prop-label">Dégâts :</span> ${w.dmg||r.damage||'—'}</div>
+      <div class="rd-prop"><span class="rd-prop-label">Bonus d'attaque :</span> <strong>${cw.atk}</strong></div>
+      <div class="rd-prop"><span class="rd-prop-label">Dégâts :</span> <strong>${cw.dmg}</strong></div>
+      ${magic?`<div class="rd-prop"><span class="rd-prop-label">Bonus magique :</span> +${magic}</div>`:''}
       ${r.properties ? `<div class="rd-prop"><span class="rd-prop-label">Propriétés :</span> ${r.properties}</div>` : ''}
       ${r.cost ? `<div class="rd-prop"><span class="rd-prop-label">Coût :</span> ${r.cost}</div>` : ''}
       ${r.weight ? `<div class="rd-prop"><span class="rd-prop-label">Poids :</span> ${r.weight}</div>` : ''}
+    </div>
+    <div class="rd-separator"></div>
+    <div style="text-align:left">
+      <div style="font-size:0.62rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px;margin-bottom:6px">RÉGLAGES DE CALCUL</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-family:'Crimson Pro';font-size:0.84rem">
+        <label>Maîtrisée <select class="wpn-set" onchange="window._setWeaponField('${charId}',${index},'prof',this.value==='1')">
+          <option value="1" ${w.prof!==false?'selected':''}>Oui</option>
+          <option value="0" ${w.prof===false?'selected':''}>Non</option>
+        </select></label>
+        <label>Caractéristique <select class="wpn-set" onchange="window._setWeaponField('${charId}',${index},'abil',this.value)">
+          <option value="auto" ${(!w.abil||w.abil==='auto')?'selected':''}>Auto</option>
+          <option value="str" ${w.abil==='str'?'selected':''}>Force</option>
+          <option value="dex" ${w.abil==='dex'?'selected':''}>Dextérité</option>
+        </select></label>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;font-family:'Crimson Pro';font-size:0.84rem">
+        <label>Bonus toucher <input class="wpn-set" type="number" value="${w.atkExtra||0}" style="width:52px" onchange="window._setWeaponField('${charId}',${index},'atkExtra',this.value)"></label>
+        <label>Bonus dégâts <input class="wpn-set" type="number" value="${w.dmgExtra||0}" style="width:52px" onchange="window._setWeaponField('${charId}',${index},'dmgExtra',this.value)"></label>
+      </div>
+      <div style="font-size:0.72rem;color:#888;margin-top:8px;font-style:italic">Toucher/dégâts = carac + maîtrise + bonus magique (« +N » dans le nom) + ces bonus. Utilise « Bonus » pour les styles de combat (Archerie +2 au toucher, Duel +2 aux dégâts…), la Rage, etc.</div>
     </div>
     ${r.desc ? `<div class="rd-separator"></div><div class="rd-desc">${r.desc}</div>` : ''}
     <div class="rd-separator"></div>
@@ -7363,7 +7440,7 @@ window._pickResource = async (charId, catId, index) => {
     const atk = `+${atkBonus}`;
     const dmg = `${r.damage||'?'}${dmgBonus>=0?'+':''}${dmgBonus}`;
     const weapons = [...(d.inventory_weapons||[])];
-    weapons.push({ name: r.name, atk, dmg, properties: r.properties||'', type: r.type||'' });
+    weapons.push({ name: r.name, atk, dmg, damage: r.damage||'', properties: r.properties||'', type: r.type||'' });
     update.inventory_weapons = weapons;
   }
   else if (catId === 'armor') {
@@ -8094,28 +8171,8 @@ window._toggleEquipArmor = async (charId, index) => {
   }
   target.equipped = !wasEquipped;
 
-  // Recalcul de la CA : armure de torse (base) + bouclier (bonus), cumulés.
-  const stats = d.stats || { dex: 10 };
-  const dexMod = mod(stats.dex || 10);
-  let baseAc = 10 + dexMod; // sans armure
-  let shieldBonus = 0;
-  armors.forEach(a => {
-    if (!a.equipped) return;
-    if (isShieldItem(a)) {
-      shieldBonus += parseInt(String(a.ac || '').replace(/[^0-9-]/g, '')) || 2;
-      return;
-    }
-    const acStr = a.ac || '10';
-    if (acStr.includes('mod DEX')) {
-      const base = parseInt(acStr) || 10;
-      baseAc = acStr.includes('max 2') ? base + Math.min(dexMod, 2) : base + dexMod;
-    } else {
-      const parsed = parseInt(acStr);
-      if (!isNaN(parsed) && parsed > 0) baseAc = parsed;
-    }
-  });
-
-  await updateDoc(doc(db, "characters", charId), { inventory_armors: armors, ac: baseAc + shieldBonus });
+  const newAc = computeAC({ stats: d.stats, inventory_armors: armors });
+  await updateDoc(doc(db, "characters", charId), { inventory_armors: armors, ac: newAc });
 };
 
 // ── Équiper une arme (mêlée en main, ou à distance dans l'emplacement dédié) ──
@@ -8137,6 +8194,19 @@ window._toggleEquipWeapon = async (charId, index) => {
   }
   weapons[index] = { ...t, equipped: !t.equipped };
   await updateDoc(doc(db, "characters", charId), { inventory_weapons: weapons });
+};
+
+// Réglages de calcul d'une arme (maîtrise, carac, bonus toucher/dégâts)
+window._setWeaponField = async (charId, index, field, value) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const weapons = [...(snap.data().inventory_weapons || [])];
+  if (weapons[index]) {
+    const v = (field==='atkExtra'||field==='dmgExtra') ? (parseInt(value)||0) : value;
+    weapons[index] = { ...weapons[index], [field]: v };
+  }
+  await updateDoc(doc(db, "characters", charId), { inventory_weapons: weapons });
+  window._showSheetWeaponDetail(charId, index); // rafraîchit la modale avec les valeurs recalculées
 };
 
 // ── Bascule de vue des sorts (Applications / Liste) ──
@@ -8789,6 +8859,8 @@ window._saveNewResource = async (catId) => {
 @media (prefers-reduced-motion: reduce){ .clkpulse{animation:none} }
 /* Le panneau Équipement épouse sa carte (pas de liseré clair au-dessus) */
 .sheet-section .eqg { margin-top:0; border-top-left-radius:0; border-top-right-radius:0; }
+
+.wpn-set { font-family:'Crimson Pro'; font-size:0.82rem; padding:2px 6px; border:1px solid var(--line); border-radius:5px; background:var(--surface-soft); color:var(--ink); margin-left:4px; }
 
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
