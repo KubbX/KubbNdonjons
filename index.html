@@ -9,7 +9,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, query, where, addDoc, deleteDoc, getDocs, arrayUnion, arrayRemove, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
  
 const firebaseConfig = {
   apiKey: "AIzaSyCVhG8iH0KiKyvGDPH2sh37u9DLgkPUgLQ",
@@ -25,6 +25,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
  
 let currentUid = null;
+let currentEmail = null;
 let activeCharId = null;
 let activeCharUnsubscribe = null;
  
@@ -1940,12 +1941,15 @@ function showAuthError(msg) {
 onAuthStateChanged(auth, user => {
   if (user) {
     currentUid = user.uid;
+    currentEmail = (user.email||'').toLowerCase();
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'block';
     loadCharacterList();
     loadCompendium();
+    loadGroups();
   } else {
     currentUid = null;
+    currentEmail = null;
     document.getElementById('authScreen').style.display = 'flex';
     document.getElementById('appScreen').style.display = 'none';
   }
@@ -1958,7 +1962,7 @@ window._showTab = (tabId) => {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('nav-active'));
-  const map = {'tab-list':'navList','tab-sheet':'navSheet','tab-gm':'navGM','tab-compendium':'navCompendium'};
+  const map = {'tab-list':'navList','tab-sheet':'navSheet','tab-gm':'navGM','tab-compendium':'navCompendium','tab-editor':'navEditor','tab-groups':'navGroups'};
   if(map[tabId]) document.getElementById(map[tabId]).classList.add('nav-active');
   if(tabId === 'tab-compendium') {
     const catsEl = document.getElementById('compCats');
@@ -2463,6 +2467,7 @@ async function loadCharacterList() {
   onSnapshot(q, (snapshot) => {
     const list = document.getElementById('charList');
     list.innerHTML = '';
+    window._myCharacters = [];
     if(snapshot.empty) {
       list.innerHTML = '<p style="color:#888;text-align:center;margin-top:30px">Aucun personnage. Crée ton premier héros !</p>';
       return;
@@ -2470,6 +2475,8 @@ async function loadCharacterList() {
     snapshot.forEach(docSnap => {
       const d = docSnap.data();
       const tLvl = totalLevel(d);
+      (window._myCharacters = window._myCharacters || []);
+      window._myCharacters.push({ id: docSnap.id, name: d.name || 'Sans nom' });
       const card = document.createElement('div');
       card.className = 'char-card';
       card.innerHTML = `
@@ -3688,6 +3695,182 @@ window._removeGMWatch = (id) => {
     window._combatRender();
   }
 };
+
+// ============================================================
+// SYSTÈME DE GROUPES
+// ============================================================
+window._currentGroups = [];
+let _grpGm = {}, _grpMem = {}, _grpUnsub = [];
+function loadGroups(){
+  _grpUnsub.forEach(u=>{ try{u();}catch(e){} }); _grpUnsub=[];
+  _grpGm={}; _grpMem={};
+  if(!currentUid){ window._currentGroups=[]; renderGroups(); return; }
+  _grpUnsub.push(onSnapshot(query(collection(db,'groups'), where('gmUid','==',currentUid)),
+    s=>{ _grpGm={}; s.forEach(d=>_grpGm[d.id]={id:d.id,...d.data()}); mergeGroups(); },
+    e=>console.warn('[groups gm]',e)));
+  if(currentEmail){
+    _grpUnsub.push(onSnapshot(query(collection(db,'groups'), where('memberEmails','array-contains',currentEmail)),
+      s=>{ _grpMem={}; s.forEach(d=>_grpMem[d.id]={id:d.id,...d.data()}); mergeGroups(); },
+      e=>console.warn('[groups mem]',e)));
+  }
+}
+function mergeGroups(){
+  const m=Object.assign({}, _grpMem, _grpGm);
+  window._currentGroups = Object.values(m).sort((a,b)=>(a.name||'').localeCompare(b.name||'','fr'));
+  renderGroups();
+}
+function groupById(id){ return (window._currentGroups||[]).find(g=>g.id===id); }
+
+window._createGroup = async ()=>{
+  const name=(document.getElementById('newGroupName')?.value||'').trim();
+  if(!name){ alert('Donne un nom au groupe.'); return; }
+  const icon=(document.getElementById('newGroupIcon')?.value||'').trim()||'🛡️';
+  const color=document.getElementById('newGroupColor')?.value||'#b8860b';
+  try {
+    await addDoc(collection(db,'groups'), { name, icon, color, gmUid:currentUid, gmEmail:currentEmail||'',
+      memberEmails: currentEmail?[currentEmail]:[], assignments:{}, enemyGroups:[], createdAt:new Date().toISOString() });
+    const n=document.getElementById('newGroupName'); if(n) n.value='';
+  } catch(e){ console.error(e); if(e.code==='permission-denied') alert("Firestore refuse l'écriture des groupes : ajoute une règle pour la collection « groups » (voir console)."); }
+};
+window._deleteGroup = async (id)=>{ if(!confirm('Supprimer ce groupe ?')) return; await deleteDoc(doc(db,'groups',id)); };
+window._setGroupField = async (id,field,val)=>{ await updateDoc(doc(db,'groups',id), {[field]:val}); };
+window._inviteMember = async (id)=>{
+  const inp=document.getElementById('grpInvite_'+id); const email=(inp?.value||'').trim().toLowerCase();
+  if(!email||!email.includes('@')){ alert('Email invalide.'); return; }
+  await updateDoc(doc(db,'groups',id), { memberEmails: arrayUnion(email) });
+  if(inp) inp.value='';
+};
+window._removeMember = async (id,email)=>{ await updateDoc(doc(db,'groups',id), { memberEmails: arrayRemove(email) }); };
+window._assignCharToGroup = async (id, charId)=>{
+  if(!charId){ await updateDoc(doc(db,'groups',id), {['assignments.'+currentUid]: deleteField()}); return; }
+  const c=(window._myCharacters||[]).find(x=>x.id===charId);
+  await updateDoc(doc(db,'groups',id), {['assignments.'+currentUid]: {charId, charName:c?c.name:'?', email:currentEmail||''}});
+};
+window._watchCharId = (id)=>{
+  if(!id||gmWatches[id]) return;
+  gmWatches[id]=onSnapshot(doc(db,'characters',id), snap=>{ if(snap.exists()) renderGMCard(snap.id, snap.data()); });
+};
+window._loadGroupSheets = (id)=>{
+  const g=groupById(id); if(!g) return;
+  Object.values(g.assignments||{}).forEach(x=>{ if(x&&x.charId) window._watchCharId(x.charId); });
+  window._showTab('tab-gm');
+};
+async function saveEnemyGroups(id, arr){ await updateDoc(doc(db,'groups',id), {enemyGroups:arr}); }
+window._createEnemyGroup = async (id)=>{
+  const g=groupById(id); if(!g) return;
+  const name=prompt("Nom du groupe d'ennemis :"); if(!name||!name.trim()) return;
+  await saveEnemyGroups(id, [...(g.enemyGroups||[]), {id:'eg'+Date.now(), name:name.trim(), monsters:[]}]);
+};
+window._deleteEnemyGroup = async (id, egId)=>{
+  const g=groupById(id); if(!g) return;
+  await saveEnemyGroups(id, (g.enemyGroups||[]).filter(e=>e.id!==egId));
+};
+function _allMonsters(){
+  let m=[]; try{ if(typeof getAllResourcesForCategory==='function') m=getAllResourcesForCategory('monster'); }catch(e){}
+  if(!m||!m.length) m=(typeof COMPENDIUM_DATA!=='undefined' && COMPENDIUM_DATA.monster)||[];
+  return m;
+}
+window._egSearch = (id, egId)=>{
+  const q=(document.getElementById(`egSearch_${id}_${egId}`)?.value||'').toLowerCase().trim();
+  const box=document.getElementById(`egResults_${id}_${egId}`); if(!box) return;
+  if(!q){ box.innerHTML=''; return; }
+  const f=_allMonsters().filter(m=>(m.name||'').toLowerCase().includes(q)).slice(0,8);
+  box.innerHTML = f.length ? f.map(m=>`<button class="grp-mon-res" onclick="window._egAddMonster('${id}','${egId}','${(m.name||'').replace(/'/g,"\\'")}')">${m.name} <small>RC ${m.cr||'?'}</small></button>`).join('') : '<span class="grp-noassign">Aucun</span>';
+};
+window._egAddMonster = async (id, egId, name)=>{
+  const g=groupById(id); if(!g) return;
+  const m=_allMonsters().find(x=>x.name===name); if(!m) return;
+  const arr=(g.enemyGroups||[]).map(e=>{
+    if(e.id!==egId) return e;
+    const mons=[...(e.monsters||[])]; const ex=mons.find(x=>x.name===name);
+    if(ex) ex.qty=(ex.qty||1)+1;
+    else mons.push({name:m.name, cr:m.cr||'', type:m.type||'', hp:m.hp||'', ac:m.ac||'', dex:m.dex||'', qty:1});
+    return {...e, monsters:mons};
+  });
+  await saveEnemyGroups(id, arr);
+  const s=document.getElementById(`egSearch_${id}_${egId}`); if(s) s.value='';
+  const b=document.getElementById(`egResults_${id}_${egId}`); if(b) b.innerHTML='';
+};
+window._egRemoveMonster = async (id, egId, name)=>{
+  const g=groupById(id); if(!g) return;
+  await saveEnemyGroups(id, (g.enemyGroups||[]).map(e=> e.id!==egId ? e : {...e, monsters:(e.monsters||[]).filter(x=>x.name!==name)}));
+};
+window._loadEnemyGroupToCombat = (id, egId)=>{
+  const g=groupById(id); if(!g) return;
+  const eg=(g.enemyGroups||[]).find(e=>e.id===egId); if(!eg) return;
+  if(!window._combatState || !window._combatState.active){
+    window._combatState={active:true,round:1,turnIndex:0,combatants:[],monsterSel:{},_sorted:false};
+    window._combatSyncPcs(true);
+  }
+  (eg.monsters||[]).forEach(m=>{
+    const qty=m.qty||1;
+    const existing=window._combatState.combatants.filter(c=>c.kind==='monster'&&c.baseName===m.name).length;
+    for(let i=0;i<qty;i++){
+      const num=existing+i+1; const dex=_combatParseDexFromMonster(m); const hp=_combatParseHp(m.hp);
+      window._combatState.combatants.push({kind:'monster',baseName:m.name,name:(qty>1||existing>0)?`${m.name} ${num}`:m.name,sub:`RC ${m.cr||'?'} · ${m.type||'?'}`,init:'',initBonus:_combatMod(dex),hp:hp,hpMax:hp,ac:parseInt(m.ac)||10,dead:false});
+    }
+  });
+  window._combatRender();
+  window._showTab('tab-gm');
+  alert(`Groupe « ${eg.name} » ajouté au combat.`);
+};
+
+function renderGroups(){
+  const box=document.getElementById('groupsList'); if(!box) return;
+  const gs=window._currentGroups||[];
+  if(!gs.length){ box.innerHTML='<p class="grp-empty">Aucun groupe pour l\'instant. Crée un groupe ci-dessus (tu en seras le MJ), ou demande à ton MJ de t\'inviter par email.</p>'; return; }
+  const esc=s=>String(s||'').replace(/'/g,"\\'");
+  box.innerHTML = gs.map(g=>{
+    const isGm = g.gmUid===currentUid;
+    const myChars = window._myCharacters||[];
+    const myAssign = (g.assignments||{})[currentUid];
+    const assignments = Object.values(g.assignments||{});
+    let body = `<div class="grp-head" style="border-left:5px solid ${g.color||'#b8860b'}">
+        <span class="grp-icon">${g.icon||'🛡️'}</span>
+        <span class="grp-name">${g.name||'Groupe'}</span>
+        <span class="grp-role ${isGm?'gm':''}">${isGm?'MJ':'Membre'}</span>
+        ${isGm?`<button class="grp-x" title="Supprimer le groupe" onclick="window._deleteGroup('${g.id}')">✕</button>`:''}
+      </div>`;
+    if(isGm){
+      body += `<div class="grp-custom">
+        <input class="grp-in" value="${(g.name||'').replace(/"/g,'&quot;')}" onchange="window._setGroupField('${g.id}','name',this.value)" placeholder="Nom du groupe">
+        <input class="grp-in grp-in-icon" value="${g.icon||'🛡️'}" maxlength="2" onchange="window._setGroupField('${g.id}','icon',this.value)" title="Icône">
+        <input type="color" class="grp-color" value="${g.color||'#b8860b'}" onchange="window._setGroupField('${g.id}','color',this.value)" title="Couleur">
+      </div>`;
+      body += `<div class="grp-sec-label">Membres</div><div class="grp-members">`;
+      body += (g.memberEmails||[]).map(em=>{
+        const a = assignments.find(v=>v && v.email===em);
+        const isGmEmail = em===g.gmEmail;
+        const charTxt = isGmEmail ? '' : (a ? `<span class="grp-assigned">→ ${a.charName}</span>` : '<span class="grp-noassign">(pas de fiche)</span>');
+        return `<div class="grp-member"><span class="grp-member-mail">${em} ${isGmEmail?'<small>(MJ)</small>':''}</span> ${charTxt} ${isGmEmail?'':`<button class="grp-x" onclick="window._removeMember('${g.id}','${esc(em)}')">✕</button>`}</div>`;
+      }).join('');
+      body += `</div>`;
+      body += `<div class="grp-invite"><input id="grpInvite_${g.id}" class="grp-in" placeholder="email@exemple.com"><button class="grp-btn" onclick="window._inviteMember('${g.id}')">Inviter</button></div>`;
+      const nAssigned = assignments.filter(v=>v&&v.charId).length;
+      body += `<button class="grp-btn grp-load" ${nAssigned?'':'disabled'} onclick="window._loadGroupSheets('${g.id}')">📂 Ouvrir ${nAssigned} fiche(s) PJ dans l'écran MJ</button>`;
+      body += `<div class="grp-sec-label">Groupes d'ennemis</div><div class="grp-egs">`;
+      body += (g.enemyGroups||[]).map(eg=>{
+        const mons=(eg.monsters||[]);
+        const chips = mons.length ? mons.map(m=>`<span class="grp-mon">${m.name}${m.qty>1?' ×'+m.qty:''}<button onclick="window._egRemoveMonster('${g.id}','${eg.id}','${esc(m.name)}')">✕</button></span>`).join('') : '<span class="grp-noassign">Aucune créature</span>';
+        return `<div class="grp-eg">
+          <div class="grp-eg-head"><b>${eg.name}</b><span class="grp-eg-actions"><button class="grp-btn sm" ${mons.length?'':'disabled'} onclick="window._loadEnemyGroupToCombat('${g.id}','${eg.id}')">⚔ Combat</button><button class="grp-x" onclick="window._deleteEnemyGroup('${g.id}','${eg.id}')">✕</button></span></div>
+          <div class="grp-eg-mons">${chips}</div>
+          <div class="grp-eg-add"><input id="egSearch_${g.id}_${eg.id}" class="grp-in" placeholder="Ajouter une créature…" oninput="window._egSearch('${g.id}','${eg.id}')"><div id="egResults_${g.id}_${eg.id}" class="grp-eg-results"></div></div>
+        </div>`;
+      }).join('');
+      body += `</div><button class="grp-btn" onclick="window._createEnemyGroup('${g.id}')">+ Nouveau groupe d'ennemis</button>`;
+    } else {
+      const opts = myChars.map(c=>`<option value="${c.id}" ${myAssign&&myAssign.charId===c.id?'selected':''}>${c.name}</option>`).join('');
+      body += `<div class="grp-sec-label">Ma fiche dans ce groupe</div>
+        <select class="grp-in grp-select" onchange="window._assignCharToGroup('${g.id}',this.value)">
+          <option value="">— Aucune —</option>${opts}
+        </select>`;
+      if(myAssign&&myAssign.charName) body += `<div class="grp-assigned" style="margin-top:6px">Fiche assignée : <b>${myAssign.charName}</b></div>`;
+      body += `<div class="grp-sec-label">Membres</div><div class="grp-members">`+(g.memberEmails||[]).map(em=>`<div class="grp-member"><span class="grp-member-mail">${em}${em===g.gmEmail?' <small>(MJ)</small>':''}</span></div>`).join('')+`</div>`;
+    }
+    return `<div class="grp-card">${body}</div>`;
+  }).join('');
+}
 
 // ============================================================
 // COMBAT TRACKER (V1.40)
@@ -8941,6 +9124,52 @@ window._saveNewResource = async (catId) => {
 .coin-gp { background:radial-gradient(circle at 35% 28%, #ffe98c, #e2b421 68%, #a8801a); }
 .coin-pp { background:radial-gradient(circle at 35% 28%, #f2f6fa, #d2dbe4 68%, #abb6c2); }
 
+/* ── Système de groupes ── */
+#tab-groups { padding:18px; max-width:760px; margin:0 auto; }
+#tab-groups h2 { font-family:'Cinzel'; color:var(--gold); margin-bottom:12px; }
+.grp-create { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+.grp-hint { font-family:'Crimson Pro'; font-size:0.84rem; color:#9a8e72; line-height:1.5; margin-bottom:16px; }
+.grp-in { font-family:'Crimson Pro'; font-size:0.9rem; padding:7px 10px; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); color:var(--ink); }
+.grp-in-icon { width:48px; text-align:center; }
+.grp-color { width:40px; height:34px; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); cursor:pointer; padding:2px; }
+.grp-select { min-width:200px; }
+.grp-btn { font-family:'Cinzel'; font-size:0.7rem; letter-spacing:0.5px; padding:7px 12px; border-radius:8px; border:1px solid var(--gold); background:transparent; color:var(--gold); cursor:pointer; }
+.grp-btn.primary, .grp-btn.sm { background:var(--gold); color:#fff; }
+.grp-btn.sm { padding:4px 9px; font-size:0.62rem; }
+.grp-btn:hover:not(:disabled) { filter:brightness(1.08); }
+.grp-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.grp-load { display:block; width:100%; margin:10px 0 4px; }
+.grp-card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:0 0 14px; margin-bottom:16px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+.grp-head { display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surface-hi); }
+.grp-icon { font-size:1.4rem; }
+.grp-name { font-family:'Cinzel'; font-weight:700; color:var(--ink); font-size:1.05rem; flex:1; }
+.grp-role { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; padding:2px 8px; border-radius:10px; background:var(--line); color:var(--ink); }
+.grp-role.gm { background:var(--gold); color:#fff; }
+.grp-x { background:none; border:none; color:var(--red); cursor:pointer; font-size:0.85rem; padding:0 4px; }
+.grp-custom { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:10px 14px 4px; }
+.grp-custom .grp-in:first-child { flex:1; }
+.grp-sec-label { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; color:var(--gold); text-transform:uppercase; padding:10px 14px 4px; }
+.grp-members { display:flex; flex-direction:column; gap:4px; padding:0 14px; }
+.grp-member { display:flex; align-items:center; gap:6px; font-family:'Crimson Pro'; font-size:0.86rem; color:var(--ink); }
+.grp-member-mail { color:var(--ink); }
+.grp-assigned { color:#2e7d32; font-size:0.82rem; }
+.grp-noassign { color:#aaa; font-style:italic; font-size:0.8rem; }
+.grp-invite { display:flex; gap:8px; padding:8px 14px 0; }
+.grp-invite .grp-in { flex:1; }
+.grp-egs { display:flex; flex-direction:column; gap:8px; padding:0 14px; }
+.grp-eg { border:1px solid var(--line); border-radius:9px; padding:8px 10px; background:var(--surface-soft); }
+.grp-eg-head { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--ink); }
+.grp-eg-actions { display:flex; gap:6px; align-items:center; }
+.grp-eg-mons { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0; }
+.grp-mon { display:inline-flex; align-items:center; gap:4px; font-family:'Crimson Pro'; font-size:0.78rem; background:var(--surface-hi); border:1px solid var(--line); border-radius:8px; padding:2px 4px 2px 8px; color:var(--ink); }
+.grp-mon button { background:none; border:none; color:var(--red); cursor:pointer; font-size:0.72rem; }
+.grp-eg-add { position:relative; }
+.grp-eg-add .grp-in { width:100%; box-sizing:border-box; }
+.grp-eg-results { display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+.grp-mon-res { text-align:left; background:var(--surface-hi); border:1px solid var(--line); border-radius:6px; padding:5px 9px; cursor:pointer; font-family:'Crimson Pro'; font-size:0.84rem; color:var(--ink); }
+.grp-mon-res:hover { border-color:var(--gold); }
+.grp-empty { font-family:'Crimson Pro'; color:#9a8e72; font-style:italic; padding:20px 0; text-align:center; }
+
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
   --parch: #f4ece1;
@@ -9670,6 +9899,7 @@ nav button:last-child { color:#884444; }
     <button id="navSheet" onclick="_showTab('tab-sheet')">FICHE</button>
     <button id="navCompendium" onclick="_showTab('tab-compendium')">COMPENDIUM</button>
     <button id="navGM" onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
+    <button id="navGroups" onclick="_showTab('tab-groups')">GROUPES</button>
     <button id="navEditor" onclick="_showTab('tab-editor')">ÉDITEUR</button>
     <button onclick="window._openThemePicker()" title="Changer le thème de couleurs">🎨 THÈME</button>
     <button onclick="_doLogout()">QUITTER</button>
@@ -10344,6 +10574,18 @@ nav button:last-child { color:#884444; }
     </div>
   </div>
   <!-- Éditeur de descriptions Firestore -->
+  <div id="tab-groups" class="tab-content">
+    <h2>Groupes</h2>
+    <div class="grp-create">
+      <input id="newGroupName" class="grp-in" placeholder="Nom du nouveau groupe">
+      <input id="newGroupIcon" class="grp-in grp-in-icon" maxlength="2" placeholder="🛡️">
+      <input id="newGroupColor" type="color" class="grp-color" value="#b8860b" title="Couleur">
+      <button class="grp-btn primary" onclick="window._createGroup()">Créer</button>
+    </div>
+    <p class="grp-hint">Un groupe a un seul <b>MJ</b> (son créateur). Le MJ invite les joueurs par email ; chaque joueur assigne une de ses fiches au groupe, et le MJ les ouvre toutes d'un clic dans son écran — sans coller d'identifiants. Le MJ peut aussi préparer des <b>groupes d'ennemis</b> et les lancer en combat en un clic.</p>
+    <div id="groupsList"></div>
+  </div>
+
   <div id="tab-editor" class="tab-content">
     <div class="comp-container">
       <h2>Éditeur de descriptions — Compendium Firebase</h2>
