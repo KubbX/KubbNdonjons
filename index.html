@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.42</title>
+<title>Grimoire — RPG Companion V1.43</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -2922,7 +2922,7 @@ function renderCharSheet(id, d) {
               ${fItem('bottes','Pieds',IC.pieds)}
               ${fItem('anneau1','Anneau',IC.ring)}
             </div>
-            <div class="eqg-fig"><img class="eqg-fig-img" alt="Personnage" src="${d.equipFigure || EQ_DEFAULT_FIG}"><div class="eqg-fig-tools"><button class="eqg-fig-btn" title="Importer une image" onclick="document.getElementById('equipFigInput').click()">🖼️</button>${d.equipFigure?`<button class="eqg-fig-btn" title="Rétablir l'image par défaut" onclick="window._resetEquipFigure('${id}')">↺</button>`:``}</div><input type="file" id="equipFigInput" accept="image/*" style="display:none" onchange="window._equipFigChosen(this,'${id}')"></div>
+            <div class="eqg-fig"><img class="eqg-fig-img ${d.equipFigure?'eqg-fig-custom':''}" alt="Personnage" src="${d.equipFigure || EQ_DEFAULT_FIG}"><div class="eqg-fig-tools"><button class="eqg-fig-btn" title="Importer une image" onclick="document.getElementById('equipFigInput').click()">🖼️</button>${d.equipFigure?`<button class="eqg-fig-btn" title="Rétablir l'image par défaut" onclick="window._resetEquipFigure('${id}')">↺</button>`:``}</div><input type="file" id="equipFigInput" accept="image/*" style="display:none" onchange="window._equipFigChosen(this,'${id}')"></div>
             <div class="eqg-col">
               ${fItem('cape','Dos',IC.dos,true)}
               ${fAuto('Torse',bodyName,bodyClick,IC.body,true)}
@@ -4259,7 +4259,9 @@ function renderGMCard(id, d) {
       <span>Mort: </span>
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.success||0)>=i?'success':''}">✓</span>`).join('')}
       ${[1,2,3].map(i=>`<span class="gm-ds ${(d.deathSaves?.fail||0)>=i?'fail':''}">✗</span>`).join('')}
-      <span class="gm-insp-btn ${inspClass}" style="margin-left:auto;cursor:pointer" onclick="window._toggleInspiration('${id}')">Inspiration: <strong>${d.inspiration?'★':'☆'}</strong></span>
+    </div>
+    <div class="gm-insp-row">
+      <button class="gm-insp-toggle ${inspClass}" onclick="window._toggleInspiration('${id}')">${d.inspiration ? 'Inspiration ✓' : 'Donner inspiration'}</button>
     </div>
     <!-- Conditions on GM card -->
     <div class="gm-conditions">
@@ -4308,7 +4310,6 @@ function renderGMCard(id, d) {
       <input id="gmhp_${id}" type="number" class="gm-input" placeholder="±" value="${preservedHpVal}">
       <button class="btn-gm-action heal" onclick="window._gmHeal('${id}')">Soigner</button>
       <button class="btn-gm-action dmg" onclick="window._gmDamage('${id}')">Blessure</button>
-      <button class="btn-gm-action gm-insp-action ${inspClass}" style="margin-left:auto" onclick="window._toggleInspiration('${id}')">${d.inspiration?'Retirer ★':'Donner ★'}</button>
     </div>
     <div class="gm-notes-section ${shouldBeOpen ? 'gm-notes-open' : ''}">
       <div class="gm-notes-header" onclick="window._toggleGMNotes('${id}')">
@@ -9081,9 +9082,12 @@ window._saveNewResource = async (catId) => {
 @keyframes eqfloat2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-12%,-9%)} }
 .eqg-grid { position:relative; z-index:1; display:grid; grid-template-columns:1fr minmax(108px,168px) 1fr; gap:9px; align-items:center; }
 .eqg-col { display:flex; flex-direction:column; gap:9px; }
-.eqg-fig { position:relative; display:flex; align-items:flex-end; justify-content:center; }
+.eqg-fig { position:relative; align-self:stretch; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .eqg-fig::before { content:''; position:absolute; inset:8% 4% 4%; background:radial-gradient(ellipse at 50% 42%, rgba(212,160,23,0.22), transparent 68%); filter:blur(16px); z-index:0; pointer-events:none; }
-.eqg-fig-img { position:relative; z-index:1; width:100%; height:auto; opacity:0.86; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.5)); }
+.eqg-fig-img { position:relative; z-index:1; height:100%; width:auto; max-width:100%; max-height:100%; object-fit:contain; opacity:0.86; filter:drop-shadow(0 8px 20px rgba(0,0,0,0.5)); }
+.eqg-fig-custom { width:100%; height:100%; object-fit:cover; opacity:0.95; filter:none;
+  -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 15%, #000 85%, transparent 100%);
+  mask-image:linear-gradient(90deg, transparent 0%, #000 15%, #000 85%, transparent 100%); }
 .eqg-bottom { position:relative; z-index:1; display:grid; grid-template-columns:1fr minmax(108px,168px) 1fr; gap:9px; margin-top:11px; }
 .eqb { position:relative; display:flex; flex-direction:row; align-items:center; gap:9px; text-align:left; cursor:pointer; overflow:hidden;
   background:rgba(255,255,255,0.07); -webkit-backdrop-filter:blur(9px) saturate(1.3); backdrop-filter:blur(9px) saturate(1.3);
@@ -9127,10 +9131,13 @@ window._saveNewResource = async (catId) => {
 .bpk::before,.bpk::after { content:''; position:absolute; aspect-ratio:1; width:56%; border-radius:50%; filter:blur(44px); opacity:0.45; pointer-events:none; z-index:0; }
 .bpk::before { background:radial-gradient(circle, rgba(212,160,23,0.38), transparent 70%); top:-12%; left:-10%; animation:eqfloat1 16s ease-in-out infinite; }
 .bpk::after { width:50%; background:radial-gradient(circle, rgba(110,150,90,0.30), transparent 70%); bottom:-14%; right:-8%; animation:eqfloat2 20s ease-in-out infinite; }
-.bpk-grid { position:relative; z-index:1; display:grid; grid-template-columns:1fr minmax(120px,200px) 1fr; gap:9px; align-items:start; }
+.bpk-grid { position:relative; z-index:1; display:grid; grid-template-columns:1fr minmax(120px,210px) 1fr; gap:9px; align-items:stretch; }
 .bpk-col { display:flex; flex-direction:column; gap:9px; }
-.bpk-fig { display:flex; align-items:center; justify-content:center; align-self:center; }
-.bpk-fig-img { width:100%; max-width:200px; height:auto; opacity:0.82; filter:drop-shadow(0 8px 22px rgba(0,0,0,0.5)); }
+.bpk-fig { position:relative; display:flex; align-items:center; justify-content:center; align-self:stretch; min-height:170px; overflow:hidden; }
+.bpk-fig::before { content:''; position:absolute; inset:6% 2%; background:radial-gradient(ellipse at 50% 46%, rgba(212,160,23,0.20), transparent 68%); filter:blur(18px); z-index:0; pointer-events:none; }
+.bpk-fig-img { position:relative; z-index:1; width:100%; height:100%; object-fit:cover; opacity:0.85; filter:drop-shadow(0 8px 22px rgba(0,0,0,0.5));
+  -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image:linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%); }
 .bpk-coins { position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:14px; }
 .bpc { background:rgba(255,255,255,0.07); -webkit-backdrop-filter:blur(9px) saturate(1.3); backdrop-filter:blur(9px) saturate(1.3); border:1px solid rgba(255,255,255,0.16); border-radius:12px; padding:6px 8px; box-shadow:0 4px 16px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12); }
 .bpc-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; gap:6px; }
@@ -9670,8 +9677,21 @@ nav button:last-child { color:#884444; }
 .combat-monster-pick .mmeta { font-family:'Crimson Pro'; font-size:0.78rem; color:#888; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .combat-monster-pick .mqty { width:55px !important; flex:0 0 55px !important; padding:5px !important; margin:0 !important; border:1px solid var(--line); border-radius:3px; text-align:center; font-family:'Cinzel'; }
 
-#gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
-.gm-card { background:var(--parch); border:1px solid var(--gold); border-radius:4px; overflow:hidden; }
+#gmMonitor { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; padding:16px; border-radius:16px;
+  background: radial-gradient(60% 40% at 15% 5%, rgba(212,160,23,0.10), transparent 60%), linear-gradient(160deg, var(--bg), var(--brown) 58%, var(--bg2)); }
+.gm-card { position:relative; border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,0.10);
+  background:
+    radial-gradient(70% 50% at 16% 6%, rgba(212,160,23,0.20), transparent 60%),
+    radial-gradient(60% 55% at 88% 92%, rgba(140,90,200,0.14), transparent 60%),
+    linear-gradient(150deg, var(--bg), var(--brown) 58%, var(--bg2));
+  -webkit-backdrop-filter:blur(10px) saturate(1.3); backdrop-filter:blur(10px) saturate(1.3);
+  box-shadow:0 10px 30px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.14);
+  transition:box-shadow .3s ease, transform .2s ease; }
+.gm-card::before, .gm-card::after { content:''; position:absolute; aspect-ratio:1; width:56%; border-radius:50%; filter:blur(44px); opacity:0.45; pointer-events:none; z-index:0; }
+.gm-card::before { background:radial-gradient(circle, rgba(212,160,23,0.38), transparent 70%); top:-14%; left:-12%; animation:eqfloat1 17s ease-in-out infinite; }
+.gm-card::after  { width:50%; background:radial-gradient(circle, rgba(150,90,210,0.30), transparent 70%); bottom:-16%; right:-10%; animation:eqfloat2 21s ease-in-out infinite; }
+.gm-card > * { position:relative; z-index:1; }
+.gm-card:hover { transform:translateY(-2px); box-shadow:0 16px 40px rgba(0,0,0,0.46), 0 0 26px -8px var(--gold), inset 0 1px 0 rgba(255,255,255,0.20); }
 .gm-card-header { padding:12px 14px; background:linear-gradient(135deg, var(--ink), var(--brown));
   display:flex; justify-content:space-between; align-items:flex-start; }
 .gm-card-name { font-family:'Cinzel'; color:var(--gold); font-size:1rem; }
@@ -9693,7 +9713,7 @@ nav button:last-child { color:#884444; }
 .gm-ds { display:inline-flex; width:18px; height:18px; border-radius:50%; border:1px solid #ccc; align-items:center; justify-content:center; font-size:0.7rem; }
 .gm-ds.success { background:#4caf50; color:#fff; border-color:#4caf50; }
 .gm-ds.fail { background:#f44336; color:#fff; border-color:#f44336; }
-.gm-actions { padding:10px 14px; display:flex; align-items:center; gap:6px; }
+.gm-actions { padding:10px 14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .gm-action-label { font-size:0.78rem; font-family:'Cinzel'; color:#666; }
 .gm-input { width:60px!important; padding:5px 8px!important; margin:0!important; text-align:center; }
 .btn-gm-action { padding:6px 12px; border:none; cursor:pointer; font-family:'Cinzel'; font-size:0.68rem; border-radius:3px; }
@@ -9706,9 +9726,40 @@ nav button:last-child { color:#884444; }
 .gm-notes-chevron { font-size:0.8rem; }
 .gm-notes-body { padding:4px 14px 10px; }
 .gm-notes-area { width:100%; margin-top:4px; min-height:60px; }
-.gm-insp-btn { padding:2px 8px; border-radius:3px; transition:all 0.2s; }
-.gm-insp-btn.gm-insp-active { background:rgba(184,134,11,0.2); color:var(--gold); }
-.gm-insp-action.gm-insp-active { background:linear-gradient(135deg,#8b6914,#6b4f0e)!important; box-shadow:0 0 8px rgba(184,134,11,0.4); }
+.gm-insp-row { padding:4px 14px 8px; display:flex; }
+.gm-insp-toggle { flex:1; min-width:0; max-width:100%; padding:6px 12px; border-radius:11px; border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.07); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); color:#f0e6d2;
+  cursor:pointer; font-family:'Cinzel'; font-size:0.64rem; letter-spacing:0.6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;
+  transition:all 0.2s; box-shadow:inset 0 1px 0 rgba(255,255,255,0.12); }
+.gm-insp-toggle:hover { border-color:var(--gold); background:rgba(212,160,23,0.18); }
+.gm-insp-toggle.gm-insp-active { background:var(--gold); color:#fff; border-color:var(--gold); box-shadow:0 0 12px rgba(212,160,23,0.55), inset 0 1px 0 rgba(255,255,255,0.25); }
+
+/* ── Cartes MJ : lisibilité sur verre sombre ── */
+.gm-card .gm-card-header { background:linear-gradient(135deg, rgba(0,0,0,0.42), rgba(61,32,16,0.52)); border-bottom:1px solid rgba(255,255,255,0.08); }
+.gm-card .gm-hp-bar-wrap { background:rgba(255,255,255,0.13); }
+.gm-card .gm-stats-row { background:transparent; }
+.gm-card .gm-stat-label, .gm-card .gm-char-lbl { color:#e3c574; }
+.gm-card .gm-stat-val { color:#f5eddd; }
+.gm-card .gm-char { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.14); }
+.gm-card .gm-char-val { color:#f5eddd; }
+.gm-card .gm-char-mod { color:#c1b18f; }
+.gm-card .gm-ds-row { background:transparent; color:#e9dcc0; }
+.gm-card .gm-ds { border-color:rgba(255,255,255,0.28); color:#e9dcc0; }
+.gm-card .gm-conditions { background:transparent; border-top:1px solid rgba(255,255,255,0.10); }
+.gm-card .gm-conc-banner { background:rgba(155,89,182,0.18); border-top:1px solid rgba(155,89,182,0.30); color:#d8b6ec; }
+.gm-card .gm-spellslots { background:transparent; }
+.gm-card .gm-slot { background:rgba(255,255,255,0.07); border-color:rgba(255,255,255,0.16); color:#f0e6d2; }
+.gm-card .gm-slot-pact { border-color:#b07cd0; color:#d8b6ec; }
+.gm-card .gm-charges-row { background:transparent; border-top:1px solid rgba(255,255,255,0.10); }
+.gm-card .gm-charge { background:rgba(255,255,255,0.07); border-color:rgba(255,255,255,0.16); color:#f0e6d2; }
+.gm-card .gm-charge-empty { background:rgba(244,67,54,0.18); border-color:#f44336; color:#ff9b94; }
+.gm-card .gm-actions { background:transparent; }
+.gm-card .gm-action-label { color:#c9b88a; }
+.gm-card .gm-input { background:rgba(255,255,255,0.92); }
+.gm-card .gm-notes-section { border-top-color:rgba(255,255,255,0.12); }
+.gm-card .gm-notes-header:hover { background:rgba(255,255,255,0.06); }
+.gm-card .gm-notes-area { background:rgba(255,255,255,0.92); }
+.gm-card .section-add-btn { color:#e9cf8a; border-color:rgba(212,160,23,0.55); }
  
 /* ── SPELL SLOTS ── */
 .spell-slots-section { padding:4px 0; }
@@ -10523,7 +10574,7 @@ nav button:last-child { color:#884444; }
     </div>
 
     <div id="gmMonitor">
-      <p style="color:#666;font-style:italic">Collez l'ID d'une fiche pour la surveiller en temps réel. Plusieurs personnages peuvent être affichés simultanément.</p>
+      <p style="color:#c9b88a;font-style:italic">Charge les fiches de PJ depuis l'onglet <strong>Groupes</strong> (📂), ou colle l'ID d'une fiche dans le champ ci-dessus. Plusieurs personnages peuvent être affichés simultanément.</p>
     </div>
     </div><!-- /gm-left -->
 
