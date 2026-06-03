@@ -2531,6 +2531,7 @@ function spellMeta(school) {
 
 function renderCharSheet(id, d) {
   window._currentSheetData = d;
+  window._currentSheetId = id;
   // Cache caster classes for spell filter auto-apply
   const cls = getClasses(d);
   window._activeCharCasterClasses = cls.filter(c => CLASSES[c.name]?.spellcaster).map(c => c.name);
@@ -2690,17 +2691,40 @@ function renderCharSheet(id, d) {
  
       <!-- Compétences -->
       <div class="sheet-section">
-        <div class="section-title">Compétences <small style="color:var(--muted-gold);font-family:'Crimson Pro';letter-spacing:0">(clic pour maîtrise)</small></div>
+        <div class="section-title">Compétences
+          <select class="skill-sort-select" onchange="window._setSkillSort(this.value)" title="Trier les compétences">
+            <option value="default" ${(window._skillSort||'default')==='default'?'selected':''}>Ordre par défaut</option>
+            <option value="alpha" ${window._skillSort==='alpha'?'selected':''}>A → Z</option>
+            <option value="ability" ${window._skillSort==='ability'?'selected':''}>Par caractéristique</option>
+          </select>
+        </div>
+        <div style="font-size:0.62rem;color:var(--muted-gold);font-family:'Crimson Pro';padding:0 0 4px">Clic sur la pastille pour la maîtrise.</div>
         <div class="skill-list">
-          ${SKILLS_LIST.map(sk=>{
-            const prof = d.skillProficiencies?.[sk.name];
-            const dotClass = prof==='expert'?'expert':prof==='prof'?'filled':'';
-            return `
-          <div class="skill-row">
-            <span class="prof-dot clickable ${dotClass}" onclick="window._cycleSkillProf('${id}','${sk.name}')" title="Clic: aucune → maîtrise → expertise"></span>
-            <span class="skill-val">${fmtB(skillBonus(sk.name))}</span>
-            <span class="skill-name">${sk.name} <small>(${{str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'}[sk.stat]})</small></span>
-          </div>`;}).join('')}
+          ${(()=>{
+            const sortMode = window._skillSort || 'default';
+            const ABIL = {str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'};
+            const skillRow = (sk) => {
+              const prof = d.skillProficiencies?.[sk.name];
+              const dotClass = prof==='expert'?'expert':prof==='prof'?'filled':'';
+              return `
+              <div class="skill-row">
+                <span class="prof-dot clickable ${dotClass}" onclick="window._cycleSkillProf('${id}','${sk.name}')" title="Clic: aucune → maîtrise → expertise"></span>
+                <span class="skill-val">${fmtB(skillBonus(sk.name))}</span>
+                <span class="skill-name">${sk.name} <small>(${ABIL[sk.stat]})</small></span>
+              </div>`;
+            };
+            if (sortMode === 'ability') {
+              const ORDER = [['str','FORCE'],['dex','DEXTÉRITÉ'],['con','CONSTITUTION'],['int','INTELLIGENCE'],['wis','SAGESSE'],['cha','CHARISME']];
+              return ORDER.map(([stat,label])=>{
+                const grp = SKILLS_LIST.filter(s=>s.stat===stat).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+                if(!grp.length) return '';
+                return `<div class="skill-group-header">${label}</div>` + grp.map(skillRow).join('');
+              }).join('');
+            }
+            let list = SKILLS_LIST.slice();
+            if (sortMode === 'alpha') list.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+            return list.map(skillRow).join('');
+          })()}
         </div>
       </div>
  
@@ -2874,8 +2898,8 @@ function renderCharSheet(id, d) {
           </div>
           <div class="inv-list">
             ${(d.inventory_items||[]).map((it,i)=>`
-            <div class="inv-item" onclick="window._showSheetItemDetail('${id}',${i})" style="cursor:pointer">
-              <div class="inv-item-main"><strong>${it.name}</strong>${it.qty>1?` ×${it.qty}`:''} ${it.detail?`<span style="color:#888;font-size:0.78rem">— ${it.detail}</span>`:''}</div>
+            <div class="inv-item" onclick="window._showSheetItemDetail('${id}',${i})" style="cursor:pointer" title="Voir le détail">
+              <div class="inv-item-main"><strong>${it.name}</strong>${it.qty>1?` <span style="color:#888">×${it.qty}</span>`:''}${it.rarity&&it.rarity!=='Commun'&&it.rarity!=='Commune'?` <span style="color:var(--muted-gold);font-size:0.72rem">${it.rarity}</span>`:''}</div>
               <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_items',${i})">✕</button>
             </div>`).join('')}
             ${!(d.inventory_items||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Inventaire vide</div>' : ''}
@@ -3090,16 +3114,28 @@ function renderCharSheet(id, d) {
       <!-- Aptitudes & Traits -->
       <div class="sheet-section">
         <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
-        <div class="features-list">
-          ${(d.traits||[]).map(t=>`<div class="feature-item">• ${t}</div>`).join('')}
-          ${(d.features||[]).map((f,i)=>`
-          <div class="feature-item feature-item-removable">
-            <div><strong>${f.name}${f.src?' <small style="color:#999">('+f.src+')</small>':''}: </strong>${f.desc}</div>
-            ${f.src==='Compendium'||f.src==='Don'?`<button class="inv-remove-btn" onclick="window._removeFeature('${id}',${i})">✕</button>`:''}
+        <div class="inv-list">
+          ${getClasses(d).filter(c=>d.subclasses&&d.subclasses[c.name]).map(c=>`
+          <div class="inv-item" onclick="window._showCard('subclass','${c.name}')" style="cursor:pointer" title="Voir la sous-classe">
+            <div class="inv-item-main"><strong>${d.subclasses[c.name]}</strong> <span style="color:#888">— Sous-classe (${c.name})</span></div>
           </div>`).join('')}
+          ${d.background?`
+          <div class="inv-item" onclick="window._showCard('background',0)" style="cursor:pointer" title="Voir l'historique">
+            <div class="inv-item-main"><strong>${d.background}</strong> <span style="color:#888">— Historique</span></div>
+          </div>`:''}
+          ${(d.traits||[]).map((t,i)=>`
+          <div class="inv-item" onclick="window._showCard('trait',${i})" style="cursor:pointer" title="Voir le trait">
+            <div class="inv-item-main">${t}</div>
+          </div>`).join('')}
+          ${(d.features||[]).map((f,i)=>`
+          <div class="inv-item" onclick="window._showCard('feature',${i})" style="cursor:pointer" title="Voir le détail">
+            <div class="inv-item-main"><strong>${f.name}</strong>${f.src?` <span style="color:#999;font-size:0.76rem">(${f.src})</span>`:''}</div>
+            ${f.src==='Compendium'||f.src==='Don'?`<button class="inv-remove-btn" onclick="event.stopPropagation();window._removeFeature('${id}',${i})">✕</button>`:''}
+          </div>`).join('')}
+          ${!(d.traits||[]).length && !(d.features||[]).length && !d.background ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune aptitude — utilisez + Don ou montez de niveau.</div>' : ''}
         </div>
         <div class="field-group" style="margin-top:8px">
-          <label>Autres aptitudes</label>
+          <label>Autres aptitudes (note libre)</label>
           <div class="editable block-edit" data-field="extraFeatures" data-type="textarea">${d.extraFeatures||'—'}</div>
         </div>
       </div>
@@ -4307,9 +4343,14 @@ window._showSheetItemDetail = async (charId, index) => {
     <div class="rd-props">
       ${r.cost ? `<div class="rd-prop"><span class="rd-prop-label">Coût :</span> ${r.cost}</div>` : ''}
       ${r.weight ? `<div class="rd-prop"><span class="rd-prop-label">Poids :</span> ${r.weight}</div>` : ''}
-      ${it.detail ? `<div class="rd-prop"><span class="rd-prop-label">Détail :</span> ${it.detail}</div>` : ''}
     </div>
     ${r.desc ? `<div class="rd-separator"></div><div class="rd-desc">${r.desc}</div>` : ''}
+    <div class="rd-separator"></div>
+    <div style="text-align:left">
+      <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Note personnelle (optionnelle)</label>
+      <textarea id="itemNoteInput" class="item-note-input" placeholder="Ajoute une note si tu le souhaites…">${it.detail||''}</textarea>
+      <button class="section-add-btn" onclick="window._saveItemNote('${charId}',${index},this)">Enregistrer la note</button>
+    </div>
     <div class="rd-separator"></div>
     <div class="rd-tags"><span class="rd-source-tag">${r.source||'—'}</span></div>
   </div>`;
@@ -4317,6 +4358,71 @@ window._showSheetItemDetail = async (charId, index) => {
   content.innerHTML = html;
   document.getElementById('forgeOverlay').style.display = 'flex';
 };
+
+// ── Fiche détaillée d'une carte d'aptitude (trait / don / aptitude / historique / sous-classe) ──
+function bgDetailHtml(bg){
+  let h = '<div class="rd-props">';
+  if (bg.skills && bg.skills.length) h += `<div class="rd-prop"><span class="rd-prop-label">Compétences :</span> ${bg.skills.join(', ')}</div>`;
+  if (bg.tools && bg.tools.length)   h += `<div class="rd-prop"><span class="rd-prop-label">Outils :</span> ${bg.tools.join(', ')}</div>`;
+  if (bg.lang)                       h += `<div class="rd-prop"><span class="rd-prop-label">Langues :</span> ${bg.lang}</div>`;
+  if (bg.equipment)                  h += `<div class="rd-prop"><span class="rd-prop-label">Équipement :</span> ${bg.equipment}</div>`;
+  h += '</div>';
+  if (bg.feature) h += `<div class="rd-separator"></div><div class="rd-desc"><strong>Capacité :</strong> ${bg.feature}</div>`;
+  if (bg.source)  h += `<div class="rd-separator"></div><div class="rd-tags"><span class="rd-source-tag">${bg.source}</span></div>`;
+  return h;
+}
+function openSheetCardModal(icon, title, subtitle, bodyHtml){
+  const content = document.getElementById('forgeContent');
+  if (!content) return;
+  document.getElementById('forgeProgress').innerHTML = `<div class="progress-step active">${icon}</div>`;
+  document.getElementById('forgePrev').style.visibility = 'hidden';
+  document.getElementById('forgeNext').style.display = 'none';
+  content.innerHTML = `<div class="rd-sheet">
+    <div class="rd-title">${title||'?'}</div>
+    <div class="rd-subtitle">${subtitle||''}</div>
+    <div class="rd-separator"></div>
+    ${bodyHtml || '<div class="rd-desc" style="color:#888;font-style:italic">Pas de description détaillée.</div>'}
+  </div>
+  <button class="btn-prev" style="margin-top:12px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">Fermer</button>`;
+  document.getElementById('forgeOverlay').style.display = 'flex';
+}
+window._showCard = (kind, key) => {
+  const d = window._currentSheetData;
+  if (!d) return;
+  if (kind === 'trait') {
+    openSheetCardModal('🧬', (d.traits||[])[key] || '?', 'Trait racial / inné', '');
+  } else if (kind === 'feature') {
+    const f = (d.features||[])[key] || {};
+    openSheetCardModal('⭐', f.name||'?', f.src || 'Aptitude', f.desc ? `<div class="rd-desc">${f.desc}</div>` : '');
+  } else if (kind === 'background') {
+    const bg = (typeof BACKGROUNDS !== 'undefined') ? BACKGROUNDS[d.background] : null;
+    openSheetCardModal('📜', d.background || '—', 'Historique', bg ? bgDetailHtml(bg) : '');
+  } else if (kind === 'subclass') {
+    const sub = d.subclasses ? d.subclasses[key] : null;
+    const sc  = (typeof SUBCLASSES !== 'undefined') ? SUBCLASSES[key] : null;
+    let body = '';
+    if (sc && sub && sc.options && sc.options[sub]) {
+      body = (sc.options[sub].features||[]).map(f => `<div class="rd-prop" style="margin-bottom:8px"><strong>Niv.${f.lvl} — ${f.name}</strong><div style="color:#555;margin-top:2px">${f.desc}</div></div>`).join('');
+    }
+    openSheetCardModal('🎖️', sub || '?', 'Sous-classe — ' + key, body);
+  }
+};
+
+// ── Enregistrer la note personnelle d'un objet ──
+window._saveItemNote = async (charId, index, btn) => {
+  const ta = document.getElementById('itemNoteInput');
+  const val = ta ? ta.value : '';
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  const items = [...(snap.data().inventory_items || [])];
+  if (items[index]) items[index] = { ...items[index], detail: val };
+  await updateDoc(doc(db, "characters", charId), { inventory_items: items });
+  if (btn) { const o = btn.textContent; btn.textContent = '✓ Enregistré'; setTimeout(()=>{ try { btn.textContent = o; } catch(e){} }, 1500); }
+};
+
+// ── Re-rendu de la fiche + tri des compétences ──
+window._rerenderSheet = () => { if (window._currentSheetId && window._currentSheetData) renderCharSheet(window._currentSheetId, window._currentSheetData); };
+window._setSkillSort = (v) => { window._skillSort = v; window._rerenderSheet(); };
 
 window._doShortRest = async (charId) => {
   const snap = await getDoc(doc(db, "characters", charId));
@@ -7244,7 +7350,7 @@ window._pickResource = async (charId, catId, index) => {
     // Check if item already exists, increment qty
     const existing = items.find(it => it.name === r.name);
     if (existing) { existing.qty = (existing.qty||1) + 1; }
-    else { items.push({ name: r.name, detail: r.desc||r.type||'', qty: 1, rarity: r.rarity||'' }); }
+    else { items.push({ name: r.name, qty: 1, rarity: r.rarity||'' }); }
     update.inventory_items = items;
   }
   else if (catId === 'feat') {
@@ -8508,6 +8614,19 @@ window._saveNewResource = async (catId) => {
 .pd-pick-row:hover { border-color:var(--gold); background:var(--surface-hi); }
 .pd-pick-row.danger { color:var(--red); border-color:rgba(139,0,0,0.3); }
 .pd-pick-sep { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; color:var(--gold); margin:8px 0 5px; text-transform:uppercase; }
+
+/* ── Barre de navigation : accessible en mobile (passe à la ligne au lieu de rogner) ── */
+@media (max-width: 768px) {
+  nav { padding:0 6px; gap:2px; flex-wrap:wrap; }
+  nav button { padding:9px 9px; font-size:0.6rem; letter-spacing:1px; border-bottom-width:2px; }
+}
+
+/* ── Tri des compétences ── */
+.skill-sort-select { font-family:'Crimson Pro'; font-size:0.72rem; padding:2px 6px; border:1px solid var(--line); border-radius:5px; background:var(--surface-soft); color:var(--ink); margin-left:6px; cursor:pointer; }
+.skill-group-header { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:1px; color:var(--gold); text-transform:uppercase; margin:8px 0 2px; padding-top:5px; border-top:1px solid var(--surface-alt); }
+
+/* ── Note personnelle d'objet (modale d'inventaire) ── */
+.item-note-input { width:100%; box-sizing:border-box; min-height:54px; margin:4px 0 6px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--surface-soft); color:var(--ink); font-family:'Crimson Pro'; font-size:0.88rem; resize:vertical; }
 
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
