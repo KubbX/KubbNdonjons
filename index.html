@@ -2797,64 +2797,70 @@ function renderCharSheet(id, d) {
         const mainW = meleeW[0], offW = meleeW[1], distW = rangedW[0];
         const findItem = key => items.findIndex(it=>it.slot===key);
 
-        // Emplacement d'accessoire (objet assignable)
         const acc = (key,ic,lb) => {
-          const idx = findItem(key);
-          const filled = idx>=0;
+          const idx = findItem(key); const filled = idx>=0;
           return `<button class="pd-slot ${filled?'filled':'empty'}" title="${lb}" onclick="window._pdSlotClick('${id}','${key}')">
             <span class="pd-ic">${ic}</span>
             <span class="pd-tx"><span class="pd-lb">${lb}</span><span class="pd-it">${filled?items[idx].name:'—'}</span></span>
           </button>`;
         };
-        // Emplacement d'équipement (arme/armure : clic = détail)
         const eq = (ic,lb,name,click,filled) => `
           <button class="pd-slot ${filled?'filled':'empty'}" title="${lb}" ${click?`onclick="${click}"`:''} ${filled?'':'style="cursor:default"'}>
             <span class="pd-ic">${ic}</span>
             <span class="pd-tx"><span class="pd-lb">${lb}</span><span class="pd-it">${filled?name:'—'}</span></span>
           </button>`;
 
-        const bodySlot = eq('🦺','Armure', bodyIdx>=0?armors[bodyIdx].name:'', bodyIdx>=0?`window._showSheetArmorDetail('${id}',${bodyIdx})`:'', bodyIdx>=0);
-        const mainSlot = eq('🗡️','Main droite', mainW?mainW.w.name:'', mainW?`window._showSheetWeaponDetail('${id}',${mainW.i})`:'', !!mainW);
-        let leftIc='🛡️', leftName='', leftClick='', leftFilled=false;
-        if (shieldIdx>=0) { leftName=armors[shieldIdx].name; leftClick=`window._showSheetArmorDetail('${id}',${shieldIdx})`; leftFilled=true; }
-        else if (offW) { leftIc='🗡️'; leftName=offW.w.name; leftClick=`window._showSheetWeaponDetail('${id}',${offW.i})`; leftFilled=true; }
-        const leftSlot = eq(leftIc, 'Main gauche', leftName, leftClick, leftFilled);
-        const distSlot = eq('🏹','Distance', distW?distW.w.name:'', distW?`window._showSheetWeaponDetail('${id}',${distW.i})`:'', !!distW);
+        const bodySlot   = eq('🦺','Armure',   bodyIdx>=0?armors[bodyIdx].name:'',     bodyIdx>=0?`window._showSheetArmorDetail('${id}',${bodyIdx})`:'', bodyIdx>=0);
+        const shieldSlot = eq('🛡️','Bouclier', shieldIdx>=0?armors[shieldIdx].name:'', shieldIdx>=0?`window._showSheetArmorDetail('${id}',${shieldIdx})`:'', shieldIdx>=0);
+        const mainSlot   = eq('⚔️','Main droite', mainW?mainW.w.name:'', mainW?`window._showSheetWeaponDetail('${id}',${mainW.i})`:'', !!mainW);
+        const leftSlot   = eq('🗡️','Main gauche', offW?offW.w.name:'',  offW?`window._showSheetWeaponDetail('${id}',${offW.i})`:'',  !!offW);
+        const distSlot   = eq('🏹','Distance',    distW?distW.w.name:'', distW?`window._showSheetWeaponDetail('${id}',${distW.i})`:'', !!distW);
 
         return `
       <div class="sheet-section">
-        <div class="section-title">Équipement porté</div>
-        <div class="pd-wrap">
-          <div class="pd-col">
-            ${acc('tete','🪖','Tête')}
+        <div class="section-title">Équipement</div>
+        <div class="eq-doll">
+          <div class="eq-top">${acc('tete','🪖','Casque')}</div>
+          <div class="eq-colL">
+            ${acc('visage','🎭','Visage')}
             ${acc('cou','📿','Amulette')}
-            ${acc('cape','🧥','Cape')}
             ${bodySlot}
-            ${acc('mains','🧤','Mains')}
+            ${shieldSlot}
+            ${acc('vetements','👕','Vêtements')}
           </div>
-          <figure class="pd-figure">
-            <svg viewBox="0 0 100 200" class="pd-svg" aria-hidden="true">
-              <circle class="body" cx="50" cy="20" r="14"/>
-              <path class="body" d="M50 35 C40 35 33 38 33 46 L30 64 C29 70 24 92 22 108 L31 110 C34 96 37 82 38 76 L38 120 C38 140 36 168 34 186 L46 186 C47 168 49 150 50 140 C51 150 53 168 54 186 L66 186 C64 168 62 140 62 120 L62 76 C63 82 66 96 69 110 L78 108 C76 92 71 70 70 64 L67 46 C67 38 60 35 50 35 Z"/>
-              <circle class="outline" cx="50" cy="20" r="14"/>
-              <path class="outline" d="M50 35 C40 35 33 38 33 46 L30 64 C29 70 24 92 22 108 L31 110 C34 96 37 82 38 76 L38 120 C38 140 36 168 34 186 L46 186 C47 168 49 150 50 140 C51 150 53 168 54 186 L66 186 C64 168 62 140 62 120 L62 76 C63 82 66 96 69 110 L78 108 C76 92 71 70 70 64 L67 46 C67 38 60 35 50 35 Z"/>
+          <figure class="eq-fig">
+            <svg viewBox="0 0 120 240" class="eq-figure-svg" aria-hidden="true">
+              <path class="fig-cloak" d="M40 58 C20 110 20 190 26 214 L44 210 C38 150 44 96 48 70 Z"/>
+              <path class="fig-cloak" d="M80 58 C100 110 100 190 94 214 L76 210 C82 150 76 96 72 70 Z"/>
+              <path class="fig-leg" d="M50 116 L47 196 L58 196 L60 118 Z"/>
+              <path class="fig-leg" d="M70 116 L73 196 L62 196 L60 118 Z"/>
+              <path class="fig-boot" d="M45 194 L59 194 L59 214 L39 214 Q39 200 45 194 Z"/>
+              <path class="fig-boot" d="M75 194 L61 194 L61 214 L81 214 Q81 200 75 194 Z"/>
+              <path class="fig-arm" d="M34 62 C27 90 29 116 35 128 L45 124 C40 102 42 80 45 66 Z"/>
+              <path class="fig-arm" d="M86 62 C93 90 91 116 85 128 L75 124 C80 102 78 80 75 66 Z"/>
+              <path class="fig-torso" d="M44 58 C60 52 76 58 76 58 L80 106 C60 116 40 106 40 106 Z"/>
+              <rect class="fig-belt" x="40" y="105" width="40" height="10" rx="2"/>
+              <ellipse class="fig-torso" cx="42" cy="60" rx="13" ry="9"/>
+              <ellipse class="fig-torso" cx="78" cy="60" rx="13" ry="9"/>
+              <path class="fig-line" d="M60 62 L60 104"/>
+              <rect class="fig-skin" x="54" y="40" width="12" height="9" rx="3"/>
+              <circle class="fig-skin" cx="60" cy="29" r="13"/>
+              <path class="fig-helm" d="M47 29 A13 13 0 0 1 73 29 L73 23 Q60 13 47 23 Z"/>
+              <path class="fig-line" d="M52 30 L68 30"/>
             </svg>
           </figure>
-          <div class="pd-col">
+          <div class="eq-colR">
+            ${acc('cape','🧥','Cape')}
+            ${acc('mains','🧤','Gants')}
             ${acc('anneau1','💍','Anneau')}
             ${acc('anneau2','💍','Anneau')}
             ${acc('ceinture','🟫','Ceinture')}
-            ${acc('bottes','🥾','Bottes')}
           </div>
+          <div class="eq-hands">${leftSlot}${mainSlot}</div>
+          <div class="eq-dist">${distSlot}</div>
+          <div class="eq-bottom">${acc('bottes','🥾','Pieds')}${acc('divers','📦','Divers')}</div>
         </div>
-        <div class="pd-hands">
-          ${leftSlot}
-          ${mainSlot}
-        </div>
-        <div class="pd-hands pd-distance">
-          ${distSlot}
-        </div>
-        <div style="padding:0 10px 8px;font-size:0.72rem;color:#999;font-style:italic">Astuce : clique un emplacement vide pour y placer un objet. Pour les armes/armures, utilise « Équiper » dans les listes ci-dessous (une arme à distance ira dans l'emplacement Distance).</div>
+        <div style="padding:2px 14px 10px;font-size:0.72rem;color:#999;font-style:italic">Clique une case vide pour y placer un objet. Armes &amp; armures : bouton « Équiper » dans le Sac à dos ci-dessous.</div>
       </div>`;
       })()}
 
@@ -2878,7 +2884,7 @@ function renderCharSheet(id, d) {
  
       <!-- Équipement & Monnaie -->
       <div class="sheet-section">
-        <div class="section-title">Équipement & Monnaie</div>
+        <div class="section-title">🎒 Sac à dos &amp; Monnaie</div>
         <div class="coin-row">
           ${['cp','sp','ep','gp','pp'].map(c=>`
           <div class="coin-box">
@@ -2909,10 +2915,10 @@ function renderCharSheet(id, d) {
         <!-- Inventaire objets -->
         <div style="padding:4px 10px 10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Objets & Équipement</label>
+            <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Contenu du sac</label>
             <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','item')">+ Compendium</button>
           </div>
-          <div class="inv-list">
+          <div class="inv-list backpack-list">
             ${(d.inventory_items||[]).map((it,i)=>`
             <div class="inv-item" onclick="window._showSheetItemDetail('${id}',${i})" style="cursor:pointer" title="Voir le détail">
               <div class="inv-item-main"><strong>${it.name}</strong>${it.qty>1?` <span style="color:#888">×${it.qty}</span>`:''}${it.rarity&&it.rarity!=='Commun'&&it.rarity!=='Commune'?` <span style="color:var(--muted-gold);font-size:0.72rem">${it.rarity}</span>`:''}</div>
@@ -8161,7 +8167,7 @@ window._setSpellView = (v) => {
 };
 
 // ── Paper doll : emplacements d'accessoires (objets de l'inventaire) ──
-const PD_SLOT_LABELS = { tete:'Tête', cou:'Amulette', cape:'Cape', mains:'Mains', anneau1:'Anneau (gauche)', anneau2:'Anneau (droite)', ceinture:'Ceinture', bottes:'Bottes' };
+const PD_SLOT_LABELS = { tete:'Casque', visage:'Visage', cou:'Amulette', cape:'Cape', mains:'Gants', vetements:'Vêtements', anneau1:'Anneau (gauche)', anneau2:'Anneau (droite)', ceinture:'Ceinture', bottes:'Pieds', divers:'Divers' };
 window._pdClosePicker = () => { const el = document.getElementById('pdSlotPicker'); if (el) el.style.display = 'none'; };
 window._pdSlotClick = async (charId, slotKey) => {
   const snap = await getDoc(doc(db, "characters", charId));
@@ -8681,6 +8687,62 @@ window._saveNewResource = async (catId) => {
 .feat-group.open .feat-arrow { transform:rotate(90deg); }
 .feat-group-body { display:none; padding:8px; flex-direction:column; gap:5px; }
 .feat-group.open .feat-group-body { display:flex; }
+
+/* ── Écran d'équipement façon fiche papier (paper doll) ── */
+.eq-doll {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  grid-template-areas:
+    "top top top"
+    "left figure right"
+    "hands hands hands"
+    "dist dist dist"
+    "bottom bottom bottom";
+  gap:9px 6px; align-items:center; padding:10px 14px 4px;
+}
+.eq-top { grid-area:top; display:flex; justify-content:center; }
+.eq-top .pd-slot { max-width:210px; }
+.eq-colL { grid-area:left; display:flex; flex-direction:column; gap:9px; }
+.eq-colR { grid-area:right; display:flex; flex-direction:column; gap:9px; }
+.eq-fig  { grid-area:figure; display:flex; align-items:center; justify-content:center; padding:0 2px; }
+.eq-hands { grid-area:hands; display:flex; gap:8px; }
+.eq-dist  { grid-area:dist;  display:flex; }
+.eq-bottom { grid-area:bottom; display:flex; gap:8px; }
+.eq-hands .pd-slot, .eq-dist .pd-slot, .eq-bottom .pd-slot { flex:1; }
+.eq-figure-svg { width:116px; height:auto; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.15)); }
+.fig-cloak { fill:var(--brown); opacity:0.20; }
+.fig-torso { fill:var(--ink); opacity:0.16; stroke:var(--gold); stroke-width:0.8; stroke-opacity:0.45; }
+.fig-arm, .fig-leg { fill:var(--ink); opacity:0.14; stroke:var(--gold); stroke-width:0.7; stroke-opacity:0.4; }
+.fig-boot { fill:var(--ink); opacity:0.26; }
+.fig-belt { fill:var(--gold); opacity:0.4; }
+.fig-skin { fill:var(--ink); opacity:0.12; stroke:var(--gold); stroke-width:0.8; stroke-opacity:0.4; }
+.fig-helm { fill:var(--ink); opacity:0.18; stroke:var(--gold); stroke-width:0.8; stroke-opacity:0.5; }
+.fig-line { stroke:var(--gold); stroke-width:0.8; stroke-opacity:0.4; fill:none; }
+
+/* Étiquette-onglet (petit carré doré + libellé) */
+.eq-doll .pd-lb { display:flex; align-items:center; gap:4px; }
+.eq-doll .pd-lb::before { content:''; width:6px; height:6px; background:var(--gold); border-radius:1px; flex:0 0 auto; }
+
+/* Fils de connexion des cases latérales vers la figure */
+.eq-colL .pd-slot, .eq-colR .pd-slot { position:relative; overflow:visible; }
+.eq-colL .pd-slot::after, .eq-colR .pd-slot::after {
+  content:''; position:absolute; top:50%; width:13px; height:0;
+  border-top:1.5px dotted var(--gold); opacity:0.5; transform:translateY(-50%);
+}
+.eq-colL .pd-slot::before, .eq-colR .pd-slot::before {
+  content:''; position:absolute; top:50%; width:6px; height:6px;
+  border-radius:50%; background:var(--gold); opacity:0.65; transform:translateY(-50%);
+}
+.eq-colL .pd-slot::after  { right:-14px; }
+.eq-colL .pd-slot::before { right:-17px; }
+.eq-colR .pd-slot::after  { left:-14px; }
+.eq-colR .pd-slot::before { left:-17px; }
+
+/* ── Inventaire « Sac à dos » ── */
+.backpack-list .inv-item { border-left:3px solid var(--line-gold); background:linear-gradient(90deg, var(--surface-hi), var(--surface-soft)); }
+.backpack-list .inv-item .inv-item-main::before { content:'▪'; color:var(--muted-gold); margin-right:6px; }
+.coin-row .coin-box { background:linear-gradient(165deg, var(--surface-hi), var(--surface-alt)); border:1px solid var(--line-gold); border-radius:9px 9px 12px 12px; box-shadow:inset 0 1px 1px rgba(255,255,255,0.4); }
+.coin-row .coin-box .coin-label { color:var(--gold); font-weight:700; }
 
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
 :root {
