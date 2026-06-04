@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.44</title>
+<title>Grimoire — RPG Companion V1.45</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -2656,21 +2656,36 @@ async function _eqCutoutCanvas(srcCanvas) {
   const corner = (cx, cy) => m[Math.min(mh-1, cy) * mw + Math.min(mw-1, cx)] || 0;
   const cornerAvg = (corner(0,0) + corner(mw-1,0) + corner(0,mh-1) + corner(mw-1,mh-1)) / 4;
   const invert = cornerAvg > 0.5;
-  const ctx = srcCanvas.getContext('2d');
-  const imgData = ctx.getImageData(0, 0, w, h); const px = imgData.data;
+  // Masque alpha (rampe large = transition très douce)
+  const maskCv = document.createElement('canvas'); maskCv.width = w; maskCv.height = h;
+  const mctx = maskCv.getContext('2d');
+  const md = mctx.createImageData(w, h); const mp = md.data;
   for (let y = 0; y < h; y++) {
     const my = (mh === h) ? y : Math.min(mh-1, (y*mh/h)|0);
     for (let x = 0; x < w; x++) {
       const mx = (mw === w) ? x : Math.min(mw-1, (x*mw/w)|0);
       let v = m[my*mw + mx]; if (invert) v = 1 - v;
-      let a = (v - 0.3) / 0.4; a = a < 0 ? 0 : a > 1 ? 1 : a;   // rampe douce → bords plus nets
-      const idx = (y*w + x)*4 + 3; px[idx] = Math.round(px[idx] * a);
+      let a = (v - 0.12) / 0.76; a = a < 0 ? 0 : a > 1 ? 1 : a;
+      const idx = (y*w + x)*4; mp[idx] = 255; mp[idx+1] = 255; mp[idx+2] = 255; mp[idx+3] = Math.round(a*255);
     }
   }
+  mctx.putImageData(md, 0, 0);
   try { cmask.close && cmask.close(); } catch (_) {}
   try { result.close && result.close(); } catch (_) {}
+  // Plume : flou du masque proportionnel à la taille → bords doux
+  const r = Math.max(2, Math.round(Math.min(w, h) * 0.02));
+  const featherCv = document.createElement('canvas'); featherCv.width = w; featherCv.height = h;
+  const fctx = featherCv.getContext('2d');
+  try { fctx.filter = 'blur(' + r + 'px)'; } catch (_) {}
+  fctx.drawImage(maskCv, 0, 0);
+  fctx.filter = 'none';
+  // Composer : image d'origine × masque flouté (canal alpha)
   const out = document.createElement('canvas'); out.width = w; out.height = h;
-  out.getContext('2d').putImageData(imgData, 0, 0);
+  const octx = out.getContext('2d');
+  octx.drawImage(srcCanvas, 0, 0);
+  octx.globalCompositeOperation = 'destination-in';
+  octx.drawImage(featherCv, 0, 0);
+  octx.globalCompositeOperation = 'source-over';
   return out;
 }
 window._equipFigChosen = (input, charId) => {
@@ -9284,7 +9299,7 @@ window._saveNewResource = async (catId) => {
 .eqg-fig-loading { position:absolute; inset:0; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:rgba(10,6,2,0.58); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); border-radius:12px; color:#f0e6d2; font-family:'Cinzel'; font-size:0.56rem; letter-spacing:1.5px; text-transform:uppercase; }
 .eqg-spinner { width:28px; height:28px; border-radius:50%; border:3px solid rgba(255,255,255,0.22); border-top-color:var(--gold); animation:eqspin 0.8s linear infinite; }
 @keyframes eqspin { to { transform:rotate(360deg); } }
-.eqg-fig-cut { opacity:1; -webkit-mask-image:none; mask-image:none; filter:drop-shadow(0 10px 22px rgba(0,0,0,0.55)); }
+.eqg-fig-cut { width:100%; height:100%; max-width:none; max-height:none; object-fit:cover; object-position:center top; opacity:1; -webkit-mask-image:none; mask-image:none; filter:drop-shadow(0 10px 22px rgba(0,0,0,0.55)); }
 @media (prefers-reduced-motion: reduce) { .eqg-spinner { animation:none; } }
 
 /* ===== Palette de base (thème Parchemin par défaut) ===== */
