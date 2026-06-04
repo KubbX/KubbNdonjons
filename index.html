@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.45</title>
+<title>Grimoire — RPG Companion V1.46</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -10041,6 +10041,39 @@ nav button:last-child { color:#884444; }
   .sheet-avatar, .sheet-avatar-placeholder { width:56px; height:56px; }
   .stats-grid { grid-template-columns:repeat(3,1fr); }
 }
+/* ── Bandeau dans la console sonore ── */
+.sc-banner { font-family:'Cinzel'; font-size:0.7rem; color:var(--gold); letter-spacing:1.5px; text-transform:uppercase; text-align:center; padding:7px 6px 9px; margin:-12px -12px 2px; border-bottom:1px solid rgba(212,180,120,0.3); background:linear-gradient(180deg,rgba(212,180,120,0.10),transparent); }
+
+/* ══ Dock de projection (style OBS) — page MJ ══ */
+.proj-dock { position:fixed; bottom:16px; right:16px; z-index:9000; width:300px; max-width:calc(100vw - 32px); background:linear-gradient(160deg,#1c1c22,#101013); border:1px solid rgba(255,255,255,0.12); border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,0.55); color:#e8e8ec; font-family:'Crimson Pro',serif; overflow:hidden; }
+.proj-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 12px; cursor:pointer; background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.08); }
+.proj-title { font-family:'Cinzel'; font-size:0.76rem; letter-spacing:1px; color:var(--gold); white-space:nowrap; }
+.proj-chevron { color:var(--gold); font-size:0.8rem; transition:transform .2s; }
+.proj-dock:not(.proj-collapsed) .proj-chevron { transform:rotate(90deg); }
+.proj-collapsed { width:auto; }
+.proj-collapsed .proj-head { border-bottom:none; }
+.proj-collapsed .proj-body { display:none; }
+.proj-body { padding:11px 12px 12px; display:flex; flex-direction:column; gap:9px; }
+.proj-preview { position:relative; width:100%; aspect-ratio:16/9; background:#000; border:1px solid rgba(255,255,255,0.1); border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.proj-preview video { width:100%; height:100%; object-fit:contain; background:#000; display:block; }
+.proj-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; text-align:center; color:#8a8a92; font-size:0.82rem; padding:6px; }
+.proj-empty span { font-size:0.7rem; color:#666; }
+.proj-live { position:absolute; top:6px; left:6px; background:rgba(220,42,42,0.92); color:#fff; font-family:'Cinzel'; font-size:0.54rem; letter-spacing:1px; padding:2px 7px; border-radius:5px; }
+.proj-row { display:flex; align-items:center; gap:6px; }
+.proj-lbl { font-family:'Cinzel'; font-size:0.58rem; letter-spacing:1px; color:#9a9aa2; white-space:nowrap; }
+.proj-sel { flex:1; min-width:0; background:#0c0c0f; color:#e8e8ec; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:5px 6px; font-size:0.82rem; }
+.proj-btn { border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:#e8e8ec; border-radius:7px; padding:7px 10px; cursor:pointer; font-family:'Cinzel'; font-size:0.61rem; letter-spacing:0.5px; transition:all .15s; line-height:1.2; }
+.proj-btn:hover:not(:disabled) { background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.3); }
+.proj-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.proj-btn-main { width:100%; background:rgba(212,160,23,0.16); border-color:rgba(212,160,23,0.5); color:#e9cf8a; }
+.proj-btn-main:hover:not(:disabled) { background:rgba(212,160,23,0.28); }
+.proj-mini { padding:6px 9px; }
+.proj-actions { display:flex; }
+.proj-go { flex:1; background:rgba(54,150,86,0.20); border-color:rgba(60,180,100,0.5); color:#a8e6c0; }
+.proj-go:hover:not(:disabled) { background:rgba(54,150,86,0.34); }
+.proj-stop { flex:1; background:rgba(200,60,60,0.18); border-color:rgba(220,80,80,0.5); color:#f0b4b4; }
+.proj-stop:hover:not(:disabled) { background:rgba(200,60,60,0.32); }
+.proj-status { font-size:0.74rem; color:#9a9aa2; font-style:italic; line-height:1.35; min-height:1em; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -10683,6 +10716,7 @@ nav button:last-child { color:#884444; }
         </div>
         <div class="gm-phone-screen">
           <div class="sc-screen">
+            <div class="sc-banner">🎵 AMBIANCE SONORE — Syrinscape</div>
             <!-- CTA d'activation (audio nécessite un clic) -->
             <div id="phoneCta" class="sc-cta">
               <button class="btn-gold" onclick="window._syrinActivate()" style="width:100%">🔊 Activer le son</button>
@@ -10730,6 +10764,138 @@ nav button:last-child { color:#884444; }
     </div><!-- /gm-right -->
 
     </div><!-- /gm-split -->
+
+    <!-- ══════════════════════════════════════════════════
+         PROJECTION / ÉCRAN DÉPORTÉ (style OBS) — page MJ
+    ══════════════════════════════════════════════════ -->
+    <div id="projDock" class="proj-dock proj-collapsed">
+      <div class="proj-head" onclick="window._projToggleDock()">
+        <span class="proj-title">📺 Projection</span>
+        <span id="projDockChevron" class="proj-chevron">▸</span>
+      </div>
+      <div class="proj-body">
+        <div class="proj-preview">
+          <video id="projPreview" autoplay muted playsinline></video>
+          <div id="projPreviewEmpty" class="proj-empty">Aucune source<span>Choisis l'onglet / la fenêtre à projeter</span></div>
+          <span id="projLiveBadge" class="proj-live" style="display:none">● DIFFUSION</span>
+        </div>
+        <button class="proj-btn proj-btn-main" onclick="window._projPickSource()">🖥️ Choisir la source…</button>
+        <div class="proj-row">
+          <label class="proj-lbl">Sortie</label>
+          <select id="projScreenSel" class="proj-sel"><option value="">Écran par défaut</option></select>
+          <button class="proj-btn proj-mini" title="Détecter les écrans" onclick="window._projDetectScreens()">⟳</button>
+        </div>
+        <div class="proj-row proj-actions">
+          <button id="projStartBtn" class="proj-btn proj-go" onclick="window._projStart()" disabled>📡 Projeter</button>
+          <button id="projStopBtn" class="proj-btn proj-stop" onclick="window._projStop()" disabled>⏹ Arrêter</button>
+        </div>
+        <div id="projStatus" class="proj-status">Prêt.</div>
+      </div>
+    </div>
+
+    <script>
+    (function(){
+      const _proj = { stream:null, win:null, winVideo:null, screens:null };
+      window._proj = _proj;
+      const $ = id => document.getElementById(id);
+      function setStatus(m){ const s=$('projStatus'); if(s) s.textContent=m; }
+      function refreshButtons(){
+        const hasStream = !!(_proj.stream && _proj.stream.getVideoTracks && _proj.stream.getVideoTracks().length);
+        const projecting = !!(_proj.win && !_proj.win.closed);
+        const start=$('projStartBtn'), stop=$('projStopBtn'), badge=$('projLiveBadge'), empty=$('projPreviewEmpty');
+        if(start) start.disabled = !hasStream;
+        if(stop)  stop.disabled  = !(hasStream || projecting);
+        if(badge) badge.style.display = projecting ? 'block' : 'none';
+        if(empty) empty.style.display = hasStream ? 'none' : 'flex';
+      }
+      window._projToggleDock = function(){ const d=$('projDock'); if(d) d.classList.toggle('proj-collapsed'); };
+
+      function attachStream(stream){
+        if(_proj.stream && _proj.stream !== stream){ try{ _proj.stream.getTracks().forEach(t=>t.stop()); }catch(_){} }
+        _proj.stream = stream;
+        const pv=$('projPreview'); if(pv){ pv.srcObject=stream; pv.play().catch(()=>{}); }
+        if(_proj.win && !_proj.win.closed && _proj.winVideo){ try{ _proj.winVideo.srcObject=stream; _proj.winVideo.play().catch(()=>{}); }catch(_){} }
+        const vt = stream.getVideoTracks()[0];
+        if(vt) vt.addEventListener('ended', ()=>{ _proj.stream=null; const p=$('projPreview'); if(p) p.srcObject=null; setStatus('Source arrêtée.'); refreshButtons(); });
+        refreshButtons();
+      }
+
+      window._projPickSource = async function(){
+        if(!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)){ setStatus("Partage d'écran non supporté par ce navigateur."); return; }
+        try{
+          setStatus("Choisis l'onglet, la fenêtre ou l'écran à projeter…");
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video:{ frameRate:30 }, audio:false });
+          attachStream(stream);
+          setStatus("Source prête. Choisis l'écran de sortie puis « Projeter ».");
+        }catch(err){
+          if(err && err.name==='NotAllowedError') setStatus('Sélection annulée.');
+          else { console.warn('[Projection] getDisplayMedia', err); setStatus('Impossible de capturer cette source.'); }
+        }
+      };
+
+      window._projDetectScreens = async function(){
+        const sel=$('projScreenSel'); if(!sel) return;
+        if(!('getScreenDetails' in window)){ setStatus("Sélection d'écran auto indisponible (Chrome/Edge requis). La fenêtre s'ouvrira : glisse-la sur l'écran voulu puis « Plein écran »."); return; }
+        try{
+          const sd = await window.getScreenDetails();
+          _proj.screens = sd;
+          sel.innerHTML = '<option value="">Écran par défaut</option>';
+          sd.screens.forEach((s,i)=>{ const o=document.createElement('option'); o.value=String(i); o.textContent=(s.label||('Écran '+(i+1)))+(s.isPrimary?' (principal)':'')+(s.isInternal?' · interne':''); sel.appendChild(o); });
+          const ext = sd.screens.findIndex(s=>!s.isPrimary); if(ext>=0) sel.value=String(ext);
+          setStatus(sd.screens.length>1 ? (sd.screens.length+' écrans détectés.') : 'Un seul écran détecté.');
+          if(sd.addEventListener) sd.addEventListener('screenschange', ()=>window._projDetectScreens());
+        }catch(err){
+          if(err && err.name==='NotAllowedError') setStatus("Permission « gestion des fenêtres » refusée.");
+          else { console.warn('[Projection] getScreenDetails', err); setStatus('Détection des écrans impossible.'); }
+        }
+      };
+
+      function buildPopup(win){
+        const doc = win.document;
+        doc.open();
+        doc.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Projection — KubbNd</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#v{width:100vw;height:100vh;object-fit:contain;background:#000;display:block}#fs{position:fixed;right:14px;bottom:14px;z-index:5;font:600 13px system-ui,sans-serif;background:rgba(0,0,0,0.55);color:#fff;border:1px solid rgba(255,255,255,0.35);border-radius:8px;padding:9px 13px;cursor:pointer;opacity:.85}#fs:hover{opacity:1}body:fullscreen #fs{display:none}#hint{position:fixed;left:0;right:0;bottom:54px;text-align:center;color:#777;font:500 13px system-ui;pointer-events:none}</style></head><body><video id="v" autoplay muted playsinline></video><button id="fs">\u26F6 Plein \u00E9cran</button><div id="hint">Double-clic ou bouton pour le plein \u00E9cran</div></body></html>');
+        doc.close();
+        const v = doc.getElementById('v');
+        const goFs = ()=>{ try{ const el=doc.documentElement; if(el.requestFullscreen) el.requestFullscreen().catch(()=>{}); }catch(_){} };
+        const fsBtn = doc.getElementById('fs'); if(fsBtn) fsBtn.addEventListener('click', goFs);
+        doc.body.addEventListener('dblclick', goFs);
+        win.addEventListener('beforeunload', ()=>{ _proj.win=null; _proj.winVideo=null; setStatus('Fenêtre de projection fermée.'); refreshButtons(); });
+        _proj.winVideo = v;
+        return v;
+      }
+
+      window._projStart = function(){
+        if(!_proj.stream){ setStatus("Choisis d'abord une source."); return; }
+        let feat = 'width=1280,height=720', targetScreen=null;
+        const sel=$('projScreenSel');
+        if(_proj.screens && sel && sel.value!==''){
+          const s = _proj.screens.screens[parseInt(sel.value,10)];
+          if(s){ targetScreen=s; feat='left='+s.availLeft+',top='+s.availTop+',width='+s.availWidth+',height='+s.availHeight; }
+        }
+        if(_proj.win && !_proj.win.closed){ try{ _proj.win.close(); }catch(_){} _proj.win=null; }
+        const win = window.open('', 'kubbnd_projection', feat+',menubar=no,toolbar=no,location=no,status=no');
+        if(!win){ setStatus('Fenêtre bloquée — autorise les pop-ups pour ce site.'); return; }
+        _proj.win = win;
+        const v = buildPopup(win);
+        try{ v.srcObject=_proj.stream; v.play().catch(()=>{}); }catch(_){}
+        try{ if(targetScreen){ win.moveTo(targetScreen.availLeft, targetScreen.availTop); win.resizeTo(targetScreen.availWidth, targetScreen.availHeight); } }catch(_){}
+        try{ if(targetScreen && win.document.documentElement.requestFullscreen){ win.document.documentElement.requestFullscreen({ screen: targetScreen }).catch(()=>{}); } }catch(_){}
+        setStatus('Diffusion en cours' + (targetScreen?(' sur '+(targetScreen.label||"l'écran sélectionné")):'') + '.');
+        refreshButtons();
+      };
+
+      window._projStop = function(){
+        if(_proj.win && !_proj.win.closed){ try{ _proj.win.close(); }catch(_){} }
+        _proj.win=null; _proj.winVideo=null;
+        if(_proj.stream){ try{ _proj.stream.getTracks().forEach(t=>t.stop()); }catch(_){} _proj.stream=null; }
+        const pv=$('projPreview'); if(pv) pv.srcObject=null;
+        setStatus('Projection arrêtée.'); refreshButtons();
+      };
+
+      window.addEventListener('beforeunload', ()=>{ try{ if(_proj.win&&!_proj.win.closed)_proj.win.close(); }catch(_){} try{ _proj.stream&&_proj.stream.getTracks().forEach(t=>t.stop()); }catch(_){} });
+      if(document.readyState!=='loading') refreshButtons(); else document.addEventListener('DOMContentLoaded', refreshButtons);
+    })();
+    </script>
   </div>
 
   <!-- Monster picker overlay for combat -->
