@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.46</title>
+<title>Grimoire — RPG Companion V1.47</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -10074,6 +10074,19 @@ nav button:last-child { color:#884444; }
 .proj-stop { flex:1; background:rgba(200,60,60,0.18); border-color:rgba(220,80,80,0.5); color:#f0b4b4; }
 .proj-stop:hover:not(:disabled) { background:rgba(200,60,60,0.32); }
 .proj-status { font-size:0.74rem; color:#9a9aa2; font-style:italic; line-height:1.35; min-height:1em; }
+
+/* ── Console sonore : menu gestion & partage ── */
+.sc-manage { display:flex; flex-direction:column; gap:6px; }
+.sc-mbtn { width:100%; padding:9px 10px; border-radius:8px; border:1px solid rgba(212,180,120,0.4); background:rgba(255,255,255,0.06); color:#e8dcc0; font-family:'Cinzel'; font-size:0.64rem; letter-spacing:0.5px; cursor:pointer; transition:all .15s; line-height:1.2; }
+.sc-mbtn:hover { border-color:var(--gold); background:rgba(212,180,120,0.14); }
+.sc-mbtn-gold { background:linear-gradient(135deg, rgba(212,160,23,0.30), rgba(160,110,20,0.30)); border-color:var(--gold); color:#f0e0b0; }
+.sc-mbtn-gold:hover { background:linear-gradient(135deg, rgba(212,160,23,0.45), rgba(160,110,20,0.45)); }
+.sc-note { font-family:'Crimson Pro'; font-size:0.72rem; color:#9a8e72; line-height:1.4; margin:2px 0 0; }
+.sc-note strong { color:#c9b88a; }
+
+/* ── Mobile : masquer la barre d'onglets au défilement (plus de place à la fiche) ── */
+nav { transition: transform .28s ease; will-change: transform; }
+@media (max-width: 768px) { nav.nav-hidden { transform: translateY(-100%); } }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -10160,7 +10173,7 @@ nav button:last-child { color:#884444; }
     <!-- ══════════════════════════════════════════════════
          MODULE AMBIANCE SONORE — Syrinscape
     ══════════════════════════════════════════════════ -->
-    <div id="soundPanel" style="background:linear-gradient(135deg,var(--brown-dark),var(--brown));border:1px solid var(--gold);border-radius:6px;margin-bottom:18px;overflow:hidden">
+    <div id="soundPanel" style="display:none">
       <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(212,180,120,0.3);cursor:pointer" onclick="window._toggleSoundPanel()">
         <span style="font-family:'Cinzel';font-size:0.85rem;color:var(--gold);letter-spacing:1px">🎵 AMBIANCE SONORE — Syrinscape</span>
         <div style="display:flex;align-items:center;gap:12px">
@@ -10717,6 +10730,12 @@ nav button:last-child { color:#884444; }
         <div class="gm-phone-screen">
           <div class="sc-screen">
             <div class="sc-banner">🎵 AMBIANCE SONORE — Syrinscape</div>
+            <!-- Gestion & partage (interfaces complètes Syrinscape) -->
+            <div class="sc-manage">
+              <button class="sc-mbtn sc-mbtn-gold" onclick="window._openNova()" title="Gérer l'ensemble des sons dans l'interface complète Nova">🚀 Ouvrir Syrinscape Nova</button>
+              <button class="sc-mbtn" onclick="window._openShareAudio()" title="Récupérer le lien « Share Audio » à donner aux joueurs">🔗 Partager l'audio</button>
+            </div>
+            <p class="sc-note"><strong>Nova</strong> ouvre la session Syrinscape (tous les sons). « Partager l'audio » récupère le lien à donner aux joueurs.</p>
             <!-- CTA d'activation (audio nécessite un clic) -->
             <div id="phoneCta" class="sc-cta">
               <button class="btn-gold" onclick="window._syrinActivate()" style="width:100%">🔊 Activer le son</button>
@@ -11086,5 +11105,20 @@ nav button:last-child { color:#884444; }
   <div id="pdSlotPickerBox" style="background:var(--parch);border:2px solid var(--gold);border-radius:10px;width:min(360px,94vw);max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)"></div>
 </div>
 
+<script>
+(function(){
+  const nav = document.querySelector('nav');
+  if(!nav) return;
+  let lastY = window.scrollY || 0, ticking = false;
+  function update(){
+    const y = window.scrollY || document.documentElement.scrollTop || 0;
+    if (y < 50) nav.classList.remove('nav-hidden');                 // près du haut : toujours visible
+    else if (y > lastY + 6) nav.classList.add('nav-hidden');        // défilement vers le bas : masquer
+    else if (y < lastY - 6) nav.classList.remove('nav-hidden');     // vers le haut : afficher
+    lastY = y; ticking = false;
+  }
+  window.addEventListener('scroll', function(){ if(!ticking){ ticking = true; requestAnimationFrame(update); } }, { passive:true });
+})();
+</script>
 </body>
 </html>
