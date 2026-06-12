@@ -2460,6 +2460,844 @@ async function saveNewCharacter() {
 }
  
 // ============================================================
+// LA FORGE DU HÉROS V2 — wizard plein écran immersif
+// (le forgeOverlay historique reste utilisé par les autres modales)
+// ============================================================
+
+const WIZ_STAT_KEYS = ['str','dex','con','int','wis','cha'];
+const WIZ_STAT_FR = {str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'};
+const WIZ_STAT_LONG = {str:'Force',dex:'Dextérité',con:'Constitution',int:'Intelligence',wis:'Sagesse',cha:'Charisme'};
+const WIZ_LANGUAGES = ["Commun","Nain","Elfique","Géant","Gnome","Gobelin","Halfelin","Orc","Abyssal","Céleste","Commun des profondeurs","Draconique","Infernal","Primordial","Profond","Sylvestre"];
+const WIZ_STEPS_DEF = [
+  {id:1, icon:'🧝', label:'Peuple'},
+  {id:2, icon:'⚔️', label:'Vocation'},
+  {id:3, icon:'🎲', label:'Caractéristiques'},
+  {id:4, icon:'📜', label:'Historique'},
+  {id:5, icon:'🪶', label:'Identité'},
+  {id:6, icon:'🔥', label:'La Forge'}
+];
+
+let WIZ = null;
+let wizAssets = null;          // { races:{nom:url}, classes:{...}, backgrounds:{...} }
+let WIZ_RACE_KEYS = [], WIZ_CLASS_KEYS = [], WIZ_BG_KEYS = [];
+let WIZ_FEAT_LIST = [];        // liste filtrée courante pour le picker de don
+
+function wizFresh() {
+  return {
+    step: 1,
+    // étape 1
+    race: null, subrace: null, bonusStatPicks: [], raceSearch:'', raceSrc:'all',
+    // étape 2
+    cls: null, classSkills: [], subclass: null,
+    // étape 3
+    statMethod: 'pointbuy',
+    baseStats: {str:8,dex:8,con:8,int:8,wis:8,cha:8},
+    standardAssign: null,
+    // étape 4
+    background: null, langPicks: [], bgSearch:'',
+    // étape 5
+    name:'', age:'', gender:'', alignment:'',
+    personality:'', ideals:'', bonds:'', flaws:'', appearance:'', backstory:'',
+    feat: null, featStatPick: null, featSearch:'',
+    // ui
+    sideOpen: false
+  };
+}
+
+// ─── Visuels Firebase ────────────────────────────────────────
+async function wizLoadAssets(force) {
+  if (wizAssets && !force) return wizAssets;
+  wizAssets = { races:{}, classes:{}, backgrounds:{} };
+  try {
+    const cats = ['races','classes','backgrounds'];
+    const snaps = await Promise.all(cats.map(c => getDoc(doc(db, 'wizard_assets', c))));
+    snaps.forEach((s,i) => { if (s.exists()) wizAssets[cats[i]] = s.data() || {}; });
+  } catch(e) { console.warn('[Forge] wizard_assets non chargés :', e.message||e); }
+  return wizAssets;
+}
+
+function wizHue(str) { let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return h%360; }
+function wizVisual(cat, key, cls) {
+  const url = wizAssets?.[cat]?.[key];
+  if (url) return `<div class="${cls}" style="background-image:url('${url.replace(/'/g,"%27")}')"></div>`;
+  const h = wizHue(key);
+  const init = key.replace(/\s*\(.*\)/,'').trim().charAt(0).toUpperCase();
+  return `<div class="${cls} wiz-fallback" style="background:linear-gradient(140deg,hsl(${h},38%,26%),hsl(${(h+50)%360},45%,14%))"><span>${init}</span></div>`;
+}
+
+// ─── Helpers données ─────────────────────────────────────────
+function wizRaceData()    { return WIZ.race ? RACES[WIZ.race] : null; }
+function wizSubraceData() { const r = wizRaceData(); return (r?.subraces && WIZ.subrace) ? r.subraces[WIZ.subrace] : null; }
+function wizClassData()   { return WIZ.cls ? CLASSES[WIZ.cls] : null; }
+function wizBgData()      { return WIZ.background ? BACKGROUNDS[WIZ.background] : null; }
+function wizClassSkillPool() {
+  const c = wizClassData(); if (!c) return [];
+  if ((c.skills||[]).some(s => /^Tout/i.test(s))) return SKILLS_LIST.map(s=>s.name);
+  return c.skills || [];
+}
+function wizSubclassLvl1() {
+  const sc = WIZ.cls ? SUBCLASSES[WIZ.cls] : null;
+  return (sc && sc.level === 1) ? sc : null;
+}
+
+// Nettoyage de cohérence (appelé avant chaque calcul/rendu)
+function wizNormalize() {
+  const r = wizRaceData();
+  if (!r) { WIZ.subrace = null; WIZ.bonusStatPicks = []; }
+  else {
+    if (!r.subraces) WIZ.subrace = null;
+    const maxPicks = r.bonusStats || 0;
+    if (WIZ.bonusStatPicks.length > maxPicks) WIZ.bonusStatPicks = WIZ.bonusStatPicks.slice(0, maxPicks);
+  }
+  // compétences de classe : retirer celles offertes par l'historique (doublons) ou hors liste
+  const pool = wizClassSkillPool();
+  const bgSkills = wizBgData()?.skills || [];
+  WIZ.classSkills = WIZ.classSkills.filter(s => pool.includes(s) && !bgSkills.includes(s));
+  const max = wizClassData()?.skillCount || 0;
+  if (WIZ.classSkills.length > max) WIZ.classSkills = WIZ.classSkills.slice(0, max);
+  // sous-classe niveau 1 uniquement
+  const sc = wizSubclassLvl1();
+  if (!sc) WIZ.subclass = null;
+  else if (WIZ.subclass && !sc.options[WIZ.subclass]) WIZ.subclass = null;
+  // langues de l'historique
+  const langN = wizBgData()?.lang || 0;
+  if (WIZ.langPicks.length > langN) WIZ.langPicks = WIZ.langPicks.slice(0, langN);
+  // don
+  if (WIZ.feat && !(WIZ.feat.statBonus?.choice)) WIZ.featStatPick = null;
+}
+
+// ─── MOTEUR D'AGRÉGATION ─────────────────────────────────────
+// Fusionne tous les acquis avec leur provenance + liste les choix en attente
+function wizBuild() {
+  wizNormalize();
+  const r = wizRaceData(), sr = wizSubraceData(), c = wizClassData(), bg = wizBgData();
+  const pending = [];
+
+  // stats finales
+  const racial = {}; WIZ_STAT_KEYS.forEach(k => racial[k] = 0);
+  Object.entries(r?.stats||{}).forEach(([k,v]) => racial[k] += v);
+  Object.entries(sr?.stats||{}).forEach(([k,v]) => racial[k] += v);
+  WIZ.bonusStatPicks.forEach(k => racial[k] += 1);
+  if (WIZ.feat?.statBonus) {
+    const sb = WIZ.feat.statBonus;
+    if (sb.choice) { if (WIZ.featStatPick) racial[WIZ.featStatPick] += (sb.val||1); }
+    else if (sb.stat) racial[sb.stat] += (sb.val||1);
+  }
+  const finalStats = {};
+  WIZ_STAT_KEYS.forEach(k => finalStats[k] = (WIZ.baseStats[k]||8) + racial[k]);
+
+  // compétences { nom → source }
+  const skills = [];
+  (bg?.skills||[]).forEach(s => skills.push({name:s, src:'Historique'}));
+  WIZ.classSkills.forEach(s => skills.push({name:s, src:'Classe'}));
+
+  // traits & aptitudes
+  const traits = [...(r?.traits||[]), ...(sr?.traits||[])];
+  const features = (c?.features||[]).filter(f => f.lvl <= 1).map(f => ({name:f.name, desc:f.desc}));
+  const sc = wizSubclassLvl1();
+  if (sc && WIZ.subclass) {
+    (sc.options[WIZ.subclass]?.features||[]).filter(f => f.lvl <= 1)
+      .forEach(f => features.push({name:`${f.name} (${WIZ.subclass})`, desc:f.desc}));
+  }
+
+  // valeurs dérivées
+  const conMod = mod(finalStats.con);
+  const hpMax = (c?.hd||8) + conMod + (sr?.hpBonus||0);
+  let ac = 10 + mod(finalStats.dex), acNote = '10 + DEX';
+  if (WIZ.cls === 'Barbare') { ac = 10 + mod(finalStats.dex) + mod(finalStats.con); acNote = 'Défense sans armure (10+DEX+CON)'; }
+  if (WIZ.cls === 'Moine')   { ac = 10 + mod(finalStats.dex) + mod(finalStats.wis); acNote = 'Défense sans armure (10+DEX+SAG)'; }
+  const speed = sr?.speed || r?.speed || 9;
+
+  // langues / outils
+  const languages = ['Commun', ...WIZ.langPicks];
+  const tools = bg?.tools || [];
+
+  // ── choix en attente (bloquants) ──
+  if (!WIZ.race) pending.push({step:1, label:'Choisir un peuple'});
+  else {
+    if (r.subraces && !WIZ.subrace) pending.push({step:1, label:'Choisir une sous-race'});
+    const need = (r.bonusStats||0) - WIZ.bonusStatPicks.length;
+    if (need > 0) pending.push({step:1, label:`Bonus racial : ${need} point${need>1?'s':''} +1 à répartir`});
+  }
+  if (!WIZ.cls) pending.push({step:2, label:'Choisir une vocation'});
+  else {
+    const left = (c.skillCount||0) - WIZ.classSkills.length;
+    if (left > 0) pending.push({step:2, label:`${left} compétence${left>1?'s':''} de classe à choisir`});
+    if (sc && !WIZ.subclass) pending.push({step:2, label:`Choisir : ${sc.label}`});
+  }
+  if (!WIZ.background) pending.push({step:4, label:'Choisir un historique'});
+  else {
+    const ln = (bg.lang||0) - WIZ.langPicks.length;
+    if (ln > 0) pending.push({step:4, label:`${ln} langue${ln>1?'s':''} à choisir`});
+  }
+  if (!WIZ.name.trim()) pending.push({step:5, label:'Donner un nom au héros'});
+  if (WIZ.feat?.statBonus?.choice && !WIZ.featStatPick) pending.push({step:5, label:'Caractéristique du don à choisir'});
+
+  // avertissements non bloquants
+  const warnings = [];
+  if (WIZ.statMethod === 'pointbuy') {
+    const costs = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+    const spent = WIZ_STAT_KEYS.reduce((s,k) => s + (costs[WIZ.baseStats[k]]||0), 0);
+    const leftPts = 27 - spent;
+    if (leftPts > 0) warnings.push({step:3, label:`${leftPts} point${leftPts>1?'s':''} d'achat non dépensé${leftPts>1?'s':''}`});
+  }
+
+  return { finalStats, racial, skills, traits, features, hpMax, ac, acNote, speed, languages, tools, pending, warnings, conMod };
+}
+
+// ─── OUVERTURE / FERMETURE / NAVIGATION ──────────────────────
+window._openWizard = async () => {
+  WIZ = wizFresh();
+  WIZ_RACE_KEYS = Object.keys(RACES);
+  WIZ_CLASS_KEYS = Object.keys(CLASSES);
+  WIZ_BG_KEYS = Object.keys(BACKGROUNDS);
+  document.getElementById('wizOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  wizRender();
+  await wizLoadAssets();
+  wizRender(); // re-rendu avec les images
+};
+window._wizClose = () => {
+  const dirty = WIZ && (WIZ.race || WIZ.cls || WIZ.name);
+  if (dirty && !confirm('Abandonner la création de ce héros ?')) return;
+  document.getElementById('wizOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+  WIZ = null;
+};
+window._wizGo = (s) => { WIZ.step = s; WIZ.sideOpen = false; wizRender(); };
+window._wizPrev = () => { if (WIZ.step > 1) { WIZ.step--; wizRender(); } };
+window._wizNext = async () => {
+  const b = wizBuild();
+  if (WIZ.step < 6) {
+    const blockers = b.pending.filter(p => p.step === WIZ.step);
+    if (blockers.length) { wizFlashPending(); return; }
+    WIZ.step++; wizRender();
+  } else {
+    if (b.pending.length) { wizFlashPending(); return; }
+    await wizSave(b);
+  }
+};
+function wizFlashPending() {
+  const el = document.getElementById('wizFootHint');
+  if (el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+  const side = document.getElementById('wizSide');
+  if (side && window.innerWidth <= 940) { WIZ.sideOpen = true; wizRender(); }
+}
+window._wizToggleSide = () => { WIZ.sideOpen = !WIZ.sideOpen; wizRender(); };
+
+// ─── RENDU GLOBAL ────────────────────────────────────────────
+function wizRender() {
+  if (!WIZ) return;
+  const b = wizBuild();
+  // progression
+  const prog = document.getElementById('wizProgress');
+  prog.innerHTML = WIZ_STEPS_DEF.map((s,i) => {
+    const st = s.id === WIZ.step ? 'active' : s.id < WIZ.step ? 'done' : '';
+    const pend = b.pending.some(p => p.step === s.id);
+    return `${i>0?`<div class="wiz-pline ${s.id<=WIZ.step?'done':''}"></div>`:''}
+      <button class="wiz-pstep ${st} ${pend&&s.id<WIZ.step?'warn':''}" onclick="window._wizGo(${s.id})" title="${s.label}">
+        <span class="wiz-pstep-ico">${s.id<WIZ.step&&!pend?'✓':s.icon}</span><span class="wiz-pstep-lbl">${s.label}</span>
+      </button>`;
+  }).join('');
+
+  // contenu principal (préserver le scroll)
+  const main = document.getElementById('wizMain');
+  const sc = main.scrollTop;
+  if (WIZ.step===1) wizStepRace(main, b);
+  else if (WIZ.step===2) wizStepClass(main, b);
+  else if (WIZ.step===3) wizStepStats(main, b);
+  else if (WIZ.step===4) wizStepBg(main, b);
+  else if (WIZ.step===5) wizStepIdentity(main, b);
+  else wizStepRecap(main, b);
+  main.scrollTop = sc;
+
+  wizRenderSide(b);
+
+  // pied de page
+  document.getElementById('wizPrev').style.visibility = WIZ.step>1 ? 'visible' : 'hidden';
+  const next = document.getElementById('wizNext');
+  const stepPend = b.pending.filter(p => p.step === WIZ.step);
+  if (WIZ.step === 6) {
+    next.innerHTML = '🔥 DONNER VIE AU HÉROS';
+    next.classList.toggle('dim', b.pending.length>0);
+  } else {
+    next.innerHTML = 'SUIVANT →';
+    next.classList.toggle('dim', stepPend.length>0);
+  }
+  const hint = document.getElementById('wizFootHint');
+  const relevant = WIZ.step===6 ? b.pending : stepPend;
+  hint.innerHTML = relevant.length ? `⚠ ${relevant.map(p=>p.label).join(' · ')}` : '';
+  document.getElementById('wizSide').classList.toggle('mobile-open', !!WIZ.sideOpen);
+}
+
+// ─── PANNEAU RÉCAPITULATIF VIVANT ────────────────────────────
+function wizRenderSide(b) {
+  const el = document.getElementById('wizSide');
+  const srcTag = {Classe:'C', Historique:'H'};
+  const visCat = WIZ.cls ? 'classes' : 'races';
+  const visKey = WIZ.cls || WIZ.race;
+  el.innerHTML = `
+    <div class="wiz-side-hero">
+      ${visKey ? wizVisual(visCat, visKey, 'wiz-side-img') : '<div class="wiz-side-img wiz-fallback" style="background:linear-gradient(140deg,#2a2118,#15100a)"><span>?</span></div>'}
+      <div class="wiz-side-name">${WIZ.name.trim()||'<span class="dim">Héros sans nom</span>'}</div>
+      <div class="wiz-side-line">${WIZ.subrace?WIZ.subrace:WIZ.race||'—'} · ${WIZ.cls||'—'}${WIZ.subclass?` (${WIZ.subclass})`:''}</div>
+      <div class="wiz-side-line dim">${WIZ.background||''}</div>
+    </div>
+    <div class="wiz-side-stats">
+      ${WIZ_STAT_KEYS.map(k=>`<div class="wiz-side-stat ${b.racial[k]?'boosted':''}" title="${b.racial[k]?`base ${WIZ.baseStats[k]} + ${b.racial[k]} (bonus)`:''}">
+        <span>${WIZ_STAT_FR[k]}</span><strong>${b.finalStats[k]}</strong><em>${mod(b.finalStats[k])>=0?'+':''}${mod(b.finalStats[k])}</em>
+      </div>`).join('')}
+    </div>
+    <div class="wiz-side-combat">
+      <div><em>❤️</em><strong>${WIZ.cls?b.hpMax:'—'}</strong><span>PV</span></div>
+      <div><em>🛡</em><strong>${b.ac}</strong><span>CA</span></div>
+      <div><em>👟</em><strong>${b.speed}m</strong><span>Vitesse</span></div>
+      <div><em>🎯</em><strong>+2</strong><span>Maîtrise</span></div>
+    </div>
+    ${b.skills.length?`<div class="wiz-side-block"><h5>Compétences</h5>
+      ${b.skills.map(s=>`<div class="wiz-side-skill"><i class="tag-${s.src==='Classe'?'c':'h'}">${srcTag[s.src]}</i>${s.name}</div>`).join('')}
+    </div>`:''}
+    ${(b.languages.length>1||b.tools.length)?`<div class="wiz-side-block"><h5>Langues & outils</h5>
+      <div class="wiz-side-text">${b.languages.join(', ')}${b.tools.length?'<br>🛠 '+b.tools.join(', '):''}</div>
+    </div>`:''}
+    ${(b.traits.length||b.features.length||WIZ.feat)?`<div class="wiz-side-block"><h5>Acquis</h5>
+      <div class="wiz-side-text">${b.traits.length} trait${b.traits.length>1?'s':''} racial${b.traits.length>1?'aux':''} · ${b.features.length} aptitude${b.features.length>1?'s':''}${WIZ.feat?' · 1 don':''}</div>
+    </div>`:''}
+    ${b.pending.length?`<div class="wiz-side-block pending"><h5>⚠ À compléter</h5>
+      ${b.pending.map(p=>`<button class="wiz-pending-item" onclick="window._wizGo(${p.step})">${p.label} <span>→ ${WIZ_STEPS_DEF[p.step-1].label}</span></button>`).join('')}
+    </div>`:`<div class="wiz-side-block ready"><h5>✦ Prêt à forger</h5><div class="wiz-side-text">Tous les choix sont résolus.</div></div>`}
+    ${b.warnings.length?`<div class="wiz-side-block warn">${b.warnings.map(w=>`<button class="wiz-pending-item" onclick="window._wizGo(${w.step})">${w.label}</button>`).join('')}</div>`:''}
+  `;
+}
+
+// ─── ÉTAPE 1 : RACE ──────────────────────────────────────────
+function wizStepRace(main, b) {
+  main.innerHTML = `
+    <h3 class="wiz-title">Choisis ton peuple</h3>
+    <div class="wiz-filters">
+      <input id="wizRaceSearch" class="wiz-search" type="text" placeholder="🔍 Rechercher une race…" value="${WIZ.raceSearch.replace(/"/g,'&quot;')}" oninput="window._wizRaceSearch(this.value)">
+      ${['all','PHB','MotM','autres'].map(s=>`<button class="wiz-chip ${WIZ.raceSrc===s?'sel':''}" onclick="window._wizRaceSrc('${s}')">${s==='all'?'Toutes':s==='autres'?'Autres sources':s}</button>`).join('')}
+    </div>
+    <div id="wizRaceGrid" class="wiz-grid"></div>
+    <div id="wizRaceDetail"></div>`;
+  window._wizRaceGrid();
+  wizRaceDetail();
+}
+window._wizRaceGrid = () => {
+  const grid = document.getElementById('wizRaceGrid'); if(!grid) return;
+  const q = WIZ.raceSearch.toLowerCase();
+  grid.innerHTML = WIZ_RACE_KEYS.map((k,i) => {
+    const r = RACES[k];
+    if (q && !k.toLowerCase().includes(q)) return '';
+    if (WIZ.raceSrc==='PHB' && r.source!=='PHB') return '';
+    if (WIZ.raceSrc==='MotM' && r.source!=='MotM') return '';
+    if (WIZ.raceSrc==='autres' && (r.source==='PHB'||r.source==='MotM')) return '';
+    const bonus = Object.entries(r.stats||{}).map(([s,v])=>`+${v} ${WIZ_STAT_FR[s]}`).join(' ');
+    return `<button class="wiz-card ${WIZ.race===k?'sel':''}" onclick="window._wizPickRace(${i})">
+      ${wizVisual('races', k, 'wiz-card-img')}
+      <div class="wiz-card-body">
+        <div class="wiz-card-name">${k}</div>
+        <div class="wiz-card-meta"><span class="wiz-src">${r.source}</span>${bonus?`<span class="wiz-bonus">${bonus}</span>`:r.bonusStats?`<span class="wiz-bonus">+${r.bonusStats} au choix</span>`:''}</div>
+      </div></button>`;
+  }).join('') || '<p class="wiz-empty">Aucune race ne correspond.</p>';
+};
+window._wizPickRace = (i) => {
+  const k = WIZ_RACE_KEYS[i];
+  if (WIZ.race !== k) { WIZ.race = k; WIZ.subrace = null; WIZ.bonusStatPicks = []; }
+  wizRender();
+  document.getElementById('wizRaceDetail')?.scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+function wizRaceDetail() {
+  const box = document.getElementById('wizRaceDetail'); if(!box) return;
+  const r = wizRaceData();
+  if (!r) { box.innerHTML=''; return; }
+  const subKeys = r.subraces ? Object.keys(r.subraces) : [];
+  const sr = wizSubraceData();
+  const need = r.bonusStats || 0;
+  box.innerHTML = `<div class="wiz-detail">
+    <h4>${WIZ.race} <span class="wiz-src">${r.source}</span> <span class="wiz-detail-speed">👟 ${r.speed} m</span></h4>
+    ${subKeys.length?`<div class="wiz-detail-sub">
+      <label>Sous-race ${WIZ.subrace?'':'<em class="need">— à choisir</em>'}</label>
+      <div class="wiz-chips">${subKeys.map((s,i)=>{
+        const sd = r.subraces[s];
+        const bn = Object.entries(sd.stats||{}).map(([k,v])=>`+${v} ${WIZ_STAT_FR[k]}`).join(' ');
+        return `<button class="wiz-chip big ${WIZ.subrace===s?'sel':''}" onclick="window._wizPickSubrace(${i})">${s}${bn?`<small>${bn}</small>`:''}</button>`;
+      }).join('')}</div></div>`:''}
+    ${need?`<div class="wiz-detail-sub">
+      <label>Bonus racial libre : répartis ${need} × +1 ${WIZ.bonusStatPicks.length<need?`<em class="need">— ${need-WIZ.bonusStatPicks.length} restant${need-WIZ.bonusStatPicks.length>1?'s':''}</em>`:'<em class="ok">✓</em>'}</label>
+      <div class="wiz-chips">${WIZ_STAT_KEYS.map(s=>{
+        const n = WIZ.bonusStatPicks.filter(x=>x===s).length;
+        return `<button class="wiz-chip ${n?'sel':''}" onclick="window._wizBonusPick('${s}')">${WIZ_STAT_FR[s]}${n?` +${n}`:''}</button>`;
+      }).join('')}</div>
+      <small class="wiz-hint">Clique pour ajouter +1 (cumulable ×2 sur une même caractéristique, re-clique pour retirer).</small>
+    </div>`:''}
+    <div class="wiz-detail-traits">
+      ${[...(r.traits||[]), ...((sr?.traits)||[])].map(t=>`<div class="wiz-trait">◆ ${t}</div>`).join('')}
+    </div>
+  </div>`;
+}
+window._wizPickSubrace = (i) => {
+  const r = wizRaceData(); if(!r?.subraces) return;
+  WIZ.subrace = Object.keys(r.subraces)[i];
+  wizRender();
+};
+window._wizBonusPick = (s) => {
+  const need = wizRaceData()?.bonusStats || 0;
+  const n = WIZ.bonusStatPicks.filter(x=>x===s).length;
+  if (n >= 2 || (n>0 && WIZ.bonusStatPicks.length>=need)) {
+    // re-clique alors que plein ou déjà ×2 → retirer une occurrence
+    const idx = WIZ.bonusStatPicks.indexOf(s); WIZ.bonusStatPicks.splice(idx,1);
+  } else if (WIZ.bonusStatPicks.length < need) {
+    WIZ.bonusStatPicks.push(s);
+  } else {
+    const idx = WIZ.bonusStatPicks.indexOf(s);
+    if (idx>=0) WIZ.bonusStatPicks.splice(idx,1);
+  }
+  wizRender();
+};
+
+// ─── ÉTAPE 2 : CLASSE ────────────────────────────────────────
+function wizStepClass(main, b) {
+  main.innerHTML = `
+    <h3 class="wiz-title">Choisis ta vocation</h3>
+    <div id="wizClassGrid" class="wiz-grid"></div>
+    <div id="wizClassDetail"></div>`;
+  const grid = document.getElementById('wizClassGrid');
+  grid.innerHTML = WIZ_CLASS_KEYS.map((k,i) => {
+    const c = CLASSES[k];
+    return `<button class="wiz-card ${WIZ.cls===k?'sel':''}" onclick="window._wizPickClass(${i})">
+      ${wizVisual('classes', k, 'wiz-card-img')}
+      <div class="wiz-card-body">
+        <div class="wiz-card-name">${k}</div>
+        <div class="wiz-card-meta"><span class="wiz-src">${c.source}</span><span class="wiz-bonus">d${c.hd} PV${c.spellcaster?' · ✨':''}</span></div>
+      </div></button>`;
+  }).join('');
+  wizClassDetail();
+}
+window._wizPickClass = (i) => {
+  const k = WIZ_CLASS_KEYS[i];
+  if (WIZ.cls !== k) { WIZ.cls = k; WIZ.classSkills = []; WIZ.subclass = null; }
+  wizRender();
+  document.getElementById('wizClassDetail')?.scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+function wizClassDetail() {
+  const box = document.getElementById('wizClassDetail'); if(!box) return;
+  const c = wizClassData();
+  if (!c) { box.innerHTML=''; return; }
+  const pool = wizClassSkillPool();
+  const bgSkills = wizBgData()?.skills || [];
+  const left = (c.skillCount||0) - WIZ.classSkills.length;
+  const scInfo = wizSubclassLvl1();
+  const lvl1 = (c.features||[]).filter(f=>f.lvl<=1);
+  box.innerHTML = `<div class="wiz-detail">
+    <h4>${WIZ.cls} <span class="wiz-src">${c.source}</span></h4>
+    <div class="wiz-detail-row">
+      <span>🎲 Dé de vie : <strong>d${c.hd}</strong></span>
+      <span>🛡 Sauvegardes : <strong>${c.saves.map(s=>WIZ_STAT_FR[s]).join(', ')}</strong></span>
+      ${c.spellcaster?`<span>✨ Lanceur de sorts (<strong>${WIZ_STAT_FR[c.spellAbility]}</strong>)</span>`:''}
+    </div>
+    <div class="wiz-detail-row dim">
+      <span>Armures : ${(c.armor||[]).join(', ')||'—'}</span>
+      <span>Armes : ${(c.weapons||[]).join(', ')||'—'}</span>
+    </div>
+    ${scInfo?`<div class="wiz-detail-sub">
+      <label>${scInfo.label} (niveau 1) ${WIZ.subclass?'<em class="ok">✓</em>':'<em class="need">— à choisir</em>'}</label>
+      <div class="wiz-chips">${Object.keys(scInfo.options).map((s,i)=>`<button class="wiz-chip big ${WIZ.subclass===s?'sel':''}" onclick="window._wizPickSubclass(${i})">${s}</button>`).join('')}</div>
+    </div>`:''}
+    <div class="wiz-detail-sub">
+      <label>Compétences de classe — choisis-en ${c.skillCount} ${left>0?`<em class="need">— ${left} restante${left>1?'s':''}</em>`:'<em class="ok">✓</em>'}</label>
+      <div class="wiz-chips">${pool.map((s,i)=>{
+        const viaBg = bgSkills.includes(s);
+        const on = WIZ.classSkills.includes(s);
+        return `<button class="wiz-chip ${on?'sel':''} ${viaBg?'dis':''}" ${viaBg?'disabled title="Déjà acquise via l\u2019historique"':''} onclick="window._wizToggleSkill(${i})">${s}${viaBg?' <small>· Historique</small>':''}</button>`;
+      }).join('')}</div>
+      ${bgSkills.some(s=>pool.includes(s))?`<small class="wiz-hint">Les compétences grisées sont déjà offertes par ton historique « ${WIZ.background} » — elles ne consomment pas tes choix de classe.</small>`:''}
+    </div>
+    <div class="wiz-detail-sub">
+      <label>Aptitudes de niveau 1</label>
+      <div class="wiz-detail-traits">${lvl1.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div>
+    </div>
+    <div class="wiz-detail-sub dim"><label>Équipement de départ</label><div class="wiz-side-text">${c.equipment||'—'}</div></div>
+  </div>`;
+}
+window._wizPickSubclass = (i) => {
+  const sc = wizSubclassLvl1(); if(!sc) return;
+  WIZ.subclass = Object.keys(sc.options)[i];
+  wizRender();
+};
+window._wizToggleSkill = (i) => {
+  const pool = wizClassSkillPool();
+  const s = pool[i]; if(!s) return;
+  const c = wizClassData();
+  if (WIZ.classSkills.includes(s)) WIZ.classSkills = WIZ.classSkills.filter(x=>x!==s);
+  else if (WIZ.classSkills.length < (c.skillCount||0)) WIZ.classSkills.push(s);
+  wizRender();
+};
+
+// ─── ÉTAPE 3 : CARACTÉRISTIQUES ──────────────────────────────
+function wizStepStats(main, b) {
+  const methods = [['pointbuy','Achat de points (27)'],['standard','Tableau standard'],['manual','Saisie libre']];
+  main.innerHTML = `
+    <h3 class="wiz-title">Forge tes caractéristiques</h3>
+    <div class="wiz-chips" style="margin-bottom:14px">${methods.map(([m,l])=>`<button class="wiz-chip big ${WIZ.statMethod===m?'sel':''}" onclick="window._wizStatMethod('${m}')">${l}</button>`).join('')}</div>
+    <div id="wizStatZone"></div>
+    <small class="wiz-hint">Les bonus de ton peuple ${WIZ.race?`(${WIZ.race})`:''} sont déjà intégrés dans la valeur finale, à droite de chaque carte.</small>`;
+  wizStatZone(b);
+}
+window._wizStatMethod = (m) => {
+  WIZ.statMethod = m;
+  if (m==='standard' && !WIZ.standardAssign) { WIZ.standardAssign = {str:15,dex:14,con:13,int:12,wis:10,cha:8}; WIZ.baseStats = {...WIZ.standardAssign}; }
+  wizRender();
+};
+function wizStatZone(b) {
+  const zone = document.getElementById('wizStatZone'); if(!zone) return;
+  const costs = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+  const card = (k, controls) => `
+    <div class="wiz-statcard ${b.racial[k]?'boosted':''}">
+      <div class="wiz-statcard-name">${WIZ_STAT_LONG[k]}</div>
+      ${controls}
+      <div class="wiz-statcard-final">
+        ${b.racial[k]?`<small>${WIZ.baseStats[k]} + ${b.racial[k]}</small>`:''}
+        <strong>${b.finalStats[k]}</strong>
+        <em>${mod(b.finalStats[k])>=0?'+':''}${mod(b.finalStats[k])}</em>
+      </div>
+    </div>`;
+  if (WIZ.statMethod === 'pointbuy') {
+    const spent = WIZ_STAT_KEYS.reduce((s,k)=>s+(costs[WIZ.baseStats[k]]||0),0);
+    const leftPts = 27 - spent;
+    zone.innerHTML = `<div class="wiz-pb-head">Points restants : <strong class="${leftPts===0?'ok':''}">${leftPts}</strong> / 27</div>
+      <div class="wiz-statgrid">${WIZ_STAT_KEYS.map(k=>card(k,
+        `<div class="wiz-statcard-ctrl">
+          <button onclick="window._wizPB('${k}',-1)">−</button><span>${WIZ.baseStats[k]}</span><button onclick="window._wizPB('${k}',1)">+</button>
+        </div>`)).join('')}</div>`;
+  } else if (WIZ.statMethod === 'standard') {
+    const opts = [15,14,13,12,10,8];
+    zone.innerHTML = `<div class="wiz-pb-head">Assigne chaque valeur du tableau (15, 14, 13, 12, 10, 8)</div>
+      <div class="wiz-statgrid">${WIZ_STAT_KEYS.map(k=>card(k,
+        `<select class="wiz-statcard-sel" onchange="window._wizStd('${k}',this.value)">${opts.map(v=>`<option value="${v}" ${WIZ.standardAssign[k]==v?'selected':''}>${v}</option>`).join('')}</select>`)).join('')}</div>`;
+  } else {
+    zone.innerHTML = `<div class="wiz-statgrid">${WIZ_STAT_KEYS.map(k=>card(k,
+      `<input class="wiz-statcard-inp" type="number" min="1" max="20" value="${WIZ.baseStats[k]}" onchange="window._wizManual('${k}',this.value)">`)).join('')}</div>`;
+  }
+}
+window._wizPB = (k,d) => {
+  const costs = {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9};
+  const cur = WIZ.baseStats[k], nv = Math.max(8, Math.min(15, cur+d));
+  const spent = WIZ_STAT_KEYS.reduce((s,x)=>s+(costs[WIZ.baseStats[x]]||0),0);
+  const diff = (costs[nv]||0)-(costs[cur]||0);
+  if (diff>0 && (27-spent)<diff) return;
+  WIZ.baseStats[k]=nv; wizRender();
+};
+window._wizStd = (k,v) => { WIZ.standardAssign[k]=parseInt(v); WIZ.baseStats={...WIZ.standardAssign}; wizRender(); };
+window._wizManual = (k,v) => { WIZ.baseStats[k]=Math.max(1,Math.min(20,parseInt(v)||8)); wizRender(); };
+
+// ─── ÉTAPE 4 : HISTORIQUE ────────────────────────────────────
+function wizStepBg(main, b) {
+  main.innerHTML = `
+    <h3 class="wiz-title">D'où viens-tu ?</h3>
+    <div class="wiz-filters">
+      <input id="wizBgSearch" class="wiz-search" type="text" placeholder="🔍 Rechercher un historique…" value="${WIZ.bgSearch.replace(/"/g,'&quot;')}" oninput="window._wizBgSearch(this.value)">
+    </div>
+    <div id="wizBgGrid" class="wiz-grid"></div>
+    <div id="wizBgDetail"></div>`;
+  window._wizBgGrid();
+  wizBgDetail();
+}
+window._wizBgGrid = () => {
+  const grid = document.getElementById('wizBgGrid'); if(!grid) return;
+  const q = WIZ.bgSearch.toLowerCase();
+  grid.innerHTML = WIZ_BG_KEYS.map((k,i) => {
+    if (q && !k.toLowerCase().includes(q)) return '';
+    const bg = BACKGROUNDS[k];
+    return `<button class="wiz-card ${WIZ.background===k?'sel':''}" onclick="window._wizPickBg(${i})">
+      ${wizVisual('backgrounds', k, 'wiz-card-img')}
+      <div class="wiz-card-body">
+        <div class="wiz-card-name">${k}</div>
+        <div class="wiz-card-meta"><span class="wiz-src">${bg.source}</span><span class="wiz-bonus">${(bg.skills||[]).join(' · ')}</span></div>
+      </div></button>`;
+  }).join('') || '<p class="wiz-empty">Aucun historique ne correspond.</p>';
+};
+window._wizPickBg = (i) => {
+  const k = WIZ_BG_KEYS[i];
+  if (WIZ.background !== k) { WIZ.background = k; WIZ.langPicks = []; }
+  wizRender();
+  document.getElementById('wizBgDetail')?.scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+function wizBgDetail() {
+  const box = document.getElementById('wizBgDetail'); if(!box) return;
+  const bg = wizBgData();
+  if (!bg) { box.innerHTML=''; return; }
+  const langN = bg.lang || 0;
+  const langLeft = langN - WIZ.langPicks.length;
+  // collision : compétences de l'historique que la classe proposait
+  const overlap = (bg.skills||[]).filter(s => wizClassSkillPool().includes(s));
+  box.innerHTML = `<div class="wiz-detail">
+    <h4>${WIZ.background} <span class="wiz-src">${bg.source}</span></h4>
+    <div class="wiz-detail-row">
+      <span>📚 Compétences offertes : <strong>${(bg.skills||[]).join(', ')}</strong></span>
+      ${bg.tools?.length?`<span>🛠 Outils : <strong>${bg.tools.join(', ')}</strong></span>`:''}
+    </div>
+    ${overlap.length&&WIZ.cls?`<div class="wiz-banner">✦ ${overlap.join(' et ')} ${overlap.length>1?'sont':'est'} aussi proposée${overlap.length>1?'s':''} par ta classe ${WIZ.cls} : ton choix de classe a été libéré automatiquement, tu ne perds rien.</div>`:''}
+    ${langN?`<div class="wiz-detail-sub">
+      <label>Langues supplémentaires — choisis-en ${langN} ${langLeft>0?`<em class="need">— ${langLeft} restante${langLeft>1?'s':''}</em>`:'<em class="ok">✓</em>'}</label>
+      <div class="wiz-chips">${WIZ_LANGUAGES.filter(l=>l!=='Commun').map((l,i)=>`<button class="wiz-chip ${WIZ.langPicks.includes(l)?'sel':''}" onclick="window._wizLangPick(${i})">${l}</button>`).join('')}</div>
+    </div>`:''}
+    <div class="wiz-detail-sub">
+      <label>Capacité d'historique</label>
+      <div class="wiz-trait">◆ ${bg.feature||'—'}</div>
+    </div>
+    <div class="wiz-detail-sub dim"><label>Équipement</label><div class="wiz-side-text">${bg.equipment||'—'}</div></div>
+  </div>`;
+}
+window._wizLangPick = (i) => {
+  const l = WIZ_LANGUAGES.filter(x=>x!=='Commun')[i];
+  const n = wizBgData()?.lang || 0;
+  if (WIZ.langPicks.includes(l)) WIZ.langPicks = WIZ.langPicks.filter(x=>x!==l);
+  else if (WIZ.langPicks.length < n) WIZ.langPicks.push(l);
+  wizRender();
+};
+
+// ─── ÉTAPE 5 : IDENTITÉ + DON OPTIONNEL ──────────────────────
+function wizStepIdentity(main, b) {
+  main.innerHTML = `
+    <h3 class="wiz-title">Qui es-tu ?</h3>
+    <div class="wiz-form">
+      <div class="wiz-field main">
+        <label>Nom du héros ${WIZ.name.trim()?'':'<em class="need">— requis</em>'}</label>
+        <input id="wizName" type="text" value="${WIZ.name.replace(/"/g,'&quot;')}" placeholder="Ex : Aldarion du Val d'Ambre" oninput="window._wizField('name',this.value)">
+      </div>
+      <div class="wiz-field-row">
+        <div class="wiz-field"><label>Âge</label><input type="text" value="${WIZ.age.replace(/"/g,'&quot;')}" oninput="window._wizField('age',this.value)"></div>
+        <div class="wiz-field"><label>Genre</label><input type="text" value="${WIZ.gender.replace(/"/g,'&quot;')}" oninput="window._wizField('gender',this.value)"></div>
+      </div>
+      <div class="wiz-field">
+        <label>Alignement</label>
+        <div class="wiz-align-grid">${ALIGNMENTS.map((a,i)=>`<button class="wiz-chip ${WIZ.alignment===a?'sel':''}" onclick="window._wizPickAlign(${i})">${a}</button>`).join('')}</div>
+      </div>
+      <details class="wiz-fold" ${WIZ.personality||WIZ.ideals||WIZ.bonds||WIZ.flaws?'open':''}>
+        <summary>🎭 Personnalité & roleplay (optionnel)</summary>
+        <div class="wiz-field"><label>Traits de personnalité</label><textarea rows="2" oninput="window._wizField('personality',this.value)">${WIZ.personality}</textarea></div>
+        <div class="wiz-field-row">
+          <div class="wiz-field"><label>Idéaux</label><input type="text" value="${WIZ.ideals.replace(/"/g,'&quot;')}" oninput="window._wizField('ideals',this.value)"></div>
+          <div class="wiz-field"><label>Liens</label><input type="text" value="${WIZ.bonds.replace(/"/g,'&quot;')}" oninput="window._wizField('bonds',this.value)"></div>
+        </div>
+        <div class="wiz-field"><label>Défauts</label><input type="text" value="${WIZ.flaws.replace(/"/g,'&quot;')}" oninput="window._wizField('flaws',this.value)"></div>
+      </details>
+      <details class="wiz-fold" ${WIZ.appearance||WIZ.backstory?'open':''}>
+        <summary>📖 Apparence & histoire (optionnel)</summary>
+        <div class="wiz-field"><label>Apparence physique</label><textarea rows="2" oninput="window._wizField('appearance',this.value)">${WIZ.appearance}</textarea></div>
+        <div class="wiz-field"><label>Histoire du personnage</label><textarea rows="3" oninput="window._wizField('backstory',this.value)">${WIZ.backstory}</textarea></div>
+      </details>
+      <details class="wiz-fold" ${WIZ.feat||WIZ.featSearch?'open':''}>
+        <summary>⭐ Don de départ (optionnel — règle de variante)</summary>
+        <div id="wizFeatZone"></div>
+      </details>
+    </div>`;
+  wizFeatZone();
+}
+window._wizField = (k,v) => { if(!WIZ) return; WIZ[k]=v; if(k==='name') wizRenderSide(wizBuild()); };
+window._wizRaceSearch = (v) => { WIZ.raceSearch=v; window._wizRaceGrid(); };
+window._wizRaceSrc = (s) => { WIZ.raceSrc=s; const f=document.querySelectorAll('.wiz-filters .wiz-chip'); window._wizRaceGrid(); f.forEach(b=>b.classList.toggle('sel', b.textContent===( {all:'Toutes',PHB:'PHB',MotM:'MotM',autres:'Autres sources'}[s] ))); };
+window._wizBgSearch = (v) => { WIZ.bgSearch=v; window._wizBgGrid(); };
+window._wizFeatSearch = (v) => { WIZ.featSearch=v; wizFeatZoneRefresh(); };
+window._wizFeatStat = (s) => { WIZ.featStatPick=s; wizRender(); };
+window._wizPickAlign = (i) => { const a=ALIGNMENTS[i]; WIZ.alignment = WIZ.alignment===a?'':a; wizRender(); };
+
+function wizFeatZone() {
+  const zone = document.getElementById('wizFeatZone'); if(!zone) return;
+  if (WIZ.feat) {
+    const f = WIZ.feat;
+    const sb = f.statBonus;
+    zone.innerHTML = `<div class="wiz-detail" style="margin-top:8px">
+      <h4>⭐ ${f.name} <span class="wiz-src">${f.source||''}</span> <button class="wiz-x" onclick="window._wizClearFeat()">✕ retirer</button></h4>
+      <div class="wiz-side-text">${f.desc||''}</div>
+      ${sb?.choice?`<div class="wiz-detail-sub">
+        <label>Bonus du don : +${sb.val||1} à ${WIZ.featStatPick?'':'<em class="need">— à choisir</em>'}</label>
+        <div class="wiz-chips">${sb.choice.map(s=>`<button class="wiz-chip ${WIZ.featStatPick===s?'sel':''}" onclick="window._wizFeatStat('${s}')">${WIZ_STAT_FR[s]}</button>`).join('')}</div>
+      </div>`:''}
+    </div>`;
+    return;
+  }
+  // recherche
+  const q = WIZ.featSearch.toLowerCase();
+  const homebrew = (typeof compendiumResources!=='undefined' ? compendiumResources : []).filter(r=>r.type==='feat');
+  const all = [...(COMPENDIUM_DATA.feat||[]), ...homebrew.filter(h=>!(COMPENDIUM_DATA.feat||[]).some(f=>f.name===h.name))];
+  WIZ_FEAT_LIST = q ? all.filter(f=>f.name.toLowerCase().includes(q)).slice(0,30) : [];
+  zone.innerHTML = `
+    <input class="wiz-search" type="text" placeholder="🔍 Rechercher un don (ex : Alerte, Chanceux…)" value="${WIZ.featSearch.replace(/"/g,'&quot;')}" oninput="window._wizFeatSearch(this.value)">
+    <div id="wizFeatList" class="wiz-featlist">${wizFeatListHtml()}</div>`;
+}
+function wizFeatListHtml() {
+  if (!WIZ.featSearch) return '<p class="wiz-hint" style="margin-top:8px">Une règle maison appréciée : autoriser un don dès le niveau 1. Laisse vide pour t\'en passer.</p>';
+  if (!WIZ_FEAT_LIST.length) return '<p class="wiz-empty">Aucun don trouvé.</p>';
+  return WIZ_FEAT_LIST.map((f,i)=>`<button class="wiz-featrow" onclick="window._wizPickFeat(${i})">
+    <strong>${f.name}</strong><span>${(f.desc||'').slice(0,90)}${(f.desc||'').length>90?'…':''}</span>
+  </button>`).join('');
+}
+function wizFeatZoneRefresh() {
+  const q = WIZ.featSearch.toLowerCase();
+  const homebrew = (typeof compendiumResources!=='undefined' ? compendiumResources : []).filter(r=>r.type==='feat');
+  const all = [...(COMPENDIUM_DATA.feat||[]), ...homebrew.filter(h=>!(COMPENDIUM_DATA.feat||[]).some(f=>f.name===h.name))];
+  WIZ_FEAT_LIST = q ? all.filter(f=>f.name.toLowerCase().includes(q)).slice(0,30) : [];
+  const list = document.getElementById('wizFeatList');
+  if (list) list.innerHTML = wizFeatListHtml();
+}
+window._wizPickFeat = (i) => { WIZ.feat = WIZ_FEAT_LIST[i]; WIZ.featStatPick = null; wizRender(); };
+window._wizClearFeat = () => { WIZ.feat = null; WIZ.featStatPick = null; WIZ.featSearch=''; wizRender(); };
+
+// ─── ÉTAPE 6 : RÉCAP / FORGE ─────────────────────────────────
+function wizStepRecap(main, b) {
+  const heroCat = WIZ.cls ? 'classes' : 'races';
+  const heroKey = WIZ.cls || WIZ.race || '';
+  const c = wizClassData();
+  const group = (title, items) => !items.length ? '' : `
+    <div class="wiz-recap-group">
+      <h5>${title}</h5>
+      ${items.map(t=>`<div class="wiz-trait">${t}</div>`).join('')}
+    </div>`;
+  main.innerHTML = `
+    <div class="wiz-recap-hero">
+      ${heroKey?wizVisual(heroCat, heroKey, 'wiz-recap-img'):''}
+      <div class="wiz-recap-hero-txt">
+        <h3>${WIZ.name.trim()||'Héros sans nom'}</h3>
+        <p>${WIZ.subrace||WIZ.race||'—'} · ${WIZ.cls||'—'}${WIZ.subclass?` (${WIZ.subclass})`:''} · Niveau 1</p>
+        <p class="dim">${WIZ.background||''} ${WIZ.alignment?'· '+WIZ.alignment:''}</p>
+      </div>
+    </div>
+    <div class="wiz-recap-stats">
+      ${WIZ_STAT_KEYS.map(k=>`<div class="wiz-side-stat"><span>${WIZ_STAT_FR[k]}</span><strong>${b.finalStats[k]}</strong><em>${mod(b.finalStats[k])>=0?'+':''}${mod(b.finalStats[k])}</em></div>`).join('')}
+    </div>
+    <div class="wiz-recap-combat">
+      <span>❤️ <strong>${b.hpMax}</strong> PV</span>
+      <span>🛡 <strong>${b.ac}</strong> CA <small>(${b.acNote})</small></span>
+      <span>👟 <strong>${b.speed} m</strong></span>
+      <span>🎯 Maîtrise <strong>+2</strong></span>
+      ${c?.spellcaster?`<span>✨ DD sorts <strong>${8+2+mod(b.finalStats[c.spellAbility]||8)}</strong></span>`:''}
+    </div>
+    <div class="wiz-recap-groups">
+      ${group('🧝 Peuple — '+(WIZ.subrace?WIZ.subrace+' ('+WIZ.race+')':WIZ.race||''), b.traits.map(t=>'◆ '+t))}
+      ${group('⚔️ Classe — '+(WIZ.cls||''), b.features.map(f=>`<strong>${f.name}</strong> — ${f.desc}`))}
+      ${group('📜 Historique — '+(WIZ.background||''), wizBgData()?[
+        '📚 '+(wizBgData().skills||[]).join(', '),
+        ...(wizBgData().tools?.length?['🛠 '+wizBgData().tools.join(', ')]:[]),
+        '◆ '+(wizBgData().feature||'')
+      ]:[])}
+      ${group('🗣 Langues', [b.languages.join(', ')])}
+      ${WIZ.feat?group('⭐ Don — '+WIZ.feat.name, [WIZ.feat.desc||'']):''}
+      ${group('📚 Compétences maîtrisées', b.skills.map(s=>`${s.name} <small class="dim">· via ${s.src}</small>`))}
+      ${group('🎒 Équipement de départ', [c?.equipment||'—', wizBgData()?.equipment||''].filter(Boolean))}
+    </div>
+    ${c?.spellcaster?'<p class="wiz-hint">✨ Tes sorts se choisissent ensuite directement sur la fiche, via le compendium.</p>':''}
+    ${b.pending.length?`<div class="wiz-banner warn">⚠ Il reste des choix à compléter avant de forger : ${b.pending.map(p=>`<button class="wiz-pending-item inline" onclick="window._wizGo(${p.step})">${p.label}</button>`).join(' ')}</div>`:
+      '<div class="wiz-banner ok">✦ Tout est prêt. Souffle sur les braises…</div>'}
+  `;
+}
+
+// ─── SAUVEGARDE ──────────────────────────────────────────────
+async function wizSave(b) {
+  const c = wizClassData() || {hd:8, saves:[], skills:[]};
+  const r = wizRaceData() || {};
+  const next = document.getElementById('wizNext');
+  next.disabled = true; next.innerHTML = '🔥 Forge en cours…';
+  try {
+    const skillProf = {};
+    b.skills.forEach(s => skillProf[s.name] = 'prof');
+    const saves = {};
+    (c.saves||[]).forEach(s => saves[s] = true);
+
+    const features = b.features.map(f => ({...f}));
+    if (WIZ.feat) features.push({ name: WIZ.feat.name, desc: WIZ.feat.desc||'', src:'Don' });
+
+    const profLang = [
+      'Langues : ' + b.languages.join(', '),
+      b.tools.length ? 'Outils : ' + b.tools.join(', ') : '',
+      (c.armor||[]).length ? 'Armures : ' + c.armor.join(', ') : '',
+      (c.weapons||[]).length ? 'Armes : ' + c.weapons.join(', ') : ''
+    ].filter(Boolean).join('\n');
+
+    const newChar = {
+      owner: currentUid,
+      name: WIZ.name.trim(), age: WIZ.age||'', gender: WIZ.gender||'',
+      alignment: WIZ.alignment||'', background: WIZ.background||'',
+      ideals: WIZ.ideals||'', bonds: WIZ.bonds||'', flaws: WIZ.flaws||'',
+      personality: WIZ.personality||'', appearance: WIZ.appearance||'', backstory: WIZ.backstory||'',
+      race: WIZ.race, subrace: WIZ.subrace||'',
+      class: WIZ.cls, classes: [{ name: WIZ.cls, level: 1 }],
+      subclasses: WIZ.subclass ? { [WIZ.cls]: WIZ.subclass } : {},
+      level: 1, xp: 0,
+      stats: b.finalStats,
+      hp: b.hpMax, hpMax: b.hpMax, tmpHp: 0,
+      ac: b.ac, speed: b.speed,
+      initiative: mod(b.finalStats.dex), profBonus: 2,
+      hitDice: `1d${c.hd}`,
+      deathSaves: { success:0, fail:0 },
+      saveProficiencies: saves,
+      skillProficiencies: skillProf,
+      profLang,
+      languages: b.languages.join(', '),
+      cp:0, sp:0, ep:0, gp:10, pp:0,
+      equipment: [c.equipment||'', wizBgData()?.equipment||''].filter(Boolean).join('\n'),
+      weapons: '', armor: '',
+      spellcaster: c.spellcaster||false,
+      spellAbility: c.spellAbility||'',
+      spellAttackBonus: c.spellcaster ? (2 + mod(b.finalStats[c.spellAbility]||8)) : 0,
+      spellSaveDC: c.spellcaster ? (8 + 2 + mod(b.finalStats[c.spellAbility]||8)) : 0,
+      spells: {},
+      features,
+      traits: b.traits,
+      inspiration: false, notes: '',
+      createdAt: new Date().toISOString()
+    };
+    await addDoc(collection(db, "characters"), newChar);
+    document.getElementById('wizOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+    WIZ = null;
+  } catch(e) {
+    alert('La forge a refusé le métal : ' + (e.message||e));
+  } finally {
+    next.disabled = false;
+  }
+}
+
+// ============================================================
+// ÉDITEUR — VISUELS DU CRÉATEUR (wizard_assets)
+// ============================================================
+window._wizAssetsRender = async () => {
+  const panel = document.getElementById('wizAssetsPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'none') return;
+  await wizLoadAssets(true);
+  window._wizAssetsList();
+};
+window._wizAssetsList = () => {
+  const cat = document.getElementById('wizAssetsCat').value;
+  const keys = cat==='races' ? Object.keys(RACES) : cat==='classes' ? Object.keys(CLASSES) : Object.keys(BACKGROUNDS);
+  const q = (document.getElementById('wizAssetsSearch').value||'').toLowerCase();
+  const list = document.getElementById('wizAssetsList');
+  list.innerHTML = keys.filter(k=>!q||k.toLowerCase().includes(q)).map(k => {
+    const url = wizAssets?.[cat]?.[k] || '';
+    const esc = url.replace(/"/g,'&quot;');
+    return `<div class="wiz-asset-row">
+      ${url?`<div class="wiz-asset-thumb" style="background-image:url('${url.replace(/'/g,"%27")}')"></div>`:'<div class="wiz-asset-thumb empty">∅</div>'}
+      <span class="wiz-asset-name">${k}</span>
+      <input type="url" placeholder="https://… (URL de l'image)" value="${esc}" data-key="${k.replace(/"/g,'&quot;')}">
+      <button class="section-add-btn" onclick="window._wizAssetSave('${cat}', this)">💾</button>
+    </div>`;
+  }).join('');
+};
+window._wizAssetSave = async (cat, btn) => {
+  const input = btn.previousElementSibling;
+  const key = input.dataset.key;
+  const url = input.value.trim();
+  try {
+    await setDoc(doc(db, 'wizard_assets', cat), { [key]: url }, { merge: true });
+    wizAssets[cat][key] = url;
+    btn.textContent = '✓'; setTimeout(()=>{ btn.textContent='💾'; window._wizAssetsList(); }, 800);
+  } catch(e) { alert('Erreur de sauvegarde : ' + (e.message||e)); }
+};
+
+
+// ============================================================
 // LISTE DES PERSONNAGES
 // ============================================================
 async function loadCharacterList() {
@@ -9636,6 +10474,220 @@ nav button:last-child { color:#884444; }
 .btn-prev { background:transparent; border:1px solid #aaa; color:#666; padding:10px 20px; cursor:pointer; font-family:'Cinzel'; font-size:0.75rem; border-radius:3px; }
 .btn-prev:hover { border-color:var(--ink); color:var(--ink); }
  
+/* ════════════════════════════════════════════════════════════
+   LA FORGE DU HÉROS V2 — wizard plein écran
+   ════════════════════════════════════════════════════════════ */
+#wizOverlay { display:none; position:fixed; inset:0; z-index:1300;
+  background:radial-gradient(1200px 600px at 50% -10%, #3a2a14 0%, #1b1309 45%, #0d0905 100%);
+  color:#efe6d6; flex-direction:column; font-family:'Crimson Pro',serif; }
+#wizOverlay.open { display:flex; }
+#wizOverlay::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:0.5;
+  background:radial-gradient(2px 2px at 18% 32%, rgba(255,190,90,0.5) 0%, transparent 100%),
+             radial-gradient(2px 2px at 71% 64%, rgba(255,190,90,0.35) 0%, transparent 100%),
+             radial-gradient(1.5px 1.5px at 42% 78%, rgba(255,190,90,0.4) 0%, transparent 100%),
+             radial-gradient(2px 2px at 88% 22%, rgba(255,190,90,0.3) 0%, transparent 100%); }
+
+.wiz-head { display:flex; align-items:center; gap:18px; padding:12px 22px;
+  background:rgba(0,0,0,0.35); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  border-bottom:1px solid rgba(255,255,255,0.1); z-index:2; }
+.wiz-head h2 { font-family:'Cinzel'; color:var(--gold); font-size:1.05rem; letter-spacing:3px; white-space:nowrap; filter:brightness(1.4); }
+.wiz-x-btn { margin-left:auto; background:none; border:1px solid rgba(255,255,255,0.25); color:#cbb; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1rem; flex-shrink:0; }
+.wiz-x-btn:hover { border-color:var(--gold); color:var(--gold); }
+
+#wizProgress { display:flex; align-items:center; flex:1; min-width:0; overflow-x:auto; gap:0; }
+.wiz-pstep { display:flex; flex-direction:column; align-items:center; gap:2px; background:none; border:none; cursor:pointer; color:#8a7d6a; padding:2px 8px; flex-shrink:0; }
+.wiz-pstep-ico { width:30px; height:30px; border-radius:50%; border:2px solid #5a4f40; display:flex; align-items:center; justify-content:center; font-size:0.85rem; transition:all 0.25s; background:rgba(0,0,0,0.3); }
+.wiz-pstep-lbl { font-family:'Cinzel'; font-size:0.55rem; letter-spacing:1px; }
+.wiz-pstep.active { color:var(--gold); filter:brightness(1.5); }
+.wiz-pstep.active .wiz-pstep-ico { border-color:var(--gold); box-shadow:0 0 14px rgba(220,170,60,0.5); }
+.wiz-pstep.done { color:#c9b88f; }
+.wiz-pstep.done .wiz-pstep-ico { border-color:var(--gold); background:rgba(184,134,11,0.35); }
+.wiz-pstep.warn .wiz-pstep-ico { border-color:#e0a050; color:#e0a050; }
+.wiz-pline { width:22px; height:2px; background:#4a4032; flex-shrink:0; }
+.wiz-pline.done { background:var(--gold); }
+
+.wiz-body { flex:1; display:flex; min-height:0; z-index:1; }
+#wizMain { flex:1; overflow-y:auto; padding:22px 26px 40px; min-width:0; }
+#wizSide { width:300px; flex-shrink:0; overflow-y:auto; padding:16px;
+  background:rgba(255,255,255,0.05); -webkit-backdrop-filter:blur(10px) saturate(1.2); backdrop-filter:blur(10px) saturate(1.2);
+  border-left:1px solid rgba(255,255,255,0.12); }
+
+.wiz-title { font-family:'Cinzel'; color:var(--gold); filter:brightness(1.4); font-size:1.15rem; letter-spacing:2px; margin-bottom:14px; }
+
+/* filtres / recherche */
+.wiz-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+.wiz-search { flex:1; min-width:200px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.18); border-radius:8px; color:#efe6d6; padding:9px 12px; font-family:'Crimson Pro'; font-size:0.95rem; }
+.wiz-search:focus { outline:none; border-color:var(--gold); }
+
+/* cartes */
+.wiz-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+.wiz-card { background:rgba(255,255,255,0.06); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,0.14); border-radius:12px; overflow:hidden; cursor:pointer; padding:0;
+  text-align:left; color:inherit; transition:transform 0.15s, border-color 0.2s, box-shadow 0.2s; display:flex; flex-direction:column; }
+.wiz-card:hover { transform:translateY(-3px); border-color:rgba(255,210,120,0.5); }
+.wiz-card.sel { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 6px 24px rgba(200,150,40,0.35); }
+.wiz-card-img { width:100%; aspect-ratio:4/3; background-size:cover; background-position:center top; }
+.wiz-fallback { display:flex; align-items:center; justify-content:center; }
+.wiz-fallback span { font-family:'Cinzel'; font-size:2.2rem; color:rgba(255,235,200,0.55); text-shadow:0 2px 8px rgba(0,0,0,0.6); }
+.wiz-card-body { padding:8px 10px 10px; }
+.wiz-card-name { font-family:'Cinzel'; font-size:0.82rem; letter-spacing:0.5px; color:#f3e9d2; line-height:1.25; }
+.wiz-card-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:5px; align-items:center; }
+.wiz-src { font-size:0.62rem; font-family:'Cinzel'; letter-spacing:1px; border:1px solid rgba(255,255,255,0.25); border-radius:4px; padding:1px 5px; color:#bba; }
+.wiz-bonus { font-size:0.72rem; color:#d9c08a; }
+.wiz-empty { color:#998; font-style:italic; padding:20px 4px; }
+
+/* panneau de détail */
+.wiz-detail { margin-top:18px; background:rgba(255,255,255,0.055); -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px);
+  border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:16px 18px; }
+.wiz-detail h4 { font-family:'Cinzel'; color:var(--gold); filter:brightness(1.35); font-size:1rem; letter-spacing:1px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.wiz-detail-speed { font-size:0.78rem; color:#cbb; font-family:'Crimson Pro'; letter-spacing:0; }
+.wiz-detail-row { display:flex; gap:18px; flex-wrap:wrap; margin-top:10px; font-size:0.9rem; }
+.wiz-detail-row.dim, .wiz-detail-sub.dim label { color:#a99; }
+.wiz-detail-sub { margin-top:14px; }
+.wiz-detail-sub label { display:block; font-family:'Cinzel'; font-size:0.68rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:7px; }
+.wiz-detail-traits { margin-top:10px; display:flex; flex-direction:column; gap:5px; }
+.wiz-trait { font-size:0.88rem; line-height:1.45; color:#e6dcc8; }
+.wiz-hint { display:block; margin-top:7px; font-size:0.78rem; color:#a59a85; font-style:italic; }
+em.need { color:#e8a04c; font-style:normal; font-size:0.85em; }
+em.ok { color:#7fc06a; font-style:normal; }
+.wiz-x { margin-left:auto; background:none; border:1px solid rgba(255,255,255,0.3); color:#caa; border-radius:6px; padding:3px 8px; cursor:pointer; font-size:0.7rem; font-family:'Cinzel'; }
+.wiz-x:hover { border-color:#e07070; color:#e07070; }
+
+/* chips */
+.wiz-chips { display:flex; gap:7px; flex-wrap:wrap; }
+.wiz-chip { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.22); border-radius:18px; color:#e3d8c2;
+  padding:6px 13px; cursor:pointer; font-family:'Crimson Pro'; font-size:0.85rem; transition:all 0.15s; }
+.wiz-chip.big { padding:8px 16px; display:flex; flex-direction:column; align-items:center; }
+.wiz-chip.big small { font-size:0.68rem; color:#cdb88c; }
+.wiz-chip:hover:not(:disabled) { border-color:rgba(255,210,120,0.6); }
+.wiz-chip.sel { background:rgba(184,134,11,0.4); border-color:var(--gold); color:#fff; box-shadow:0 0 10px rgba(200,150,40,0.3); }
+.wiz-chip.dis, .wiz-chip:disabled { opacity:0.42; cursor:not-allowed; text-decoration:line-through; }
+.wiz-chip.dis small { text-decoration:none; }
+
+/* bannières */
+.wiz-banner { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:0.88rem; line-height:1.5;
+  background:rgba(184,134,11,0.16); border:1px solid rgba(220,170,60,0.4); color:#f0dfb6; }
+.wiz-banner.warn { background:rgba(220,130,50,0.15); border-color:rgba(230,150,70,0.5); color:#f3cfa2; }
+.wiz-banner.ok { background:rgba(110,180,90,0.13); border-color:rgba(130,200,110,0.4); color:#cfe8c2; text-align:center; font-family:'Cinzel'; letter-spacing:1px; }
+
+/* étape stats */
+.wiz-pb-head { font-family:'Cinzel'; font-size:0.85rem; letter-spacing:1px; color:#d9c08a; margin-bottom:12px; }
+.wiz-pb-head strong { color:#fff; } .wiz-pb-head strong.ok { color:#7fc06a; }
+.wiz-statgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:12px; }
+.wiz-statcard { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.wiz-statcard.boosted { border-color:rgba(220,170,60,0.45); }
+.wiz-statcard-name { font-family:'Cinzel'; font-size:0.72rem; letter-spacing:1.5px; color:#cdb88c; }
+.wiz-statcard-ctrl { display:flex; align-items:center; gap:10px; }
+.wiz-statcard-ctrl button { width:30px; height:30px; border-radius:8px; border:1px solid var(--gold); background:transparent; color:var(--gold); filter:brightness(1.3); font-size:1.1rem; cursor:pointer; line-height:1; }
+.wiz-statcard-ctrl button:hover { background:rgba(184,134,11,0.35); }
+.wiz-statcard-ctrl span { font-size:1.15rem; min-width:26px; text-align:center; }
+.wiz-statcard-sel, .wiz-statcard-inp { background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.2); color:#efe6d6; border-radius:7px; padding:6px 10px; font-size:1rem; width:74px; text-align:center; }
+.wiz-statcard-final { display:flex; align-items:baseline; gap:7px; }
+.wiz-statcard-final small { color:#9d8f78; font-size:0.7rem; }
+.wiz-statcard-final strong { font-size:1.5rem; color:#fff; font-family:'Cinzel'; }
+.wiz-statcard-final em { font-style:normal; color:#d9c08a; font-size:0.9rem; }
+
+/* étape identité */
+.wiz-form { max-width:640px; display:flex; flex-direction:column; gap:14px; }
+.wiz-field label { display:block; font-family:'Cinzel'; font-size:0.66rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:5px; }
+.wiz-field input, .wiz-field textarea { width:100%; box-sizing:border-box; background:rgba(0,0,0,0.32); border:1px solid rgba(255,255,255,0.18); border-radius:8px; color:#efe6d6; padding:9px 12px; font-family:'Crimson Pro'; font-size:0.95rem; resize:vertical; }
+.wiz-field input:focus, .wiz-field textarea:focus { outline:none; border-color:var(--gold); }
+.wiz-field.main input { font-size:1.2rem; font-family:'Cinzel'; padding:12px 14px; }
+.wiz-field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.wiz-align-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+.wiz-align-grid .wiz-chip { border-radius:8px; text-align:center; }
+.wiz-fold { background:rgba(255,255,255,0.045); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 14px; }
+.wiz-fold summary { cursor:pointer; font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; color:#d9c08a; }
+.wiz-fold .wiz-field { margin-top:10px; }
+.wiz-fold .wiz-field-row { margin-top:10px; }
+.wiz-featlist { display:flex; flex-direction:column; gap:5px; margin-top:10px; max-height:260px; overflow-y:auto; }
+.wiz-featrow { display:flex; flex-direction:column; gap:2px; text-align:left; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.13); border-radius:8px; padding:8px 11px; color:#e6dcc8; cursor:pointer; font-family:'Crimson Pro'; }
+.wiz-featrow:hover { border-color:var(--gold); }
+.wiz-featrow span { font-size:0.78rem; color:#a99; }
+
+/* panneau latéral */
+.wiz-side-hero { text-align:center; }
+.wiz-side-img { width:100%; aspect-ratio:16/10; border-radius:12px; background-size:cover; background-position:center top; border:1px solid rgba(255,255,255,0.18); }
+.wiz-side-name { font-family:'Cinzel'; font-size:1rem; color:#f3e9d2; margin-top:10px; letter-spacing:1px; }
+.wiz-side-name .dim, .dim { color:#9d8f78; }
+.wiz-side-line { font-size:0.84rem; color:#cdc0a8; margin-top:2px; }
+.wiz-side-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:14px; }
+.wiz-side-stat { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.13); border-radius:9px; padding:6px 4px; text-align:center; display:flex; flex-direction:column; }
+.wiz-side-stat.boosted { border-color:rgba(220,170,60,0.5); }
+.wiz-side-stat span { font-family:'Cinzel'; font-size:0.58rem; letter-spacing:1px; color:#cdb88c; }
+.wiz-side-stat strong { font-size:1.05rem; color:#fff; }
+.wiz-side-stat em { font-style:normal; font-size:0.72rem; color:#d9c08a; }
+.wiz-side-combat { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:8px; }
+.wiz-side-combat > div { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.13); border-radius:9px; padding:6px 2px; text-align:center; display:flex; flex-direction:column; }
+.wiz-side-combat em { font-style:normal; font-size:0.8rem; }
+.wiz-side-combat strong { font-size:0.95rem; color:#fff; }
+.wiz-side-combat span { font-size:0.56rem; font-family:'Cinzel'; letter-spacing:1px; color:#cdb88c; }
+.wiz-side-block { margin-top:14px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; }
+.wiz-side-block h5 { font-family:'Cinzel'; font-size:0.66rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:7px; }
+.wiz-side-skill { font-size:0.85rem; display:flex; align-items:center; gap:7px; padding:2px 0; }
+.wiz-side-skill i { font-style:normal; font-size:0.58rem; font-family:'Cinzel'; width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wiz-side-skill .tag-c { background:rgba(184,134,11,0.45); color:#ffe9b0; }
+.wiz-side-skill .tag-h { background:rgba(90,130,200,0.45); color:#cfe0ff; }
+.wiz-side-text { font-size:0.83rem; color:#d8ccb4; line-height:1.5; }
+.wiz-side-block.pending h5 { color:#e8a04c; }
+.wiz-side-block.ready h5 { color:#7fc06a; }
+.wiz-pending-item { display:block; width:100%; text-align:left; background:rgba(230,150,70,0.12); border:1px solid rgba(230,150,70,0.4); color:#f3cfa2; border-radius:8px; padding:6px 10px; margin-bottom:5px; cursor:pointer; font-family:'Crimson Pro'; font-size:0.82rem; }
+.wiz-pending-item span { color:#c9a; font-size:0.72rem; }
+.wiz-pending-item:hover { border-color:#e8a04c; }
+.wiz-pending-item.inline { display:inline-block; width:auto; margin:2px 3px 0 0; }
+.wiz-side-block.warn .wiz-pending-item { background:rgba(200,180,80,0.1); border-color:rgba(210,190,100,0.35); color:#e8dcae; }
+
+/* récap */
+.wiz-recap-hero { display:flex; gap:18px; align-items:center; background:rgba(255,255,255,0.055); border:1px solid rgba(255,255,255,0.14); border-radius:14px; padding:14px; }
+.wiz-recap-img { width:130px; aspect-ratio:1; border-radius:12px; background-size:cover; background-position:center top; flex-shrink:0; border:1px solid rgba(255,255,255,0.2); }
+.wiz-recap-hero-txt h3 { font-family:'Cinzel'; color:var(--gold); filter:brightness(1.4); font-size:1.3rem; letter-spacing:1.5px; }
+.wiz-recap-hero-txt p { margin-top:4px; font-size:0.95rem; }
+.wiz-recap-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:14px; }
+.wiz-recap-combat { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 16px; font-size:0.92rem; align-items:center; }
+.wiz-recap-combat strong { color:#fff; font-size:1.05rem; }
+.wiz-recap-combat small { color:#a99; }
+.wiz-recap-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; margin-top:14px; }
+.wiz-recap-group { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.13); border-radius:12px; padding:12px 15px; }
+.wiz-recap-group h5 { font-family:'Cinzel'; font-size:0.72rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px; }
+.wiz-recap-group .wiz-trait { margin-bottom:5px; font-size:0.85rem; }
+
+/* pied de page */
+.wiz-foot { display:flex; align-items:center; gap:14px; padding:12px 22px;
+  background:rgba(0,0,0,0.4); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  border-top:1px solid rgba(255,255,255,0.1); z-index:2; }
+#wizFootHint { flex:1; font-size:0.82rem; color:#e8a04c; text-align:center; min-width:0; }
+#wizFootHint.flash { animation:wizflash 0.5s; }
+@keyframes wizflash { 0%,100%{transform:none} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+.wiz-btn-gold { background:linear-gradient(135deg, var(--gold), #8a6508); border:none; color:#fff; font-family:'Cinzel'; letter-spacing:2px; font-size:0.8rem; padding:12px 24px; border-radius:8px; cursor:pointer; box-shadow:0 4px 16px rgba(180,130,30,0.35); transition:all 0.2s; white-space:nowrap; }
+.wiz-btn-gold:hover { filter:brightness(1.15); }
+.wiz-btn-gold.dim { opacity:0.45; }
+.wiz-btn-ghost { background:transparent; border:1px solid rgba(255,255,255,0.3); color:#cbb; font-family:'Cinzel'; letter-spacing:1px; font-size:0.74rem; padding:11px 18px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+.wiz-btn-ghost:hover { border-color:#efe6d6; color:#efe6d6; }
+.wiz-side-toggle { display:none; }
+
+/* éditeur des visuels */
+#wizAssetsPanel { margin-top:24px; border-top:2px solid var(--line-gold); padding-top:14px; }
+.wiz-asset-row { display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--line); }
+.wiz-asset-thumb { width:42px; height:32px; border-radius:5px; background-size:cover; background-position:center; border:1px solid var(--line-gold); flex-shrink:0; }
+.wiz-asset-thumb.empty { display:flex; align-items:center; justify-content:center; color:#bbb; font-size:0.8rem; background:var(--surface); }
+.wiz-asset-name { width:190px; flex-shrink:0; font-size:0.85rem; }
+.wiz-asset-row input { flex:1; min-width:120px; font-size:0.8rem; padding:5px 8px; border:1px solid var(--line); border-radius:4px; font-family:'Crimson Pro'; }
+
+/* responsive */
+@media (max-width:940px) {
+  #wizSide { position:fixed; right:0; top:0; bottom:0; width:min(320px,88vw); transform:translateX(105%); transition:transform 0.28s; z-index:5; background:rgba(20,14,8,0.92); box-shadow:-10px 0 40px rgba(0,0,0,0.6); }
+  #wizSide.mobile-open { transform:none; }
+  .wiz-side-toggle { display:inline-block; }
+  .wiz-pstep-lbl { display:none; }
+  .wiz-recap-stats { grid-template-columns:repeat(3,1fr); }
+  .wiz-recap-hero { flex-direction:column; text-align:center; }
+  .wiz-field-row { grid-template-columns:1fr; }
+  .wiz-align-grid { grid-template-columns:repeat(2,1fr); }
+  #wizMain { padding:16px 14px 40px; }
+  .wiz-asset-name { width:110px; }
+}
+
+
 /* ── CHARACTER SHEET ── */
 #tab-sheet { min-height:100vh;
   background:
@@ -10149,7 +11201,7 @@ nav { transition: transform .28s ease; will-change: transform; }
   <div id="tab-list" class="tab-content active">
     <h2>Vos Chroniques</h2>
     <div id="charList"></div>
-    <button class="btn-gold" style="margin-top:24px;width:100%;max-width:700px;display:block;margin-left:auto;margin-right:auto" onclick="window._openForge()">+ FORGER UN NOUVEAU HÉROS</button>
+    <button class="btn-gold" style="margin-top:24px;width:100%;max-width:700px;display:block;margin-left:auto;margin-right:auto" onclick="window._openWizard()">+ FORGER UN NOUVEAU HÉROS</button>
   </div>
  
   <!-- Fiche -->
@@ -11030,6 +12082,23 @@ nav { transition: transform .28s ease; will-change: transform; }
           <div id="editorOrigDesc" style="margin-top:6px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
         </div>
       </div>
+
+      <!-- Visuels du créateur de héros -->
+      <div style="margin-top:24px">
+        <button class="btn-gold" onclick="window._wizAssetsRender()">🖼 VISUELS DU CRÉATEUR DE HÉROS</button>
+        <div id="wizAssetsPanel" style="display:none">
+          <p style="color:#666;font-size:0.85rem;margin:10px 0">Associez une image (URL) à chaque race, classe ou historique : elle s'affichera sur les cartes de la Forge du Héros. Sans image, un fond stylisé est utilisé. Stockage Firestore : collection <code>wizard_assets</code>.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <select id="wizAssetsCat" onchange="window._wizAssetsList()" style="font-family:'Crimson Pro';font-size:0.9rem;padding:6px 10px;border:1px solid var(--line);border-radius:3px;background:#fff">
+              <option value="races">Races</option>
+              <option value="classes">Classes</option>
+              <option value="backgrounds">Historiques</option>
+            </select>
+            <input id="wizAssetsSearch" type="text" placeholder="Filtrer par nom…" oninput="window._wizAssetsList()" style="flex:1;min-width:160px;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 10px;border:1px solid var(--line);border-radius:3px">
+          </div>
+          <div id="wizAssetsList" style="max-height:50vh;overflow-y:auto"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -11051,6 +12120,25 @@ nav { transition: transform .28s ease; will-change: transform; }
   </div>
 </div>
  
+<!-- LA FORGE DU HÉROS V2 (wizard plein écran) -->
+<div id="wizOverlay">
+  <div class="wiz-head">
+    <h2>⚒ LA FORGE DU HÉROS</h2>
+    <div id="wizProgress"></div>
+    <button class="wiz-x-btn" onclick="window._wizClose()" title="Fermer">✕</button>
+  </div>
+  <div class="wiz-body">
+    <div id="wizMain"></div>
+    <div id="wizSide"></div>
+  </div>
+  <div class="wiz-foot">
+    <button id="wizPrev" class="wiz-btn-ghost" onclick="window._wizPrev()">← Précédent</button>
+    <button class="wiz-btn-ghost wiz-side-toggle" onclick="window._wizToggleSide()">📜 Résumé</button>
+    <span id="wizFootHint"></span>
+    <button id="wizNext" class="wiz-btn-gold" onclick="window._wizNext()">SUIVANT →</button>
+  </div>
+</div>
+
 <!-- SÉLECTEUR DE THÈME -->
 <div id="themeOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)window._closeThemePicker()">
   <div style="background:var(--parch);border:2px solid var(--gold);border-radius:10px;width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)">
