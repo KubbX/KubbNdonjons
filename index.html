@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.48</title>
+<title>Grimoire — RPG Companion V1.49</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -10030,17 +10030,18 @@ nav button:last-child { color:#884444; }
   .sheet-body { grid-template-columns:240px 1fr 300px; }
 }
 @media(max-width:900px) {
-  .sheet-body { grid-template-columns:1fr; }
+  .sheet-body { grid-template-columns:minmax(0,1fr); }
+  .sheet-col-left, .sheet-col-center, .sheet-col-right { min-width:0; }
   .sheet-col-left, .sheet-col-center { border-right:none; border-bottom:1px solid rgba(255,255,255,0.10); }
   .summary-grid { grid-template-columns:1fr; }
-  .stats-grid { grid-template-columns:repeat(6,1fr); }
+  .stats-grid { grid-template-columns:repeat(6,minmax(0,1fr)); }
 }
 @media(max-width:600px) {
   .sheet-combat-row { gap:5px; }
   .combat-box { min-width:55px; padding:5px 8px; }
   .sheet-header-top { gap:10px; }
   .sheet-avatar, .sheet-avatar-placeholder { width:56px; height:56px; }
-  .stats-grid { grid-template-columns:repeat(3,1fr); }
+  .stats-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
 /* ── Bandeau dans la console sonore ── */
 .sc-banner { font-family:'Cinzel'; font-size:0.7rem; color:var(--gold); letter-spacing:1.5px; text-transform:uppercase; text-align:center; padding:7px 6px 9px; margin:-12px -12px 2px; border-bottom:1px solid rgba(212,180,120,0.3); background:linear-gradient(180deg,rgba(212,180,120,0.10),transparent); }
