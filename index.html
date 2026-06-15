@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grimoire — RPG Companion V1.49</title>
+<title>Grimoire — RPG Companion V1.51</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
  
 <script type="module">
@@ -3961,10 +3961,35 @@ function renderCharSheet(id, d) {
         const spellsByLvl = {};
         knownSpells.forEach(sp => { if(!spellsByLvl[sp.level]) spellsByLvl[sp.level]=[]; spellsByLvl[sp.level].push(sp); });
 
+        // ── Rituels : sorts connus lançables en rituel (temps d'incantation contenant « rituel ») ──
+        const isRitual = sp => /rituel/i.test(sp.time || '');
+        const ritualEntries = [];
+        [0,1,2,3,4,5,6,7,8,9].forEach(lvl => { (spellsByLvl[lvl]||[]).forEach((sp,si)=>{ if(isRitual(sp)) ritualEntries.push({sp,lvl,si}); }); });
+        const ritualAppsHtml = ritualEntries.length ? `
+            <div class="spell-level-header spell-ritual-header">📜 Rituels</div>
+            <div class="spell-app-grid">
+              ${ritualEntries.map(({sp,lvl,si}) => { const m = spellMeta(sp.school); return `
+              <button class="spell-app" style="--app:${m.color}" title="${sp.name} (rituel)" onclick="window._openCastSpell('${id}',${lvl},${si})">
+                <span class="spell-app-icon"><img class="spell-app-img" src="${m.img}" alt=""></span>
+                <span class="spell-app-name">${sp.name}</span>
+              </button>`; }).join('')}
+            </div>` : '';
+        const ritualListHtml = ritualEntries.length ? `
+            <div class="spell-level-group">
+              <div class="spell-level-header spell-ritual-header">📜 Rituels</div>
+              ${ritualEntries.map(({sp,lvl,si}) => `
+              <div class="spell-known-item">
+                <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
+                  <strong>${sp.name}</strong>
+                  <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
+                </div>
+              </div>`).join('')}
+            </div>` : '';
+
         // Vue active (Applications / Liste) — conservée entre re-rendus
         const spellView = window._spellView || 'apps';
         // Grille d'applications par niveau
-        const spellAppsHtml = [0,1,2,3,4,5,6,7,8,9].map(lvl => {
+        const spellAppsHtml = ritualAppsHtml + [0,1,2,3,4,5,6,7,8,9].map(lvl => {
           const spells = spellsByLvl[lvl];
           if (!spells || !spells.length) return '';
           return `
@@ -4032,7 +4057,7 @@ function renderCharSheet(id, d) {
         <!-- Vue Liste (sorts groupés par niveau) -->
         <div class="spell-known-list" data-spellview="list" style="${spellView==='list'?'':'display:none'}">
           ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : ''}
-          ${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
+          ${ritualListHtml}${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
             const spells = spellsByLvl[lvl];
             if (!spells || !spells.length) return '';
             return `
@@ -4622,6 +4647,510 @@ window._confirmLevelUp = async (charId) => {
   </div><button class="btn-gold" style="margin-top:16px" onclick="window._closeForge();document.getElementById('forgeNext').style.display=''">FERMER</button>`;
   window._lvlupCharData = null;
 };
+
+// ============================================================
+// L'ASCENSION — montée de niveau plein écran (style Forge V2)
+// Remplace l'ancienne modale (window._openLevelUp est réassigné)
+// ============================================================
+
+const LVL_STEPS_DEF = [
+  {id:1, icon:'⚔️', label:'Voie'},
+  {id:2, icon:'❤️', label:'Vitalité'},
+  {id:3, icon:'⭐', label:'Acquis'},
+  {id:4, icon:'🔥', label:'Ascension'}
+];
+let LVL = null;
+let LVL_FEAT_LIST = [];
+
+window._openLevelUp = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId));
+  if (!snap.exists()) return;
+  LVL = {
+    charId, d: snap.data(), step: 1, done: false,
+    cls: null, hpMode: 'average', hpRoll: null,
+    subclass: null,
+    asiMode: 'asi', asiSplit: false, asiStat1: null, asiStat2: null,
+    feat: null, featStatPick: null, featSearch: '',
+    sideOpen: false, result: null
+  };
+  // pré-sélection : classe unique → directement choisie
+  const cls = getClasses(LVL.d);
+  if (cls.length === 1) LVL.cls = cls[0].name;
+  document.getElementById('lvlOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  lvlRender();
+  await wizLoadAssets();
+  lvlRender();
+};
+window._lvlClose = () => {
+  document.getElementById('lvlOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+  LVL = null;
+};
+window._lvlGo = (s) => { if (LVL.done) return; LVL.step = s; LVL.sideOpen = false; lvlRender(); };
+window._lvlPrev = () => { if (LVL.step > 1) { LVL.step--; lvlRender(); } };
+window._lvlNext = async () => {
+  const b = lvlBuild();
+  if (LVL.step < 4) {
+    const blockers = b.pending.filter(p => p.step === LVL.step);
+    if (blockers.length) { lvlFlash(); return; }
+    LVL.step++; lvlRender();
+  } else {
+    if (b.pending.length) { lvlFlash(); return; }
+    await lvlSave(b);
+  }
+};
+function lvlFlash() {
+  const el = document.getElementById('lvlFootHint');
+  if (el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+  if (window.innerWidth <= 940) { LVL.sideOpen = true; lvlRender(); }
+}
+window._lvlToggleSide = () => { LVL.sideOpen = !LVL.sideOpen; lvlRender(); };
+
+// ─── helpers ─────────────────────────────────────────────────
+function lvlClassData() { return LVL.cls ? CLASSES[LVL.cls] : null; }
+function lvlExisting()  { return getClasses(LVL.d).find(c => c.name === LVL.cls); }
+function lvlNewClassLevel() { const e = lvlExisting(); return e ? e.level + 1 : 1; }
+function lvlInfo() { return gatherLevelUpInfo(LVL.cls, lvlNewClassLevel(), LVL.d); }
+function lvlSubAlready() { return LVL.d.subclasses?.[LVL.cls] || null; }
+
+// ─── MOTEUR : agrégation + choix en attente ──────────────────
+function lvlBuild() {
+  const d = LVL.d;
+  const pending = [];
+  const tLvl = totalLevel(d);
+  const newTotal = tLvl + 1;
+  const newPB = PROF_BONUS[newTotal - 1] || 2;
+  const conMod = mod(d.stats?.con || 10);
+  const c = lvlClassData();
+
+  let hpGain = null, hpText = '—';
+  if (c) {
+    if (LVL.hpMode === 'average') { hpGain = Math.ceil(c.hd/2)+1+conMod; hpText = `${Math.ceil(c.hd/2)+1} + ${conMod} (CON)`; }
+    else if (LVL.hpMode === 'max') { hpGain = c.hd+conMod; hpText = `${c.hd} + ${conMod} (CON)`; }
+    else if (LVL.hpRoll) { hpGain = LVL.hpRoll+conMod; hpText = `🎲 ${LVL.hpRoll} + ${conMod} (CON)`; }
+    if (hpGain !== null) hpGain = Math.max(1, hpGain);
+  }
+
+  // stats avec ASI / don
+  const newStats = {...(d.stats||{})};
+  const deltas = {};
+  let info = null, sc = null, needSubclass = false;
+  const newFeatures = [];
+  if (c) {
+    info = lvlInfo();
+    sc = SUBCLASSES[LVL.cls];
+    needSubclass = info.subclassLevel && !lvlSubAlready();
+    const ncl = lvlNewClassLevel();
+    info.baseFeatures.forEach(f => newFeatures.push({name:f.name, desc:f.desc, src:LVL.cls, lvl:ncl}));
+    const subName = needSubclass ? LVL.subclass : lvlSubAlready();
+    if (sc && subName && sc.options[subName]) {
+      sc.options[subName].features.filter(f=>f.lvl===ncl)
+        .forEach(f => newFeatures.push({name:`${f.name} (${subName})`, desc:f.desc, src:LVL.cls, lvl:ncl}));
+    }
+    if (info.isAsiLevel) {
+      if (LVL.asiMode === 'asi') {
+        if (LVL.asiStat1) { const v = LVL.asiSplit?1:2; deltas[LVL.asiStat1]=(deltas[LVL.asiStat1]||0)+v; }
+        if (LVL.asiSplit && LVL.asiStat2) deltas[LVL.asiStat2]=(deltas[LVL.asiStat2]||0)+1;
+      } else if (LVL.feat) {
+        const sb = LVL.feat.statBonus;
+        if (sb?.choice && LVL.featStatPick) deltas[LVL.featStatPick]=(deltas[LVL.featStatPick]||0)+(sb.val||1);
+        else if (sb?.stat) deltas[sb.stat]=(deltas[sb.stat]||0)+(sb.val||1);
+      }
+    }
+  }
+  Object.entries(deltas).forEach(([k,v]) => newStats[k] = Math.min(20,(newStats[k]||10)+v));
+
+  // ── pending ──
+  if (!LVL.cls) pending.push({step:1, label:'Choisir une voie'});
+  if (c && LVL.hpMode==='roll' && !LVL.hpRoll) pending.push({step:2, label:'Lancer le dé de vie'});
+  if (c && needSubclass && !LVL.subclass) pending.push({step:3, label:`Choisir : ${sc.label}`});
+  if (c && info?.isAsiLevel) {
+    if (LVL.asiMode==='asi') {
+      if (!LVL.asiStat1) pending.push({step:3, label:'Caractéristique à améliorer'});
+      else if (LVL.asiSplit && !LVL.asiStat2) pending.push({step:3, label:'Seconde caractéristique (+1)'});
+    } else {
+      if (!LVL.feat) pending.push({step:3, label:'Choisir un don'});
+      else if (LVL.feat.statBonus?.choice && !LVL.featStatPick) pending.push({step:3, label:'Caractéristique du don'});
+    }
+  }
+
+  return { tLvl, newTotal, newPB, conMod, hpGain, hpText, newStats, deltas, newFeatures, info, sc, needSubclass, pending };
+}
+
+// ─── RENDU ───────────────────────────────────────────────────
+function lvlRender() {
+  if (!LVL) return;
+  const b = lvlBuild();
+  const prog = document.getElementById('lvlProgress');
+  prog.innerHTML = LVL_STEPS_DEF.map((s,i) => {
+    const st = s.id === LVL.step ? 'active' : s.id < LVL.step ? 'done' : '';
+    const pend = b.pending.some(p => p.step === s.id);
+    return `${i>0?`<div class="wiz-pline ${s.id<=LVL.step?'done':''}"></div>`:''}
+      <button class="wiz-pstep ${st} ${pend&&s.id<LVL.step?'warn':''}" onclick="window._lvlGo(${s.id})" title="${s.label}">
+        <span class="wiz-pstep-ico">${s.id<LVL.step&&!pend?'✓':s.icon}</span><span class="wiz-pstep-lbl">${s.label}</span>
+      </button>`;
+  }).join('');
+
+  const main = document.getElementById('lvlMain');
+  const scroll = main.scrollTop;
+  if (LVL.done) lvlStepDone(main, b);
+  else if (LVL.step===1) lvlStepClass(main, b);
+  else if (LVL.step===2) lvlStepHp(main, b);
+  else if (LVL.step===3) lvlStepGains(main, b);
+  else lvlStepRecap(main, b);
+  main.scrollTop = scroll;
+
+  lvlRenderSide(b);
+
+  document.getElementById('lvlPrev').style.visibility = (LVL.step>1 && !LVL.done) ? 'visible' : 'hidden';
+  const next = document.getElementById('lvlNext');
+  if (LVL.done) { next.style.display='none'; }
+  else {
+    next.style.display='';
+    const stepPend = b.pending.filter(p => p.step === LVL.step);
+    next.innerHTML = LVL.step===4 ? '🔥 CONFIRMER L\u2019ASCENSION' : 'SUIVANT →';
+    next.classList.toggle('dim', (LVL.step===4 ? b.pending.length : stepPend.length) > 0);
+  }
+  const hint = document.getElementById('lvlFootHint');
+  const relevant = LVL.done ? [] : (LVL.step===4 ? b.pending : b.pending.filter(p=>p.step===LVL.step));
+  hint.innerHTML = relevant.length ? `⚠ ${relevant.map(p=>p.label).join(' · ')}` : '';
+  document.getElementById('lvlSide').classList.toggle('mobile-open', !!LVL.sideOpen);
+}
+
+function lvlRenderSide(b) {
+  const el = document.getElementById('lvlSide');
+  const d = LVL.d;
+  const vis = d.avatarUrl
+    ? `<div class="wiz-side-img" style="background-image:url('${d.avatarUrl.replace(/'/g,"%27")}')"></div>`
+    : (LVL.cls ? wizVisual('classes', LVL.cls, 'wiz-side-img')
+               : '<div class="wiz-side-img wiz-fallback" style="background:linear-gradient(140deg,#2a2118,#15100a)"><span>⬆</span></div>');
+  const hpMaxNew = b.hpGain !== null ? (d.hpMax||0)+b.hpGain : null;
+  el.innerHTML = `
+    <div class="wiz-side-hero">
+      ${vis}
+      <div class="wiz-side-name">${d.name||'—'}</div>
+      <div class="wiz-side-line">${classesDisplayFull(d)}${LVL.cls?` → <strong style="color:var(--gold)">${LVL.cls} ${lvlNewClassLevel()}</strong>`:''}</div>
+      <div class="wiz-side-line dim">Niveau total ${b.tLvl} → ${b.newTotal}</div>
+    </div>
+    <div class="wiz-side-combat" style="grid-template-columns:repeat(3,1fr)">
+      <div><em>❤️</em><strong>${hpMaxNew!==null?`${d.hpMax||0}→${hpMaxNew}`:'—'}</strong><span>PV max</span></div>
+      <div><em>🎯</em><strong>+${profBonus(b.tLvl)}→+${b.newPB}</strong><span>Maîtrise</span></div>
+      <div><em>🎲</em><strong>${LVL.cls?`+1d${lvlClassData().hd}`:'—'}</strong><span>Dé de vie</span></div>
+    </div>
+    <div class="wiz-side-stats">
+      ${WIZ_STAT_KEYS.map(k=>`<div class="wiz-side-stat ${b.deltas[k]?'boosted':''}">
+        <span>${WIZ_STAT_FR[k]}</span><strong>${b.deltas[k]?`${d.stats?.[k]||10}→${b.newStats[k]}`:(d.stats?.[k]||10)}</strong><em>${mod(b.newStats[k])>=0?'+':''}${mod(b.newStats[k])}</em>
+      </div>`).join('')}
+    </div>
+    ${b.newFeatures.length?`<div class="wiz-side-block"><h5>Nouveaux acquis</h5>
+      ${b.newFeatures.map(f=>`<div class="wiz-side-skill"><i class="tag-c">✦</i>${f.name}</div>`).join('')}
+    </div>`:''}
+    ${LVL.feat?`<div class="wiz-side-block"><h5>Don</h5><div class="wiz-side-text">⭐ ${LVL.feat.name}</div></div>`:''}
+    ${!LVL.done && b.pending.length?`<div class="wiz-side-block pending"><h5>⚠ À compléter</h5>
+      ${b.pending.map(p=>`<button class="wiz-pending-item" onclick="window._lvlGo(${p.step})">${p.label} <span>→ ${LVL_STEPS_DEF[p.step-1].label}</span></button>`).join('')}
+    </div>`:''}
+    ${!LVL.done && !b.pending.length?`<div class="wiz-side-block ready"><h5>✦ Prêt pour l'ascension</h5><div class="wiz-side-text">Tous les choix sont résolus.</div></div>`:''}
+  `;
+}
+
+// ─── ÉTAPE 1 : VOIE (classe) ─────────────────────────────────
+function lvlStepClass(main, b) {
+  const d = LVL.d;
+  const owned = getClasses(d);
+  const others = Object.keys(CLASSES).filter(k => !owned.find(c => c.name === k));
+  const card = (k, sub) => {
+    const c = CLASSES[k];
+    return `<button class="wiz-card ${LVL.cls===k?'sel':''}" onclick="window._lvlPickClass('${k.replace(/'/g,"\\'")}')">
+      ${wizVisual('classes', k, 'wiz-card-img')}
+      <div class="wiz-card-body">
+        <div class="wiz-card-name">${k}</div>
+        <div class="wiz-card-meta"><span class="wiz-src">${c.source}</span><span class="wiz-bonus">${sub}</span></div>
+      </div></button>`;
+  };
+  main.innerHTML = `
+    <h3 class="wiz-title">Quelle voie poursuivre ?</h3>
+    <div class="wiz-detail-row dim" style="margin-bottom:14px">
+      <span><strong style="color:#f3e9d2">${d.name}</strong> — niveau total ${b.tLvl} → ${b.newTotal}</span>
+      ${d.xp !== undefined ? `<span>XP : ${d.xp||0}${XP_THRESHOLDS[b.tLvl]?` / ${XP_THRESHOLDS[b.tLvl]}`:''}</span>`:''}
+    </div>
+    <div class="wiz-grid">${owned.map(c => card(c.name, `Niv. ${c.level} → ${c.level+1}`)).join('')}</div>
+    ${others.length?`<details class="wiz-fold" style="margin-top:18px" ${LVL.cls && !lvlExisting() ? 'open':''}>
+      <summary>⚔ Multiclassage — débuter une nouvelle voie (niveau 1)</summary>
+      <div class="wiz-grid" style="margin-top:12px">${others.map(k => card(k, `Nouveau · d${CLASSES[k].hd} PV`)).join('')}</div>
+    </details>`:''}
+    <div id="lvlClassDetail"></div>`;
+  lvlClassDetail(b);
+}
+window._lvlPickClass = (k) => {
+  if (LVL.cls !== k) {
+    LVL.cls = k; LVL.subclass = null; LVL.hpRoll = null;
+    LVL.asiStat1 = null; LVL.asiStat2 = null; LVL.feat = null; LVL.featStatPick = null;
+  }
+  lvlRender();
+  document.getElementById('lvlClassDetail')?.scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+function lvlClassDetail(b) {
+  const box = document.getElementById('lvlClassDetail'); if (!box) return;
+  const c = lvlClassData();
+  if (!c) { box.innerHTML = ''; return; }
+  const ncl = lvlNewClassLevel();
+  const isMc = !lvlExisting();
+  box.innerHTML = `<div class="wiz-detail">
+    <h4>${LVL.cls} — niveau ${ncl} <span class="wiz-src">${c.source}</span></h4>
+    ${isMc?`<div class="wiz-banner">⚔ Multiclassage : tu débutes la voie de ${LVL.cls}. Pense aux prérequis de caractéristiques de ta table.</div>`:''}
+    <div class="wiz-detail-row">
+      <span>🎲 Dé de vie : <strong>d${c.hd}</strong></span>
+      ${b.info?.isAsiLevel?'<span>⭐ <strong>Amélioration ou don</strong> à ce niveau</span>':''}
+      ${b.needSubclass?`<span>🏰 <strong>${b.sc.label}</strong> à choisir</span>`:''}
+    </div>
+    ${b.info?.baseFeatures.length?`<div class="wiz-detail-sub">
+      <label>Nouvelles aptitudes de ${LVL.cls} ${ncl}</label>
+      <div class="wiz-detail-traits">${b.info.baseFeatures.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div>
+    </div>`:''}
+  </div>`;
+}
+
+// ─── ÉTAPE 2 : VITALITÉ (PV) ─────────────────────────────────
+function lvlStepHp(main, b) {
+  const c = lvlClassData();
+  const d = LVL.d;
+  const modes = [['average','⚖ Moyenne','La voie sûre'],['max','💪 Maximum','Règle maison généreuse'],['roll','🎲 Lancer le dé','Le destin décide']];
+  main.innerHTML = `
+    <h3 class="wiz-title">Forge ta vitalité</h3>
+    <div class="wiz-chips" style="margin-bottom:18px">${modes.map(([m,l,t])=>`<button class="wiz-chip big ${LVL.hpMode===m?'sel':''}" title="${t}" onclick="window._lvlHpMode('${m}')">${l}</button>`).join('')}</div>
+    <div class="wiz-detail" style="text-align:center">
+      ${LVL.hpMode==='roll' ? `
+        <div class="lvl-die ${LVL.hpRoll?'rolled':''}" onclick="window._lvlRollHp()">${LVL.hpRoll||'d'+c.hd}</div>
+        <p class="wiz-hint" style="text-align:center">${LVL.hpRoll?`Relance possible avant confirmation — clique sur le dé.`:`Clique sur le dé pour lancer 1d${c.hd}.`}</p>
+        ${LVL.hpRoll?`<div class="lvl-hp-sum">🎲 ${LVL.hpRoll} + ${b.conMod} (CON) = <strong>+${b.hpGain} PV</strong></div>`:''}
+      ` : `
+        <div class="lvl-hp-sum big">${b.hpText} = <strong>+${b.hpGain} PV</strong></div>
+      `}
+      <div class="wiz-detail-row" style="justify-content:center;margin-top:16px">
+        <span>PV max : <strong>${d.hpMax||0}</strong> → <strong style="color:var(--gold)">${b.hpGain!==null?(d.hpMax||0)+b.hpGain:'?'}</strong></span>
+        <span>Dés de vie : <strong>+1d${c.hd}</strong></span>
+      </div>
+    </div>`;
+}
+window._lvlHpMode = (m) => { LVL.hpMode = m; lvlRender(); };
+window._lvlRollHp = () => {
+  const c = lvlClassData(); if (!c) return;
+  LVL.hpRoll = Math.floor(Math.random()*c.hd)+1;
+  lvlRender();
+};
+
+// ─── ÉTAPE 3 : ACQUIS & CHOIX ────────────────────────────────
+function lvlStepGains(main, b) {
+  const ncl = lvlNewClassLevel();
+  const subName = b.needSubclass ? LVL.subclass : lvlSubAlready();
+  let html = `<h3 class="wiz-title">Acquis du niveau ${ncl} de ${LVL.cls}</h3>`;
+
+  // sous-classe à choisir
+  if (b.needSubclass) {
+    html += `<div class="wiz-detail">
+      <h4>🏰 ${b.sc.label} ${LVL.subclass?'<em class="ok">✓</em>':'<em class="need">— à choisir</em>'}</h4>
+      <div class="wiz-chips" style="margin-top:10px">${Object.keys(b.sc.options).map(s=>`<button class="wiz-chip big ${LVL.subclass===s?'sel':''}" onclick="window._lvlPickSubclass('${s.replace(/'/g,"\\'")}')">${s}</button>`).join('')}</div>
+      <div id="lvlSubPreview"></div>
+    </div>`;
+  }
+  // aptitudes de sous-classe existante à ce niveau
+  if (b.sc && subName && !b.needSubclass) {
+    const feats = b.sc.options[subName]?.features?.filter(f=>f.lvl===ncl) || [];
+    if (feats.length) html += `<div class="wiz-detail"><h4>🏰 ${subName}</h4>
+      <div class="wiz-detail-traits" style="margin-top:8px">${feats.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div></div>`;
+  }
+  // aptitudes de base
+  if (b.info?.baseFeatures.length) {
+    html += `<div class="wiz-detail"><h4>⚔ Aptitudes de classe</h4>
+      <div class="wiz-detail-traits" style="margin-top:8px">${b.info.baseFeatures.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div></div>`;
+  }
+  // ASI / don
+  if (b.info?.isAsiLevel) {
+    html += `<div class="wiz-detail"><h4>⭐ Amélioration ou don</h4>
+      <div class="wiz-chips" style="margin:10px 0 4px">
+        <button class="wiz-chip big ${LVL.asiMode==='asi'?'sel':''}" onclick="window._lvlAsiMode('asi')">⬆ Améliorer les caractéristiques</button>
+        <button class="wiz-chip big ${LVL.asiMode==='feat'?'sel':''}" onclick="window._lvlAsiMode('feat')">⭐ Choisir un don</button>
+      </div>
+      <div id="lvlAsiZone"></div>
+    </div>`;
+  }
+  if (!b.info?.baseFeatures.length && !b.needSubclass && !(b.sc&&subName&&b.sc.options[subName]?.features?.some(f=>f.lvl===ncl)) && !b.info?.isAsiLevel) {
+    html += `<div class="wiz-detail"><div class="wiz-side-text" style="font-style:italic">Pas de nouvelle aptitude à ce niveau — mais vérifie tes emplacements de sorts et tes ressources de classe.</div></div>`;
+  }
+  main.innerHTML = html;
+  lvlSubPreview();
+  lvlAsiZone(b);
+}
+window._lvlPickSubclass = (s) => { LVL.subclass = s; lvlRender(); };
+function lvlSubPreview() {
+  const box = document.getElementById('lvlSubPreview'); if (!box) return;
+  const sc = SUBCLASSES[LVL.cls];
+  if (!LVL.subclass || !sc?.options[LVL.subclass]) { box.innerHTML=''; return; }
+  const ncl = lvlNewClassLevel();
+  const now = sc.options[LVL.subclass].features.filter(f=>f.lvl===ncl);
+  const later = sc.options[LVL.subclass].features.filter(f=>f.lvl>ncl);
+  box.innerHTML = `
+    ${now.length?`<div class="wiz-detail-traits" style="margin-top:12px">${now.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div>`:''}
+    ${later.length?`<details class="wiz-fold" style="margin-top:10px"><summary>Voir les aptitudes futures</summary>
+      <div class="wiz-detail-traits" style="margin-top:8px">${later.map(f=>`<div class="wiz-trait dim"><strong>Niv.${f.lvl} ${f.name}</strong> — ${f.desc}</div>`).join('')}</details>`:''}`;
+}
+window._lvlAsiMode = (m) => { LVL.asiMode = m; lvlRender(); };
+function lvlAsiZone(b) {
+  const zone = document.getElementById('lvlAsiZone'); if (!zone) return;
+  const d = LVL.d;
+  if (LVL.asiMode === 'asi') {
+    zone.innerHTML = `
+      <div class="wiz-chips" style="margin-top:10px">
+        <button class="wiz-chip ${!LVL.asiSplit?'sel':''}" onclick="window._lvlAsiSplit(false)">+2 à une caractéristique</button>
+        <button class="wiz-chip ${LVL.asiSplit?'sel':''}" onclick="window._lvlAsiSplit(true)">+1 à deux caractéristiques</button>
+      </div>
+      <div class="wiz-detail-sub"><label>${LVL.asiSplit?'Première caractéristique (+1)':'Caractéristique (+2)'} ${LVL.asiStat1?'<em class="ok">✓</em>':'<em class="need">— à choisir</em>'}</label>
+        <div class="wiz-chips">${WIZ_STAT_KEYS.map(k=>{
+          const cur = d.stats?.[k]||10;
+          const dis = cur>=20 || k===LVL.asiStat2;
+          return `<button class="wiz-chip ${LVL.asiStat1===k?'sel':''} ${dis?'dis':''}" ${dis?'disabled':''} onclick="window._lvlAsiStat(1,'${k}')">${WIZ_STAT_FR[k]} ${cur}→${Math.min(20,cur+(LVL.asiSplit?1:2))}</button>`;
+        }).join('')}</div>
+      </div>
+      ${LVL.asiSplit?`<div class="wiz-detail-sub"><label>Seconde caractéristique (+1) ${LVL.asiStat2?'<em class="ok">✓</em>':'<em class="need">— à choisir</em>'}</label>
+        <div class="wiz-chips">${WIZ_STAT_KEYS.map(k=>{
+          const cur = d.stats?.[k]||10;
+          const dis = cur>=20 || k===LVL.asiStat1;
+          return `<button class="wiz-chip ${LVL.asiStat2===k?'sel':''} ${dis?'dis':''}" ${dis?'disabled':''} onclick="window._lvlAsiStat(2,'${k}')">${WIZ_STAT_FR[k]} ${cur}→${Math.min(20,cur+1)}</button>`;
+        }).join('')}</div>
+      </div>`:''}`;
+  } else {
+    if (LVL.feat) {
+      const f = LVL.feat, sb = f.statBonus;
+      zone.innerHTML = `<div class="wiz-detail" style="margin-top:10px;background:rgba(0,0,0,0.22)">
+        <h4>⭐ ${f.name} <span class="wiz-src">${f.source||''}</span> <button class="wiz-x" onclick="window._lvlClearFeat()">✕ retirer</button></h4>
+        <div class="wiz-side-text" style="margin-top:6px">${f.desc||''}</div>
+        ${sb?.choice?`<div class="wiz-detail-sub"><label>Bonus du don : +${sb.val||1} à ${LVL.featStatPick?'<em class="ok">✓</em>':'<em class="need">— à choisir</em>'}</label>
+          <div class="wiz-chips">${sb.choice.map(s=>`<button class="wiz-chip ${LVL.featStatPick===s?'sel':''}" onclick="window._lvlFeatStat('${s}')">${WIZ_STAT_FR[s]}</button>`).join('')}</div>
+        </div>`:''}
+        ${sb?.stat?`<div class="wiz-hint">+${sb.val||1} ${WIZ_STAT_FR[sb.stat]} appliqué automatiquement.</div>`:''}
+      </div>`;
+    } else {
+      zone.innerHTML = `
+        <input class="wiz-search" style="margin-top:10px" type="text" placeholder="🔍 Rechercher un don…" value="${LVL.featSearch.replace(/"/g,'&quot;')}" oninput="window._lvlFeatSearch(this.value)">
+        <div id="lvlFeatList" class="wiz-featlist">${lvlFeatListHtml()}</div>`;
+    }
+  }
+}
+window._lvlAsiSplit = (v) => { LVL.asiSplit = v; if(!v) LVL.asiStat2=null; lvlRender(); };
+window._lvlAsiStat = (n,k) => { if(n===1) LVL.asiStat1 = LVL.asiStat1===k?null:k; else LVL.asiStat2 = LVL.asiStat2===k?null:k; lvlRender(); };
+function lvlFeatListHtml() {
+  const q = LVL.featSearch.toLowerCase();
+  const all = (typeof getAllResourcesForCategory==='function' && getAllResourcesForCategory('feat').length)
+    ? getAllResourcesForCategory('feat') : (COMPENDIUM_DATA.feat||[]);
+  LVL_FEAT_LIST = q ? all.filter(f=>(f.name||'').toLowerCase().includes(q)||(f.desc||'').toLowerCase().includes(q)).slice(0,30) : [];
+  if (!q) return '<p class="wiz-hint" style="margin-top:8px">Tape pour chercher dans les dons (PHB + homebrew).</p>';
+  if (!LVL_FEAT_LIST.length) return '<p class="wiz-empty">Aucun don trouvé.</p>';
+  return LVL_FEAT_LIST.map((f,i)=>`<button class="wiz-featrow" onclick="window._lvlPickFeat(${i})">
+    <strong>${f.name}${f.statBonus?' <small style="color:var(--gold)">· +1 stat</small>':''}</strong><span>${(f.desc||'').slice(0,90)}${(f.desc||'').length>90?'…':''}</span>
+  </button>`).join('');
+}
+window._lvlFeatSearch = (v) => { LVL.featSearch = v; const l=document.getElementById('lvlFeatList'); if(l) l.innerHTML = lvlFeatListHtml(); };
+window._lvlPickFeat = (i) => { LVL.feat = LVL_FEAT_LIST[i]; LVL.featStatPick = null; lvlRender(); };
+window._lvlClearFeat = () => { LVL.feat = null; LVL.featStatPick = null; LVL.featSearch=''; lvlRender(); };
+window._lvlFeatStat = (s) => { LVL.featStatPick = s; lvlRender(); };
+
+// ─── ÉTAPE 4 : RÉCAP ─────────────────────────────────────────
+function lvlStepRecap(main, b) {
+  const d = LVL.d;
+  const group = (title, items) => !items.length ? '' : `
+    <div class="wiz-recap-group"><h5>${title}</h5>${items.map(t=>`<div class="wiz-trait">${t}</div>`).join('')}</div>`;
+  const asiTxt = [];
+  Object.entries(b.deltas).forEach(([k,v]) => asiTxt.push(`${WIZ_STAT_FR[k]} : ${d.stats?.[k]||10} → ${b.newStats[k]} (+${v})`));
+  main.innerHTML = `
+    <div class="wiz-recap-hero">
+      ${d.avatarUrl?`<div class="wiz-recap-img" style="background-image:url('${d.avatarUrl.replace(/'/g,"%27")}')"></div>`:(LVL.cls?wizVisual('classes',LVL.cls,'wiz-recap-img'):'')}
+      <div class="wiz-recap-hero-txt">
+        <h3>${d.name}</h3>
+        <p>${classesDisplayFull(d)} → <strong style="color:var(--gold)">${LVL.cls} ${lvlNewClassLevel()}</strong></p>
+        <p class="dim">Niveau total ${b.tLvl} → ${b.newTotal} · Maîtrise +${profBonus(b.tLvl)} → +${b.newPB}</p>
+      </div>
+    </div>
+    <div class="wiz-recap-combat">
+      <span>❤️ PV max <strong>${d.hpMax||0} → ${b.hpGain!==null?(d.hpMax||0)+b.hpGain:'?'}</strong> <small>(${b.hpText})</small></span>
+      <span>🎲 Dés de vie <strong>+1d${lvlClassData()?.hd||8}</strong></span>
+    </div>
+    <div class="wiz-recap-groups">
+      ${group('⭐ Caractéristiques', asiTxt)}
+      ${group('✦ Nouveaux acquis', b.newFeatures.map(f=>`<strong>${f.name}</strong> — ${f.desc}`))}
+      ${LVL.feat?group('⭐ Don — '+LVL.feat.name,[LVL.feat.desc||'']):''}
+    </div>
+    ${CLASSES[LVL.cls]?.spellcaster?'<p class="wiz-hint">✨ Pense à vérifier tes nouveaux emplacements et sorts connus sur la fiche.</p>':''}
+    ${b.pending.length?`<div class="wiz-banner warn">⚠ Choix à compléter : ${b.pending.map(p=>`<button class="wiz-pending-item inline" onclick="window._lvlGo(${p.step})">${p.label}</button>`).join(' ')}</div>`:
+      '<div class="wiz-banner ok">✦ L\u2019ascension t\u2019attend.</div>'}`;
+}
+
+function lvlStepDone(main, b) {
+  const r = LVL.result;
+  main.innerHTML = `
+    <div class="wiz-recap-hero" style="flex-direction:column;text-align:center;padding:28px">
+      <h3 class="wiz-title" style="margin:0">✓ ${r.name} s'élève !</h3>
+      <p style="margin-top:8px;font-size:1.05rem">${r.classDisplay} — Niveau total <strong style="color:var(--gold)">${r.newTotal}</strong></p>
+      <p style="margin-top:6px">❤️ +${r.hpGain} PV (max : ${r.hpMax})</p>
+    </div>
+    ${r.newFeatures.length?`<div class="wiz-recap-group" style="margin-top:14px"><h5>✦ Nouveaux acquis</h5>
+      ${r.newFeatures.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div>`:''}
+    <div style="text-align:center;margin-top:20px"><button class="wiz-btn-gold" onclick="window._lvlClose()">FERMER</button></div>`;
+}
+
+// ─── SAUVEGARDE ──────────────────────────────────────────────
+async function lvlSave(b) {
+  const next = document.getElementById('lvlNext');
+  next.disabled = true; next.innerHTML = '🔥 Ascension…';
+  try {
+    const snap = await getDoc(doc(db, "characters", LVL.charId));
+    if (!snap.exists()) throw new Error('Personnage introuvable');
+    const d = snap.data();
+    const ncl = lvlNewClassLevel();
+    const newClasses = getClasses(d).map(c => ({...c}));
+    const existing = newClasses.find(c => c.name === LVL.cls);
+    if (existing) existing.level += 1; else newClasses.push({ name: LVL.cls, level: 1 });
+    const newTotal = newClasses.reduce((s,c) => s + c.level, 0);
+    const newPB = PROF_BONUS[newTotal - 1] || 2;
+
+    const newFeatures = b.newFeatures.map(f => ({...f}));
+    if (b.info?.isAsiLevel) {
+      if (LVL.asiMode === 'feat' && LVL.feat) {
+        newFeatures.push({ name:`Don: ${LVL.feat.name}`, desc:LVL.feat.desc||'', src:'Don', lvl:ncl });
+      } else if (LVL.asiMode === 'asi' && LVL.asiStat1) {
+        const descParts = [`${WIZ_STAT_FR[LVL.asiStat1]} +${LVL.asiSplit?1:2}`];
+        if (LVL.asiSplit && LVL.asiStat2) descParts.push(`${WIZ_STAT_FR[LVL.asiStat2]} +1`);
+        newFeatures.push({ name:'Amélioration de caractéristique', desc:descParts.join(', '), src:LVL.cls, lvl:ncl });
+      }
+    }
+    const newSubclasses = {...(d.subclasses||{})};
+    if (b.needSubclass && LVL.subclass) newSubclasses[LVL.cls] = LVL.subclass;
+
+    const hitDiceStr = newClasses.map(c=>`${c.level}d${(CLASSES[c.name]||{hd:8}).hd}`).join(' + ');
+    const classDisplay = newClasses.length===1 ? newClasses[0].name : newClasses.map(c=>`${c.name} ${c.level}`).join(' / ');
+    let spellUpdate = {};
+    const casters = newClasses.filter(c=>CLASSES[c.name]?.spellcaster);
+    if (casters.length) {
+      const pcD = CLASSES[casters[0].name];
+      spellUpdate = { spellcaster:true, spellAbility:pcD.spellAbility,
+        spellAttackBonus:newPB+mod(b.newStats[pcD.spellAbility]||10),
+        spellSaveDC:8+newPB+mod(b.newStats[pcD.spellAbility]||10) };
+    }
+    await updateDoc(doc(db,"characters",LVL.charId), {
+      classes:newClasses, class:classDisplay, level:newTotal, stats:b.newStats,
+      hpMax:(d.hpMax||0)+b.hpGain, hp:(d.hp||0)+b.hpGain, profBonus:newPB, hitDice:hitDiceStr,
+      features:[...(d.features||[]), ...newFeatures], subclasses:newSubclasses, ...spellUpdate
+    });
+    LVL.result = { name:d.name, classDisplay, newTotal, hpGain:b.hpGain, hpMax:(d.hpMax||0)+b.hpGain, newFeatures };
+    LVL.done = true;
+    lvlRender();
+  } catch(e) {
+    alert('L\u2019ascension a échoué : ' + (e.message||e));
+  } finally {
+    next.disabled = false;
+  }
+}
+
 
 // ============================================================
 // ÉCRAN DU MAÎTRE
@@ -10477,11 +11006,11 @@ nav button:last-child { color:#884444; }
 /* ════════════════════════════════════════════════════════════
    LA FORGE DU HÉROS V2 — wizard plein écran
    ════════════════════════════════════════════════════════════ */
-#wizOverlay { display:none; position:fixed; inset:0; z-index:1300;
+#wizOverlay, #lvlOverlay { display:none; position:fixed; inset:0; z-index:1300;
   background:radial-gradient(1200px 600px at 50% -10%, #3a2a14 0%, #1b1309 45%, #0d0905 100%);
   color:#efe6d6; flex-direction:column; font-family:'Crimson Pro',serif; }
-#wizOverlay.open { display:flex; }
-#wizOverlay::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:0.5;
+#wizOverlay.open, #lvlOverlay.open { display:flex; }
+#wizOverlay::before, #lvlOverlay::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:0.5;
   background:radial-gradient(2px 2px at 18% 32%, rgba(255,190,90,0.5) 0%, transparent 100%),
              radial-gradient(2px 2px at 71% 64%, rgba(255,190,90,0.35) 0%, transparent 100%),
              radial-gradient(1.5px 1.5px at 42% 78%, rgba(255,190,90,0.4) 0%, transparent 100%),
@@ -10508,7 +11037,7 @@ nav button:last-child { color:#884444; }
 
 .wiz-body { flex:1; display:flex; min-height:0; z-index:1; }
 #wizMain { flex:1; overflow-y:auto; padding:22px 26px 40px; min-width:0; }
-#wizSide { width:300px; flex-shrink:0; overflow-y:auto; padding:16px;
+#wizSide, #lvlSide { width:300px; flex-shrink:0; overflow-y:auto; padding:16px;
   background:rgba(255,255,255,0.05); -webkit-backdrop-filter:blur(10px) saturate(1.2); backdrop-filter:blur(10px) saturate(1.2);
   border-left:1px solid rgba(255,255,255,0.12); }
 
@@ -10675,8 +11204,8 @@ em.ok { color:#7fc06a; font-style:normal; }
 
 /* responsive */
 @media (max-width:940px) {
-  #wizSide { position:fixed; right:0; top:0; bottom:0; width:min(320px,88vw); transform:translateX(105%); transition:transform 0.28s; z-index:5; background:rgba(20,14,8,0.92); box-shadow:-10px 0 40px rgba(0,0,0,0.6); }
-  #wizSide.mobile-open { transform:none; }
+  #wizSide, #lvlSide { position:fixed; right:0; top:0; bottom:0; width:min(320px,88vw); transform:translateX(105%); transition:transform 0.28s; z-index:5; background:rgba(20,14,8,0.92); box-shadow:-10px 0 40px rgba(0,0,0,0.6); }
+  #wizSide.mobile-open, #lvlSide.mobile-open { transform:none; }
   .wiz-side-toggle { display:inline-block; }
   .wiz-pstep-lbl { display:none; }
   .wiz-recap-stats { grid-template-columns:repeat(3,1fr); }
@@ -10687,6 +11216,22 @@ em.ok { color:#7fc06a; font-style:normal; }
   .wiz-asset-name { width:110px; }
 }
 
+
+/* ── L'ASCENSION (montée de niveau plein écran) ── */
+.lvl-die { width:96px; height:96px; margin:6px auto; display:flex; align-items:center; justify-content:center;
+  font-family:'Cinzel'; font-size:1.6rem; color:#fff; cursor:pointer; user-select:none;
+  background:linear-gradient(145deg, rgba(184,134,11,0.5), rgba(90,60,20,0.55));
+  border:2px solid var(--gold); border-radius:22px; transform:rotate(45deg);
+  box-shadow:0 0 24px rgba(220,170,60,0.35); transition:transform 0.2s, box-shadow 0.2s; }
+.lvl-die > * { transform:rotate(-45deg); }
+.lvl-die { writing-mode:horizontal-tb; }
+.lvl-die:hover { transform:rotate(45deg) scale(1.07); box-shadow:0 0 34px rgba(220,170,60,0.55); }
+.lvl-die.rolled { animation:lvlroll 0.45s ease; }
+@keyframes lvlroll { 0%{transform:rotate(45deg) scale(0.6)} 60%{transform:rotate(405deg) scale(1.12)} 100%{transform:rotate(405deg) scale(1)} }
+.lvl-die.rolled { transform:rotate(405deg); }
+.lvl-hp-sum { margin-top:14px; font-size:1rem; color:#e6dcc8; }
+.lvl-hp-sum.big { font-size:1.15rem; margin-top:4px; }
+.lvl-hp-sum strong { color:var(--gold); filter:brightness(1.4); font-family:'Cinzel'; font-size:1.25em; }
 
 /* ── CHARACTER SHEET ── */
 #tab-sheet { min-height:100vh;
@@ -11147,15 +11692,22 @@ nav { transition: transform .28s ease; will-change: transform; }
   background-repeat:no-repeat; background-position:center bottom; background-size:cover;
   opacity:0.42; mix-blend-mode:screen; }
 
-/* ── Équipement mobile vertical : image recadrée au centre + bulles resserrées ── */
+/* ── Sorts : en-tête de la catégorie Rituels ── */
+.spell-ritual-header { background:linear-gradient(90deg, rgba(150,90,210,0.40), rgba(90,60,160,0.28)) !important; color:#e6d2ff !important; }
+
+/* ── Équipement & inventaire mobile vertical : bulles entièrement visibles, tailles égales ── */
 @media (max-width: 600px) {
   .eqg { padding:10px 8px 12px; }
-  .eqg-grid, .eqg-bottom { grid-template-columns:1fr minmax(0,44px) 1fr; gap:6px; }
+  .eqg-grid, .eqg-bottom { grid-template-columns:minmax(0,1fr) minmax(0,44px) minmax(0,1fr); gap:6px; }
   .eqg-sil { background-position:center center; background-size:cover; }
   .eqb { padding:6px 7px; gap:6px; border-radius:11px; }
   .eqb-ic { width:20px; height:20px; }
   .eqb-lb { font-size:0.48rem; letter-spacing:0.8px; }
   .eqb-v { font-size:0.74rem; }
+  /* Sac à dos : 2 colonnes égales, illustration masquée pour laisser la place aux bulles */
+  .bpk-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
+  .bpk-fig { display:none; }
+  .bpc { min-width:0; }
 }
 </style>
 <script>
@@ -12136,6 +12688,25 @@ nav { transition: transform .28s ease; will-change: transform; }
     <button class="wiz-btn-ghost wiz-side-toggle" onclick="window._wizToggleSide()">📜 Résumé</button>
     <span id="wizFootHint"></span>
     <button id="wizNext" class="wiz-btn-gold" onclick="window._wizNext()">SUIVANT →</button>
+  </div>
+</div>
+
+<!-- L'ASCENSION (montée de niveau plein écran) -->
+<div id="lvlOverlay" class="wiz-skin">
+  <div class="wiz-head">
+    <h2>⬆ L'ASCENSION</h2>
+    <div id="lvlProgress" style="display:flex;align-items:center;flex:1;min-width:0;overflow-x:auto"></div>
+    <button class="wiz-x-btn" onclick="window._lvlClose()" title="Fermer">✕</button>
+  </div>
+  <div class="wiz-body">
+    <div id="lvlMain" style="flex:1;overflow-y:auto;padding:22px 26px 40px;min-width:0"></div>
+    <div id="lvlSide"></div>
+  </div>
+  <div class="wiz-foot">
+    <button id="lvlPrev" class="wiz-btn-ghost" onclick="window._lvlPrev()">← Précédent</button>
+    <button class="wiz-btn-ghost wiz-side-toggle" onclick="window._lvlToggleSide()">📜 Résumé</button>
+    <span id="lvlFootHint"></span>
+    <button id="lvlNext" class="wiz-btn-gold" onclick="window._lvlNext()">SUIVANT →</button>
   </div>
 </div>
 
