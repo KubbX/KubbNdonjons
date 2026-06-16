@@ -2517,9 +2517,88 @@ async function wizLoadAssets(force) {
 }
 
 function wizHue(str) { let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return h%360; }
+const RACE_IMAGES = {
+  'Humain': 'humain.png',
+  'Elfe': 'elfe.png',
+  'Nain': 'nain.png',
+  'Halfelin': 'halfelin.png',
+  'Gnome': 'gnome.png',
+  'Semi-Elfe': 'semi_elfe.png',
+  'Semi-Orque': 'semi_orque.png',
+  'Tieffelin': 'tieffelin.png',
+  'Dragonné': 'dragonne.png',
+  'Aasimar': 'aasimar.png',
+  'Tabaxi': 'tabaxi.png',
+  'Triton': 'triton.png',
+  'Kenku': 'kenku.png',
+  'Kobold': 'kobold.png',
+  'Gobelin': 'gobelin.png',
+  'Hobgobelin': 'hobgobelin.png',
+  'Bugbear': 'bugbear.png',
+  'Yuan-ti Malison': 'yuan_ti.png',
+  'Firbolg': 'firbolg.png',
+  'Lizardfolk': 'lizardfolk.png',
+  'Goliath': 'goliath.png',
+  'Githyanki': 'githyanki.png',
+  'Githzerai': 'githzerai.png',
+  'Aasimar (MotM)': 'aasimar.png',
+  'Eladrin': 'eladrin.png',
+  'Elfe marin': 'elfe_marin.png',
+  'Shadar-kai': 'shadar_kai.png',
+  'Duergar': 'duergar.png',
+  'Gnome des profondeurs (Svirfneblin)': 'gnome_des_profondeurs.png',
+  'Kobold (MotM)': 'kobold.png',
+  'Gobelin (MotM)': 'gobelin.png',
+  'Hobgobelin (MotM)': 'hobgobelin.png',
+  'Bugbear (MotM)': 'bugbear.png',
+  'Yuan-ti (MotM)': 'yuan_ti.png',
+  'Firbolg (MotM)': 'firbolg.png',
+  'Minotaure': 'minotaure.png',
+  'Centaure': 'centaure.png',
+  'Triton (MotM)': 'triton.png',
+  'Tabaxi (MotM)': 'tabaxi.png',
+  'Tortle': 'tortle.png',
+  'Kenku (MotM)': 'kenku.png',
+  'Shifter': 'shifter.png',
+  'Changelin': 'changelin.png',
+  'Kalashtar': 'kalashtar.png',
+  'Lizardfolk (MotM)': 'lizardfolk.png',
+  'Goliath (MotM)': 'goliath.png',
+  'Warforged': 'warforged.png',
+  'Génasi de l\'air': 'genasi_de_lair.png',
+  'Génasi de la terre': 'genasi_de_la_terre.png',
+  'Génasi du feu': 'genasi_du_feu.png',
+  'Génasi de l\'eau': 'genasi_de_leau.png',
+  'Simic Hybrid': 'simic_hybrid.png',
+  'Vedalken': 'vedalken.png',
+  'Loxodon': 'loxodon.png',
+  'Satyre': 'satyre.png',
+  'Leonin': 'leonin.png',
+  'Minotaure (Theros)': 'minotaure.png',
+  'Dhampir': 'dhampir.png',
+  'Hexblood': 'hexblood.png',
+  'Reborn': 'reborn.png',
+  'Harengon': 'harengon.png',
+  'Owlin': 'owlin.png',
+  'Astral Elf': 'astral_elf.png',
+  'Autognome': 'autognome.png',
+  'Giff': 'giff.png',
+  'Hadozee': 'hadozee.png',
+  'Plasmoid': 'plasmoid.png',
+  'Thri-kreen': 'thri_kreen.png',
+  'Kender': 'kender.png',
+  'Féral Tieffelin': 'feral_tieffelin.png',
+  'Githyanki (PHB)': 'githyanki.png',
+};
+const RACE_PANELS = new Set(['Aasimar', 'Aasimar (MotM)', 'Eladrin']);
+
 function wizVisual(cat, key, cls) {
   const url = wizAssets?.[cat]?.[key];
   if (url) return `<div class="${cls}" style="background-image:url('${url.replace(/'/g,"%27")}')"></div>`;
+  if (cat === 'races' && RACE_IMAGES[key]) {
+    const mod = RACE_PANELS.has(key) ? 'race-img-panel' : 'race-img-bust';
+    return `<div class="${cls} ${mod}" style="background-image:url('assets/races/${RACE_IMAGES[key]}')"></div>`;
+  }
   const h = wizHue(key);
   const init = key.replace(/\s*\(.*\)/,'').trim().charAt(0).toUpperCase();
   return `<div class="${cls} wiz-fallback" style="background:linear-gradient(140deg,hsl(${h},38%,26%),hsl(${(h+50)%360},45%,14%))"><span>${init}</span></div>`;
@@ -11056,6 +11135,8 @@ nav button:last-child { color:#884444; }
 .wiz-card:hover { transform:translateY(-3px); border-color:rgba(255,210,120,0.5); }
 .wiz-card.sel { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 6px 24px rgba(200,150,40,0.35); }
 .wiz-card-img { width:100%; aspect-ratio:4/3; background-size:cover; background-position:center top; }
+.race-img-bust { background-size:contain !important; background-position:center bottom !important; background-repeat:no-repeat; background-color:#0d0b16; box-shadow: inset 0 0 0 1px rgba(231,194,90,0.30), inset 0 -14px 34px -12px rgba(231,194,90,0.28), inset 0 1px 0 rgba(255,255,255,0.10); }
+.race-img-panel { background-size:cover !important; background-position:center !important; }
 .wiz-fallback { display:flex; align-items:center; justify-content:center; }
 .wiz-fallback span { font-family:'Cinzel'; font-size:2.2rem; color:rgba(255,235,200,0.55); text-shadow:0 2px 8px rgba(0,0,0,0.6); }
 .wiz-card-body { padding:8px 10px 10px; }
