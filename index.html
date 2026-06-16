@@ -2607,6 +2607,67 @@ const CLASS_IMAGES = {
   'Magicien': 'magicien.png',
 };
 
+const BACKGROUND_IMAGES = {
+  'Acolyte': 'acolyte.png',
+  'Charlatan': 'charlatan.png',
+  'Criminel': 'criminel.png',
+  'Espion': 'espion.png',
+  'Artiste': 'artiste.png',
+  'Gladiateur': 'gladiateur.png',
+  'Hors-la-loi': 'hors_la_loi.png',
+  'Héros du Peuple': 'heros_du_peuple.png',
+  'Artisan de guilde': 'artisan_de_guilde.png',
+  'Marchand de guilde': 'marchand_de_guilde.png',
+  'Ermite': 'ermite.png',
+  'Noble': 'noble.png',
+  'Chevalier': 'chevalier.png',
+  'Sage': 'sage.png',
+  'Marin': 'marin.png',
+  'Pirate': 'pirate.png',
+  'Soldat': 'soldat.png',
+  'Gamin des rues': 'gamin_des_rues.png',
+  'Étranger': 'etranger.png',
+  'Garde de la ville': 'garde_de_la_ville.png',
+  'Artisan clanique': 'artisan_clanique.png',
+  'Érudit cloîtré': 'erudit_cloitre.png',
+  'Courtisan': 'courtisan.png',
+  'Agent de faction': 'agent_de_faction.png',
+  'Grand voyageur': 'grand_voyageur.png',
+  'Chevalier d\'ordre': 'chevalier_dordre.png',
+  'Vétéran mercenaire': 'veteran_mercenaire.png',
+  'Chercheur de sorts': 'chercheur_de_sorts.png',
+  'Anthropologue': 'anthropologue.png',
+  'Archéologue': 'archeologue.png',
+  'Fonctionnaire azorius': 'fonctionnaire_azorius.png',
+  'Légionnaire boros': 'legionnaire_boros.png',
+  'Agent dimir': 'agent_dimir.png',
+  'Agent golgari': 'agent_golgari.png',
+  'Anarch gruul': 'anarch_gruul.png',
+  'Chercheur izzet': 'chercheur_izzet.png',
+  'Initié orzhov': 'initie_orzhov.png',
+  'Médecin simic': 'medecin_simic.png',
+  'Punk rakdos': 'punk_rakdos.png',
+  'Mage selesnya': 'mage_selesnya.png',
+  'Athlète': 'athlete.png',
+  'Citoyen': 'citoyen.png',
+  'Sage de l\'oracle': 'sage_de_loracle.png',
+  'Anthropologue (ToA)': 'anthropologue_toa.png',
+  'Archéologue (ToA)': 'archeologue_toa.png',
+  'Opératif du Myriade': 'operatif_du_myriade.png',
+  'Acolyte luxonborn': 'acolyte_luxonborn.png',
+  'Marque d\'artisan': 'marque_dartisan.png',
+  'Perdu dans les fées': 'perdu_dans_les_fees.png',
+  'Émissaire des fées': 'emissaire_des_fees.png',
+  'Pêcheur': 'pecheur.png',
+  'Contrebandier': 'contrebandier.png',
+  'Marine': 'marine.png',
+  'Étudiant de Lorehold': 'etudiant_de_lorehold.png',
+  'Étudiant de Prismari': 'etudiant_de_prismari.png',
+  'Étudiant de Quandrix': 'etudiant_de_quandrix.png',
+  'Étudiant de Silverquill': 'etudiant_de_silverquill.png',
+  'Étudiant de Witherbloom': 'etudiant_de_witherbloom.png',
+};
+
 function wizVisual(cat, key, cls) {
   const url = wizAssets?.[cat]?.[key];
   if (url) return `<div class="${cls}" style="background-image:url('${url.replace(/'/g,"%27")}')"></div>`;
@@ -2616,6 +2677,9 @@ function wizVisual(cat, key, cls) {
   }
   if (cat === 'classes' && CLASS_IMAGES[key]) {
     return `<div class="${cls} class-img-icon" style="background-image:url('assets/classes/${CLASS_IMAGES[key]}')"></div>`;
+  }
+  if (cat === 'backgrounds' && BACKGROUND_IMAGES[key]) {
+    return `<div class="${cls} class-img-icon" style="background-image:url('assets/backgrounds/${BACKGROUND_IMAGES[key]}')"></div>`;
   }
   const h = wizHue(key);
   const init = key.replace(/\s*\(.*\)/,'').trim().charAt(0).toUpperCase();
