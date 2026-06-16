@@ -2592,12 +2592,30 @@ const RACE_IMAGES = {
 };
 const RACE_PANELS = new Set(['Aasimar', 'Aasimar (MotM)', 'Eladrin']);
 
+const CLASS_IMAGES = {
+  'Barbare': 'barbare.png',
+  'Barde': 'barde.png',
+  'Clerc': 'clerc.png',
+  'Druide': 'druide.png',
+  'Guerrier': 'guerrier.png',
+  'Moine': 'moine.png',
+  'Paladin': 'paladin.png',
+  'Rôdeur': 'rodeur.png',
+  'Roublard': 'roublard.png',
+  'Ensorceleur': 'ensorceleur.png',
+  'Occultiste': 'occultiste.png',
+  'Magicien': 'magicien.png',
+};
+
 function wizVisual(cat, key, cls) {
   const url = wizAssets?.[cat]?.[key];
   if (url) return `<div class="${cls}" style="background-image:url('${url.replace(/'/g,"%27")}')"></div>`;
   if (cat === 'races' && RACE_IMAGES[key]) {
     const mod = RACE_PANELS.has(key) ? 'race-img-panel' : 'race-img-bust';
     return `<div class="${cls} ${mod}" style="background-image:url('assets/races/${RACE_IMAGES[key]}')"></div>`;
+  }
+  if (cat === 'classes' && CLASS_IMAGES[key]) {
+    return `<div class="${cls} class-img-icon" style="background-image:url('assets/classes/${CLASS_IMAGES[key]}')"></div>`;
   }
   const h = wizHue(key);
   const init = key.replace(/\s*\(.*\)/,'').trim().charAt(0).toUpperCase();
@@ -11137,6 +11155,7 @@ nav button:last-child { color:#884444; }
 .wiz-card-img { width:100%; aspect-ratio:4/3; background-size:cover; background-position:center top; }
 .race-img-bust { background-size:contain !important; background-position:center bottom !important; background-repeat:no-repeat; background-color:#0d0b16; box-shadow: inset 0 0 0 1px rgba(231,194,90,0.30), inset 0 -14px 34px -12px rgba(231,194,90,0.28), inset 0 1px 0 rgba(255,255,255,0.10); }
 .race-img-panel { background-size:cover !important; background-position:center !important; }
+.class-img-icon { background-size:contain !important; background-position:center !important; background-repeat:no-repeat; background-color:#0d0b16; box-shadow: inset 0 0 0 1px rgba(231,194,90,0.30), inset 0 0 34px -10px rgba(231,194,90,0.30), inset 0 1px 0 rgba(255,255,255,0.10); }
 .wiz-fallback { display:flex; align-items:center; justify-content:center; }
 .wiz-fallback span { font-family:'Cinzel'; font-size:2.2rem; color:rgba(255,235,200,0.55); text-shadow:0 2px 8px rgba(0,0,0,0.6); }
 .wiz-card-body { padding:8px 10px 10px; }
