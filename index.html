@@ -1031,10 +1031,11 @@ const CLASSES = {
     armor:["Légères","Moyennes","Boucliers (pas métal)"], weapons:["Massue","Dague","Fléchette","Javeline","Gourdin","Serpe","Lance","Bâton","Cimeterre","Fronde","Trident"],
     equipment:"Bouclier de bois, Cimeterre, Armure de cuir, Pack d'explorateur, Focalisateur druidique",
     features:[
-      {lvl:1,name:"Druidique",desc:"Langue secrète des druides"},
-      {lvl:1,name:"Lanceur de sorts",desc:"Sagesse (sorts de druide)"},
-      {lvl:2,name:"Forme sauvage",desc:"Se transformer en bête (RC 1/4, 2/repos court)"},
-      {lvl:8,name:"Forme sauvage améliorée (RC 1)",desc:"RC max 1"},
+      {lvl:1,name:"Druidique",desc:"Langue secrète des druides : laisser et repérer des messages cachés ; les non-initiés ne peuvent les déchiffrer qu'avec un test d'Intelligence (Investigation) difficile."},
+      {lvl:1,name:"Lanceur de sorts",desc:"Sagesse — prépare ses sorts de druide (mod SAG + niveau de druide, min 1) ; peut lancer en rituel. Ne porte ni armure ni bouclier en métal."},
+      {lvl:2,name:"Forme sauvage",desc:"Action : se transformer en une bête déjà vue (RC max 1/4, ni nage ni vol), 2 fois par repos (court ou long), pendant un nombre d'heures égal à la moitié du niveau de druide. On garde INT/SAG/CHA et ses aptitudes de classe ; on prend les PV, la CA et les stats physiques de la bête."},
+      {lvl:4,name:"Forme sauvage améliorée (RC 1/2)",desc:"RC max 1/2 ; on peut adopter une forme dotée d'une vitesse de nage."},
+      {lvl:8,name:"Forme sauvage améliorée (RC 1)",desc:"RC max 1 ; on peut adopter une forme dotée d'une vitesse de vol."},
       {lvl:18,name:"Incantation bestiale",desc:"Lancer des sorts en forme sauvage"},
       {lvl:18,name:"Corps éternel",desc:"Ne plus subir les effets du vieillissement"},
       {lvl:20,name:"Archidruide",desc:"Forme sauvage illimitée, ignorer composantes VS de sorts"}
@@ -4305,15 +4306,22 @@ function renderCharSheet(id, d) {
           if (cr.includes('/')) { const p = cr.split('/'); return parseInt(p[0])/parseInt(p[1]); }
           return parseFloat(cr) || 0;
         };
-        // Calcul RC max pour forme sauvage druide
+        // Calcul RC max forme sauvage (base : 1/4 -> 1/2 -> 1 ; Cercle de la Lune : 1 puis niveau/3 des niv.6)
         let wsMaxCr = '—';
         if (isDruid) {
           const druidClass = classes.find(c => c.name === 'Druide');
           const lvl = druidClass ? druidClass.level : 1;
-          if (lvl >= 8) wsMaxCr = '4';
-          else if (lvl >= 4) wsMaxCr = '1';
-          else if (lvl >= 2) wsMaxCr = '1/4';
-          else wsMaxCr = '0';
+          const isMoon = d.subclasses && d.subclasses['Druide'] === 'Cercle de la Lune';
+          if (isMoon) {
+            if (lvl >= 6) wsMaxCr = String(Math.max(1, Math.floor(lvl/3)));
+            else if (lvl >= 2) wsMaxCr = '1';
+            else wsMaxCr = '0';
+          } else {
+            if (lvl >= 8) wsMaxCr = '1';
+            else if (lvl >= 4) wsMaxCr = '1/2';
+            else if (lvl >= 2) wsMaxCr = '1/4';
+            else wsMaxCr = '0';
+          }
         }
         const hasforms = forms.length > 0;
         const sectionId = 'forms-section-' + id;
