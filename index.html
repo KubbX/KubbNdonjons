@@ -4026,7 +4026,7 @@ function renderCharSheet(id, d) {
 
       <!-- Armes & Attaques -->
       <div class="sheet-section">
-        <div class="section-title">Armes & Attaques <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','weapon')">+ Compendium</button></div>
+        <div class="section-title">Armes & Attaques <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','weapon')">✚ Arme</button></div>
         <table class="weapon-table">
           <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th><th></th></tr></thead>
           <tbody>
@@ -4037,9 +4037,10 @@ function renderCharSheet(id, d) {
               <td>${cw.dmg}</td>
               <td style="white-space:nowrap"><button class="inv-equip-btn ${w.equipped?'equipped':''}" title="${w.equipped?'Équipée (en main)':'Équiper (en main)'}" onclick="event.stopPropagation();window._toggleEquipWeapon('${id}',${i})">${w.equipped?'✓':'＋'}</button> <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
             </tr>`;}).join('')}
-            ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — utilisez le Compendium pour en ajouter</td></tr>' : ''}
+            ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — appuyez sur ✚ Ajouter une arme ci-dessous</td></tr>' : ''}
           </tbody>
         </table>
+        <button class="sheet-add-cta" onclick="window._pickFromCompendium('${id}','weapon')"><span class="cta-plus">✚</span> Ajouter une arme</button>
       </div>
  
       <!-- Équipement & Monnaie -->
@@ -4078,14 +4079,14 @@ function renderCharSheet(id, d) {
             </div>
           </div>
           <div class="bpk-coins">${orb('cp')}${orb('sp')}${orb('ep')}${orb('gp')}${orb('pp')}</div>
-          <button class="section-add-btn" style="margin:8px auto 0;display:block" onclick="window._pickFromCompendium('${id}','item')">＋ Ajouter un objet</button>
+          <button class="sheet-add-cta" onclick="window._pickFromCompendium('${id}','item')"><span class="cta-plus">✚</span> Ajouter un objet</button>
         </div>`;
         })()}
         <!-- Armures (équipement) -->
         <div style="padding:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <label style="font-size:0.65rem;font-family:'Cinzel';color:var(--gold);letter-spacing:1px">Armures</label>
-            <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','armor')">+ Compendium</button>
+            <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','armor')">✚ Armure</button>
           </div>
           <div class="inv-list">
             ${(d.inventory_armors||[]).map((a,i)=>`
@@ -4100,6 +4101,7 @@ function renderCharSheet(id, d) {
             </div>`).join('')}
             ${!(d.inventory_armors||[]).length ? '<div style="color:#aaa;font-style:italic;font-size:0.82rem">Aucune armure</div>' : ''}
           </div>
+          <button class="sheet-add-cta" onclick="window._pickFromCompendium('${id}','armor')"><span class="cta-plus">✚</span> Ajouter une armure</button>
         </div>
         ${d.equipment ? `<div class="field-group" style="margin:0 10px 10px"><label>Équipement (texte libre)</label><div class="editable block-edit" data-field="equipment" data-type="textarea">${d.equipment||'—'}</div></div>` : ''}
       </div>
@@ -4160,7 +4162,7 @@ function renderCharSheet(id, d) {
 
         return `
       <div class="sheet-section">
-        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">+ Compendium</button></div>
+        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button></div>
         <div class="spell-stats">
           <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${spellAbility.toUpperCase()||'—'}</div></div>
           <div class="spell-stat-box"><div class="combat-label">DD Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
@@ -4203,15 +4205,16 @@ function renderCharSheet(id, d) {
           <button class="svt-btn ${spellView==='apps'?'active':''}" data-v="apps" onclick="window._setSpellView('apps')">▦ Applications</button>
           <button class="svt-btn ${spellView==='list'?'active':''}" data-v="list" onclick="window._setSpellView('list')">☰ Liste</button>
         </div>
+        <button class="sheet-add-cta" onclick="window._pickFromCompendium('${id}','spell')"><span class="cta-plus">✚</span> Ajouter un sort</button>
 
         <!-- Vue Applications -->
         <div data-spellview="apps" style="${spellView==='apps'?'':'display:none'}">
-          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : spellAppsHtml}
+          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — appuyez sur ✚ Ajouter un sort</div>' : spellAppsHtml}
         </div>
 
         <!-- Vue Liste (sorts groupés par niveau) -->
         <div class="spell-known-list" data-spellview="list" style="${spellView==='list'?'':'display:none'}">
-          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — utilisez le Compendium pour en ajouter</div>' : ''}
+          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — appuyez sur ✚ Ajouter un sort</div>' : ''}
           ${ritualListHtml}${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
             const spells = spellsByLvl[lvl];
             if (!spells || !spells.length) return '';
@@ -4268,7 +4271,7 @@ function renderCharSheet(id, d) {
       <div class="sheet-section ${hasforms ? 'forms-section-open' : ''}" id="${sectionId}">
         <div class="section-title forms-section-title" onclick="(function(el){el.classList.toggle('forms-section-open')})(document.getElementById('${sectionId}'))">
           <span>${label}${forms.length > 0 ? `<span class='forms-count-badge'>${forms.length}</span>` : ''} <i class='forms-toggle-arrow'>▶</i></span>
-          <button class="section-add-btn" onclick="event.stopPropagation();window._openFormPicker('${id}')">+ Compendium</button>
+          <button class="section-add-btn" onclick="event.stopPropagation();window._openFormPicker('${id}')">✚ Forme</button>
         </div>
         <div class="forms-collapsible-body">
           <div class="forms-collapsible-inner">
@@ -4278,7 +4281,7 @@ function renderCharSheet(id, d) {
               <span class="ws-info-item">🌊 Vol dès niv.8 · Nage dès niv.4</span>
             </div>` : ''}
             <div class="form-known-list">
-              ${forms.length === 0 ? '<div style="padding:4px 0 2px;color:#aaa;font-style:italic;font-size:0.82rem">Aucune forme — utilisez + Compendium pour en ajouter</div>' : ''}
+              ${forms.length === 0 ? '<div style="padding:4px 0 2px;color:#aaa;font-style:italic;font-size:0.82rem">Aucune forme — appuyez sur ✚ Forme</div>' : ''}
               ${Object.entries(byType).map(([type, list]) => `
               <div class="spell-level-group">
                 <div class="spell-level-header">${type}</div>
@@ -4333,7 +4336,7 @@ function renderCharSheet(id, d) {
     <div class="sheet-col-right">
       <!-- Aptitudes & Traits -->
       <div class="sheet-section">
-        <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">+ Don</button></div>
+        <div class="section-title">Aptitudes & Traits <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','feat')">✚ Don</button></div>
         <div class="feat-groups">
           ${(()=>{
             const feats = d.features || [];
@@ -11702,9 +11705,16 @@ em.ok { color:#7fc06a; font-style:normal; }
 #tab-compendium { background:var(--parch); min-height:100vh; }
 
 /* Inventory items on character sheet */
-.section-add-btn { float:right; background:transparent; border:1px solid rgba(184,134,11,0.5); color:var(--gold);
-  padding:1px 8px; font-family:'Cinzel'; font-size:0.55rem; letter-spacing:1px; cursor:pointer; border-radius:2px; transition:all 0.2s; }
+.section-add-btn { float:right; background:rgba(184,134,11,0.12); border:1px solid rgba(184,134,11,0.6); color:var(--gold);
+  padding:3px 10px; font-family:'Cinzel'; font-size:0.62rem; letter-spacing:1px; cursor:pointer; border-radius:5px; transition:all 0.2s; }
 .section-add-btn:hover { background:var(--gold); color:#fff; }
+/* Bouton d'ajout proéminent (objets / équipements / sorts) */
+.sheet-add-cta { display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 20px); margin:10px auto 12px; padding:11px 16px;
+  background:linear-gradient(135deg, rgba(184,134,11,0.24), rgba(184,134,11,0.10)); border:1.5px solid var(--gold); color:#f1e4c2;
+  font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; border-radius:10px; cursor:pointer; transition:all 0.18s; }
+.sheet-add-cta:hover { background:linear-gradient(135deg, var(--gold), #8a6508); color:#fff; box-shadow:0 4px 16px rgba(184,134,11,0.4); transform:translateY(-1px); }
+.sheet-add-cta:active { transform:translateY(0); }
+.sheet-add-cta .cta-plus { font-size:1.05rem; line-height:1; font-weight:bold; }
 .inv-list { display:flex; flex-direction:column; gap:3px; }
 .inv-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:var(--surface-hi);
   border-left:3px solid var(--gold); border-radius:2px; font-size:0.82rem; }
