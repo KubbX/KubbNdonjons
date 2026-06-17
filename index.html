@@ -1278,6 +1278,12 @@ function computeMulticlassCasterLevel(classes, subclasses) {
 }
 
 // Retourne les emplacements de sorts pour un personnage
+// ── Cartes de sorts illustrées (assets/sorts/{slug}.jpg = face, {slug}_txt.jpg = verso) ──
+const SPELL_ASSET_BASE = 'assets/sorts/';
+function spellSlug(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+const SPELL_CARD_SET = new Set(['agrandissement-rapetissement','alarme','allie-planaire','amis','amitie-avec-les-animaux','animation-d-objets','animation-des-morts','antidetection','apaisement-des-emotions','apparence-trompeuse','appel-de-destrier','appel-de-familier','appel-de-la-foudre','arme-elementaire','arme-magique','arme-spirituelle','armure-d-agathys','armure-de-mage','arret-du-temps','aspersion-d-acide','assistance','augure','aura-de-purete','aura-de-vie','aura-de-vitalite','aura-du-croise','aura-magique-de-nystul','aura-sacree','aversion-attirance','bagou','baies-nourricieres','bannissement','barriere-de-lames','benediction','blessure','bosquet-des-druides','bouche-magique','bouclier','bouclier-de-feu','bouclier-de-la-foi','bouffee-de-poison','boule-de-feu','boule-de-feu-a-retardement','bourrasque','brume-mortelle','cage-de-force','cecite-surdite','cercle-de-mort','cercle-de-pouvoir','cercle-de-teleportation','cercle-magique','chaine-d-eclairs','champ-antimagie','changement-de-forme','changement-de-plan','charme-monstre','charme-personne','chatiment-calcinant','chatiment-courrouce','chatiment-debilitant','chatiment-du-ban','chatiment-revelateur','chien-de-garde-de-mordenkainen','clairvoyance','clignotement','clone','coffre-secret-de-leomund','colonne-de-flamme','communication-a-distance','communication-avec-les-animaux','communication-avec-les-morts','communication-avec-les-plantes','communion','communion-avec-la-nature','comprehension-des-langues','compulsion','cone-de-froid','confusion','contact-avec-un-autre-plan','contact-glacial','contagion','contamination','contresort','controle-de-l-eau','controle-du-climat','convocation-d-aberration','convocation-d-artificiel','convocation-d-elementaire','convocation-de-bete','convocation-de-celeste','convocation-de-fee','convocation-de-fielon','convocation-de-mort-vivant','coquille-antivie','corde-enchantee','cordon-de-fleches','couleurs-dansantes','coup-au-but','coup-de-tonnerre','couronne-d-etoiles','couronne-du-dement','couteau-de-glace','creation','creation-de-mort-vivant','creation-de-nourriture-et-d-eau','creation-ou-destruction-d-eau','croissance-d-epines','croissance-vegetale','danse-irresistible-d-otto','deblocage','decharge-occulte','dedale','deguisement','delivrance-des-maledictions','demi-plan','desintegration','detection-de-la-magie','detection-des-pensees','detection-du-mal-et-du-bien','discours-captivant','disque-flottant-de-tenser','dissimulation','dissipation-de-la-magie','dissipation-du-mal-et-du-bien','divination','doigt-de-mort','domination-de-bete','domination-de-monstre','domination-de-personne','don-des-langues','double-illusoire','druidisme','duel-force','eclair','eclat-du-soleil','emprisonnement','enchevetrement','ennemi-subconscient','epee-de-mordenkainen','epine-mentale','esprit-impenetrable','esprits-gardiens','eveil','fabrication','faconnage-de-la-pierre','faveur-divine','festin-des-heros','feuille-morte','flamme-eternelle','flamme-sacree','flammes','fleau-d-insectes','fleche-acide-de-melf','fleche-de-foudre','fletrissement','flou','force-fantasmagorique','forme-etheree','forme-gazeuse','fou-rire-de-tasha','fouet-epineux','foulee-brumeuse','fracassement','frappe-du-vent-d-acier','frappe-piegeuse','frayeur','fusion-dans-la-pierre','gardien-de-la-foi','glas','globe-d-invulnerabilite','glyphe-de-protection','gourdin-magique','graisse','grande-foulee','grele-d-epines','guerison','guerison-de-groupe','heroisme','identification','illusion-mineure','illusion-programmee','image-majeure','image-miroir','image-silencieuse','immobilisation-de-monstre','immobilisation-de-personne','injonction','insecte-geant','interdiction','inversion-de-la-gravite','invisibilite','invisibilite-superieure','invocation-d-animaux','invocation-d-elementaire','invocation-d-etres-sylvestres','invocation-de-celeste','invocation-de-fee','invocation-de-projectiles','invocation-de-volee','lame-de-feu','lenteur','levitation','liane-avide','liberte-de-mouvement','lien-de-protection','lien-telepathique-de-rary','localisation-d-objet','localisation-de-creature','lueur-d-espoir','lueurs-feeriques','lumiere','lumiere-du-jour','lumieres-dansantes','main-de-bigby','main-de-mage','mains-brulantes','malediction','malefice','marche-sur-l-eau','marque-du-chasseur','mauvais-oeil','messager-animal','metal-brulant','metamorphose','metamorphose-supreme','mirage','modification-d-apparence','modification-de-memoire','monture-fantome','moquerie-cruelle','mot-de-guerison','mot-de-guerison-de-groupe','mot-de-pouvoir-etourdissant','mot-de-pouvoir-guerisseur','mot-de-pouvoir-mortel','mot-de-radiance','mot-de-retour','motif-hypnotique','mur-d-epines','mur-de-feu','mur-de-force','mur-de-glace','mur-de-pierre','mur-de-vent','mur-prismatique','murmures-dissonants','mythes-et-legendes','nappe-de-brouillard','nuage-incendiaire','nuage-nauseabond','nuee-de-dagues','nuee-de-meteores','oeil-magique','orbe-chromatique','ossements-de-la-terre','parole-divine','passage-par-les-arbres','passage-sans-trace','passe-muraille','pattes-d-araignee','peau-d-ecorce','peau-de-pierre','perturbations-synaptiques','petite-hutte-de-leomund','petrification','piqure-mentale','poigne-electrique','portail','portail-magique','porte-dimensionnelle','premonition','prestidigitation','priere-de-guerison','projectile-magique','projection-astrale','protection-contre-la-mort','protection-contre-le-poison','protection-contre-une-energie','protections-et-sceaux','quete','rappel-a-la-vie','rayon-affaiblissant','rayon-ardent','rayon-de-givre','rayon-de-lune','rayon-de-soleil','rayon-empoisonne','rayons-prismatiques','regeneration','reincarnation','reparation','repli-expeditif','represailles-infernales','resistance','respiration-aquatique','restauration-partielle','resurrection','resurrection-supreme','retour-a-la-vie','sanctification','sanctuaire','scrutation','serviteur-invisible','silence','simulacre','simulacre-de-vie','soins','soins-de-groupe','sommeil','songe','souffle-du-dragon','souhait','sphere-de-feu','sphere-de-vitriol','sphere-glaciale-d-otiluke','sphere-resiliente-d-otiluke','stabilisation','suggestion','suggestion-de-groupe','symbole','telekinesie','telepathie','teleportation','tempete-de-feu','tempete-de-grele','tempete-de-neige','tempete-vengeresse','tenebres','tentacules-de-hadar','tentacules-noirs-d-evard','terrain-hallucinatoire','texte-illusoire','thaumaturgie','toile-d-araignee','toucher-du-vampire','trait-de-feu','trait-ensorcele','tremblement-de-terre','tsunami','vague-destructrice','vague-tonnante','verrou-magique','vision-dans-le-noir','vision-supreme','voie-vegetale','voracite-de-hadar','zone-de-verite']);
+window._spellCardFace = (name) => { const s = spellSlug(name); return SPELL_CARD_SET.has(s) ? SPELL_ASSET_BASE + s + '.jpg' : ''; };
+window._spellCardText = (name) => { const s = spellSlug(name); return SPELL_CARD_SET.has(s) ? SPELL_ASSET_BASE + s + '_txt.jpg' : ''; };
 function getSpellSlots(d) {
   const classes = getClasses(d);
   const subclasses = d.subclasses || {};
@@ -4178,7 +4184,7 @@ function renderCharSheet(id, d) {
             <div class="spell-app-grid">
               ${ritualEntries.map(({sp,lvl,si}) => { const m = spellMeta(sp.school); return `
               <button class="spell-app" style="--app:${m.color}" title="${sp.name} (rituel)" onclick="window._openCastSpell('${id}',${lvl},${si})">
-                <span class="spell-app-icon"><img class="spell-app-img" src="${m.img}" alt=""></span>
+                <span class="spell-app-icon"><img class="spell-app-img" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.src='${m.img}'"></span>
                 <span class="spell-app-name">${sp.name}</span>
               </button>`; }).join('')}
             </div>` : '';
@@ -4186,7 +4192,7 @@ function renderCharSheet(id, d) {
             <div class="spell-level-group">
               <div class="spell-level-header spell-ritual-header">📜 Rituels</div>
               ${ritualEntries.map(({sp,lvl,si}) => `
-              <div class="spell-known-item">
+              <div class="spell-known-item">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
                 <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
                   <strong>${sp.name}</strong>
                   <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
@@ -4205,7 +4211,7 @@ function renderCharSheet(id, d) {
             <div class="spell-app-grid">
               ${spells.map((sp,si) => { const m = spellMeta(sp.school); return `
               <button class="spell-app" style="--app:${m.color}" title="${sp.name}" onclick="window._openCastSpell('${id}',${lvl},${si})">
-                <span class="spell-app-icon"><img class="spell-app-img" src="${m.img}" alt=""></span>
+                <span class="spell-app-icon"><img class="spell-app-img" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.src='${m.img}'"></span>
                 <span class="spell-app-name">${sp.name}</span>
               </button>`; }).join('')}
             </div>`;
@@ -4273,7 +4279,7 @@ function renderCharSheet(id, d) {
             <div class="spell-level-group">
               <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
               ${spells.map((sp,si) => `
-              <div class="spell-known-item">
+              <div class="spell-known-item">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
                 <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
                   <strong>${sp.name}</strong>
                   <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
@@ -6142,7 +6148,10 @@ window._openCastSpell = (charId, level, indexInLevel) => {
   const usedSlots = d.usedSpellSlots || {};
 
   // Spell detail in rd-sheet style
-  let html = `<div class="rd-sheet">${_renderSpellDetail(sp)}</div>`;
+  const _cardTxt = window._spellCardText(sp.name);
+  let html = _cardTxt
+    ? `<div class="spell-card-detail"><img src="${_cardTxt}" alt="${(sp.name||'').replace(/"/g,'&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="rd-sheet" style="display:none">${_renderSpellDetail(sp)}</div></div>`
+    : `<div class="rd-sheet">${_renderSpellDetail(sp)}</div>`;
 
   // Cast section — cantrips don't use slots
   if (sp.level === 0) {
@@ -10696,6 +10705,10 @@ window._saveNewResource = async (catId) => {
 .spell-app:hover .spell-app-icon { transform:translateY(-3px); box-shadow:0 9px 24px rgba(0,0,0,0.5), 0 0 22px -2px var(--app), inset 0 1px 0 rgba(255,255,255,0.28); }
 .spell-app:active .spell-app-icon { transform:translateY(0); }
 .spell-app-name { font-size:0.72rem; line-height:1.12; text-align:center; color:var(--ink); max-width:78px; max-height:2.3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.spell-app .spell-app-img { object-position:center 36%; }
+.spell-known-thumb { width:30px; height:42px; object-fit:cover; object-position:center 34%; border-radius:4px; margin-right:9px; border:1px solid var(--line); flex:0 0 auto; }
+.spell-card-detail { margin-bottom:8px; }
+.spell-card-detail img { width:100%; max-width:430px; display:block; margin:0 auto; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.45); }
 
 /* ── Sélecteur d'emplacement (paper doll) ── */
 .pd-pick-row { display:block; width:100%; text-align:left; padding:9px 11px; margin-bottom:5px; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); color:var(--ink); cursor:pointer; font-family:'Crimson Pro'; font-size:0.9rem; }
