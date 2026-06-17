@@ -2470,7 +2470,7 @@ function wizFresh() {
     // étape 4
     background: null, langPicks: [], bgSearch:'',
     // étape 5
-    name:'', age:'', gender:'', alignment:'',
+    name:'', age:'', gender:'', alignment:'', avatarUrl:'',
     personality:'', ideals:'', bonds:'', flaws:'', appearance:'', backstory:'',
     feat: null, featStatPick: null, featSearch:'',
     // ui
@@ -3206,6 +3206,18 @@ function wizStepIdentity(main, b) {
         <label>Nom du héros ${WIZ.name.trim()?'':'<em class="need">— requis</em>'}</label>
         <input id="wizName" type="text" value="${WIZ.name.replace(/"/g,'&quot;')}" placeholder="Ex : Aldarion du Val d'Ambre" oninput="window._wizField('name',this.value)">
       </div>
+      <div class="wiz-field">
+        <label>Portrait (optionnel)</label>
+        <div class="wiz-portrait-row">
+          <div class="wiz-portrait-preview">${WIZ.avatarUrl?`<img src="${WIZ.avatarUrl}" alt="Portrait">`:'<span>⚔</span>'}</div>
+          <div class="wiz-portrait-actions">
+            <label class="wiz-portrait-btn">📁 Importer une image
+              <input type="file" accept="image/*" style="display:none" onchange="window._wizPortraitPick(this)">
+            </label>
+            ${WIZ.avatarUrl?'<button type="button" class="wiz-portrait-rm" onclick="window._wizPortraitClear()">Retirer</button>':''}
+          </div>
+        </div>
+      </div>
       <div class="wiz-field-row">
         <div class="wiz-field"><label>Âge</label><input type="text" value="${WIZ.age.replace(/"/g,'&quot;')}" oninput="window._wizField('age',this.value)"></div>
         <div class="wiz-field"><label>Genre</label><input type="text" value="${WIZ.gender.replace(/"/g,'&quot;')}" oninput="window._wizField('gender',this.value)"></div>
@@ -3236,6 +3248,8 @@ function wizStepIdentity(main, b) {
   wizFeatZone();
 }
 window._wizField = (k,v) => { if(!WIZ) return; WIZ[k]=v; if(k==='name') wizRenderSide(wizBuild()); };
+window._wizPortraitPick = async (inp) => { const f=inp.files&&inp.files[0]; if(!f||!WIZ) return; try{ WIZ.avatarUrl = await imgFileToDataURL(f); wizRender(); }catch(e){ alert("Impossible de charger cette image : "+(e.message||e)); } };
+window._wizPortraitClear = () => { if(!WIZ) return; WIZ.avatarUrl=''; wizRender(); };
 window._wizRaceSearch = (v) => { WIZ.raceSearch=v; window._wizRaceGrid(); };
 window._wizRaceSrc = (s) => { WIZ.raceSrc=s; const f=document.querySelectorAll('.wiz-filters .wiz-chip'); window._wizRaceGrid(); f.forEach(b=>b.classList.toggle('sel', b.textContent===( {all:'Toutes',PHB:'PHB',MotM:'MotM',autres:'Autres sources'}[s] ))); };
 window._wizBgSearch = (v) => { WIZ.bgSearch=v; window._wizBgGrid(); };
@@ -3358,7 +3372,7 @@ async function wizSave(b) {
 
     const newChar = {
       owner: currentUid,
-      name: WIZ.name.trim(), age: WIZ.age||'', gender: WIZ.gender||'',
+      name: WIZ.name.trim(), age: WIZ.age||'', gender: WIZ.gender||'', avatarUrl: WIZ.avatarUrl || null,
       alignment: WIZ.alignment||'', background: WIZ.background||'',
       ideals: WIZ.ideals||'', bonds: WIZ.bonds||'', flaws: WIZ.flaws||'',
       personality: WIZ.personality||'', appearance: WIZ.appearance||'', backstory: WIZ.backstory||'',
@@ -9934,7 +9948,29 @@ window._toggleInspiration = async (charId) => {
   await updateDoc(doc(db, "characters", charId), { inspiration: !d.inspiration });
 };
 
-// ── Change avatar (image URL) ──
+// ── Helper : fichier image -> data URL redimensionnée (léger pour Firestore) ──
+async function imgFileToDataURL(file, max=512, quality=0.85) {
+  if (!file || !file.type || !file.type.startsWith('image/')) throw new Error('fichier non image');
+  const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error||new Error('lecture impossible')); r.readAsDataURL(file); });
+  const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('image illisible')); i.src=dataUrl; });
+  let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+  const scale=Math.min(1, max/Math.max(w,h)); w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+  return cv.toDataURL('image/jpeg', quality);
+}
+window._avatarFilePick = async (inp) => {
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  try {
+    const data=await imgFileToDataURL(f);
+    const di=document.getElementById('avatarDataInput'); if(di) di.value=data;
+    const ui=document.getElementById('avatarUrlInput'); if(ui) ui.value='';
+    const zone=document.getElementById('avatarPreviewZone');
+    if(zone) zone.innerHTML=`<img src="${data}" style="max-width:200px;max-height:200px;border-radius:8px;border:2px solid var(--gold)">`;
+  } catch(e){ alert("Impossible de charger cette image : "+(e.message||e)); }
+};
+
+// ── Change avatar (image URL ou depuis l'appareil) ──
 window._changeAvatar = async (charId) => {
   const snap = await getDoc(doc(db, "characters", charId));
   if (!snap.exists()) return;
@@ -9948,11 +9984,18 @@ window._changeAvatar = async (charId) => {
 
   content.innerHTML = `
     <h3 class="step-title">Portrait du personnage</h3>
-    <p style="font-size:0.85rem;color:#666;margin-bottom:12px">Collez l'URL d'une image pour l'utiliser comme portrait. Vous pouvez héberger votre image sur <a href="https://imgur.com" target="_blank" style="color:var(--gold)">Imgur</a>, <a href="https://postimages.org" target="_blank" style="color:var(--gold)">PostImages</a> ou tout autre hébergeur d'images.</p>
+    <p style="font-size:0.85rem;color:#888;margin-bottom:12px">Importez une image depuis votre appareil, ou collez l'URL d'une image hébergée en ligne (<a href="https://imgur.com" target="_blank" style="color:var(--gold)">Imgur</a>, <a href="https://postimages.org" target="_blank" style="color:var(--gold)">PostImages</a>…).</p>
+    <div style="text-align:center;margin-bottom:10px">
+      <label class="btn-gold" style="display:inline-block;cursor:pointer">📁 Importer depuis l'appareil
+        <input type="file" accept="image/*" style="display:none" onchange="window._avatarFilePick(this)">
+      </label>
+    </div>
+    <div style="text-align:center;color:#777;font-size:0.78rem;margin:4px 0 10px">— ou une URL —</div>
     <div class="field-group">
       <label>URL de l'image</label>
-      <input id="avatarUrlInput" type="url" value="${d.avatarUrl||''}" placeholder="https://exemple.com/mon-portrait.jpg" style="width:100%">
+      <input id="avatarUrlInput" type="url" value="${(d.avatarUrl&&!String(d.avatarUrl).startsWith('data:'))?d.avatarUrl:''}" placeholder="https://exemple.com/mon-portrait.jpg" style="width:100%">
     </div>
+    <input type="hidden" id="avatarDataInput" value="${String(d.avatarUrl||'').startsWith('data:')?d.avatarUrl:''}">
     ${d.avatarUrl ? `<div style="margin:12px 0;text-align:center"><img src="${d.avatarUrl}" style="max-width:200px;max-height:200px;border-radius:8px;border:2px solid var(--gold)"></div>` : ''}
     <div id="avatarPreviewZone" style="margin:12px 0;text-align:center"></div>
     <div style="display:flex;gap:10px;margin-top:16px">
@@ -9977,8 +10020,9 @@ window._changeAvatar = async (charId) => {
 };
 
 window._saveAvatar = async (charId) => {
+  const data = document.getElementById('avatarDataInput')?.value || '';
   const url = document.getElementById('avatarUrlInput')?.value?.trim() || '';
-  await updateDoc(doc(db, "characters", charId), { avatarUrl: url || null });
+  await updateDoc(doc(db, "characters", charId), { avatarUrl: (data || url) || null });
   window._closeForge();
   document.getElementById('forgeNext').style.display = '';
 };
@@ -11379,6 +11423,15 @@ em.ok { color:#7fc06a; font-style:normal; }
   .wiz-asset-name { width:110px; }
 }
 
+/* Footer wizard/ascension sur petit écran : indice sur sa propre ligne, boutons répartis, SUIVANT toujours visible */
+@media (max-width:560px) {
+  .wiz-foot { flex-wrap:wrap; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)); }
+  #wizFootHint, #lvlFootHint { flex:1 0 100%; order:-1; text-align:center; font-size:0.76rem; line-height:1.25; }
+  .wiz-foot > button { flex:1 1 0; min-width:0; padding:11px 6px; font-size:0.7rem; letter-spacing:0.5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #wizNext, #lvlNext { flex:1.6 1 0; }
+}
+
 
 /* ── L'ASCENSION (montée de niveau plein écran) ── */
 .lvl-die { width:96px; height:96px; margin:6px auto; display:flex; align-items:center; justify-content:center;
@@ -11411,6 +11464,13 @@ em.ok { color:#7fc06a; font-style:normal; }
 .sheet-avatar-wrap:hover .sheet-avatar-placeholder { border-color:var(--gold); }
 .sheet-avatar-edit { position:absolute; bottom:0; right:0; background:var(--gold); color:var(--ink); width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; opacity:0; transition:opacity 0.2s; pointer-events:none; }
 .sheet-avatar-wrap:hover .sheet-avatar-edit { opacity:1; }
+.wiz-portrait-row { display:flex; align-items:center; gap:14px; }
+.wiz-portrait-preview { width:72px; height:72px; border-radius:50%; border:2px solid var(--gold); overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.05); color:rgba(184,134,11,0.6); font-size:1.6rem; }
+.wiz-portrait-preview img { width:100%; height:100%; object-fit:cover; }
+.wiz-portrait-actions { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+.wiz-portrait-btn { display:inline-block; cursor:pointer; background:rgba(184,134,11,0.15); border:1px solid var(--gold); color:#e6dcc8; padding:8px 14px; border-radius:8px; font-family:'Crimson Pro'; font-size:0.85rem; transition:background 0.2s; }
+.wiz-portrait-btn:hover { background:rgba(184,134,11,0.28); }
+.wiz-portrait-rm { background:none; border:1px solid rgba(255,255,255,0.25); color:#caa; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:0.78rem; }
 .sheet-name { font-family:'Cinzel'; font-size:1.6rem; color:var(--gold); margin-bottom:4px; }
 .sheet-subtitle { color:#c9a860; font-size:0.9rem; }
 .sheet-combat-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; justify-content:center; }
