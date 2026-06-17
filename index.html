@@ -4184,7 +4184,7 @@ function renderCharSheet(id, d) {
             <div class="spell-app-grid">
               ${ritualEntries.map(({sp,lvl,si}) => { const m = spellMeta(sp.school); return `
               <button class="spell-app" style="--app:${m.color}" title="${sp.name} (rituel)" onclick="window._openCastSpell('${id}',${lvl},${si})">
-                <span class="spell-app-icon"><img class="spell-app-img" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.src='${m.img}'"></span>
+                <span class="spell-app-icon"><img class="spell-app-img${window._spellCardFace(sp.name)?' is-card':''}" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.classList.remove('is-card');this.src='${m.img}'"></span>
                 <span class="spell-app-name">${sp.name}</span>
               </button>`; }).join('')}
             </div>` : '';
@@ -4211,7 +4211,7 @@ function renderCharSheet(id, d) {
             <div class="spell-app-grid">
               ${spells.map((sp,si) => { const m = spellMeta(sp.school); return `
               <button class="spell-app" style="--app:${m.color}" title="${sp.name}" onclick="window._openCastSpell('${id}',${lvl},${si})">
-                <span class="spell-app-icon"><img class="spell-app-img" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.src='${m.img}'"></span>
+                <span class="spell-app-icon"><img class="spell-app-img${window._spellCardFace(sp.name)?' is-card':''}" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.classList.remove('is-card');this.src='${m.img}'"></span>
                 <span class="spell-app-name">${sp.name}</span>
               </button>`; }).join('')}
             </div>`;
@@ -6149,9 +6149,9 @@ window._openCastSpell = (charId, level, indexInLevel) => {
 
   // Spell detail in rd-sheet style
   const _cardTxt = window._spellCardText(sp.name);
-  let html = _cardTxt
+  let html = '<div class="spell-detail-modal" hidden></div>' + (_cardTxt
     ? `<div class="spell-card-detail"><img src="${_cardTxt}" alt="${(sp.name||'').replace(/"/g,'&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="rd-sheet" style="display:none">${_renderSpellDetail(sp)}</div></div>`
-    : `<div class="rd-sheet">${_renderSpellDetail(sp)}</div>`;
+    : `<div class="rd-sheet">${_renderSpellDetail(sp)}</div>`);
 
   // Cast section — cantrips don't use slots
   if (sp.level === 0) {
@@ -10699,16 +10699,37 @@ window._saveNewResource = async (catId) => {
 .svt-btn { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:0.5px; padding:4px 11px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
 .svt-btn.active { background:var(--gold); color:#fff; border-color:var(--gold); }
 .spell-app-grid { display:flex; flex-wrap:wrap; gap:14px 10px; padding:8px 12px 14px; justify-content:center; }
-.spell-app { display:flex; flex-direction:column; align-items:center; gap:5px; border:none; background:none; cursor:pointer; font-family:'Crimson Pro'; padding:0; width:72px; flex:0 0 auto; }
-.spell-app-icon { width:56px; height:56px; border-radius:15px; overflow:hidden; position:relative; background:#0a0a14; border:1px solid rgba(255,255,255,0.20); box-shadow:0 4px 14px rgba(0,0,0,0.45), 0 0 16px -4px var(--app), inset 0 1px 0 rgba(255,255,255,0.18); transition:transform .12s ease, box-shadow .25s ease; }
+.spell-app { display:flex; flex-direction:column; align-items:center; gap:6px; border:none; background:none; cursor:pointer; font-family:'Crimson Pro'; padding:0; width:80px; flex:0 0 auto; }
+.spell-app-icon { width:80px; aspect-ratio:818/1118; height:auto; border-radius:9px; overflow:hidden; position:relative; background:#0a0a14; border:1px solid rgba(255,255,255,0.20); box-shadow:0 4px 14px rgba(0,0,0,0.45), 0 0 16px -4px var(--app), inset 0 1px 0 rgba(255,255,255,0.18); transition:transform .12s ease, box-shadow .25s ease; }
 .spell-app-img { width:100%; height:100%; object-fit:cover; display:block; }
 .spell-app:hover .spell-app-icon { transform:translateY(-3px); box-shadow:0 9px 24px rgba(0,0,0,0.5), 0 0 22px -2px var(--app), inset 0 1px 0 rgba(255,255,255,0.28); }
 .spell-app:active .spell-app-icon { transform:translateY(0); }
 .spell-app-name { font-size:0.72rem; line-height:1.12; text-align:center; color:var(--ink); max-width:78px; max-height:2.3em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-.spell-app .spell-app-img { object-position:center 36%; }
-.spell-known-thumb { width:30px; height:42px; object-fit:cover; object-position:center 34%; border-radius:4px; margin-right:9px; border:1px solid var(--line); flex:0 0 auto; }
+.spell-app-img { object-position:center; }
+.spell-app-img:not(.is-card) { object-fit:contain; padding:18%; box-sizing:border-box; }
+.spell-known-thumb { width:34px; aspect-ratio:818/1118; height:auto; object-fit:cover; border-radius:5px; margin-right:9px; border:1px solid var(--line); flex:0 0 auto; box-shadow:0 2px 6px rgba(0,0,0,0.25); }
 .spell-card-detail { margin-bottom:8px; }
 .spell-card-detail img { width:100%; max-width:430px; display:block; margin:0 auto; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.45); }
+/* ── Modal de sort : habillage glassmorph (cohérent avec les wizards) ── */
+.forge-window:has(.spell-detail-modal) { background:rgba(20,15,9,0.74); -webkit-backdrop-filter:blur(16px) saturate(1.2); backdrop-filter:blur(16px) saturate(1.2); border:1px solid rgba(212,180,120,0.45); box-shadow:0 24px 70px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08); }
+.forge-window:has(.spell-detail-modal) .forge-top { background:linear-gradient(135deg, #1c1409, #2a1605); }
+.forge-window:has(.spell-detail-modal) .spell-card-detail img { border-radius:12px; box-shadow:0 12px 38px rgba(0,0,0,0.55); }
+.forge-window:has(.spell-detail-modal) .rd-sheet { background:rgba(255,255,255,0.05); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.14); border-top:3px solid var(--gold); border-radius:12px; color:#e6dabf; box-shadow:0 6px 24px rgba(0,0,0,0.32); }
+.forge-window:has(.spell-detail-modal) .rd-title { color:#f3e9d2; }
+.forge-window:has(.spell-detail-modal) .rd-subtitle { color:var(--gold); }
+.forge-window:has(.spell-detail-modal) .rd-prop-label { color:var(--gold); }
+.forge-window:has(.spell-detail-modal) .rd-prop, .forge-window:has(.spell-detail-modal) .rd-desc { color:#ddd0b8; }
+.forge-window:has(.spell-detail-modal) .rd-separator { border-color:rgba(212,180,120,0.22); background:rgba(212,180,120,0.18); }
+.forge-window:has(.spell-detail-modal) .rd-tag { background:rgba(184,134,11,0.28); border-color:rgba(212,180,120,0.4); color:#f0e4cc; }
+.forge-window:has(.spell-detail-modal) .rd-source-tag { color:#cdb88c; }
+.forge-window:has(.spell-detail-modal) .cast-section { background:rgba(255,255,255,0.05); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border:1px solid rgba(212,180,120,0.35); border-radius:12px; }
+.forge-window:has(.spell-detail-modal) .cast-header { color:var(--gold); }
+.forge-window:has(.spell-detail-modal) .cast-slot-btn { background:rgba(0,0,0,0.35); border:1.5px solid rgba(212,180,120,0.55); color:#e6dabf; border-radius:10px; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.forge-window:has(.spell-detail-modal) .cast-slot-btn:hover:not(.cast-slot-empty) { background:rgba(184,134,11,0.5); border-color:var(--gold); color:#fff; transform:translateY(-2px); box-shadow:0 6px 18px rgba(200,150,40,0.4); }
+.forge-window:has(.spell-detail-modal) .cast-slot-btn .cast-slot-lvl { color:var(--gold); }
+.forge-window:has(.spell-detail-modal) .cast-slot-btn .cast-slot-remaining { color:#f0e4cc; }
+.forge-window:has(.spell-detail-modal) .cast-slot-empty { border-color:rgba(255,255,255,0.15); }
+.forge-window:has(.spell-detail-modal) .cast-slot-pact { border-color:#a06fc0; }
 
 /* ── Sélecteur d'emplacement (paper doll) ── */
 .pd-pick-row { display:block; width:100%; text-align:left; padding:9px 11px; margin-bottom:5px; border:1px solid var(--line); border-radius:7px; background:var(--surface-soft); color:var(--ink); cursor:pointer; font-family:'Crimson Pro'; font-size:0.9rem; }
