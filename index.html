@@ -3558,6 +3558,12 @@ function fightingStyleChoiceKey(d){
   return null;
 }
 function fightingStyleOf(d){ return fightingStyleChoiceKey(d) ? ((d && d.fightingStyle) || '') : ''; }
+// Forgeur de bataille (Artificier) : sous-classe au niveau ≥3
+function isBattleSmith(d){
+  if (!d || !d.subclasses || d.subclasses['Artificier'] !== 'Forgeur de bataille') return false;
+  const art = getClasses(d).find(c => c.name === 'Artificier');
+  return !!art && (art.level||0) >= 3;
+}
 function fightingStyleId(s){
   s = (s||'').toLowerCase();
   if (s.includes('archerie')) return 'archery';
@@ -3622,8 +3628,12 @@ function computeWeapon(d, w){
   const twoH = /deux mains|two.?hand/.test(((w&&w.properties)||'').toLowerCase());
   const styleAtk = (fsId==='archery' && ranged) ? 2 : 0;
   const styleDmg = (fsId==='dueling' && !ranged && !twoH) ? 2 : 0;
-  const atkTotal = aMod + prof + magic + atkExtra + styleAtk;
-  const dmgBonus = aMod + magic + dmgExtra + rageB + styleDmg;
+  // Forgeur de bataille « Prêt au combat » : INT au lieu de FOR/DEX pour une arme magique
+  const intM = mod((stats&&stats.int)||10);
+  const bsInt = isBattleSmith(d) && magic>0 && intM > aMod;
+  const effMod = bsInt ? intM : aMod;
+  const atkTotal = effMod + prof + magic + atkExtra + styleAtk;
+  const dmgBonus = effMod + magic + dmgExtra + rageB + styleDmg;
   const raw = (w&&(w.damage || w.dmg)) || '';
   const dieM = String(raw).match(/\d+\s*d\s*\d+/i);
   const die = dieM ? dieM[0].replace(/\s+/g,'') : '';
@@ -3632,7 +3642,7 @@ function computeWeapon(d, w){
   const atkStr = (atkTotal>=0?'+':'') + atkTotal;
   let dmgStr = die + (dmgBonus!==0 ? ((dmgBonus>=0?'+':'')+dmgBonus) : '');
   dmgStr = (dmgStr + (dtype?(' '+dtype):'')).trim();
-  return { atk: atkStr, dmg: dmgStr || '—', rage: rageB, style: styleAtk?'archery':(styleDmg?'dueling':'') };
+  return { atk: atkStr, dmg: dmgStr || '—', rage: rageB, style: styleAtk?'archery':(styleDmg?'dueling':''), int: bsInt };
 }
 
 // Catégorise un objet du sac selon son nom (compartiments)
@@ -4073,7 +4083,7 @@ function renderCharSheet(id, d) {
             ${(d.inventory_weapons||[]).map((w,i)=>{ const cw = computeWeapon(d,w); return `
             <tr class="weapon-row-click" onclick="window._showSheetWeaponDetail('${id}',${i})">
               <td>${w.name||'—'}</td>
-              <td>${cw.atk}${cw.style==='archery'?` <span title="Archerie +2" style="color:#5a9bd4;cursor:help">🎯</span>`:''}</td>
+              <td>${cw.atk}${cw.style==='archery'?` <span title="Archerie +2" style="color:#5a9bd4;cursor:help">🎯</span>`:''}${cw.int?` <span title="Prêt au combat : INT" style="color:#7a9a3a;cursor:help">🔧</span>`:''}</td>
               <td>${cw.dmg}${cw.rage?` <span title="Bonus de rage +${cw.rage}" style="color:#e8702a;cursor:help">🔥</span>`:''}${cw.style==='dueling'?` <span title="Duel +2" style="color:#c98a3a;cursor:help">⚔</span>`:''}</td>
               <td style="white-space:nowrap"><button class="inv-equip-btn ${w.equipped?'equipped':''}" title="${w.equipped?'Équipée (en main)':'Équiper (en main)'}" onclick="event.stopPropagation();window._toggleEquipWeapon('${id}',${i})">${w.equipped?'✓':'＋'}</button> <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
             </tr>`;}).join('')}
