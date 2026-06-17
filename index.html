@@ -763,14 +763,14 @@ const SUBCLASSES = {
         {lvl:15,name:"Tueur parfait",desc:"Attaque critique automatique en début de combat vs cible marquée (si vous agissez en premier)"}
       ]},
       "Rôdeur des fées": {features:[
-        {lvl:3,name:"Présence draconique",desc:"Dextérité mentale: ajouter mod CHA aux jets de Tromperie, Persuasion et Perception"},
+        {lvl:3,name:"Frappes terribles & Charme d'un autre monde",desc:"Frappes terribles : 1/tour, +1d4 dégâts psychiques sur une touche d'arme. Charme d'un autre monde : bonus égal au mod de SAG (min +1) à tous les tests de Charisme, + maîtrise d'une compétence (Tromperie, Représentation ou Persuasion)."},
         {lvl:3,name:"Sorts de fée",desc:"Sorts supplémentaires: Charme-personne, Détection de magie, Respiration aquatique, Invisibilité, etc."},
         {lvl:7,name:"Promenade dans les fées",desc:"1/repos long: emmener jusqu'à 5 créatures via un portail de fée (téléportation 1km)"},
         {lvl:11,name:"Regard mystique",desc:"Regarder une créature: connaître ses résistances/immunités et si elle ment"},
         {lvl:15,name:"Don des terres de fées",desc:"1/repos long: octroyer charme féerique permanent sur une créature (JdS SAG)"}
       ]},
       "Traqueur (Swarmkeeper)": {features:[
-        {lvl:3,name:"Essaim de natur",desc:"Essaim de fées/bêtes minuscules vous entourent: +1d6 dégâts sur une attaque/tour"},
+        {lvl:3,name:"Essaim de la nature",desc:"Un essaim de fées/bêtes minuscules vous entoure : 1/tour, +1d6 dégâts de force sur une cible touchée (ou la repousser/ralentir à la place)."},
         {lvl:3,name:"Sorts de l'essaim",desc:"Sorts supplémentaires: Repas des fées, Bourrasque de vent, Insecte géant, Nuée de vermine, etc."},
         {lvl:7,name:"Déluge de l'essaim",desc:"1/tour: essaim peut repousser ou ralentir la cible touchée au lieu de +dégâts"},
         {lvl:11,name:"Sanctuaire de l'essaim",desc:"Réaction: l'essaim absorbe une attaque (réduire dégâts de 2d8)"},
@@ -967,7 +967,7 @@ const CLASSES = {
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Hache à deux mains (ou toute arme de guerre martiale), 2 hachettes, 10 javelines, kit d'explorateur",
     features:[
-      {lvl:1,name:"Rage",desc:"2 rages/jour, bonus dégâts +2, résistance physique"},
+      {lvl:1,name:"Rage",desc:"Action bonus, sans armure lourde. Avantage aux tests et JdS de Force ; bonus aux dégâts de mêlée à la Force (+2, puis +3 au niv.9 et +4 au niv.16, appliqué automatiquement) ; résistance aux dégâts contondants, perçants et tranchants. Impossible de lancer ou maintenir un sort. Dure 1 min (prend fin si, à la fin du tour, pas d'attaque ni de dégâts subis, ou si inconscient). 2 rages/jour, récupérées au repos long."},
       {lvl:1,name:"Défense sans armure",desc:"CA = 10 + mod DEX + mod CON"},
       {lvl:2,name:"Attaque téméraire",desc:"Avantage en attaque, mais les attaques contre vous ont aussi l'avantage"},
       {lvl:2,name:"Sens du danger",desc:"Avantage aux JdS DEX contre effets visibles"},
@@ -1114,20 +1114,21 @@ const CLASSES = {
     armor:["Légères","Moyennes","Boucliers"], weapons:["Simples","Martiales"],
     equipment:"Armure d'écailles, 2 épées courtes, Pack de donjonneur, Arc long + 20 flèches",
     features:[
-      {lvl:1,name:"Ennemi juré",desc:"1 type de créature: avantage Survie pour pister, INT pour se rappeler"},
-      {lvl:1,name:"Explorateur-né",desc:"1 terrain de prédilection: avantages exploration"},
-      {lvl:2,name:"Incantation",desc:"SAG — sorts de rôdeur",choice:"style_combat_rodeur"},
-      {lvl:3,name:"Vigilance primitive",desc:"Sorts sans composantes, capacités en terrain difficile améliorées"},
+      {lvl:1,name:"Ennemi juré",desc:"Choisir un type de créature : avantage aux tests de Survie pour les pister et aux tests d'Intelligence pour se rappeler des informations à leur sujet. Apprendre une langue parlée par ces ennemis (ou de leur choix)."},
+      {lvl:1,name:"Explorateur-né",desc:"Choisir un terrain de prédilection. Dans ce terrain : le terrain difficile non magique ne ralentit pas le groupe, impossible de se perdre sauf magie, reste alerte même en tâche absorbante, déplacement furtif possible à allure normale (en solo), double de nourriture trouvée en quête, et infos précises lors du pistage."},
+      {lvl:2,name:"Style de combat",desc:"Adopter un style de combat (Archerie, Défense, Duel ou Combat à deux armes). Le bonus est appliqué automatiquement via le sélecteur de la fiche.",choice:"style_combat_rodeur"},
+      {lvl:2,name:"Incantation",desc:"Lanceur de demi-niveau (SAG). Apprend des sorts de rôdeur et les lance via des emplacements ; commence à lancer des sorts au niveau 2."},
+      {lvl:3,name:"Conscience primitive",desc:"Action + 1 emplacement de sort : détecter la présence (sans le nombre ni la position) d'aberrations, célestes, dragons, élémentaires, fées, fiélons et morts-vivants dans un rayon de 1,5 km (jusqu'à 9,5 km en terrain de prédilection), pendant 1 min par niveau d'emplacement dépensé."},
       {lvl:5,name:"Attaque supplémentaire",desc:"Deux attaques par action Attaquer"},
       {lvl:6,name:"Ennemi juré supplémentaire",desc:"+1 type d'ennemi juré"},
       {lvl:6,name:"Terrain de prédilection supplémentaire",desc:"+1 terrain de prédilection"},
-      {lvl:8,name:"Foulée terrestre",desc:"Le terrain difficile non-magique ne ralentit plus"},
-      {lvl:10,name:"Camouflage naturel",desc:"Se cacher dans un terrain de prédilection (1 min préparation)"},
-      {lvl:10,name:"Ennemi juré supplémentaire",desc:"+1 type d'ennemi juré"},
+      {lvl:8,name:"Foulée terrestre",desc:"Le terrain difficile non magique ne coûte plus de déplacement supplémentaire ; avantage aux jets de sauvegarde contre les plantes magiques qui entravent (ronces, etc.)."},
+      {lvl:10,name:"Camouflage naturel",desc:"Dans un terrain de prédilection : passer 1 min à créer un camouflage pour gagner +10 aux tests de Discrétion tant qu'on reste immobile (sans bouger ni agir)."},
       {lvl:10,name:"Terrain de prédilection supplémentaire",desc:"+1 terrain"},
-      {lvl:14,name:"Disparition",desc:"Action bonus: Se cacher"},
+      {lvl:14,name:"Disparition",desc:"Utiliser l'action bonus pour se cacher (Hide). Ne peut plus être pisté par des moyens non magiques."},
+      {lvl:14,name:"Ennemi juré supplémentaire",desc:"+1 type d'ennemi juré (3e au total)"},
       {lvl:18,name:"Sens sauvages",desc:"Pas de désavantage aux attaques contre créatures invisibles à 9m"},
-      {lvl:20,name:"Tueur d'ennemis",desc:"+mod SAG aux dégâts contre ennemis jurés, 1/tour"}
+      {lvl:20,name:"Tueur d'ennemis",desc:"1/tour : ajouter le modificateur de Sagesse au jet d'attaque OU au jet de dégâts d'une attaque contre un ennemi juré."}
     ]
   },
   "Roublard": { hd:8, saves:["dex","int"], source:"PHB", spellcaster:false,
@@ -1418,7 +1419,7 @@ const CLASS_CHARGES = {
 
 // Conditions spéciales de classe (états temporaires visibles par le MJ)
 const CLASS_CONDITIONS = [
-  {id:'rage', name:'En rage', icon:'🔥', desc:'Avantage FOR, bonus dégâts, résistance contondant/perçant/tranchant. Dure 1 min ou si pas d\'attaque/dégâts.', className:'Barbare'},
+  {id:'rage', name:'En rage', icon:'🔥', desc:'Avantage aux tests et JdS de Force ; bonus de dégâts en mêlée à la Force (+2/+3/+4 selon le niveau, appliqué automatiquement aux armes) ; résistance contondant/perçant/tranchant ; impossible de lancer/maintenir un sort. Dure 1 min ; prend fin si inconscient ou si, à la fin du tour, le barbare n\'a ni attaqué ni subi de dégâts.', className:'Barbare'},
   {id:'wild_shape', name:'Forme sauvage', icon:'🐻', desc:'Transformé en bête. PV de la bête utilisés. Retour à la forme normale si PV bête = 0.', className:'Druide'},
   {id:'divine_favor', name:'Faveur divine', icon:'⚔', desc:'Bonus de dégâts radiants aux attaques.', className:'Paladin'},
   {id:'bladesong', name:'Chant de lames', icon:'🗡', desc:'Bonus CA, vitesse, concentration. Magicien Bladesinger.', className:'Magicien'},
@@ -3547,10 +3548,30 @@ function isRangedWeapon(w){
 function magicBonus(name){ const m = String(name||'').match(/\+(\d+)/); return m ? parseInt(m[1]) : 0; }
 
 // Calcul complet de la CA : base d'armure + plafond DEX + bonus magique d'armure + bouclier (base + magie)
+// ── Style de combat (Guerrier / Paladin / Rôdeur) ──
+function fightingStyleChoiceKey(d){
+  for (const c of getClasses(d)){
+    const cd = CLASSES[c.name]; if(!cd) continue;
+    const f = (cd.features||[]).find(ft => ft.choice && /^style_combat/.test(ft.choice) && (ft.lvl||1) <= c.level);
+    if (f) return f.choice;
+  }
+  return null;
+}
+function fightingStyleOf(d){ return fightingStyleChoiceKey(d) ? ((d && d.fightingStyle) || '') : ''; }
+function fightingStyleId(s){
+  s = (s||'').toLowerCase();
+  if (s.includes('archerie')) return 'archery';
+  if (s.includes('défense') || s.includes('defense')) return 'defense';
+  if (s.includes('duel')) return 'dueling';
+  if (s.includes('deux armes')) return 'twf';
+  if (s.includes('deux mains')) return 'gwf';
+  if (s.includes('protection')) return 'protection';
+  return '';
+}
 function computeAC(d){
   const armors = (d && d.inventory_armors) || [];
   const dexMod = mod(((d&&d.stats)||{}).dex || 10);
-  let base = 10 + dexMod, armorMagic = 0, shieldTotal = 0;
+  let base = 10 + dexMod, armorMagic = 0, shieldTotal = 0, wearingArmor = false;
   armors.forEach(a => {
     if (!a || !a.equipped) return;
     const mg = magicBonus(a.name);
@@ -3558,6 +3579,7 @@ function computeAC(d){
       let sBase = parseInt(String(a.ac||'').replace(/[^0-9]/g,'')); if (isNaN(sBase) || sBase<=0) sBase = 2;
       shieldTotal += sBase + mg; return;
     }
+    wearingArmor = true;
     armorMagic += mg;
     const acStr = String(a.ac || '10').toLowerCase();
     if (acStr.includes('mod dex')) {
@@ -3569,10 +3591,19 @@ function computeAC(d){
       base = (!isNaN(p) && p>0) ? p : (10 + dexMod);
     }
   });
-  return base + armorMagic + shieldTotal;
+  const styleDef = (fightingStyleId(fightingStyleOf(d))==='defense' && wearingArmor) ? 1 : 0;
+  return base + armorMagic + shieldTotal + styleDef;
 }
 
 // Toucher & dégâts d'une arme : mod de carac + maîtrise + bonus magique (+N du nom) + bonus divers (styles/dons)
+// Bonus de dégâts de rage (Barbare) : +2 (niv.1-8), +3 (niv.9-15), +4 (niv.16+), uniquement en rage
+function rageDamageBonus(d){
+  if (!d || !(d.conditions||[]).includes('rage')) return 0;
+  const bar = getClasses(d).find(c => c.name === 'Barbare');
+  if (!bar) return 0;
+  const lvl = bar.level || 0;
+  return lvl >= 16 ? 4 : lvl >= 9 ? 3 : lvl >= 1 ? 2 : 0;
+}
 function computeWeapon(d, w){
   const stats = (d&&d.stats) || {};
   const strM = mod(stats.str||10), dexM = mod(stats.dex||10);
@@ -3583,8 +3614,16 @@ function computeWeapon(d, w){
   const prof = (w&&w.prof===false) ? 0 : profBonus(totalLevel(d));
   const magic = magicBonus(w&&w.name);
   const atkExtra = parseInt(w&&w.atkExtra)||0, dmgExtra = parseInt(w&&w.dmgExtra)||0;
-  const atkTotal = aMod + prof + magic + atkExtra;
-  const dmgBonus = aMod + magic + dmgExtra;
+  // Rage : bonus de dégâts sur les attaques de mêlée utilisant la Force
+  let usesStr; if (ranged) usesStr=false; else if (abil==='dex') usesStr=false; else if (abil==='str') usesStr=true; else usesStr = finesse ? (strM>=dexM) : true;
+  const rageB = usesStr ? rageDamageBonus(d) : 0;
+  // Style de combat : Archerie (+2 att. à distance), Duel (+2 dégâts arme à 1 main)
+  const fsId = fightingStyleId(fightingStyleOf(d));
+  const twoH = /deux mains|two.?hand/.test(((w&&w.properties)||'').toLowerCase());
+  const styleAtk = (fsId==='archery' && ranged) ? 2 : 0;
+  const styleDmg = (fsId==='dueling' && !ranged && !twoH) ? 2 : 0;
+  const atkTotal = aMod + prof + magic + atkExtra + styleAtk;
+  const dmgBonus = aMod + magic + dmgExtra + rageB + styleDmg;
   const raw = (w&&(w.damage || w.dmg)) || '';
   const dieM = String(raw).match(/\d+\s*d\s*\d+/i);
   const die = dieM ? dieM[0].replace(/\s+/g,'') : '';
@@ -3593,7 +3632,7 @@ function computeWeapon(d, w){
   const atkStr = (atkTotal>=0?'+':'') + atkTotal;
   let dmgStr = die + (dmgBonus!==0 ? ((dmgBonus>=0?'+':'')+dmgBonus) : '');
   dmgStr = (dmgStr + (dtype?(' '+dtype):'')).trim();
-  return { atk: atkStr, dmg: dmgStr || '—' };
+  return { atk: atkStr, dmg: dmgStr || '—', rage: rageB, style: styleAtk?'archery':(styleDmg?'dueling':'') };
 }
 
 // Catégorise un objet du sac selon son nom (compartiments)
@@ -4027,14 +4066,15 @@ function renderCharSheet(id, d) {
       <!-- Armes & Attaques -->
       <div class="sheet-section">
         <div class="section-title">Armes & Attaques <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','weapon')">✚ Arme</button></div>
+        ${(()=>{ const ck=fightingStyleChoiceKey(d); if(!ck) return ''; const opts=(LEVEL_CHOICES[ck]||{}).options||[]; const cur=d.fightingStyle||''; return `<div class="fstyle-row"><span class="fstyle-lbl">⚔ Style de combat</span><select class="fstyle-select" onchange="window._setFightingStyle('${id}', this.value)"><option value="">— Aucun —</option>${opts.map(o=>`<option value="${o.replace(/"/g,'&quot;')}" ${cur===o?'selected':''}>${o}</option>`).join('')}</select></div>`; })()}
         <table class="weapon-table">
           <thead><tr><th>Arme</th><th>Bonus attaque</th><th>Dégâts / Type</th><th></th></tr></thead>
           <tbody>
             ${(d.inventory_weapons||[]).map((w,i)=>{ const cw = computeWeapon(d,w); return `
             <tr class="weapon-row-click" onclick="window._showSheetWeaponDetail('${id}',${i})">
               <td>${w.name||'—'}</td>
-              <td>${cw.atk}</td>
-              <td>${cw.dmg}</td>
+              <td>${cw.atk}${cw.style==='archery'?` <span title="Archerie +2" style="color:#5a9bd4;cursor:help">🎯</span>`:''}</td>
+              <td>${cw.dmg}${cw.rage?` <span title="Bonus de rage +${cw.rage}" style="color:#e8702a;cursor:help">🔥</span>`:''}${cw.style==='dueling'?` <span title="Duel +2" style="color:#c98a3a;cursor:help">⚔</span>`:''}</td>
               <td style="white-space:nowrap"><button class="inv-equip-btn ${w.equipped?'equipped':''}" title="${w.equipped?'Équipée (en main)':'Équiper (en main)'}" onclick="event.stopPropagation();window._toggleEquipWeapon('${id}',${i})">${w.equipped?'✓':'＋'}</button> <button class="inv-remove-btn" onclick="event.stopPropagation();window._removeInventoryItem('${id}','inventory_weapons',${i})">✕</button></td>
             </tr>`;}).join('')}
             ${!(d.inventory_weapons||[]).length ? '<tr><td colspan="4" style="color:#aaa;text-align:center;font-style:italic">Aucune arme — appuyez sur ✚ Ajouter une arme ci-dessous</td></tr>' : ''}
@@ -10263,6 +10303,9 @@ window._adjustHp = async (charId, delta, event) => {
 // CONDITIONS / ÉTATS
 // ============================================================
 
+window._setFightingStyle = async (charId, val) => {
+  await updateDoc(doc(db, "characters", charId), { fightingStyle: val || null });
+};
 window._toggleCondition = async (charId, conditionId) => {
   // Exhaustion is special: cycle 0-6
   if (conditionId === 'exhaustion') {
@@ -11715,6 +11758,9 @@ em.ok { color:#7fc06a; font-style:normal; }
 .sheet-add-cta:hover { background:linear-gradient(135deg, var(--gold), #8a6508); color:#fff; box-shadow:0 4px 16px rgba(184,134,11,0.4); transform:translateY(-1px); }
 .sheet-add-cta:active { transform:translateY(0); }
 .sheet-add-cta .cta-plus { font-size:1.05rem; line-height:1; font-weight:bold; }
+.fstyle-row { display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(184,134,11,0.06); border-bottom:1px solid var(--line); }
+.fstyle-lbl { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:1px; color:var(--gold); white-space:nowrap; }
+.fstyle-select { flex:1; min-width:0; padding:4px 6px; font-size:0.78rem; border:1px solid var(--line-gold); border-radius:5px; background:var(--surface-hi); color:var(--ink); cursor:pointer; }
 .inv-list { display:flex; flex-direction:column; gap:3px; }
 .inv-item { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:var(--surface-hi);
   border-left:3px solid var(--gold); border-radius:2px; font-size:0.82rem; }
