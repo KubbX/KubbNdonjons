@@ -11361,6 +11361,38 @@ em.ok { color:#7fc06a; font-style:normal; }
 .wiz-chip.big small { font-size:0.68rem; color:#cdb88c; }
 .wiz-chip:hover:not(:disabled) { border-color:rgba(255,210,120,0.6); }
 .wiz-chip.sel { background:rgba(184,134,11,0.4); border-color:var(--gold); color:#fff; box-shadow:0 0 10px rgba(200,150,40,0.3); }
+/* ── Console d'ambiances Syrinscape (glassmorph) ── */
+.amb-skin { display:flex; flex-direction:column; gap:14px; }
+.amb-label { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:1.5px; color:var(--gold); margin-bottom:8px; text-transform:uppercase; }
+.amb-hint { font-family:'Crimson Pro'; font-size:0.72rem; letter-spacing:0; color:#9a8e72; font-style:italic; text-transform:none; }
+.amb-daynight { display:flex; gap:8px; }
+.amb-dn { flex:1; padding:9px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); color:#e3d8c2; font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; cursor:pointer; transition:all .15s; }
+.amb-dn:hover { border-color:rgba(255,210,120,0.55); }
+.amb-dn.sel { background:rgba(184,134,11,0.4); border-color:var(--gold); color:#fff; box-shadow:0 0 10px rgba(200,150,40,0.3); }
+.amb-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(82px,1fr)); gap:8px; }
+.amb-tile { display:flex; flex-direction:column; align-items:center; gap:5px; padding:11px 6px; border-radius:12px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); color:#e3d8c2; cursor:pointer; transition:all .15s; }
+.amb-tile:hover { transform:translateY(-2px); border-color:rgba(255,210,120,0.5); }
+.amb-tile.sel { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 6px 18px rgba(200,150,40,0.3); background:rgba(184,134,11,0.22); }
+.amb-tile-emoji { font-size:1.5rem; line-height:1; }
+.amb-tile-name { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:0.4px; text-align:center; line-height:1.15; }
+.amb-moods { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:8px; }
+.amb-mood { display:flex; align-items:center; justify-content:center; gap:6px; padding:11px 8px; border-radius:12px; border:1px solid rgba(255,255,255,0.18); background:rgba(0,0,0,0.28); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); color:#e8dcc0; font-family:'Cinzel'; font-size:0.7rem; letter-spacing:0.5px; cursor:pointer; transition:all .15s; }
+.amb-mood-emoji { font-size:1.15rem; }
+.amb-mood:hover { transform:translateY(-2px); border-color:rgba(255,210,120,0.6); }
+.amb-mood.sel { background:rgba(184,134,11,0.42); border-color:var(--gold); color:#fff; box-shadow:0 0 12px rgba(200,150,40,0.4); }
+.amb-overlays { display:flex; flex-wrap:wrap; gap:8px; }
+.amb-ov { display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:18px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#dcd0b8; font-family:'Crimson Pro'; font-size:0.85rem; cursor:pointer; transition:all .15s; }
+.amb-ov:hover { border-color:rgba(255,210,120,0.6); }
+.amb-ov.on { background:rgba(90,150,90,0.35); border-color:#7ec87e; color:#eafbe6; box-shadow:0 0 10px rgba(120,200,120,0.3); }
+.amb-empty { opacity:0.4; }
+.amb-controls { display:flex; align-items:center; gap:12px; }
+.amb-stop { flex:1; padding:10px; border-radius:10px; border:1px solid rgba(224,112,112,0.5); background:rgba(120,40,40,0.3); color:#f0c8c8; font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; cursor:pointer; transition:all .15s; }
+.amb-stop:hover { background:rgba(160,50,50,0.45); }
+.amb-vol { display:flex; align-items:center; gap:8px; font-size:1rem; color:var(--gold); }
+.amb-vol input { accent-color:var(--gold); width:90px; }
+.amb-sfx-wrap { border-top:1px solid rgba(212,180,120,0.2); padding-top:10px; }
+.amb-sfx-wrap summary { font-family:'Cinzel'; font-size:0.65rem; letter-spacing:1px; color:var(--gold); cursor:pointer; }
+.amb-sfx-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .wiz-chip.dis, .wiz-chip:disabled { opacity:0.42; cursor:not-allowed; text-decoration:line-through; }
 .wiz-chip.dis small { text-decoration:none; }
 
@@ -12122,51 +12154,44 @@ nav { transition: transform .28s ease; will-change: transform; }
 
         <!-- Interface principale (masquée jusqu'à activation) -->
         <div id="syrinInterface" style="display:none">
+        <div class="amb-skin">
 
-          <!-- Thème + Ambiance + Volume -->
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-            <div style="flex:1;min-width:140px">
-              <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:5px">THÈME</label>
-              <select id="soundTheme" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:var(--bg);color:#e8dcc0">
-                <option value="taverne">🍺 Taverne</option>
-                <option value="ville">🏰 Ville</option>
-                <option value="foret">🌲 Forêt</option>
-                <option value="desert">🏜️ Désert</option>
-                <option value="donjon">⛏️ Donjon</option>
-                <option value="mer">⚓ Mer / Port</option>
-                <option value="temple">⛩️ Temple</option>
-                <option value="caverne">🕳️ Caverne</option>
-              </select>
-            </div>
-            <div style="flex:1;min-width:140px">
-              <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:5px">AMBIANCE</label>
-              <select id="soundMood" onchange="window._soundApply()" style="width:100%;font-family:'Crimson Pro';font-size:0.9rem;padding:6px 8px;border:1px solid rgba(212,180,120,0.4);border-radius:3px;background:var(--bg);color:#e8dcc0">
-                <option value="normal">😐 Normale</option>
-                <option value="joyeux">😄 Joyeuse</option>
-                <option value="sombre">🌑 Sombre</option>
-                <option value="mysterieux">🔮 Mystérieuse</option>
-              </select>
-            </div>
-            <div style="display:flex;flex-direction:column;justify-content:flex-end">
-              <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:flex;align-items:center;gap:6px">
-                VOL
-                <input type="range" id="soundVolume" min="0" max="1.5" step="0.05" value="0.8"
-                  oninput="window._soundSetVolume()" style="width:80px;accent-color:var(--gold)">
-              </label>
-            </div>
+          <!-- Moment de la journée -->
+          <div class="amb-daynight">
+            <button class="amb-dn" data-dn="jour" onclick="window._ambSetDayNight('jour')">☀️ Jour</button>
+            <button class="amb-dn" data-dn="nuit" onclick="window._ambSetDayNight('nuit')">🌙 Nuit</button>
           </div>
 
-          <!-- Boutons principaux -->
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-            <button id="btnSoundPlay"   onclick="window._soundPlay()"          class="btn-gold"       style="flex:1;min-width:100px">▶ Jouer</button>
-            <button id="btnSoundStop"   onclick="window._soundStop()"          class="btn-gm-action"  style="flex:1;min-width:100px">⏹ Arrêter</button>
-            <button id="btnSoundCombat" onclick="window._soundCombatToggle()"  class="btn-gm-action dmg" style="flex:1;min-width:100px">⚔ Combat</button>
-          </div>
-
-          <!-- Effets sonores ponctuels -->
+          <!-- Localités -->
           <div>
-            <label style="font-family:'Cinzel';font-size:0.65rem;color:var(--gold);letter-spacing:1px;display:block;margin-bottom:7px">EFFETS SONORES</label>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div class="amb-label">Localité</div>
+            <div class="amb-grid" id="ambLocalities"></div>
+          </div>
+
+          <!-- Ambiances -->
+          <div>
+            <div class="amb-label">Ambiance <span class="amb-hint">— touchez pour lancer</span></div>
+            <div class="amb-moods" id="ambMoods"></div>
+          </div>
+
+          <!-- Surcouches sonores -->
+          <div>
+            <div class="amb-label">Surcouches <span class="amb-hint">— se superposent à l'ambiance</span></div>
+            <div class="amb-overlays" id="ambOverlays"></div>
+          </div>
+
+          <!-- Contrôles -->
+          <div class="amb-controls">
+            <button class="amb-stop" onclick="window._ambStop()">⏹ Tout arrêter</button>
+            <label class="amb-vol" title="Volume global">🔊
+              <input type="range" id="soundVolume" min="0" max="1.5" step="0.05" value="0.8" oninput="window._soundSetVolume()">
+            </label>
+          </div>
+
+          <!-- Effets ponctuels -->
+          <details class="amb-sfx-wrap">
+            <summary>💥 Effets ponctuels</summary>
+            <div class="amb-sfx-row">
               <button onclick="window._soundSfx('sword')"   class="btn-gm-action" title="Coup d'épée"      style="font-size:1.1rem;padding:6px 10px">⚔️</button>
               <button onclick="window._soundSfx('arrow')"   class="btn-gm-action" title="Flèche"           style="font-size:1.1rem;padding:6px 10px">🏹</button>
               <button onclick="window._soundSfx('spell')"   class="btn-gm-action" title="Sort magique"     style="font-size:1.1rem;padding:6px 10px">✨</button>
@@ -12176,9 +12201,10 @@ nav { transition: transform .28s ease; will-change: transform; }
               <button onclick="window._soundSfx('coin')"    class="btn-gm-action" title="Pièces"           style="font-size:1.1rem;padding:6px 10px">💰</button>
               <button onclick="window._soundSfx('scream')"  class="btn-gm-action" title="Cri"              style="font-size:1.1rem;padding:6px 10px">😱</button>
             </div>
-          </div>
+          </details>
 
-        </div><!-- /syrinInterface -->
+        </div>
+      </div><!-- /syrinInterface -->
       </div>
     </div>
 
@@ -12322,6 +12348,126 @@ nav { transition: transform .28s ease; will-change: transform; }
         }).catch(() => {});
       }
 
+      // ══════════════════════════════════════════════
+      // AMBIANCES PRÉDÉFINIES — console glassmorph
+      // ══════════════════════════════════════════════
+      // Modèle éditable : localité -> ambiance -> Mood IDs Syrinscape.
+      // Une ambiance = [id, id2] (même piste jour/nuit) OU
+      //   {jour:[...], nuit:[...]} (pistes distinctes). [] = à compléter.
+      const MOODS = [
+        {id:'joyeuse',  label:'Joyeuse',  emoji:'😄'},
+        {id:'festive',  label:'Festive',  emoji:'🎉'},
+        {id:'calme',    label:'Calme',    emoji:'🕊️'},
+        {id:'tendue',   label:'Tendue',   emoji:'😨'},
+        {id:'intrigue', label:'Intrigue', emoji:'🕵️'},
+        {id:'combat',   label:'Combat',   emoji:'⚔️'},
+      ];
+      const AMBIANCES = {
+        taverne:   { label:'Taverne',    emoji:'🍺', moods:{ joyeuse:[69], festive:[252833], calme:{jour:[70],nuit:[71]}, tendue:[], intrigue:[71], combat:[696964] } },
+        ville:     { label:'Ville',      emoji:'🏰', moods:{ joyeuse:[15112], festive:[15112], calme:[15112], tendue:[], intrigue:[15112], combat:[696964] } },
+        foret:     { label:'Forêt',      emoji:'🌲', moods:{ joyeuse:[565152], festive:[565152], calme:[565152], tendue:[565152], intrigue:[565152], combat:[696964] } },
+        montagne:  { label:'Montagne',   emoji:'⛰️', moods:{ joyeuse:[], festive:[], calme:[], tendue:[], intrigue:[], combat:[696964] } },
+        desert:    { label:'Désert',     emoji:'🏜️', moods:{ joyeuse:[831], festive:[831], calme:[831], tendue:[831], intrigue:[831], combat:[696964] } },
+        donjon:    { label:'Donjon',     emoji:'🗝️', moods:{ joyeuse:[748294], festive:[748294], calme:[748294], tendue:[748294], intrigue:[748294], combat:[696964] } },
+        caverne:   { label:'Caverne',    emoji:'🕳️', moods:{ joyeuse:[779267], festive:[779267], calme:[779267], tendue:[779267], intrigue:[779267], combat:[696964] } },
+        mer:       { label:'Mer / Port', emoji:'⚓', moods:{ joyeuse:[15112], festive:[15112], calme:[15112], tendue:[15112], intrigue:[15112], combat:[696964] } },
+        temple:    { label:'Temple',     emoji:'⛩️', moods:{ joyeuse:[1270], festive:[1270], calme:[1270], tendue:[1270], intrigue:[1270], combat:[696964] } },
+        campement: { label:'Campement',  emoji:'🏕️', moods:{ joyeuse:[], festive:[], calme:[], tendue:[], intrigue:[], combat:[696964] } },
+      };
+      // Surcouches sonores (éléments superposés) — complète les Element IDs.
+      const OVERLAYS = [
+        {id:'feu',      label:'Feu de camp', emoji:'🔥',  element:[]},
+        {id:'murmures', label:'Murmures',    emoji:'💬',  element:[]},
+        {id:'vent',     label:'Vent',        emoji:'🌬️', element:[]},
+        {id:'eau',      label:'Eau',         emoji:'💧',  element:[]},
+        {id:'pluie',    label:'Pluie',       emoji:'🌧️', element:[]},
+        {id:'foule',    label:'Foule',       emoji:'👥',  element:[]},
+        {id:'cloches',  label:'Cloches',     emoji:'🔔',  element:[]},
+        {id:'hibou',    label:'Hibou',       emoji:'🦉',  element:[]},
+      ];
+
+      // ── État de la console d'ambiances ──
+      let ambLocality = 'taverne', ambMood = 'calme', ambDayNight = 'jour', ambPlaying = false, ambPending = null;
+      const ambActiveOverlays = new Set();
+
+      function resolveMoodIds(moodVal, dn){
+        if (!moodVal) return [];
+        if (Array.isArray(moodVal)) return moodVal;
+        return moodVal[dn] || moodVal.jour || moodVal.nuit || [];
+      }
+      function stopElement(elementId){
+        return syrinCall(`https://syrinscape.com/online/frontend-api/elements/${elementId}/stop/`);
+      }
+      function ambMoodLabel(id){ return (MOODS.find(m=>m.id===id)||{}).label || id; }
+
+      // ── Rendu des grilles ──
+      function renderAmbDayNight(){
+        document.querySelectorAll('.amb-dn').forEach(b => b.classList.toggle('sel', b.dataset.dn === ambDayNight));
+      }
+      function renderAmbLocalities(){
+        const box = document.getElementById('ambLocalities'); if (!box) return;
+        box.innerHTML = Object.entries(AMBIANCES).map(([id,a]) =>
+          `<button class="amb-tile ${id===ambLocality?'sel':''}" onclick="window._ambSelectLocality('${id}')"><span class="amb-tile-emoji">${a.emoji}</span><span class="amb-tile-name">${a.label}</span></button>`).join('');
+      }
+      function renderAmbMoods(){
+        const box = document.getElementById('ambMoods'); if (!box) return;
+        const amb = AMBIANCES[ambLocality];
+        box.innerHTML = MOODS.map(m => {
+          const ids = amb ? resolveMoodIds(amb.moods[m.id], ambDayNight) : [];
+          const empty = !ids.length;
+          return `<button class="amb-mood ${m.id===ambMood?'sel':''} ${empty?'amb-empty':''}" onclick="window._ambSelectMood('${m.id}')" ${empty?'title="Aucune piste définie — à compléter"':''}><span class="amb-mood-emoji">${m.emoji}</span><span>${m.label}</span></button>`;
+        }).join('');
+      }
+      function renderAmbOverlays(){
+        const box = document.getElementById('ambOverlays'); if (!box) return;
+        box.innerHTML = OVERLAYS.map(o => {
+          const empty = !o.element.length;
+          const on = ambActiveOverlays.has(o.id);
+          return `<button class="amb-ov ${on?'on':''} ${empty?'amb-empty':''}" onclick="window._ambToggleOverlay('${o.id}')" ${empty?'title="Élément non défini — à compléter"':''}><span>${o.emoji}</span><span class="amb-ov-name">${o.label}</span></button>`;
+        }).join('');
+      }
+      function renderAmbConsole(){ renderAmbDayNight(); renderAmbLocalities(); renderAmbMoods(); renderAmbOverlays(); }
+
+      // ── Lecture ──
+      function doAmbPlay(){
+        const amb = AMBIANCES[ambLocality]; if (!amb) return;
+        const ids = resolveMoodIds(amb.moods[ambMood], ambDayNight);
+        if (!ids.length){ setStatus(`⚠ ${amb.label} · ${ambMoodLabel(ambMood)} : aucune piste définie`, '#e09050'); ambPlaying = false; return; }
+        playMood(pickRandom(ids));
+        ambPlaying = true;
+        setStatus(`▶ ${amb.emoji} ${amb.label} · ${ambMoodLabel(ambMood)} · ${ambDayNight==='nuit'?'🌙 Nuit':'☀️ Jour'}`, '#7ec87e');
+        if (ambActiveOverlays.size){
+          setTimeout(() => ambActiveOverlays.forEach(id => {
+            const ov = OVERLAYS.find(o => o.id === id);
+            if (ov && ov.element.length) playElement(pickRandom(ov.element));
+          }), 600);
+        }
+      }
+      function ensureReadyThen(fn){
+        if (playerReady){ fn(); return; }
+        ambPending = fn;
+        setStatus('⏳ Activation du son…', '#aaa');
+        window._syrinActivate();
+      }
+      window._ambOnReady = function(){ if (ambPending){ const fn = ambPending; ambPending = null; setTimeout(fn, 250); } };
+
+      window._ambSetDayNight = function(v){ ambDayNight = v; renderAmbDayNight(); renderAmbMoods(); if (ambPlaying) doAmbPlay(); };
+      window._ambSelectLocality = function(loc){ ambLocality = loc; renderAmbLocalities(); renderAmbMoods(); if (ambPlaying) doAmbPlay(); };
+      window._ambSelectMood = function(mood){ ambMood = mood; renderAmbMoods(); ensureReadyThen(doAmbPlay); };
+      window._ambStop = function(){ ambPlaying = false; ambActiveOverlays.clear(); stopAll(); renderAmbOverlays(); setStatus('Inactif'); };
+      window._ambToggleOverlay = function(id){
+        const ov = OVERLAYS.find(o => o.id === id); if (!ov) return;
+        if (!ov.element.length){ setStatus(`⚠ « ${ov.label} » : élément non défini`, '#e09050'); return; }
+        ensureReadyThen(() => {
+          if (ambActiveOverlays.has(id)){ ambActiveOverlays.delete(id); ov.element.forEach(stopElement); }
+          else { ambActiveOverlays.add(id); playElement(pickRandom(ov.element)); }
+          renderAmbOverlays();
+        });
+      };
+
+      // Rendu initial des grilles (le DOM de la console est déjà présent)
+      renderAmbConsole();
+
       // ── Chargement dynamique + init Syrinscape ───
       function loadScript(src) {
         return new Promise((resolve, reject) => {
@@ -12345,6 +12491,7 @@ nav { transition: transform .28s ease; will-change: transform; }
             document.getElementById('syrinInterface').style.display = 'block';
             setStatus('✅ Prêt', '#7ec87e');
             if (window._scReveal) window._scReveal(true);
+            if (window._ambOnReady) window._ambOnReady();
           },
           onInactive() {
             playerReady = false;
