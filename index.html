@@ -1284,6 +1284,81 @@ function spellSlug(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/
 const SPELL_CARD_SET = new Set(['agrandissement-rapetissement','alarme','allie-planaire','amis','amitie-avec-les-animaux','animation-d-objets','animation-des-morts','antidetection','apaisement-des-emotions','apparence-trompeuse','appel-de-destrier','appel-de-familier','appel-de-la-foudre','arme-elementaire','arme-magique','arme-spirituelle','armure-d-agathys','armure-de-mage','arret-du-temps','aspersion-d-acide','assistance','augure','aura-de-purete','aura-de-vie','aura-de-vitalite','aura-du-croise','aura-magique-de-nystul','aura-sacree','aversion-attirance','bagou','baies-nourricieres','bannissement','barriere-de-lames','benediction','blessure','bosquet-des-druides','bouche-magique','bouclier','bouclier-de-feu','bouclier-de-la-foi','bouffee-de-poison','boule-de-feu','boule-de-feu-a-retardement','bourrasque','brume-mortelle','cage-de-force','cecite-surdite','cercle-de-mort','cercle-de-pouvoir','cercle-de-teleportation','cercle-magique','chaine-d-eclairs','champ-antimagie','changement-de-forme','changement-de-plan','charme-monstre','charme-personne','chatiment-calcinant','chatiment-courrouce','chatiment-debilitant','chatiment-du-ban','chatiment-revelateur','chien-de-garde-de-mordenkainen','clairvoyance','clignotement','clone','coffre-secret-de-leomund','colonne-de-flamme','communication-a-distance','communication-avec-les-animaux','communication-avec-les-morts','communication-avec-les-plantes','communion','communion-avec-la-nature','comprehension-des-langues','compulsion','cone-de-froid','confusion','contact-avec-un-autre-plan','contact-glacial','contagion','contamination','contresort','controle-de-l-eau','controle-du-climat','convocation-d-aberration','convocation-d-artificiel','convocation-d-elementaire','convocation-de-bete','convocation-de-celeste','convocation-de-fee','convocation-de-fielon','convocation-de-mort-vivant','coquille-antivie','corde-enchantee','cordon-de-fleches','couleurs-dansantes','coup-au-but','coup-de-tonnerre','couronne-d-etoiles','couronne-du-dement','couteau-de-glace','creation','creation-de-mort-vivant','creation-de-nourriture-et-d-eau','creation-ou-destruction-d-eau','croissance-d-epines','croissance-vegetale','danse-irresistible-d-otto','deblocage','decharge-occulte','dedale','deguisement','delivrance-des-maledictions','demi-plan','desintegration','detection-de-la-magie','detection-des-pensees','detection-du-mal-et-du-bien','discours-captivant','disque-flottant-de-tenser','dissimulation','dissipation-de-la-magie','dissipation-du-mal-et-du-bien','divination','doigt-de-mort','domination-de-bete','domination-de-monstre','domination-de-personne','don-des-langues','double-illusoire','druidisme','duel-force','eclair','eclat-du-soleil','emprisonnement','enchevetrement','ennemi-subconscient','epee-de-mordenkainen','epine-mentale','esprit-impenetrable','esprits-gardiens','eveil','fabrication','faconnage-de-la-pierre','faveur-divine','festin-des-heros','feuille-morte','flamme-eternelle','flamme-sacree','flammes','fleau-d-insectes','fleche-acide-de-melf','fleche-de-foudre','fletrissement','flou','force-fantasmagorique','forme-etheree','forme-gazeuse','fou-rire-de-tasha','fouet-epineux','foulee-brumeuse','fracassement','frappe-du-vent-d-acier','frappe-piegeuse','frayeur','fusion-dans-la-pierre','gardien-de-la-foi','glas','globe-d-invulnerabilite','glyphe-de-protection','gourdin-magique','graisse','grande-foulee','grele-d-epines','guerison','guerison-de-groupe','heroisme','identification','illusion-mineure','illusion-programmee','image-majeure','image-miroir','image-silencieuse','immobilisation-de-monstre','immobilisation-de-personne','injonction','insecte-geant','interdiction','inversion-de-la-gravite','invisibilite','invisibilite-superieure','invocation-d-animaux','invocation-d-elementaire','invocation-d-etres-sylvestres','invocation-de-celeste','invocation-de-fee','invocation-de-projectiles','invocation-de-volee','lame-de-feu','lenteur','levitation','liane-avide','liberte-de-mouvement','lien-de-protection','lien-telepathique-de-rary','localisation-d-objet','localisation-de-creature','lueur-d-espoir','lueurs-feeriques','lumiere','lumiere-du-jour','lumieres-dansantes','main-de-bigby','main-de-mage','mains-brulantes','malediction','malefice','marche-sur-l-eau','marque-du-chasseur','mauvais-oeil','messager-animal','metal-brulant','metamorphose','metamorphose-supreme','mirage','modification-d-apparence','modification-de-memoire','monture-fantome','moquerie-cruelle','mot-de-guerison','mot-de-guerison-de-groupe','mot-de-pouvoir-etourdissant','mot-de-pouvoir-guerisseur','mot-de-pouvoir-mortel','mot-de-radiance','mot-de-retour','motif-hypnotique','mur-d-epines','mur-de-feu','mur-de-force','mur-de-glace','mur-de-pierre','mur-de-vent','mur-prismatique','murmures-dissonants','mythes-et-legendes','nappe-de-brouillard','nuage-incendiaire','nuage-nauseabond','nuee-de-dagues','nuee-de-meteores','oeil-magique','orbe-chromatique','ossements-de-la-terre','parole-divine','passage-par-les-arbres','passage-sans-trace','passe-muraille','pattes-d-araignee','peau-d-ecorce','peau-de-pierre','perturbations-synaptiques','petite-hutte-de-leomund','petrification','piqure-mentale','poigne-electrique','portail','portail-magique','porte-dimensionnelle','premonition','prestidigitation','priere-de-guerison','projectile-magique','projection-astrale','protection-contre-la-mort','protection-contre-le-poison','protection-contre-une-energie','protections-et-sceaux','quete','rappel-a-la-vie','rayon-affaiblissant','rayon-ardent','rayon-de-givre','rayon-de-lune','rayon-de-soleil','rayon-empoisonne','rayons-prismatiques','regeneration','reincarnation','reparation','repli-expeditif','represailles-infernales','resistance','respiration-aquatique','restauration-partielle','resurrection','resurrection-supreme','retour-a-la-vie','sanctification','sanctuaire','scrutation','serviteur-invisible','silence','simulacre','simulacre-de-vie','soins','soins-de-groupe','sommeil','songe','souffle-du-dragon','souhait','sphere-de-feu','sphere-de-vitriol','sphere-glaciale-d-otiluke','sphere-resiliente-d-otiluke','stabilisation','suggestion','suggestion-de-groupe','symbole','telekinesie','telepathie','teleportation','tempete-de-feu','tempete-de-grele','tempete-de-neige','tempete-vengeresse','tenebres','tentacules-de-hadar','tentacules-noirs-d-evard','terrain-hallucinatoire','texte-illusoire','thaumaturgie','toile-d-araignee','toucher-du-vampire','trait-de-feu','trait-ensorcele','tremblement-de-terre','tsunami','vague-destructrice','vague-tonnante','verrou-magique','vision-dans-le-noir','vision-supreme','voie-vegetale','voracite-de-hadar','zone-de-verite']);
 window._spellCardFace = (name) => { const s = spellSlug(name); return SPELL_CARD_SET.has(s) ? SPELL_ASSET_BASE + s + '.jpg' : ''; };
 window._spellCardText = (name) => { const s = spellSlug(name); return SPELL_CARD_SET.has(s) ? SPELL_ASSET_BASE + s + '_txt.jpg' : ''; };
+// ── Préparation de sorts : capacité par classe ──
+const PREPARED_CASTERS = { 'Clerc':'full','Druide':'full','Magicien':'full','Paladin':'half','Artificier':'half' };
+function preparedSpellsInfo(d){
+  const stats = d.stats||{}; const lines=[]; let cap=0; let prepares=false;
+  getClasses(d).forEach(c=>{
+    const kind = PREPARED_CASTERS[c.name]; if(!kind) return;
+    prepares=true;
+    const ab = (CLASSES[c.name]||{}).spellAbility||'int';
+    const lvlPart = kind==='full' ? c.level : Math.floor(c.level/2);
+    const n = Math.max(1, mod(stats[ab]||10) + lvlPart);
+    cap += n; lines.push({cls:c.name, ability:ab, n});
+  });
+  return { cap, prepares, lines };
+}
+
+// ── Le Grimoire : interface de préparation des sorts ──
+window._grim = null;
+window._openGrimoire = async (charId) => {
+  const snap = await getDoc(doc(db, "characters", charId)); if(!snap.exists()) return;
+  const d = snap.data();
+  const info = preparedSpellsInfo(d);
+  const known = (d.known_spells||[]).filter(s => (s.level||0) > 0);
+  const prep = new Set((Array.isArray(d.prepared_spells)?d.prepared_spells:[]).filter(n => known.some(s=>s.name===n)));
+  window._grim = { charId, name:d.name||'', prepared:prep, cap:info.cap, prepares:info.prepares, lines:info.lines, known };
+  _grimRender();
+  document.getElementById('grimoireOverlay').style.display = 'flex';
+};
+function _grimRender(){
+  const g = window._grim; if(!g) return;
+  const book = document.getElementById('grimBook');
+  const sorted = [...g.known].sort((a,b)=>((a.level||0)-(b.level||0))||(a.name||'').localeCompare(b.name||''));
+  let curLvl=null, body='';
+  sorted.forEach(s=>{
+    if(s.level!==curLvl){ curLvl=s.level; body += `<div class="grim-level">Niveau ${s.level}</div>`; }
+    const idx = g.known.indexOf(s); const on = g.prepared.has(s.name);
+    body += `<button class="grim-spell ${on?'on':''}" onclick="window._grimToggle(${idx})">`
+      + `<span class="grim-sigil">${on?'✦':''}</span>`
+      + `<span class="grim-sname">${s.name}</span>`
+      + `<span class="grim-sschool">${s.school||''}</span></button>`;
+  });
+  if(!body) body = '<div class="grim-empty">Aucun sort de niveau 1 ou plus dans votre répertoire. Ajoutez-en depuis l’onglet Sorts (✚), puis revenez les préparer ici.</div>';
+  const count = g.prepared.size; const over = g.prepares && count > g.cap;
+  const counter = g.prepares
+    ? `<div class="grim-counter ${over?'over':''}"><strong>${count}</strong> / ${g.cap} sorts préparés${over?' — au-delà de votre limite !':''}</div>`
+      + `<div class="grim-formula">${g.lines.map(l=>`${l.cls} : mod. ${l.ability.toUpperCase()} + niveau = ${l.n}`).join('  ·  ')}</div>`
+    : `<div class="grim-counter">Votre classe ne prépare pas ses sorts : tous vos sorts connus restent toujours prêts. Vous pouvez marquer ici ceux que vous gardez en tête.</div>`;
+  book.innerHTML = `
+    <div class="grim-edge"></div>
+    <div class="grim-inner">
+      <div class="grim-head"><div class="grim-orn">❧</div><h2 class="grim-title">Grimoire</h2><div class="grim-sub">${g.name}</div></div>
+      ${counter}
+      <div class="grim-list">${body}</div>
+      <div class="grim-foot">
+        <button class="grim-btn grim-save ${over?'disabled':''}" ${over?'disabled':''} onclick="window._grimSave()">Sceller le grimoire</button>
+        <button class="grim-btn grim-cancel" onclick="window._closeGrimoire()">Fermer</button>
+      </div>
+    </div>`;
+}
+window._grimToggle = (idx) => {
+  const g = window._grim; if(!g) return;
+  const name = (g.known[idx]||{}).name; if(!name) return;
+  if (g.prepared.has(name)) g.prepared.delete(name);
+  else { if (g.prepares && g.prepared.size >= g.cap) { _grimFlash(); return; } g.prepared.add(name); }
+  _grimRender();
+};
+function _grimFlash(){ const c = document.querySelector('#grimBook .grim-counter'); if(c){ c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); } }
+window._grimSave = async () => {
+  const g = window._grim; if(!g) return;
+  if (g.prepares && g.prepared.size > g.cap) { _grimFlash(); return; }
+  try { await updateDoc(doc(db,"characters",g.charId), { prepared_spells: [...g.prepared] }); }
+  catch(e){ alert('Échec de l’enregistrement : '+(e.message||e)); return; }
+  _closeGrimoire();
+};
+window._closeGrimoire = () => { const o=document.getElementById('grimoireOverlay'); if(o) o.style.display='none'; window._grim=null; };
+
 function getSpellSlots(d) {
   const classes = getClasses(d);
   const subclasses = d.subclasses || {};
@@ -4173,6 +4248,10 @@ function renderCharSheet(id, d) {
         const spellAbility = d.spellAbility||'';
         const knownSpells = d.known_spells || [];
         const usedSlots = d.usedSpellSlots || {};
+        const _prepSet0 = new Set(Array.isArray(d.prepared_spells)?d.prepared_spells:[]);
+        const _prepInfo0 = preparedSpellsInfo(d);
+        const _dim0 = _prepInfo0.prepares && _prepSet0.size>0;
+        const _isPrep0 = sp => (sp.level||0)===0 || !_dim0 || _prepSet0.has(sp.name);
         // Group spells by level
         const spellsByLvl = {};
         knownSpells.forEach(sp => { if(!spellsByLvl[sp.level]) spellsByLvl[sp.level]=[]; spellsByLvl[sp.level].push(sp); });
@@ -4185,7 +4264,7 @@ function renderCharSheet(id, d) {
             <div class="spell-level-header spell-ritual-header">📜 Rituels</div>
             <div class="spell-app-grid">
               ${ritualEntries.map(({sp,lvl,si}) => { const m = spellMeta(sp.school); return `
-              <button class="spell-app" style="--app:${m.color}" title="${sp.name} (rituel)" onclick="window._openCastSpell('${id}',${lvl},${si})">
+              <button class="spell-app${_isPrep0(sp)?'':' not-prepared'}" style="--app:${m.color}" title="${sp.name} (rituel)" onclick="window._openCastSpell('${id}',${lvl},${si})">
                 <span class="spell-app-icon"><img class="spell-app-img${window._spellCardFace(sp.name)?' is-card':''}" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.classList.remove('is-card');this.src='${m.img}'"></span>
                 <span class="spell-app-name">${sp.name}</span>
               </button>`; }).join('')}
@@ -4194,7 +4273,7 @@ function renderCharSheet(id, d) {
             <div class="spell-level-group">
               <div class="spell-level-header spell-ritual-header">📜 Rituels</div>
               ${ritualEntries.map(({sp,lvl,si}) => `
-              <div class="spell-known-item">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
+              <div class="spell-known-item${_isPrep0(sp)?'':' not-prepared'}">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
                 <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
                   <strong>${sp.name}</strong>
                   <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
@@ -4212,7 +4291,7 @@ function renderCharSheet(id, d) {
             <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
             <div class="spell-app-grid">
               ${spells.map((sp,si) => { const m = spellMeta(sp.school); return `
-              <button class="spell-app" style="--app:${m.color}" title="${sp.name}" onclick="window._openCastSpell('${id}',${lvl},${si})">
+              <button class="spell-app${_isPrep0(sp)?'':' not-prepared'}" style="--app:${m.color}" title="${sp.name}" onclick="window._openCastSpell('${id}',${lvl},${si})">
                 <span class="spell-app-icon"><img class="spell-app-img${window._spellCardFace(sp.name)?' is-card':''}" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.classList.remove('is-card');this.src='${m.img}'"></span>
                 <span class="spell-app-name">${sp.name}</span>
               </button>`; }).join('')}
@@ -4221,7 +4300,7 @@ function renderCharSheet(id, d) {
 
         return `
       <div class="sheet-section">
-        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button></div>
+        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button>${d.spellcaster?`<button class="section-add-btn grim-open-btn" onclick="window._openGrimoire('${id}')">📖 Préparer</button>`:''}</div>
         <div class="spell-stats">
           <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${spellAbility.toUpperCase()||'—'}</div></div>
           <div class="spell-stat-box"><div class="combat-label">DD Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
@@ -4281,7 +4360,7 @@ function renderCharSheet(id, d) {
             <div class="spell-level-group">
               <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
               ${spells.map((sp,si) => `
-              <div class="spell-known-item">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
+              <div class="spell-known-item${_isPrep0(sp)?'':' not-prepared'}">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
                 <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
                   <strong>${sp.name}</strong>
                   <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
@@ -5319,7 +5398,7 @@ function lvlStepDone(main, b) {
     </div>
     ${r.newFeatures.length?`<div class="wiz-recap-group" style="margin-top:14px"><h5>✦ Nouveaux acquis</h5>
       ${r.newFeatures.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div>`:''}
-    <div style="text-align:center;margin-top:20px"><button class="wiz-btn-gold" onclick="window._lvlClose()">FERMER</button></div>`;
+    <div style="text-align:center;margin-top:20px">${LVL.casterId?`<button class="wiz-btn-gold" style="background:linear-gradient(160deg,#8a6a2e,#6a4a18);margin-right:10px" onclick="window._openGrimoire('${LVL.casterId}')">📖 Préparer les sorts</button>`:''}<button class="wiz-btn-gold" onclick="window._lvlClose()">FERMER</button></div>`;
 }
 
 // ─── SAUVEGARDE ──────────────────────────────────────────────
@@ -5366,6 +5445,7 @@ async function lvlSave(b) {
       features:[...(d.features||[]), ...newFeatures], subclasses:newSubclasses, ...spellUpdate
     });
     LVL.result = { name:d.name, classDisplay, newTotal, hpGain:b.hpGain, hpMax:(d.hpMax||0)+b.hpGain, newFeatures };
+    LVL.casterId = casters.length ? LVL.charId : null;
     LVL.done = true;
     lvlRender();
   } catch(e) {
@@ -7438,9 +7518,9 @@ const COMPENDIUM_DATA = {
     {name:"Adepte martial",desc:"2 manœuvres de Maître de guerre + 1d6 de supériorité (1/repos court).",prereq:"—",source:"PHB",statBonus:null},
     {name:"Adepte occulte",desc:"2 invocations d'occultiste (pas de prérequis de niveau). Perd l'invocation si ne remplit plus les conditions.",prereq:"—",source:"TCoE",statBonus:null},
     {name:"Initié au combat",desc:"1 style de combat de guerrier + 1 manœuvre de Maître de guerre (1d6, 1/repos court).",prereq:"—",source:"TCoE",statBonus:null},
-    {name:"Faveur des fées",desc:"+1 INT, SAG ou CHA. Apprendre Illusion mineure et Lueurs féeriques (1/repos long chaque, ou emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
-    {name:"Faveur des ombres",desc:"+1 INT, SAG ou CHA. Apprendre Prestidigitation et Déguisement (1/repos long chaque, ou emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
-    {name:"Télékinésiste",desc:"+1 INT, SAG ou CHA. Apprendre Main de mage (invisible) et Poussée télékinésique (1/repos court).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
+    {name:"Faveur des fées",desc:"+1 INT, SAG ou CHA. Apprendre Pas brumeux + un sort de niveau 1 de Divination ou d'Enchantement au choix. Chacun lançable 1/repos long sans emplacement (ou via vos emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
+    {name:"Faveur des ombres",desc:"+1 INT, SAG ou CHA. Apprendre Invisibilité + un sort de niveau 1 d'Illusion ou de Nécromancie au choix. Chacun lançable 1/repos long sans emplacement (ou via vos emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
+    {name:"Télékinésiste",desc:"+1 INT, SAG ou CHA. Apprendre Main du mage (la main devient invisible). Action bonus : pousser ou attirer de 1,50 m une créature à 9 m (jet de sauvegarde de FOR pour résister).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
     {name:"Expert",desc:"+1 à une caractéristique. Maîtrise d'1 compétence. Expertise sur 1 compétence maîtrisée.",prereq:"—",source:"TCoE",statBonus:{choice:["str","dex","con","int","wis","cha"],val:1}},
     {name:"Esprit affûté",desc:"+1 INT. Avantage Investigation pour chercher des indices. Déduire des informations sur un lieu en 10 min d'observation.",prereq:"—",source:"PHB",statBonus:{stat:"int",val:1}},
     // ── Dons raciaux ──
@@ -10721,6 +10801,48 @@ window._saveNewResource = async (catId) => {
   animation: bloodPulse 2.6s ease-in-out infinite; }
 @keyframes bloodPulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
 @media (prefers-reduced-motion: reduce) { #tab-sheet.sheet-bloodied::after { animation:none; opacity:0.85; } }
+/* ════════ Le Grimoire (préparation de sorts) ════════ */
+.grim-overlay { position:fixed; inset:0; z-index:1200; display:none; align-items:center; justify-content:center; padding:16px; background:radial-gradient(ellipse at center, rgba(22,13,4,0.82), rgba(0,0,0,0.93)); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); }
+.grim-book { position:relative; width:min(560px,96vw); max-height:92vh; display:flex; border-radius:7px 13px 13px 7px; border:1px solid #6b4f2a; overflow:hidden;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(255,240,200,0.20), transparent 60%),
+    repeating-linear-gradient(92deg, rgba(120,90,50,0.05) 0 3px, transparent 3px 7px),
+    linear-gradient(160deg, #ece0c4 0%, #e4d4b2 45%, #d8c49a 100%);
+  box-shadow:0 30px 80px rgba(0,0,0,0.7), inset 0 0 60px rgba(120,85,40,0.25), inset 0 0 0 1px rgba(90,60,25,0.35); }
+.grim-edge { width:14px; flex:0 0 14px; background:linear-gradient(90deg, rgba(70,45,18,0.55), rgba(70,45,18,0.04)); box-shadow:inset -2px 0 6px rgba(60,40,15,0.4); }
+.grim-inner { flex:1; min-width:0; display:flex; flex-direction:column; padding:20px 22px 16px; overflow:hidden; color:#3a2a14; font-family:'Crimson Pro', Georgia, serif; }
+.grim-head { text-align:center; border-bottom:2px solid rgba(110,75,35,0.35); padding-bottom:8px; margin-bottom:10px; }
+.grim-orn { font-size:1.3rem; color:#7a5a2a; line-height:1; }
+.grim-title { margin:0; font-size:1.85rem; letter-spacing:0.06em; color:#4a3216; font-variant:small-caps; text-shadow:0 1px 0 rgba(255,250,235,0.5); }
+.grim-sub { font-size:0.95rem; font-style:italic; color:#6a4e2a; }
+.grim-counter { text-align:center; font-size:1.0rem; color:#523a18; background:rgba(120,85,40,0.10); border:1px solid rgba(110,75,35,0.3); border-radius:8px; padding:7px 10px; margin-bottom:5px; }
+.grim-counter.over { color:#7a1010; background:rgba(150,30,20,0.12); border-color:rgba(150,30,20,0.4); }
+.grim-counter strong { font-size:1.2rem; }
+.grim-counter.flash { animation:grimShake .4s; }
+@keyframes grimShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)} }
+.grim-formula { text-align:center; font-size:0.74rem; font-style:italic; color:#7c5d34; margin-bottom:8px; }
+.grim-list { flex:1; overflow-y:auto; padding-right:4px; }
+.grim-level { font-variant:small-caps; letter-spacing:0.08em; font-size:0.92rem; color:#6a4a1f; border-bottom:1px dotted rgba(110,75,35,0.5); margin:12px 0 5px; font-weight:700; }
+.grim-spell { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:transparent; border:1px solid transparent; border-radius:7px; padding:7px 9px; cursor:pointer; font-family:inherit; color:#3a2a14; transition:background .15s, border-color .15s; }
+.grim-spell:hover { background:rgba(120,85,40,0.10); }
+.grim-spell.on { background:rgba(150,110,40,0.16); border-color:rgba(120,80,30,0.45); }
+.grim-sigil { flex:0 0 22px; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; border:1.5px solid rgba(110,75,35,0.5); color:#7a5a2a; font-size:0.85rem; background:rgba(255,250,235,0.45); }
+.grim-spell.on .grim-sigil { background:radial-gradient(circle, #b8860b, #7a5a14); color:#fff5d8; border-color:#6a4a14; box-shadow:0 0 8px rgba(184,134,11,0.5); }
+.grim-sname { flex:1; min-width:0; font-size:1.02rem; font-weight:600; }
+.grim-spell.on .grim-sname { color:#4a3216; }
+.grim-sschool { flex:0 0 auto; font-size:0.74rem; font-style:italic; color:#86663a; }
+.grim-empty { padding:20px 12px; text-align:center; font-style:italic; color:#7c5d34; }
+.grim-foot { display:flex; gap:10px; padding-top:11px; margin-top:5px; border-top:2px solid rgba(110,75,35,0.35); }
+.grim-btn { flex:1; padding:11px; border-radius:8px; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; border:1px solid #6b4f2a; }
+.grim-save { background:linear-gradient(160deg,#8a6a2e,#6a4a18); color:#fdf3da; font-variant:small-caps; letter-spacing:0.05em; }
+.grim-save.disabled { opacity:0.45; cursor:not-allowed; }
+.grim-cancel { background:rgba(120,85,40,0.12); color:#523a18; }
+/* Indicateurs « préparé » dans l'onglet sorts */
+.spell-app.not-prepared { opacity:0.4; filter:grayscale(0.55); }
+.spell-app.not-prepared:hover { opacity:0.75; }
+.spell-known-item.not-prepared { opacity:0.55; }
+.spell-known-item.not-prepared .spell-known-main strong::after { content:' · non préparé'; font-size:0.68rem; font-style:italic; color:#a8967e; }
+.grim-open-btn { background:rgba(150,110,40,0.18); border-color:rgba(150,110,40,0.4); }
 .spell-card-detail { margin-bottom:8px; }
 .spell-card-detail img { width:100%; max-width:430px; display:block; margin:0 auto; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.45); }
 /* ── Modal de sort : habillage glassmorph (cohérent avec les wizards) ── */
@@ -13148,6 +13270,7 @@ nav { transition: transform .28s ease; will-change: transform; }
 </div>
  
 <!-- WIZARD FORGE -->
+<div id="grimoireOverlay" class="grim-overlay"><div class="grim-book" id="grimBook"></div></div>
 <div id="forgeOverlay">
   <div class="forge-window">
     <div class="forge-top">
