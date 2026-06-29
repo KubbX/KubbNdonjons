@@ -1369,227 +1369,183 @@ function grantedSpellsFor(d){
 
 // ── Le Grimoire : apprentissage + préparation ──
 window._grim = null;
-let _grimPrevOverflow = '';
 window._openGrimoire = async (charId) => {
-  const ref=doc(db,"characters",charId);
-  const snap=await getDoc(ref); if(!snap.exists()) return;
-  const d=snap.data();
-  const grants=grantedSpellsFor(d);
-  const known=[...(d.known_spells||[])];
-  let added=false;
-  grants.forEach(g=>{ if(!known.some(s=>s.name===g.name)){ const sp=_spellByName().get(g.name); if(sp){ known.push({...sp, granted:g.src}); added=true; } } });
-  if(added){ try{ await updateDoc(ref,{known_spells:known}); }catch(e){} }
-  const grantedNames=new Set(grants.map(g=>g.name));
-  const prep=new Set((Array.isArray(d.prepared_spells)?d.prepared_spells:[]).filter(n=>known.some(s=>s.name===n && (s.level||0)>0)));
-  const info=spellLearnInfo(d);
-  const pool=info.hasCaster?(COMPENDIUM_DATA.spell||[]).filter(s=>(s.level||0)<=info.maxLvl && (s.classes||[]).some(c=>info.classNames.includes(c))).sort((a,b)=>((a.level||0)-(b.level||0))||a.name.localeCompare(b.name)):[];
-  window._grim={ charId, name:d.name||'', mode:'learn', known, prepared:prep, grantedNames, prepInfo:preparedSpellsInfo(d), learnInfo:info, learnPool:pool, query:'', learnStep:null, detail:null, spread:0 };
-  _grimPrevOverflow=document.body.style.overflow; document.body.style.overflow='hidden';
+  let d, ref;
+  try { ref=doc(db,"characters",charId); const snap=await getDoc(ref); if(!snap.exists()) return; d=snap.data(); }
+  catch(e){ alert('Chargement impossible.'); return; }
   try {
-    _grimRender();
-    document.getElementById('grimoireOverlay').style.display='flex';
-  } catch(e) {
-    console.error('Grimoire:', e);
-    document.body.style.overflow='';
-    window._grim=null;
-    alert('Impossible d\u2019ouvrir le grimoire pour ce personnage.');
-  }
-};
-window._grimMode=(m)=>{ const g=window._grim; if(!g) return; g.mode=m; g.query=''; g.detail=null; g.spread=0; _grimRender(); };
-window._grimStep=(s)=>{ const g=window._grim; if(!g) return; g.learnStep=s; g.query=''; g.detail=null; g.spread=0; _grimRender(); };
-window._grimSearch=(v)=>{ const g=window._grim; if(!g) return; g.query=v; g.spread=0; _grimFillSpread(0); _grimUpdatePager(); };
-window._grimPage=(delta)=>{ const g=window._grim; if(!g||g.detail!=null) return; const n=_grimSpreads().length; let ns=g.spread+delta; if(ns<0)ns=0; if(ns>n-1)ns=n-1; if(ns===g.spread) return; g.spread=ns; _grimFillSpread(delta); _grimUpdatePager(); };
-
-// ----- items -----
-function _grimItemList(){
-  const g=window._grim;
-  if(g.mode==='prepare') return _grimPrepareItems();
-  const step=g.learnStep||(g.learnInfo.cantripsMax>0?'cantrips':'spells');
-  return _grimLearnItems(step==='cantrips');
-}
-function _grimLearnItems(cantrips){
-  const g=window._grim, info=g.learnInfo;
-  const q=(g.query||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const knownNames=new Set(g.known.map(s=>s.name));
-  const cc=g.known.filter(s=>(s.level||0)===0 && !g.grantedNames.has(s.name)).length;
-  const sc=g.known.filter(s=>(s.level||0)>0 && !g.grantedNames.has(s.name)).length;
-  const cantripFull=cc>=info.cantripsMax, spellFull=info.spellsMax!==null && sc>=info.spellsMax;
-  const items=[]; let curLvl=null;
-  g.learnPool.forEach((s,i)=>{
-    const isC=(s.level||0)===0;
-    if(cantrips? !isC : isC) return;
-    if(q){ const nn=s.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(!nn.includes(q)) return; }
-    if(!cantrips && s.level!==curLvl){ curLvl=s.level; items.push({header:true, html:`<div class="grim-level">Niveau ${s.level}</div>`}); }
-    const granted=g.grantedNames.has(s.name), has=knownNames.has(s.name), full=isC?cantripFull:spellFull;
-    let cls='grim-learn-spell', icon='＋', badge=`onclick="event.stopPropagation(); window._grimLearnToggle(${i})"`;
-    if(granted){ cls+=' locked'; icon='🔒'; badge=''; }
-    else if(has){ cls+=' has'; icon='✓'; }
-    else if(full){ cls+=' full'; icon='·'; badge=''; }
-    const m=spellMeta(s.school);
-    items.push({header:false, html:`<div class="${cls}" onclick="window._grimDetail(${i})"><button class="grim-ladd" ${badge}>${icon}</button><span class="grim-sname">${s.name}</span><span class="grim-sschool" style="color:${m.color}">${s.school||''}</span><span class="grim-eye">👁</span></div>`});
-  });
-  if(!items.length) items.push({header:false, html:`<div class="grim-empty">${q?'Aucun sort ne correspond.':(cantrips?'Aucun sort mineur disponible.':'Aucun sort disponible.')}</div>`});
-  return items;
-}
-function _grimPrepareItems(){
-  const g=window._grim;
-  const leveled=g.known.filter(s=>(s.level||0)>0).sort((a,b)=>(a.level-b.level)||a.name.localeCompare(b.name));
-  const items=[]; let curLvl=null;
-  leveled.forEach(s=>{
-    if(s.level!==curLvl){ curLvl=s.level; items.push({header:true, html:`<div class="grim-level">Niveau ${s.level}</div>`}); }
-    const granted=g.grantedNames.has(s.name), on=granted||g.prepared.has(s.name), idx=g.known.indexOf(s), m=spellMeta(s.school);
-    items.push({header:false, html:`<div class="grim-spell ${on?'on':''} ${granted?'locked':''}" ${granted?'':`onclick="window._grimPrepToggle(${idx})"`}><span class="grim-sigil">${on?'✦':''}</span><span class="grim-sname">${s.name}</span><span class="grim-sschool" style="color:${m.color}">${granted?'accordé':(s.school||'')}</span></div>`});
-  });
-  if(!items.length) items.push({header:false, html:`<div class="grim-empty">Aucun sort de niveau 1 ou plus. Apprenez-en dans l’onglet « Apprendre ».</div>`});
-  return items;
-}
-function _grimPaginate(items){
-  const per = window.innerWidth<=720 ? 7 : 9;
-  const pages=[]; let page=[];
-  items.forEach(it=>{
-    if(it.header && page.length>=per-1){ pages.push(page); page=[]; }
-    page.push(it.html);
-    if(page.length>=per){ pages.push(page); page=[]; }
-  });
-  if(page.length) pages.push(page);
-  if(!pages.length) pages.push([]);
-  return pages;
-}
-function _grimSpreads(){
-  const pages=_grimPaginate(_grimItemList()); const spreads=[];
-  for(let i=0;i<pages.length;i+=2) spreads.push([pages[i], pages[i+1]||null]);
-  return spreads;
-}
-
-// ----- render -----
-function _grimRender(){
-  const g=window._grim; if(!g) return;
-  const info=g.learnInfo;
-  const cc=g.known.filter(s=>(s.level||0)===0 && !g.grantedNames.has(s.name)).length;
-  const sc=g.known.filter(s=>(s.level||0)>0 && !g.grantedNames.has(s.name)).length;
-  const hasCantrips=info.cantripsMax>0;
-  if(g.mode==='learn' && !g.learnStep) g.learnStep=hasCantrips?'cantrips':'spells';
-  if(g.mode==='learn' && !hasCantrips) g.learnStep='spells';
-  let subbar='';
-  if(g.mode==='learn'){
-    subbar=`<div class="grim-steps">`
-      + (hasCantrips?`<button class="grim-step ${g.learnStep==='cantrips'?'on':''}" onclick="window._grimStep('cantrips')">✨ Sorts mineurs <em>${cc}/${info.cantripsMax}</em></button>`:'')
-      + `<button class="grim-step ${g.learnStep==='spells'?'on':''}" onclick="window._grimStep('spells')">📜 Sorts${info.spellsMax===null?'':` <em>${sc}/${info.spellsMax}</em>`}</button></div>`;
-  }
-  let instr='';
-  if(g.mode==='prepare'){
-    const count=g.prepared.size, over=g.prepInfo.prepares&&count>g.prepInfo.cap;
-    instr = g.prepInfo.prepares
-      ? `<div class="grim-counter ${over?'over':''}"><strong>${count}</strong> / ${g.prepInfo.cap} sorts préparés${over?' — au-delà de la limite !':''}</div>`
-      : `<div class="grim-counter">Tous vos sorts connus restent prêts (votre classe ne prépare pas).</div>`;
-  } else if(g.learnStep==='cantrips'){
-    const rem=Math.max(0,info.cantripsMax-cc);
-    instr=`<div class="grim-counter">Choisissez vos <strong>sorts mineurs</strong> — ${rem>0?`encore <strong>${rem}</strong> à choisir`:'sélection complète ✓'}</div>`;
-  } else if(info.spellsMax===null){
-    instr=`<div class="grim-counter">Ajoutez les <strong>sorts</strong> de votre choix <span class="grim-mut">(accès à toute la liste)</span></div>`;
-  } else {
-    const rem=Math.max(0,info.spellsMax-sc);
-    instr=`<div class="grim-counter">Choisissez vos <strong>sorts</strong> — ${rem>0?`encore <strong>${rem}</strong> à choisir`:'sélection complète ✓'}</div>`;
-  }
-  let filter='';
-  if(g.mode==='learn'){
-    const stepCount=g.learnPool.filter(s=> (g.learnStep==='cantrips') ? (s.level||0)===0 : (s.level||0)>0).length;
-    if(stepCount>20) filter=`<input class="grim-search" id="grimSearch" type="text" placeholder="🔍 filtrer (facultatif)…" value="${(g.query||'').replace(/"/g,'&quot;')}" oninput="window._grimSearch(this.value)">`;
-  }
-  document.getElementById('grimBook').innerHTML=`
-    <button class="grim-x" onclick="window._closeGrimoire()" title="Fermer">✕</button>
-    <div class="grim-topband">
-      <div class="grim-brand">📖 Grimoire <span class="grim-bsub">· ${g.name}</span></div>
-      <div class="grim-tabs">
-        <button class="grim-tab ${g.mode==='learn'?'on':''}" onclick="window._grimMode('learn')">Apprendre</button>
-        <button class="grim-tab ${g.mode==='prepare'?'on':''}" onclick="window._grimMode('prepare')">Préparer</button>
-      </div>
-    </div>
-    ${subbar}
-    <div id="grimInstr">${instr}</div>
-    ${filter}
-    <div class="grim-spread" id="grimSpread"></div>
-    <div class="grim-pager" id="grimPager"></div>
-    <div class="grim-foot"><button class="grim-btn grim-save" onclick="window._grimSave()">Sceller le grimoire</button></div>`;
-  if(g.detail!=null) _grimShowDetail();
-  else { _grimFillSpread(0); _grimUpdatePager(); }
-}
-function _grimFillSpread(dir){
-  const g=window._grim; if(!g) return;
-  const wrap=document.getElementById('grimSpread'); if(!wrap) return;
-  if(g.detail!=null){ _grimShowDetail(); return; }
-  const spreads=_grimSpreads();
-  if(g.spread>spreads.length-1) g.spread=spreads.length-1;
-  if(g.spread<0) g.spread=0;
-  const sp=spreads[g.spread]||[[],null];
-  const left=sp[0]||[], right=sp[1];
-  const page=(arr,side,orn)=>`<div class="grim-page ${side}">${arr&&arr.length?arr.join(''):`<div class="grim-page-empty">${orn||''}</div>`}</div>`;
-  wrap.innerHTML = page(left,'left','') + `<div class="grim-spine"></div>` + (right!==null?page(right,'right',''):page(null,'right','❧'));
-  if(dir){ wrap.classList.remove('turn-next','turn-prev'); void wrap.offsetWidth; wrap.classList.add(dir>0?'turn-next':'turn-prev'); }
-}
-function _grimUpdatePager(){
-  const g=window._grim; const el=document.getElementById('grimPager'); if(!el) return;
-  if(g.detail!=null){ el.innerHTML=''; return; }
-  const n=_grimSpreads().length;
-  el.innerHTML = n<=1 ? '' : `<button class="grim-turn" ${g.spread<=0?'disabled':''} onclick="window._grimPage(-1)">‹</button><span class="grim-pageno">${g.spread+1} / ${n}</span><button class="grim-turn" ${g.spread>=n-1?'disabled':''} onclick="window._grimPage(1)">›</button>`;
-}
-function _grimShowDetail(){
-  const g=window._grim; const wrap=document.getElementById('grimSpread'); if(!wrap) return;
-  const s=g.learnPool[g.detail];
-  if(!s){ g.detail=null; _grimFillSpread(0); _grimUpdatePager(); return; }
-  const granted=g.grantedNames.has(s.name), has=g.known.some(k=>k.name===s.name), isC=(s.level||0)===0;
-  const cc=g.known.filter(k=>(k.level||0)===0 && !g.grantedNames.has(k.name)).length;
-  const sc=g.known.filter(k=>(k.level||0)>0 && !g.grantedNames.has(k.name)).length;
-  const full=!has && (isC ? cc>=g.learnInfo.cantripsMax : (g.learnInfo.spellsMax!==null && sc>=g.learnInfo.spellsMax));
-  const face=window._spellCardText(s.name), m=spellMeta(s.school);
-  let action;
-  if(granted) action=`<div class="grim-granted-note">🔒 Sort accordé d’office (non décompté)</div>`;
-  else if(has) action=`<button class="grim-btn grim-cancel" onclick="window._grimLearnToggle(${g.detail})">✓ Connu — retirer</button>`;
-  else if(full) action=`<div class="grim-granted-note">Limite atteinte — retirez un sort pour en apprendre un autre</div>`;
-  else action=`<button class="grim-btn grim-save" onclick="window._grimLearnToggle(${g.detail})">✦ Apprendre ce sort</button>`;
-  wrap.innerHTML=`<div class="grim-detail">
-    <button class="grim-back" onclick="window._grimDetailClose()">← Retour à la liste</button>
-    <div class="grim-card">
-      ${face?`<img class="grim-card-img" src="${face}" alt="" onerror="this.style.display='none'">`:`<div class="grim-card-rune" style="background:${m.color}22;border-color:${m.color}">${s.school||'Sort'}</div>`}
-      <h3 class="grim-card-title">${s.name}</h3>
-      <div class="grim-card-sub">${isC?'Sort mineur':'Niveau '+s.level} · ${s.school||''}</div>
-      <div class="grim-card-stats"><span>⏱ ${s.time||'—'}</span><span>🎯 ${s.range||'—'}</span><span>⏳ ${s.duration||'—'}</span><span>🧩 ${s.components||'—'}</span></div>
-      <p class="grim-card-desc">${s.desc||''}</p>
-    </div>
-    <div class="grim-detail-action">${action}</div></div>`;
-  const pg=document.getElementById('grimPager'); if(pg) pg.innerHTML='';
-}
-window._grimDetail=(i)=>{ const g=window._grim; if(!g) return; g.detail=i; _grimShowDetail(); };
-window._grimDetailClose=()=>{ const g=window._grim; if(!g) return; g.detail=null; _grimFillSpread(0); _grimUpdatePager(); };
-window._grimPrepToggle=(idx)=>{
-  const g=window._grim; if(!g) return; const s=g.known[idx]; if(!s) return;
-  if(g.grantedNames.has(s.name)) return;
-  if(g.prepared.has(s.name)) g.prepared.delete(s.name);
-  else { if(g.prepInfo.prepares && g.prepared.size>=g.prepInfo.cap){ _grimFlash(); return; } g.prepared.add(s.name); }
+    const grants=grantedSpellsFor(d);
+    const known=[...(d.known_spells||[])];
+    let added=false;
+    grants.forEach(g=>{ if(!known.some(s=>s&&s.name===g.name)){ const sp=_spellByName().get(g.name); if(sp){ known.push({...sp, granted:g.src}); added=true; } } });
+    if(added){ try{ await updateDoc(ref,{known_spells:known}); }catch(e){} }
+    const grantedNames=new Set(grants.map(g=>g.name));
+    const prep=new Set((Array.isArray(d.prepared_spells)?d.prepared_spells:[]).filter(n=>known.some(s=>s&&s.name===n && (s.level||0)>0)));
+    const info=spellLearnInfo(d);
+    const pool=info.hasCaster?(COMPENDIUM_DATA.spell||[]).filter(s=>(s.level||0)<=info.maxLvl && (s.classes||[]).some(c=>info.classNames.includes(c))).sort((a,b)=>((a.level||0)-(b.level||0))||(a.name||'').localeCompare(b.name||'')):[];
+    window._grim={ charId, name:d.name||'', mode:'learn', known, prepared:prep, grantedNames, prepInfo:preparedSpellsInfo(d), learnInfo:info, learnPool:pool, learnStep:(info.cantripsMax>0?'cantrips':'spells'), detail:null, detailRefs:[], spellAbility:d.spellAbility||'', spellSaveDC:d.spellSaveDC, spellAttackBonus:d.spellAttackBonus };
+  } catch(e){ console.error('Grimoire prep:', e); alert('Préparation du grimoire impossible : '+((e&&e.message)||e)); return; }
+  document.body.style.overflow='hidden';
+  document.getElementById('grimoireOverlay').style.display='flex';
   _grimRender();
 };
-window._grimLearnToggle=(i)=>{
-  const g=window._grim; if(!g) return; const s=g.learnPool[i]; if(!s) return;
-  if(g.grantedNames.has(s.name)) return;
-  const idx=g.known.findIndex(k=>k.name===s.name);
-  if(idx>=0){ g.known.splice(idx,1); }
-  else {
+function _grimRender(){
+  const g=window._grim; if(!g) return;
+  const c=document.getElementById('grimBook'); if(!c) return;
+  let main='';
+  try { main = g.detail ? _grimDetailHtml(g.detail) : _grimMainHtml(); }
+  catch(e){ console.error('Grimoire render:', e); main = `<div class="grim-err">Affichage impossible : ${((e&&e.message)||e)}</div>`; }
+  c.innerHTML = _grimShellHtml(main);
+}
+function _grimShellHtml(main){
+  const g=window._grim, info=g.learnInfo;
+  const cc=g.known.filter(s=>(s.level||0)===0 && !g.grantedNames.has(s.name)).length;
+  const sc=g.known.filter(s=>(s.level||0)>0 && !g.grantedNames.has(s.name)).length;
+  const steps=[];
+  if(info.cantripsMax>0) steps.push({k:'cantrips',ic:'✨',lbl:'Sorts mineurs',cnt:cc+'/'+info.cantripsMax,done:cc>=info.cantripsMax,on:g.mode==='learn'&&g.learnStep==='cantrips'});
+  if(info.hasCaster) steps.push({k:'spells',ic:'📜',lbl:'Sorts',cnt:info.spellsMax===null?(''+sc):(sc+'/'+info.spellsMax),done:info.spellsMax!==null&&sc>=info.spellsMax,on:g.mode==='learn'&&g.learnStep==='spells'});
+  let nav=steps.map(s=>`<button class="grim-nav ${s.on?'on':''} ${s.done?'done':''}" onclick="window._grimGoStep('${s.k}')"><span class="grim-nav-ic">${s.done?'✓':s.ic}</span><span class="grim-nav-lbl">${s.lbl}<em>${s.cnt}</em></span></button>`).join('');
+  if(g.prepInfo.prepares) nav+=`<button class="grim-nav ${g.mode==='prepare'?'on':''}" onclick="window._grimGoPrepare()"><span class="grim-nav-ic">✦</span><span class="grim-nav-lbl">Préparer<em>${g.prepared.size}/${g.prepInfo.cap}</em></span></button>`;
+  return `<button class="grim-x" onclick="window._closeGrimoire()">✕</button>
+    <div class="grim-bg3">
+      <div class="grim-side">
+        <div class="grim-side-title">📖 Grimoire</div>
+        <div class="grim-side-name">${g.name}</div>
+        <div class="grim-nav-list">${nav}</div>
+      </div>
+      <div class="grim-main">${main}</div>
+    </div>
+    <div class="grim-foot"><button class="grim-btn grim-save" onclick="window._grimSave()">Sceller le grimoire</button></div>`;
+}
+window._grimGoStep=(k)=>{ const g=window._grim; if(!g) return; g.mode='learn'; g.learnStep=k; g.detail=null; _grimRender(); };
+window._grimGoPrepare=()=>{ const g=window._grim; if(!g) return; g.mode='prepare'; g.detail=null; _grimRender(); };
+
+function _grimStepData(){
+  const g=window._grim, info=g.learnInfo;
+  if(g.mode==='prepare'){
+    const known=g.known.filter(s=>(s.level||0)>0).sort((a,b)=>(a.level-b.level)||(a.name||'').localeCompare(b.name||''));
+    const selected=known.filter(s=>g.grantedNames.has(s.name)||g.prepared.has(s.name));
+    const available=known.filter(s=>!g.grantedNames.has(s.name)&&!g.prepared.has(s.name));
+    return { title:'Préparation', cap:g.prepInfo.cap, capActive:g.prepInfo.prepares, count:g.prepared.size, selected, available, kind:'prepare', grouped:true };
+  }
+  const cantrips=g.learnStep==='cantrips';
+  const pool=g.learnPool.filter(s=> cantrips ? (s.level||0)===0 : (s.level||0)>0);
+  const knownNames=new Set(g.known.map(s=>s.name));
+  const selected=pool.filter(s=>knownNames.has(s.name));
+  const available=pool.filter(s=>!knownNames.has(s.name));
+  const cap=cantrips?info.cantripsMax:info.spellsMax;
+  const count=cantrips
+    ? g.known.filter(s=>(s.level||0)===0 && !g.grantedNames.has(s.name)).length
+    : g.known.filter(s=>(s.level||0)>0 && !g.grantedNames.has(s.name)).length;
+  return { title:cantrips?'Sorts mineurs':'Sorts', cap, capActive:cap!==null, count, selected, available, kind:'learn', cantrips, grouped:!cantrips };
+}
+function _grimMainHtml(){
+  const g=window._grim; g.detailRefs=[];
+  const data=_grimStepData();
+  const chips=`<div class="grim-chips"><span class="grim-chip">★ ${(g.spellAbility||'').toUpperCase()||'—'}</span><span class="grim-chip">DD ${g.spellSaveDC!=null?g.spellSaveDC:'—'}</span><span class="grim-chip">Atk ${g.spellAttackBonus>=0?'+':''}${g.spellAttackBonus!=null?g.spellAttackBonus:0}</span></div>`;
+  let instr;
+  if(data.kind==='prepare'){
+    const over=data.capActive&&data.count>data.cap;
+    instr=data.capActive?`Préparez jusqu’à <strong>${data.cap}</strong> sorts (actuellement ${data.count})${over?' — au-delà de la limite !':''}. Les sorts accordés restent toujours prêts.`:`Votre classe ne prépare pas : tous vos sorts connus restent prêts.`;
+  } else if(data.cantrips){
+    const rem=Math.max(0,data.cap-data.count);
+    instr=`Les sorts mineurs ne consomment pas d’emplacement et se lancent à volonté. ${rem>0?`Encore <strong>${rem}</strong> à choisir.`:'Sélection complète.'}`;
+  } else {
+    instr=data.cap===null?`Ajoutez les sorts de votre choix <em>(accès à toute la liste)</em>.`:`Choisissez vos sorts. ${data.count>=data.cap?'Sélection complète.':`Encore <strong>${Math.max(0,data.cap-data.count)}</strong> à choisir.`}`;
+  }
+  const selTiles=data.selected.map(s=>_grimTileHtml(s,true)).join('')||'<div class="grim-grid-empty">Aucun pour l’instant</div>';
+  let avHtml;
+  if(data.grouped){
+    const byLvl={}; data.available.forEach(s=>{ (byLvl[s.level]=byLvl[s.level]||[]).push(s); });
+    const keys=Object.keys(byLvl).map(Number).sort((a,b)=>a-b);
+    avHtml=keys.length?keys.map(lv=>`<div class="grim-grid-lvl">Niveau ${lv}</div><div class="grim-grid">${byLvl[lv].map(s=>_grimTileHtml(s,false)).join('')}</div>`).join(''):'<div class="grim-grid-empty">Aucun</div>';
+  } else {
+    avHtml=`<div class="grim-grid">${data.available.map(s=>_grimTileHtml(s,false)).join('')||'<div class="grim-grid-empty">Aucun</div>'}</div>`;
+  }
+  return `<div class="grim-main-head">${data.title}</div>${chips}<div class="grim-instr2">${instr}</div>
+    <div class="grim-scroll">
+      <div class="grim-sec-label">&#10087; Sélectionné &#10087;</div>
+      <div class="grim-grid grim-grid-sel">${selTiles}</div>
+      <div class="grim-sec-label">&#10087; Disponible &#10087;</div>
+      ${avHtml}
+    </div>`;
+}
+function _grimTileHtml(s, selected){
+  const g=window._grim; const di=g.detailRefs.length; g.detailRefs.push(s);
+  const granted=g.grantedNames.has(s.name);
+  const face=window._spellCardFace(s.name); const m=spellMeta(s.school);
+  let cls='grim-tile'; if(selected) cls+=' sel'; if(granted) cls+=' locked';
+  return `<div class="${cls}" onclick="window._grimToggle(${di})">
+    <span class="grim-tile-img" style="--c:${m.color}">${face?`<img src="${face}" alt="" onerror="this.parentNode.classList.add('noimg');this.remove()">`:'<span class="grim-tile-rune">✦</span>'}</span>
+    <span class="grim-tile-name">${s.name}</span>
+    ${granted?'<span class="grim-tile-lock">🔒</span>':''}
+    <button class="grim-tile-i" onclick="event.stopPropagation(); window._grimDetail(${di})">ⓘ</button>
+  </div>`;
+}
+function _grimDetailHtml(s){
+  const g=window._grim;
+  const granted=g.grantedNames.has(s.name);
+  const isLeveled=(s.level||0)>0;
+  let btn;
+  if(g.mode==='prepare'){
+    const on=granted||g.prepared.has(s.name);
+    btn=granted?`<div class="grim-granted-note">🔒 Toujours préparé (accordé d’office)</div>`
+      :`<button class="grim-btn ${on?'grim-cancel':'grim-save'}" onclick="window._grimToggleDetail()">${on?'Retirer de la préparation':'Préparer ce sort'}</button>`;
+  } else {
+    const known=g.known.some(k=>k.name===s.name);
     const info=g.learnInfo, isC=(s.level||0)===0;
     const cc=g.known.filter(k=>(k.level||0)===0 && !g.grantedNames.has(k.name)).length;
     const sc=g.known.filter(k=>(k.level||0)>0 && !g.grantedNames.has(k.name)).length;
-    if(isC && cc>=info.cantripsMax){ _grimFlash(); return; }
-    if(!isC && info.spellsMax!==null && sc>=info.spellsMax){ _grimFlash(); return; }
-    g.known.push({...s});
+    const full=!known && (isC?cc>=info.cantripsMax:(info.spellsMax!==null&&sc>=info.spellsMax));
+    btn=granted?`<div class="grim-granted-note">🔒 Accordé d’office (non décompté)</div>`
+      :known?`<button class="grim-btn grim-cancel" onclick="window._grimToggleDetail()">Retirer ce sort</button>`
+      :full?`<div class="grim-granted-note">Limite atteinte — retirez un sort pour en apprendre un autre</div>`
+      :`<button class="grim-btn grim-save" onclick="window._grimToggleDetail()">Apprendre ce sort</button>`;
   }
+  const face=window._spellCardText(s.name); const m=spellMeta(s.school);
+  return `<button class="grim-back" onclick="window._grimDetailClose()">← Retour à la liste</button>
+    <div class="grim-card2">
+      ${face?`<img class="grim-card-img" src="${face}" alt="" onerror="this.style.display='none'">`:`<div class="grim-card-rune" style="background:${m.color}22;border-color:${m.color}">${s.school||'Sort'}</div>`}
+      <h3 class="grim-card-title">${s.name}</h3>
+      <div class="grim-card-sub">${isLeveled?'Niveau '+s.level:'Sort mineur'} · ${s.school||''}</div>
+      <div class="grim-card-stats"><span>⏱ ${s.time||'—'}</span><span>🎯 ${s.range||'—'}</span><span>⏳ ${s.duration||'—'}</span><span>🧩 ${s.components||'—'}</span></div>
+      <p class="grim-card-desc">${s.desc||''}</p>
+    </div>
+    <div class="grim-detail-action">${btn}</div>`;
+}
+window._grimDetail=(di)=>{ const g=window._grim; if(!g) return; g.detail=g.detailRefs[di]||null; if(g.detail) _grimRender(); };
+window._grimDetailClose=()=>{ const g=window._grim; if(!g) return; g.detail=null; _grimRender(); };
+window._grimToggle=(di)=>{ const g=window._grim; if(!g) return; _grimToggleObj(g.detailRefs[di]); };
+window._grimToggleDetail=()=>{ const g=window._grim; if(!g||!g.detail) return; _grimToggleObj(g.detail); };
+function _grimToggleObj(s){
+  const g=window._grim; if(!g||!s) return;
+  if(g.grantedNames.has(s.name)) return;
+  if(g.mode==='prepare'){
+    if(g.prepared.has(s.name)) g.prepared.delete(s.name);
+    else { if(g.prepInfo.prepares && g.prepared.size>=g.prepInfo.cap){ _grimShake(); return; } g.prepared.add(s.name); }
+  } else {
+    const idx=g.known.findIndex(k=>k.name===s.name);
+    if(idx>=0) g.known.splice(idx,1);
+    else {
+      const info=g.learnInfo, isC=(s.level||0)===0;
+      const cc=g.known.filter(k=>(k.level||0)===0 && !g.grantedNames.has(k.name)).length;
+      const sc=g.known.filter(k=>(k.level||0)>0 && !g.grantedNames.has(k.name)).length;
+      if(isC && cc>=info.cantripsMax){ _grimShake(); return; }
+      if(!isC && info.spellsMax!==null && sc>=info.spellsMax){ _grimShake(); return; }
+      g.known.push({...s});
+    }
+  }
+  const sc=document.querySelector('.grim-scroll'); const top=sc?sc.scrollTop:0;
   _grimRender();
-};
-function _grimFlash(){ const c=document.querySelector('#grimInstr .grim-counter'); if(c){ c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); } }
+  const sc2=document.querySelector('.grim-scroll'); if(sc2) sc2.scrollTop=top;
+}
+function _grimShake(){ const e=document.querySelector('.grim-instr2'); if(e){ e.classList.remove('shake'); void e.offsetWidth; e.classList.add('shake'); } }
 window._grimSave=async()=>{
   const g=window._grim; if(!g) return;
-  if(g.prepInfo.prepares && g.prepared.size>g.prepInfo.cap){ g.mode='prepare'; g.detail=null; _grimRender(); _grimFlash(); return; }
+  if(g.prepInfo.prepares && g.prepared.size>g.prepInfo.cap){ g.mode='prepare'; g.detail=null; _grimRender(); _grimShake(); return; }
   const prepared=[...g.prepared].filter(n=>g.known.some(s=>s.name===n && (s.level||0)>0) && !g.grantedNames.has(n));
   try{ await updateDoc(doc(db,"characters",g.charId),{known_spells:g.known, prepared_spells:prepared}); }
-  catch(e){ alert('Échec de l’enregistrement : '+(e.message||e)); return; }
+  catch(e){ alert('Échec de l’enregistrement : '+((e&&e.message)||e)); return; }
   _closeGrimoire();
 };
 window._closeGrimoire=()=>{ const o=document.getElementById('grimoireOverlay'); if(o) o.style.display='none'; document.body.style.overflow=''; window._grim=null; };
@@ -11205,6 +11161,79 @@ window._saveNewResource = async (catId) => {
   .grim-tab { padding:6px 11px; font-size:0.86rem; }
 }
 @media (prefers-reduced-motion: reduce){ .grim-spread.turn-next, .grim-spread.turn-prev { animation:none; } }
+/* ════════ LE GRIMOIRE v3 — sélection style Baldur's Gate ════════ */
+.grim-overlay { position:fixed; inset:0; z-index:1200; display:none; align-items:center; justify-content:center; padding:12px; background:rgba(8,5,2,0.88); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); overscroll-behavior:contain; }
+#grimBook { position:relative; width:min(960px,98vw); height:min(90vh,720px); display:flex; flex-direction:column; padding:0; background:none; border:none; box-shadow:none; border-radius:0; font-family:'Crimson Pro',Georgia,serif; }
+.grim-x { position:absolute; top:-4px; right:-2px; z-index:6; width:34px; height:34px; border-radius:50%; border:1px solid rgba(200,160,90,0.4); background:rgba(20,12,5,0.9); color:#e8cf9c; font-size:1rem; cursor:pointer; line-height:1; }
+.grim-bg3 { flex:1; min-height:0; display:flex; border-radius:12px; overflow:hidden; border:1px solid rgba(150,110,55,0.45); color:#e8dcc2;
+  background:radial-gradient(120% 100% at 50% -10%, rgba(72,52,26,0.5), transparent 55%), linear-gradient(160deg,#241a0e,#15100a 60%,#0d0906);
+  box-shadow:0 40px 100px rgba(0,0,0,0.8), inset 0 0 60px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(185,140,72,0.15); }
+.grim-side { flex:0 0 212px; padding:18px 14px; border-right:1px solid rgba(150,110,55,0.3); background:linear-gradient(rgba(0,0,0,0.28),rgba(0,0,0,0.08)); display:flex; flex-direction:column; }
+.grim-side-title { font-size:1.25rem; font-variant:small-caps; letter-spacing:0.06em; color:#e8cf9c; }
+.grim-side-name { font-size:0.9rem; font-style:italic; color:#b89a68; margin-bottom:14px; border-bottom:1px solid rgba(150,110,55,0.25); padding-bottom:10px; }
+.grim-nav-list { display:flex; flex-direction:column; gap:6px; }
+.grim-nav { display:flex; align-items:center; gap:10px; text-align:left; padding:9px 10px; border-radius:8px; border:1px solid transparent; background:transparent; color:#cbb88f; font-family:inherit; cursor:pointer; }
+.grim-nav:hover { background:rgba(185,140,72,0.08); }
+.grim-nav.on { background:rgba(185,140,72,0.16); border-color:rgba(185,140,72,0.4); color:#f3e4c2; }
+.grim-nav-ic { flex:0 0 26px; width:26px; height:26px; border-radius:50%; display:grid; place-items:center; border:1.5px solid rgba(185,140,72,0.4); font-size:0.95rem; }
+.grim-nav.done .grim-nav-ic { background:rgba(120,160,80,0.22); border-color:rgba(120,160,80,0.5); color:#cfe8a8; }
+.grim-nav-lbl { display:flex; flex-direction:column; line-height:1.15; font-weight:700; font-size:0.95rem; }
+.grim-nav-lbl em { font-style:normal; font-size:0.78rem; color:#a98e5f; font-weight:400; }
+.grim-main { flex:1; min-width:0; display:flex; flex-direction:column; padding:18px 20px; }
+.grim-main-head { text-align:center; font-size:1.7rem; font-variant:small-caps; letter-spacing:0.05em; color:#efe0bf; }
+.grim-chips { display:flex; gap:8px; justify-content:center; margin:8px 0; }
+.grim-chip { padding:5px 13px; border-radius:16px; border:1px solid rgba(185,140,72,0.4); background:rgba(0,0,0,0.3); color:#e3cf9f; font-size:0.85rem; font-weight:700; }
+.grim-instr2 { text-align:center; font-size:0.92rem; color:#c3ad80; max-width:580px; margin:0 auto 6px; line-height:1.4; }
+.grim-instr2 strong { color:#f3e4c2; } .grim-instr2 em { color:#b89a68; }
+.grim-instr2.shake { animation:grimShake .4s; }
+@keyframes grimShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)} }
+.grim-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-right:6px; }
+.grim-scroll::-webkit-scrollbar { width:8px; } .grim-scroll::-webkit-scrollbar-thumb { background:rgba(185,140,72,0.3); border-radius:4px; }
+.grim-sec-label { text-align:center; font-variant:small-caps; letter-spacing:0.14em; color:#b89a68; font-size:0.92rem; margin:14px 0 8px; }
+.grim-grid { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+.grim-grid-sel { min-height:56px; padding:8px; border-radius:10px; background:rgba(185,140,72,0.06); border:1px dashed rgba(185,140,72,0.22); }
+.grim-grid-lvl { text-align:left; font-variant:small-caps; color:#a98e5f; font-size:0.82rem; letter-spacing:0.08em; margin:12px 4px 4px; border-bottom:1px dotted rgba(150,110,55,0.3); }
+.grim-grid-empty { color:#7a6845; font-style:italic; font-size:0.85rem; padding:10px; }
+.grim-tile { position:relative; width:84px; display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; cursor:pointer; padding:2px; }
+.grim-tile-img { width:64px; height:64px; border-radius:10px; overflow:hidden; display:grid; place-items:center; border:2px solid rgba(185,140,72,0.35); background:#15100a; box-shadow:0 3px 8px rgba(0,0,0,0.5); }
+.grim-tile-img img { width:100%; height:100%; object-fit:cover; }
+.grim-tile-img.noimg, .grim-tile-rune { color:var(--c,#e3cf9f); font-size:1.5rem; }
+.grim-tile-name { font-size:0.72rem; text-align:center; color:#cbb88f; line-height:1.1; max-width:84px; word-break:break-word; }
+.grim-tile.sel .grim-tile-img { border-color:#e8c878; box-shadow:0 0 12px rgba(232,200,120,0.55); }
+.grim-tile.sel .grim-tile-name { color:#f3e4c2; }
+.grim-tile.locked { cursor:default; }
+.grim-tile.locked .grim-tile-img { border-color:rgba(185,140,72,0.6); }
+.grim-tile-lock { position:absolute; top:-3px; right:8px; font-size:0.8rem; }
+.grim-tile-i { position:absolute; top:-4px; left:6px; width:19px; height:19px; border-radius:50%; border:1px solid rgba(185,140,72,0.5); background:rgba(20,12,5,0.92); color:#e3cf9f; font-size:0.62rem; cursor:pointer; padding:0; line-height:1; display:grid; place-items:center; opacity:0; transition:opacity .12s; }
+.grim-tile:hover .grim-tile-i, .grim-tile:focus-within .grim-tile-i { opacity:1; }
+.grim-foot { display:flex; gap:10px; padding:12px 2px 0; }
+.grim-btn { flex:1; padding:12px; border-radius:9px; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; border:1px solid rgba(150,110,55,0.5); }
+.grim-save { background:linear-gradient(160deg,#caa258,#8a6326); color:#1a1206; font-variant:small-caps; letter-spacing:0.05em; }
+.grim-cancel { background:rgba(40,28,14,0.85); color:#e3cf9f; }
+.grim-back { align-self:flex-start; background:rgba(40,28,14,0.75); border:1px solid rgba(150,110,55,0.4); color:#e3cf9f; border-radius:8px; padding:7px 13px; font-family:inherit; font-weight:700; cursor:pointer; margin-bottom:10px; }
+.grim-card2 { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; text-align:center; padding-right:4px; }
+.grim-card-img { max-width:280px; width:72%; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.6); margin:0 auto 14px; display:block; }
+.grim-card-rune { width:120px; height:120px; margin:0 auto 14px; border-radius:12px; border:2px solid; display:grid; place-items:center; font-variant:small-caps; font-weight:700; color:#e8dcc2; }
+.grim-card-title { margin:0; font-size:1.6rem; color:#efe0bf; font-variant:small-caps; }
+.grim-card-sub { font-style:italic; color:#b89a68; margin-bottom:10px; }
+.grim-card-stats { display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:center; font-size:0.86rem; color:#cbb88f; background:rgba(0,0,0,0.25); border:1px solid rgba(150,110,55,0.2); border-radius:8px; padding:9px 12px; margin-bottom:12px; }
+.grim-card-desc { text-align:left; line-height:1.55; color:#ddcdab; font-size:1.0rem; white-space:pre-wrap; }
+.grim-detail-action { padding-top:12px; }
+.grim-granted-note { text-align:center; padding:11px; border-radius:8px; background:rgba(40,28,14,0.6); color:#b89a68; font-style:italic; border:1px solid rgba(150,110,55,0.25); }
+.grim-err { padding:24px; text-align:center; color:#e8a88f; line-height:1.5; }
+@media (max-width:760px){
+  #grimBook { height:93vh; width:98vw; }
+  .grim-bg3 { flex-direction:column; }
+  .grim-side { flex:0 0 auto; border-right:none; border-bottom:1px solid rgba(150,110,55,0.3); padding:12px; }
+  .grim-side-name { margin-bottom:8px; }
+  .grim-nav-list { flex-direction:row; flex-wrap:wrap; gap:6px; }
+  .grim-nav { flex:1 1 auto; padding:7px 9px; }
+  .grim-nav-lbl { font-size:0.84rem; }
+  .grim-main { padding:14px 12px; }
+  .grim-main-head { font-size:1.4rem; }
+  .grim-tile { width:76px; } .grim-tile-img { width:58px; height:58px; }
+  .grim-tile-i { opacity:1; }
+}
 .spell-card-detail { margin-bottom:8px; }
 .spell-card-detail img { width:100%; max-width:430px; display:block; margin:0 auto; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.45); }
 /* ── Modal de sort : habillage glassmorph (cohérent avec les wizards) ── */
