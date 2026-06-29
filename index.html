@@ -4531,7 +4531,16 @@ function renderCharSheet(id, d) {
         const hasMagic = ss.slots.some(s=>s>0) || ss.pactSlots;
         if (!hasMagic && !d.spellcaster) return '';
         const spellAbility = d.spellAbility||'';
-        const knownSpells = d.known_spells || [];
+        const knownSpells = (() => {
+          const base = [...(d.known_spells || [])];
+          try {
+            const have = new Set(base.map(s => s && s.name).filter(Boolean));
+            grantedSpellsFor(d).forEach(g => {
+              if (!have.has(g.name)) { const sp = _spellByName().get(g.name); if (sp) { base.push({ ...sp, granted: g.src }); have.add(g.name); } }
+            });
+          } catch (e) {}
+          return base;
+        })();
         const usedSlots = d.usedSpellSlots || {};
         const _prepSet0 = new Set(Array.isArray(d.prepared_spells)?d.prepared_spells:[]);
         let _grantedSet0 = new Set(); try { _grantedSet0 = new Set(grantedSpellsFor(d).map(g=>g.name)); } catch(e) {}
