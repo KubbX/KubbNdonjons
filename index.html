@@ -4494,7 +4494,7 @@ function renderCharSheet(id, d) {
 
         return `
       <div class="sheet-section">
-        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button>${d.spellcaster?`<button class="section-add-btn grim-open-btn" onclick="window._openGrimoire('${id}')">📖 Grimoire</button>`:''}</div>
+        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button></div>
         <div class="spell-stats">
           <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${spellAbility.toUpperCase()||'—'}</div></div>
           <div class="spell-stat-box"><div class="combat-label">DD Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
@@ -4537,16 +4537,16 @@ function renderCharSheet(id, d) {
           <button class="svt-btn ${spellView==='apps'?'active':''}" data-v="apps" onclick="window._setSpellView('apps')">▦ Applications</button>
           <button class="svt-btn ${spellView==='list'?'active':''}" data-v="list" onclick="window._setSpellView('list')">☰ Liste</button>
         </div>
-        <button class="sheet-add-cta" onclick="window._pickFromCompendium('${id}','spell')"><span class="cta-plus">✚</span> Ajouter un sort</button>
+        <button class="sheet-add-cta" onclick="window._openGrimoire('${id}')"><span class="cta-plus">📖</span> Ouvrir le grimoire</button>
 
         <!-- Vue Applications -->
         <div data-spellview="apps" style="${spellView==='apps'?'':'display:none'}">
-          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — appuyez sur ✚ Ajouter un sort</div>' : spellAppsHtml}
+          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — ouvrez le 📖 grimoire pour en apprendre</div>' : spellAppsHtml}
         </div>
 
         <!-- Vue Liste (sorts groupés par niveau) -->
         <div class="spell-known-list" data-spellview="list" style="${spellView==='list'?'':'display:none'}">
-          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — appuyez sur ✚ Ajouter un sort</div>' : ''}
+          ${knownSpells.length === 0 ? '<div style="padding:8px 10px;color:#aaa;font-style:italic">Aucun sort — ouvrez le 📖 grimoire pour en apprendre</div>' : ''}
           ${ritualListHtml}${[0,1,2,3,4,5,6,7,8,9].map(lvl => {
             const spells = spellsByLvl[lvl];
             if (!spells || !spells.length) return '';
