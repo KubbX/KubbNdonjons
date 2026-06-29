@@ -1355,6 +1355,20 @@ function spellLearnInfo(d){
   if(ss.pactSlots&&ss.pactSlots.level>maxLvl) maxLvl=ss.pactSlots.level;
   return { cantripsMax, spellsMax:unlimited?null:spellsMax, unlimited, maxLvl, hasCaster, classNames, lines };
 }
+// Niveau de sort max qu'une classe peut lancer (selon type de lanceur et niveau DE CLASSE)
+function maxSpellLvlForClass(c, sub){
+  const T = (c.name==='Artificier') ? 'art' : getCasterType(c.name, sub);
+  const L = Math.max(0, Math.min(20, c.level||0));
+  const TBL = {
+    full:  [0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,9,9],
+    half:  [0,0,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5],
+    art:   [0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5],
+    pact:  [0,1,1,2,2,3,3,4,4,5,5,5,5,5,5,5,5,5,5,5,5],
+    third: [0,0,0,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,4,4]
+  };
+  const tbl = TBL[T]; if(!tbl) return 0;
+  return tbl[L] || 0;
+}
 // Sorts accordés d'office (NON décomptés) par dons / sous-classes / races
 const SPELL_GRANTS = {
   feat: {
@@ -1400,10 +1414,10 @@ let _SPN=null;
 function _spellByName(){ if(!_SPN){ _SPN=new Map(); (COMPENDIUM_DATA.spell||[]).forEach(s=>{ if(s&&s.name) _SPN.set(s.name,s); }); } return _SPN; }
 function grantedSpellsFor(d){
   const lvl=totalLevel(d); const out=[]; const seen=new Set();
-  const add=(e,src)=>{ if(lvl<(e.min||0)) return; if(seen.has(e.n)) return; seen.add(e.n); out.push({name:e.n,src}); };
+  const add=(e,src,gl)=>{ if((gl==null?lvl:gl)<(e.min||0)) return; if(seen.has(e.n)) return; seen.add(e.n); out.push({name:e.n,src}); };
   if(d.race&&SPELL_GRANTS.race[d.race]) SPELL_GRANTS.race[d.race].forEach(e=>add(e,d.race));
   if(d.subrace&&SPELL_GRANTS.race[d.subrace]) SPELL_GRANTS.race[d.subrace].forEach(e=>add(e,d.subrace));
-  Object.values(d.subclasses||{}).forEach(sub=>{ if(sub&&SPELL_GRANTS.subclass[sub]) SPELL_GRANTS.subclass[sub].forEach(e=>add(e,sub)); });
+  const _gcls=getClasses(d); Object.entries(d.subclasses||{}).forEach(([cls,sub])=>{ if(sub&&SPELL_GRANTS.subclass[sub]){ const _cl=_gcls.find(c=>c.name===cls); const _clv=_cl?_cl.level:0; SPELL_GRANTS.subclass[sub].forEach(e=>add(e,sub,_clv)); } });
   (d.features||[]).forEach(f=>{ const m=/^Don:\s*(.+)$/.exec((f.name||'').trim()); if(m){ const fn=m[1].trim(); if(SPELL_GRANTS.feat[fn]) SPELL_GRANTS.feat[fn].forEach(e=>add(e,fn)); } });
   return out.filter(g=>_spellByName().has(g.name));
 }
@@ -1423,7 +1437,8 @@ window._openGrimoire = async (charId) => {
     const grantedNames=new Set(grants.map(g=>g.name));
     const prep=new Set((Array.isArray(d.prepared_spells)?d.prepared_spells:[]).filter(n=>known.some(s=>s&&s.name===n && (s.level||0)>0)));
     const info=spellLearnInfo(d);
-    const pool=info.hasCaster?(COMPENDIUM_DATA.spell||[]).filter(s=>s && (s.level||0)<=info.maxLvl && (s.classes||[]).some(c=>info.classNames.includes(c))).sort((a,b)=>((a.level||0)-(b.level||0))||(a.name||'').localeCompare(b.name||'')):[];
+    const _cmax={}; getClasses(d).forEach(c=>{ if(getCasterType(c.name,(d.subclasses||{})[c.name])!=='none') _cmax[c.name]=maxSpellLvlForClass(c,(d.subclasses||{})[c.name]); });
+    const pool=info.hasCaster?(COMPENDIUM_DATA.spell||[]).filter(s=>s && (s.classes||[]).some(c=>_cmax[c]!=null && (s.level||0)<=_cmax[c])).sort((a,b)=>((a.level||0)-(b.level||0))||(a.name||'').localeCompare(b.name||'')):[];
     window._grim={ charId, name:d.name||'', mode:'learn', known, prepared:prep, grantedNames, prepInfo:preparedSpellsInfo(d), learnInfo:info, learnPool:pool, learnStep:(info.cantripsMax>0?'cantrips':'spells'), detail:null, detailRefs:[], spellAbility:d.spellAbility||'', spellSaveDC:d.spellSaveDC, spellAttackBonus:d.spellAttackBonus };
   } catch(e){ console.error('Grimoire prep:', e); alert('Préparation du grimoire impossible : '+((e&&e.message)||e)); return; }
   document.body.style.overflow='hidden';
@@ -1679,23 +1694,23 @@ const CLASS_CHARGES = {
   ],
   "Clerc": [
     {id:'channel_div', name:'Conduit divin', icon:'✝',
-      max: lvl => lvl<6?1:lvl<18?2:3, recharge:'short'},
+      max: lvl => lvl<2?0:lvl<6?1:lvl<18?2:3, recharge:'short'},
   ],
   "Druide": [
     {id:'wild_shape', name:'Forme sauvage', icon:'🐻', condition:'wild_shape',
-      max: lvl => lvl<20?2:999, recharge:'short'},
+      max: lvl => lvl<2?0:lvl<20?2:999, recharge:'short'},
   ],
   "Guerrier": [
     {id:'second_wind', name:'Second souffle', icon:'💨',
       max: lvl => 1, recharge:'short'},
     {id:'action_surge', name:'Fougue', icon:'⚡',
-      max: lvl => lvl<17?1:2, recharge:'short'},
+      max: lvl => lvl<2?0:lvl<17?1:2, recharge:'short'},
     {id:'indomitable', name:'Indomptable', icon:'🛡',
-      max: lvl => lvl<13?1:lvl<17?2:3, recharge:'long'},
+      max: lvl => lvl<9?0:lvl<13?1:lvl<17?2:3, recharge:'long'},
   ],
   "Moine": [
     {id:'ki', name:'Points de ki', icon:'☯',
-      max: lvl => lvl, recharge:'short'},
+      max: lvl => (lvl<2?0:lvl), recharge:'short'},
   ],
   "Paladin": [
     {id:'lay_hands', name:'Imposition des mains', icon:'🤲',
@@ -1703,7 +1718,7 @@ const CLASS_CHARGES = {
     {id:'divine_sense', name:'Sens divin', icon:'👁',
       max: (lvl, stats) => 1 + Math.max(0, mod(stats?.cha||10)), recharge:'long'},
     {id:'channel_div_pal', name:'Conduit divin', icon:'✝',
-      max: lvl => 1, recharge:'short'},
+      max: lvl => (lvl<3?0:1), recharge:'short'},
     {id:'cleansing_touch', name:'Contact purificateur', icon:'🧹',
       max: (lvl, stats) => lvl>=14 ? Math.max(1, mod(stats?.cha||10)) : 0, recharge:'long'},
   ],
@@ -1716,7 +1731,7 @@ const CLASS_CHARGES = {
   ],
   "Ensorceleur": [
     {id:'sorc_points', name:'Points de sorcellerie', icon:'💎',
-      max: lvl => lvl, recharge:'long'},
+      max: lvl => (lvl<2?0:lvl), recharge:'long'},
   ],
   "Occultiste": [
     // Occultiste utilise emplacements de pacte (déjà gérés)
@@ -3822,9 +3837,24 @@ window._selectChar = (id) => {
   if(activeCharUnsubscribe) activeCharUnsubscribe();
   activeCharUnsubscribe = onSnapshot(doc(db, "characters", id), (snap) => {
     if(!snap.exists()) return;
-    renderCharSheet(snap.id, snap.data());
+    const _d = snap.data();
+    window._syncGrantedSpells(snap.id, _d);
+    renderCharSheet(snap.id, _d);
   });
   window._showTab('tab-sheet');
+};
+window._syncGrantedSpells = async (charId, d) => {
+  try {
+    const grants = grantedSpellsFor(d);
+    const grantNames = new Set(grants.map(g => g.name));
+    let known = [...(d.known_spells || [])];
+    let changed = false;
+    const filtered = known.filter(s => !(s && s.granted) || grantNames.has(s.name));
+    if (filtered.length !== known.length) { known = filtered; changed = true; }
+    const have = new Set(known.map(s => s && s.name).filter(Boolean));
+    grants.forEach(g => { if (!have.has(g.name)) { const sp = _spellByName().get(g.name); if (sp) { known.push({ ...sp, granted: g.src }); have.add(g.name); changed = true; } } });
+    if (changed) await updateDoc(doc(db, "characters", charId), { known_spells: known });
+  } catch (e) {}
 };
 
 // ---- Suppression de fiche (confirmation par saisie de "Supprimer") ----
@@ -4531,16 +4561,7 @@ function renderCharSheet(id, d) {
         const hasMagic = ss.slots.some(s=>s>0) || ss.pactSlots;
         if (!hasMagic && !d.spellcaster) return '';
         const spellAbility = d.spellAbility||'';
-        const knownSpells = (() => {
-          const base = [...(d.known_spells || [])];
-          try {
-            const have = new Set(base.map(s => s && s.name).filter(Boolean));
-            grantedSpellsFor(d).forEach(g => {
-              if (!have.has(g.name)) { const sp = _spellByName().get(g.name); if (sp) { base.push({ ...sp, granted: g.src }); have.add(g.name); } }
-            });
-          } catch (e) {}
-          return base;
-        })();
+        const knownSpells = d.known_spells || [];
         const usedSlots = d.usedSpellSlots || {};
         const _prepSet0 = new Set(Array.isArray(d.prepared_spells)?d.prepared_spells:[]);
         let _grantedSet0 = new Set(); try { _grantedSet0 = new Set(grantedSpellsFor(d).map(g=>g.name)); } catch(e) {}
@@ -4561,7 +4582,7 @@ function renderCharSheet(id, d) {
               ${ritualEntries.map(({sp,lvl,si}) => { const m = spellMeta(sp.school); return `
               <button class="spell-app${_isPrep0(sp)?'':' not-prepared'}" style="--app:${m.color}" title="${sp.name} (rituel)" onclick="window._openCastSpell('${id}',${lvl},${si})">
                 <span class="spell-app-icon"><img class="spell-app-img${window._spellCardFace(sp.name)?' is-card':''}" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.classList.remove('is-card');this.src='${m.img}'"></span>
-                <span class="spell-app-name">${sp.name}</span>
+                <span class="spell-app-name">${sp.name}</span>${sp.granted?'<span class="spell-app-lock">🔒</span>':''}
               </button>`; }).join('')}
             </div>` : '';
         const ritualListHtml = ritualEntries.length ? `
@@ -4588,7 +4609,7 @@ function renderCharSheet(id, d) {
               ${spells.map((sp,si) => { const m = spellMeta(sp.school); return `
               <button class="spell-app${_isPrep0(sp)?'':' not-prepared'}" style="--app:${m.color}" title="${sp.name}" onclick="window._openCastSpell('${id}',${lvl},${si})">
                 <span class="spell-app-icon"><img class="spell-app-img${window._spellCardFace(sp.name)?' is-card':''}" src="${window._spellCardFace(sp.name)||m.img}" alt="" onerror="this.onerror=null;this.classList.remove('is-card');this.src='${m.img}'"></span>
-                <span class="spell-app-name">${sp.name}</span>
+                <span class="spell-app-name">${sp.name}</span>${sp.granted?'<span class="spell-app-lock">🔒</span>':''}
               </button>`; }).join('')}
             </div>`;
         }).join('');
@@ -4655,12 +4676,12 @@ function renderCharSheet(id, d) {
             <div class="spell-level-group">
               <div class="spell-level-header">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div>
               ${spells.map((sp,si) => `
-              <div class="spell-known-item${_isPrep0(sp)?'':' not-prepared'}">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
+              <div class="spell-known-item${_isPrep0(sp)?'':' not-prepared'}${sp.granted?' spell-granted':''}">${window._spellCardFace(sp.name)?`<img class="spell-known-thumb" src="${window._spellCardFace(sp.name)}" alt="" onerror="this.style.display='none'">`:''}
                 <div class="spell-known-main" onclick="window._openCastSpell('${id}',${lvl},${si})">
-                  <strong>${sp.name}</strong>
+                  <strong>${sp.name}</strong>${sp.granted?` <span class="spell-granted-badge" title="Sort accordé d'office, toujours préparé">🔒 ${sp.granted}</span>`:''}
                   <span class="spell-known-meta">${sp.school||''} · ${sp.time||''} · ${sp.range||''}</span>
                 </div>
-                <button class="inv-remove-btn" onclick="window._removeSpell('${id}',${lvl},${si})">✕</button>
+                ${sp.granted?'':`<button class="inv-remove-btn" onclick="window._removeSpell('${id}',${lvl},${si})">✕</button>`}
               </div>`).join('')}
             </div>`;
           }).join('')}
@@ -12472,6 +12493,9 @@ em.ok { color:#7fc06a; font-style:normal; }
 .spell-known-main { flex:1; cursor:pointer; }
 .spell-known-main strong { font-size:0.85rem; }
 .spell-known-meta { font-size:0.72rem; color:#999; margin-left:6px; }
+.spell-granted-badge { display:inline-block; font-size:0.62rem; font-weight:600; color:#8a6d3b; background:rgba(170,140,70,0.16); border:1px solid rgba(170,140,70,0.35); border-radius:5px; padding:1px 5px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
+.spell-known-item.spell-granted { background:rgba(170,140,70,0.05); }
+.spell-app-lock { font-size:0.62rem; margin-left:3px; opacity:0.75; }
 
 /* ── COMPENDIUM ── */
 #tab-compendium { background:var(--parch); min-height:100vh; }
