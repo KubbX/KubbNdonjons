@@ -1287,77 +1287,225 @@ window._spellCardText = (name) => { const s = spellSlug(name); return SPELL_CARD
 // ── Préparation de sorts : capacité par classe ──
 const PREPARED_CASTERS = { 'Clerc':'full','Druide':'full','Magicien':'full','Paladin':'half','Artificier':'half' };
 function preparedSpellsInfo(d){
-  const stats = d.stats||{}; const lines=[]; let cap=0; let prepares=false;
+  const stats=d.stats||{}; const lines=[]; let cap=0, prepares=false;
   getClasses(d).forEach(c=>{
-    const kind = PREPARED_CASTERS[c.name]; if(!kind) return;
+    const kind=PREPARED_CASTERS[c.name]; if(!kind) return;
     prepares=true;
-    const ab = (CLASSES[c.name]||{}).spellAbility||'int';
-    const lvlPart = kind==='full' ? c.level : Math.floor(c.level/2);
-    const n = Math.max(1, mod(stats[ab]||10) + lvlPart);
-    cap += n; lines.push({cls:c.name, ability:ab, n});
+    const ab=(CLASSES[c.name]||{}).spellAbility||'int';
+    const lvlPart=kind==='full'?c.level:Math.floor(c.level/2);
+    const n=Math.max(1, mod(stats[ab]||10)+lvlPart);
+    cap+=n; lines.push({cls:c.name,ability:ab,n});
   });
   return { cap, prepares, lines };
 }
+// Sorts mineurs connus par classe / niveau
+function cantripsKnown(cls,lvl){
+  switch(cls){
+    case 'Barde': case 'Druide': case 'Occultiste': return lvl>=10?4:(lvl>=4?3:2);
+    case 'Clerc': case 'Magicien': return lvl>=10?5:(lvl>=4?4:3);
+    case 'Ensorceleur': return lvl>=10?6:(lvl>=4?5:4);
+    case 'Artificier': return lvl>=14?5:(lvl>=10?4:(lvl>=6?3:2));
+    default: return 0;
+  }
+}
+// Sorts connus (lanceurs « connus ») / grimoire du Magicien
+const SPELLS_KNOWN_TABLE = {
+  'Barde':[4,5,6,7,8,9,10,11,12,14,15,15,16,18,19,19,20,22,22,22],
+  'Ensorceleur':[2,3,4,5,6,7,8,9,10,11,12,12,13,13,14,14,15,15,15,15],
+  'Rôdeur':[0,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11],
+  'Occultiste':[2,3,4,5,6,7,8,9,10,10,11,11,12,12,13,13,14,14,15,15]
+};
+function spellsKnownFor(cls,lvl){
+  if(SPELLS_KNOWN_TABLE[cls]) return SPELLS_KNOWN_TABLE[cls][Math.min(19,Math.max(0,lvl-1))];
+  if(cls==='Magicien') return 6+2*(lvl-1);
+  return null; // Clerc/Druide/Paladin/Artificier : accès à toute la liste de classe
+}
+function spellLearnInfo(d){
+  let cantripsMax=0, spellsMax=0, unlimited=false, hasCaster=false; const classNames=[]; const lines=[];
+  getClasses(d).forEach(c=>{
+    const cl=CLASSES[c.name]; if(!cl||!cl.spellcaster) return;
+    hasCaster=true; classNames.push(c.name);
+    const cc=cantripsKnown(c.name,c.level); cantripsMax+=cc;
+    const sk=spellsKnownFor(c.name,c.level);
+    if(sk===null) unlimited=true; else spellsMax+=sk;
+    lines.push({cls:c.name,sk,cc});
+  });
+  const ss=getSpellSlots(d); let maxLvl=0;
+  (ss.slots||[]).forEach((n,i)=>{ if(n>0&&i+1>maxLvl) maxLvl=i+1; });
+  if(ss.pactSlots&&ss.pactSlots.level>maxLvl) maxLvl=ss.pactSlots.level;
+  return { cantripsMax, spellsMax:unlimited?null:spellsMax, unlimited, maxLvl, hasCaster, classNames, lines };
+}
+// Sorts accordés d'office (NON décomptés) par dons / sous-classes / races
+const SPELL_GRANTS = {
+  feat: {
+    'Faveur des fées':[{n:'Foulée brumeuse'}],
+    'Faveur des ombres':[{n:'Invisibilité'}],
+    'Télékinésiste':[{n:'Main de mage'}]
+  },
+  race: {
+    'Tieffelin':[{n:'Thaumaturgie'},{n:'Représailles infernales',min:3},{n:'Ténèbres',min:5}],
+    'Drow':[{n:'Lumières dansantes'},{n:'Lueurs féeriques',min:3},{n:'Ténèbres',min:5}],
+    'Gnome des forêts':[{n:'Illusion mineure'}],
+    'Aasimar':[{n:'Lumière'}],'Aasimar protecteur':[{n:'Lumière'}],'Aasimar vengeur':[{n:'Lumière'}],'Aasimar déchu':[{n:'Lumière'}],
+    'Yuan-ti Malison':[{n:'Bouffée de poison'},{n:'Amitié avec les animaux'},{n:'Suggestion'}],
+    'Firbolg':[{n:'Détection de la magie'},{n:'Déguisement'}],
+    'Triton':[{n:'Nappe de brouillard'},{n:'Bourrasque',min:3}]
+  },
+  subclass: {
+    // Extensible : domaines de clerc, cercles de druide, patrons d'occultiste, serments de paladin, etc.
+  }
+};
+let _SPN=null;
+function _spellByName(){ if(!_SPN) _SPN=new Map((COMPENDIUM_DATA.spell||[]).map(s=>[s.name,s])); return _SPN; }
+function grantedSpellsFor(d){
+  const lvl=totalLevel(d); const out=[]; const seen=new Set();
+  const add=(e,src)=>{ if(lvl<(e.min||0)) return; if(seen.has(e.n)) return; seen.add(e.n); out.push({name:e.n,src}); };
+  if(d.race&&SPELL_GRANTS.race[d.race]) SPELL_GRANTS.race[d.race].forEach(e=>add(e,d.race));
+  if(d.subrace&&SPELL_GRANTS.race[d.subrace]) SPELL_GRANTS.race[d.subrace].forEach(e=>add(e,d.subrace));
+  Object.values(d.subclasses||{}).forEach(sub=>{ if(sub&&SPELL_GRANTS.subclass[sub]) SPELL_GRANTS.subclass[sub].forEach(e=>add(e,sub)); });
+  (d.features||[]).forEach(f=>{ const m=/^Don:\s*(.+)$/.exec((f.name||'').trim()); if(m){ const fn=m[1].trim(); if(SPELL_GRANTS.feat[fn]) SPELL_GRANTS.feat[fn].forEach(e=>add(e,fn)); } });
+  return out.filter(g=>_spellByName().has(g.name));
+}
 
-// ── Le Grimoire : interface de préparation des sorts ──
+// ── Le Grimoire : apprentissage + préparation ──
 window._grim = null;
 window._openGrimoire = async (charId) => {
-  const snap = await getDoc(doc(db, "characters", charId)); if(!snap.exists()) return;
-  const d = snap.data();
-  const info = preparedSpellsInfo(d);
-  const known = (d.known_spells||[]).filter(s => (s.level||0) > 0);
-  const prep = new Set((Array.isArray(d.prepared_spells)?d.prepared_spells:[]).filter(n => known.some(s=>s.name===n)));
-  window._grim = { charId, name:d.name||'', prepared:prep, cap:info.cap, prepares:info.prepares, lines:info.lines, known };
+  const ref=doc(db,"characters",charId);
+  const snap=await getDoc(ref); if(!snap.exists()) return;
+  const d=snap.data();
+  const grants=grantedSpellsFor(d);
+  const known=[...(d.known_spells||[])];
+  let added=false;
+  grants.forEach(g=>{ if(!known.some(s=>s.name===g.name)){ const sp=_spellByName().get(g.name); if(sp){ known.push({...sp, granted:g.src}); added=true; } } });
+  if(added){ try{ await updateDoc(ref,{known_spells:known}); }catch(e){} }
+  const grantedNames=new Set(grants.map(g=>g.name));
+  const prep=new Set((Array.isArray(d.prepared_spells)?d.prepared_spells:[]).filter(n=>known.some(s=>s.name===n && (s.level||0)>0)));
+  const info=spellLearnInfo(d);
+  const pool=info.hasCaster?(COMPENDIUM_DATA.spell||[]).filter(s=>(s.level||0)<=info.maxLvl && (s.classes||[]).some(c=>info.classNames.includes(c))).sort((a,b)=>((a.level||0)-(b.level||0))||a.name.localeCompare(b.name)):[];
+  window._grim={ charId, name:d.name||'', mode:'learn', known, prepared:prep, grantedNames, prepInfo:preparedSpellsInfo(d), learnInfo:info, learnPool:pool, query:'' };
   _grimRender();
-  document.getElementById('grimoireOverlay').style.display = 'flex';
+  document.getElementById('grimoireOverlay').style.display='flex';
 };
+window._grimMode=(m)=>{ if(window._grim){ window._grim.mode=m; window._grim.query=''; _grimRender(); } };
 function _grimRender(){
-  const g = window._grim; if(!g) return;
-  const book = document.getElementById('grimBook');
-  const sorted = [...g.known].sort((a,b)=>((a.level||0)-(b.level||0))||(a.name||'').localeCompare(b.name||''));
-  let curLvl=null, body='';
-  sorted.forEach(s=>{
-    if(s.level!==curLvl){ curLvl=s.level; body += `<div class="grim-level">Niveau ${s.level}</div>`; }
-    const idx = g.known.indexOf(s); const on = g.prepared.has(s.name);
-    body += `<button class="grim-spell ${on?'on':''}" onclick="window._grimToggle(${idx})">`
-      + `<span class="grim-sigil">${on?'✦':''}</span>`
-      + `<span class="grim-sname">${s.name}</span>`
-      + `<span class="grim-sschool">${s.school||''}</span></button>`;
-  });
-  if(!body) body = '<div class="grim-empty">Aucun sort de niveau 1 ou plus dans votre répertoire. Ajoutez-en depuis l’onglet Sorts (✚), puis revenez les préparer ici.</div>';
-  const count = g.prepared.size; const over = g.prepares && count > g.cap;
-  const counter = g.prepares
-    ? `<div class="grim-counter ${over?'over':''}"><strong>${count}</strong> / ${g.cap} sorts préparés${over?' — au-delà de votre limite !':''}</div>`
-      + `<div class="grim-formula">${g.lines.map(l=>`${l.cls} : mod. ${l.ability.toUpperCase()} + niveau = ${l.n}`).join('  ·  ')}</div>`
-    : `<div class="grim-counter">Votre classe ne prépare pas ses sorts : tous vos sorts connus restent toujours prêts. Vous pouvez marquer ici ceux que vous gardez en tête.</div>`;
-  book.innerHTML = `
+  const g=window._grim; if(!g) return;
+  document.getElementById('grimBook').innerHTML=`
     <div class="grim-edge"></div>
     <div class="grim-inner">
       <div class="grim-head"><div class="grim-orn">❧</div><h2 class="grim-title">Grimoire</h2><div class="grim-sub">${g.name}</div></div>
-      ${counter}
-      <div class="grim-list">${body}</div>
+      <div class="grim-tabs">
+        <button class="grim-tab ${g.mode==='learn'?'on':''}" onclick="window._grimMode('learn')">📖 Apprendre</button>
+        <button class="grim-tab ${g.mode==='prepare'?'on':''}" onclick="window._grimMode('prepare')">✦ Préparer</button>
+      </div>
+      <div id="grimBody"></div>
       <div class="grim-foot">
-        <button class="grim-btn grim-save ${over?'disabled':''}" ${over?'disabled':''} onclick="window._grimSave()">Sceller le grimoire</button>
+        <button class="grim-btn grim-save" onclick="window._grimSave()">Sceller le grimoire</button>
         <button class="grim-btn grim-cancel" onclick="window._closeGrimoire()">Fermer</button>
       </div>
     </div>`;
+  _grimRenderBody();
 }
-window._grimToggle = (idx) => {
-  const g = window._grim; if(!g) return;
-  const name = (g.known[idx]||{}).name; if(!name) return;
-  if (g.prepared.has(name)) g.prepared.delete(name);
-  else { if (g.prepares && g.prepared.size >= g.cap) { _grimFlash(); return; } g.prepared.add(name); }
-  _grimRender();
+function _grimRenderBody(){
+  const g=window._grim; if(!g) return;
+  const body=document.getElementById('grimBody'); if(!body) return;
+  body.innerHTML = g.mode==='prepare' ? _grimPrepareHtml() : _grimLearnHtml();
+}
+// ---- Mode Préparer ----
+function _grimPrepareHtml(){
+  const g=window._grim, info=g.prepInfo;
+  const leveled=g.known.filter(s=>(s.level||0)>0).sort((a,b)=>(a.level-b.level)||a.name.localeCompare(b.name));
+  let curLvl=null, list='';
+  leveled.forEach(s=>{
+    if(s.level!==curLvl){ curLvl=s.level; list+=`<div class="grim-level">Niveau ${s.level}</div>`; }
+    const granted=g.grantedNames.has(s.name);
+    const on=granted||g.prepared.has(s.name);
+    const idx=g.known.indexOf(s);
+    list+=`<button class="grim-spell ${on?'on':''} ${granted?'locked':''}" ${granted?'':`onclick="window._grimPrepToggle(${idx})"`}>`
+      +`<span class="grim-sigil">${on?'✦':''}</span>`
+      +`<span class="grim-sname">${s.name}</span>`
+      +`<span class="grim-sschool">${granted?'accordé':(s.school||'')}</span></button>`;
+  });
+  if(!list) list='<div class="grim-empty">Aucun sort de niveau 1 ou plus. Onglet « Apprendre » pour en ajouter.</div>';
+  const count=g.prepared.size; const over=info.prepares&&count>info.cap;
+  const counter=info.prepares
+    ? `<div class="grim-counter ${over?'over':''}"><strong>${count}</strong> / ${info.cap} sorts préparés${over?' — au-delà de la limite !':''}</div><div class="grim-formula">${info.lines.map(l=>`${l.cls} : mod. ${l.ability.toUpperCase()} + niveau = ${l.n}`).join('  ·  ')}</div>`
+    : `<div class="grim-counter">Votre classe ne prépare pas ses sorts : tous vos sorts connus restent toujours prêts.</div>`;
+  return counter + `<div class="grim-list">${list}</div>`;
+}
+window._grimPrepToggle=(idx)=>{
+  const g=window._grim; if(!g) return; const s=g.known[idx]; if(!s) return;
+  if(g.grantedNames.has(s.name)) return;
+  if(g.prepared.has(s.name)) g.prepared.delete(s.name);
+  else { if(g.prepInfo.prepares && g.prepared.size>=g.prepInfo.cap){ _grimFlash(); return; } g.prepared.add(s.name); }
+  _grimRenderBody();
 };
-function _grimFlash(){ const c = document.querySelector('#grimBook .grim-counter'); if(c){ c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); } }
-window._grimSave = async () => {
-  const g = window._grim; if(!g) return;
-  if (g.prepares && g.prepared.size > g.cap) { _grimFlash(); return; }
-  try { await updateDoc(doc(db,"characters",g.charId), { prepared_spells: [...g.prepared] }); }
+// ---- Mode Apprendre ----
+function _grimLearnHtml(){
+  const g=window._grim;
+  if(!g.learnInfo.hasCaster) return '<div class="grim-empty">Cette classe n’est pas une classe de lanceur de sorts.</div>';
+  return `<div id="grimCounter">${_grimLearnCounterHtml()}</div>`
+    + `<input class="grim-search" id="grimSearch" type="text" placeholder="Rechercher un sort…" value="${(g.query||'').replace(/"/g,'&quot;')}" oninput="window._grimSearch(this.value)">`
+    + `<div class="grim-list" id="grimList">${_grimLearnListHtml()}</div>`;
+}
+function _grimLearnCounterHtml(){
+  const g=window._grim, info=g.learnInfo;
+  const cc=g.known.filter(s=>(s.level||0)===0 && !g.grantedNames.has(s.name)).length;
+  const sc=g.known.filter(s=>(s.level||0)>0 && !g.grantedNames.has(s.name)).length;
+  const spTxt=info.spellsMax===null?`Sorts : <strong>${sc}</strong> appris <span class="grim-mut">(accès à toute la liste)</span>`:`Sorts : <strong>${sc}</strong> / ${info.spellsMax}`;
+  return `<div class="grim-counter">Sorts mineurs : <strong>${cc}</strong> / ${info.cantripsMax}<br>${spTxt}</div><div class="grim-formula">Niveau de sort max : ${info.maxLvl} · ${info.classNames.join(', ')}</div>`;
+}
+function _grimLearnListHtml(){
+  const g=window._grim, info=g.learnInfo;
+  const q=(g.query||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const knownNames=new Set(g.known.map(s=>s.name));
+  const cc=g.known.filter(s=>(s.level||0)===0 && !g.grantedNames.has(s.name)).length;
+  const sc=g.known.filter(s=>(s.level||0)>0 && !g.grantedNames.has(s.name)).length;
+  const cantripFull=cc>=info.cantripsMax;
+  const spellFull=info.spellsMax!==null && sc>=info.spellsMax;
+  let curLvl=null, list='';
+  g.learnPool.forEach((s,i)=>{
+    if(q){ const nn=s.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(!nn.includes(q)) return; }
+    if(s.level!==curLvl){ curLvl=s.level; list+=`<div class="grim-level">${s.level===0?'Sorts mineurs':'Niveau '+s.level}</div>`; }
+    const granted=g.grantedNames.has(s.name);
+    const has=knownNames.has(s.name);
+    const isC=(s.level||0)===0;
+    const full=isC?cantripFull:spellFull;
+    let cls='grim-learn-spell', icon='＋', tag=s.school||'', click=`onclick="window._grimLearnToggle(${i})"`;
+    if(granted){ cls+=' locked'; icon='🔒'; tag='accordé'; click=''; }
+    else if(has){ cls+=' has'; icon='✓'; tag='connu — retirer'; }
+    else if(full){ cls+=' full'; icon='·'; tag='limite atteinte'; click=''; }
+    list+=`<button class="${cls}" ${click}><span class="grim-ladd">${icon}</span><span class="grim-sname">${s.name}</span><span class="grim-sschool">${tag}</span></button>`;
+  });
+  return list||'<div class="grim-empty">Aucun sort ne correspond à votre recherche.</div>';
+}
+window._grimSearch=(v)=>{ const g=window._grim; if(!g) return; g.query=v; const l=document.getElementById('grimList'); if(l) l.innerHTML=_grimLearnListHtml(); };
+window._grimLearnToggle=(i)=>{
+  const g=window._grim; if(!g) return; const s=g.learnPool[i]; if(!s) return;
+  if(g.grantedNames.has(s.name)) return;
+  const idx=g.known.findIndex(k=>k.name===s.name);
+  if(idx>=0){ g.known.splice(idx,1); }
+  else {
+    const info=g.learnInfo; const isC=(s.level||0)===0;
+    const cc=g.known.filter(k=>(k.level||0)===0 && !g.grantedNames.has(k.name)).length;
+    const sc=g.known.filter(k=>(k.level||0)>0 && !g.grantedNames.has(k.name)).length;
+    if(isC && cc>=info.cantripsMax){ _grimFlash(); return; }
+    if(!isC && info.spellsMax!==null && sc>=info.spellsMax){ _grimFlash(); return; }
+    g.known.push({...s});
+  }
+  const lst=document.getElementById('grimList'); const top=lst?lst.scrollTop:0;
+  const cEl=document.getElementById('grimCounter'); if(cEl) cEl.innerHTML=_grimLearnCounterHtml();
+  if(lst){ lst.innerHTML=_grimLearnListHtml(); lst.scrollTop=top; }
+};
+function _grimFlash(){ const c=document.querySelector('#grimBody .grim-counter'); if(c){ c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash'); } }
+window._grimSave=async()=>{
+  const g=window._grim; if(!g) return;
+  if(g.prepInfo.prepares && g.prepared.size>g.prepInfo.cap){ g.mode='prepare'; _grimRender(); _grimFlash(); return; }
+  const prepared=[...g.prepared].filter(n=>g.known.some(s=>s.name===n && (s.level||0)>0) && !g.grantedNames.has(n));
+  try{ await updateDoc(doc(db,"characters",g.charId),{known_spells:g.known, prepared_spells:prepared}); }
   catch(e){ alert('Échec de l’enregistrement : '+(e.message||e)); return; }
   _closeGrimoire();
 };
-window._closeGrimoire = () => { const o=document.getElementById('grimoireOverlay'); if(o) o.style.display='none'; window._grim=null; };
+window._closeGrimoire=()=>{ const o=document.getElementById('grimoireOverlay'); if(o) o.style.display='none'; window._grim=null; };
 
 function getSpellSlots(d) {
   const classes = getClasses(d);
@@ -3425,7 +3573,7 @@ function wizStepRecap(main, b) {
       ${group('📚 Compétences maîtrisées', b.skills.map(s=>`${s.name} <small class="dim">· via ${s.src}</small>`))}
       ${group('🎒 Équipement de départ', [c?.equipment||'—', wizBgData()?.equipment||''].filter(Boolean))}
     </div>
-    ${c?.spellcaster?'<p class="wiz-hint">✨ Tes sorts se choisissent ensuite directement sur la fiche, via le compendium.</p>':''}
+    ${c?.spellcaster?'<p class="wiz-hint">✨ Tes sorts mineurs et sorts de départ se choisissent juste après, dans le Grimoire (ou via 📖 sur la fiche).</p>':''}
     ${b.pending.length?`<div class="wiz-banner warn">⚠ Il reste des choix à compléter avant de forger : ${b.pending.map(p=>`<button class="wiz-pending-item inline" onclick="window._wizGo(${p.step})">${p.label}</button>`).join(' ')}</div>`:
       '<div class="wiz-banner ok">✦ Tout est prêt. Souffle sur les braises…</div>'}
   `;
@@ -3486,10 +3634,11 @@ async function wizSave(b) {
       inspiration: false, notes: '',
       createdAt: new Date().toISOString()
     };
-    await addDoc(collection(db, "characters"), newChar);
+    const _newRef = await addDoc(collection(db, "characters"), newChar);
     document.getElementById('wizOverlay').classList.remove('open');
     document.body.style.overflow = '';
     WIZ = null;
+    if (newChar.spellcaster) setTimeout(()=>{ try { window._openGrimoire(_newRef.id); } catch(e){} }, 450);
   } catch(e) {
     alert('La forge a refusé le métal : ' + (e.message||e));
   } finally {
@@ -4249,9 +4398,10 @@ function renderCharSheet(id, d) {
         const knownSpells = d.known_spells || [];
         const usedSlots = d.usedSpellSlots || {};
         const _prepSet0 = new Set(Array.isArray(d.prepared_spells)?d.prepared_spells:[]);
+        const _grantedSet0 = new Set(grantedSpellsFor(d).map(g=>g.name));
         const _prepInfo0 = preparedSpellsInfo(d);
         const _dim0 = _prepInfo0.prepares && _prepSet0.size>0;
-        const _isPrep0 = sp => (sp.level||0)===0 || !_dim0 || _prepSet0.has(sp.name);
+        const _isPrep0 = sp => (sp.level||0)===0 || !_dim0 || _grantedSet0.has(sp.name) || _prepSet0.has(sp.name);
         // Group spells by level
         const spellsByLvl = {};
         knownSpells.forEach(sp => { if(!spellsByLvl[sp.level]) spellsByLvl[sp.level]=[]; spellsByLvl[sp.level].push(sp); });
@@ -4300,7 +4450,7 @@ function renderCharSheet(id, d) {
 
         return `
       <div class="sheet-section">
-        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button>${d.spellcaster?`<button class="section-add-btn grim-open-btn" onclick="window._openGrimoire('${id}')">📖 Préparer</button>`:''}</div>
+        <div class="section-title">Sorts <button class="section-add-btn" onclick="window._pickFromCompendium('${id}','spell')">✚ Sort</button>${d.spellcaster?`<button class="section-add-btn grim-open-btn" onclick="window._openGrimoire('${id}')">📖 Grimoire</button>`:''}</div>
         <div class="spell-stats">
           <div class="spell-stat-box"><div class="combat-label">Caractéristique</div><div>${spellAbility.toUpperCase()||'—'}</div></div>
           <div class="spell-stat-box"><div class="combat-label">DD Sauvegarde</div><div>${d.spellSaveDC||8}</div></div>
@@ -5398,7 +5548,7 @@ function lvlStepDone(main, b) {
     </div>
     ${r.newFeatures.length?`<div class="wiz-recap-group" style="margin-top:14px"><h5>✦ Nouveaux acquis</h5>
       ${r.newFeatures.map(f=>`<div class="wiz-trait"><strong>${f.name}</strong> — ${f.desc}</div>`).join('')}</div>`:''}
-    <div style="text-align:center;margin-top:20px">${LVL.casterId?`<button class="wiz-btn-gold" style="background:linear-gradient(160deg,#8a6a2e,#6a4a18);margin-right:10px" onclick="window._openGrimoire('${LVL.casterId}')">📖 Préparer les sorts</button>`:''}<button class="wiz-btn-gold" onclick="window._lvlClose()">FERMER</button></div>`;
+    <div style="text-align:center;margin-top:20px">${LVL.casterId?`<button class="wiz-btn-gold" style="background:linear-gradient(160deg,#8a6a2e,#6a4a18);margin-right:10px" onclick="window._openGrimoire('${LVL.casterId}')">📖 Apprendre / préparer</button>`:''}<button class="wiz-btn-gold" onclick="window._lvlClose()">FERMER</button></div>`;
 }
 
 // ─── SAUVEGARDE ──────────────────────────────────────────────
@@ -7518,9 +7668,9 @@ const COMPENDIUM_DATA = {
     {name:"Adepte martial",desc:"2 manœuvres de Maître de guerre + 1d6 de supériorité (1/repos court).",prereq:"—",source:"PHB",statBonus:null},
     {name:"Adepte occulte",desc:"2 invocations d'occultiste (pas de prérequis de niveau). Perd l'invocation si ne remplit plus les conditions.",prereq:"—",source:"TCoE",statBonus:null},
     {name:"Initié au combat",desc:"1 style de combat de guerrier + 1 manœuvre de Maître de guerre (1d6, 1/repos court).",prereq:"—",source:"TCoE",statBonus:null},
-    {name:"Faveur des fées",desc:"+1 INT, SAG ou CHA. Apprendre Pas brumeux + un sort de niveau 1 de Divination ou d'Enchantement au choix. Chacun lançable 1/repos long sans emplacement (ou via vos emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
+    {name:"Faveur des fées",desc:"+1 INT, SAG ou CHA. Apprendre Foulée brumeuse + un sort de niveau 1 de Divination ou d'Enchantement au choix. Chacun lançable 1/repos long sans emplacement (ou via vos emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
     {name:"Faveur des ombres",desc:"+1 INT, SAG ou CHA. Apprendre Invisibilité + un sort de niveau 1 d'Illusion ou de Nécromancie au choix. Chacun lançable 1/repos long sans emplacement (ou via vos emplacements).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
-    {name:"Télékinésiste",desc:"+1 INT, SAG ou CHA. Apprendre Main du mage (la main devient invisible). Action bonus : pousser ou attirer de 1,50 m une créature à 9 m (jet de sauvegarde de FOR pour résister).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
+    {name:"Télékinésiste",desc:"+1 INT, SAG ou CHA. Apprendre Main de mage (la main devient invisible). Action bonus : pousser ou attirer de 1,50 m une créature à 9 m (jet de sauvegarde de FOR pour résister).",prereq:"—",source:"TCoE",statBonus:{choice:["int","wis","cha"],val:1}},
     {name:"Expert",desc:"+1 à une caractéristique. Maîtrise d'1 compétence. Expertise sur 1 compétence maîtrisée.",prereq:"—",source:"TCoE",statBonus:{choice:["str","dex","con","int","wis","cha"],val:1}},
     {name:"Esprit affûté",desc:"+1 INT. Avantage Investigation pour chercher des indices. Déduire des informations sur un lieu en 10 min d'observation.",prereq:"—",source:"PHB",statBonus:{stat:"int",val:1}},
     // ── Dons raciaux ──
@@ -10843,6 +10993,19 @@ window._saveNewResource = async (catId) => {
 .spell-known-item.not-prepared { opacity:0.55; }
 .spell-known-item.not-prepared .spell-known-main strong::after { content:' · non préparé'; font-size:0.68rem; font-style:italic; color:#a8967e; }
 .grim-open-btn { background:rgba(150,110,40,0.18); border-color:rgba(150,110,40,0.4); }
+.grim-tabs { display:flex; gap:6px; margin-bottom:8px; }
+.grim-tab { flex:1; padding:8px; border-radius:7px 7px 0 0; border:1px solid rgba(110,75,35,0.35); border-bottom:none; background:rgba(120,85,40,0.08); color:#6a4a1f; font-family:inherit; font-size:0.95rem; font-weight:700; cursor:pointer; }
+.grim-tab.on { background:rgba(150,110,40,0.20); color:#4a3216; box-shadow:inset 0 -3px 0 #b8860b; }
+.grim-search { width:100%; box-sizing:border-box; padding:8px 11px; margin-bottom:8px; border-radius:7px; border:1px solid rgba(110,75,35,0.4); background:rgba(255,250,235,0.5); color:#3a2a14; font-family:inherit; font-size:0.95rem; }
+.grim-search::placeholder { color:#9a7d52; }
+.grim-mut { font-size:0.8rem; font-style:italic; color:#86663a; }
+.grim-learn-spell { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:transparent; border:1px solid transparent; border-radius:7px; padding:6px 9px; cursor:pointer; font-family:inherit; color:#3a2a14; transition:background .12s; }
+.grim-learn-spell:hover { background:rgba(120,85,40,0.10); }
+.grim-learn-spell.has { background:rgba(60,110,45,0.13); }
+.grim-learn-spell.locked { opacity:0.72; cursor:default; }
+.grim-learn-spell.full { opacity:0.4; cursor:default; }
+.grim-ladd { flex:0 0 22px; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; border:1.5px solid rgba(110,75,35,0.4); background:rgba(255,250,235,0.4); font-size:1rem; color:#7a5a2a; }
+.grim-learn-spell.has .grim-ladd { border-color:rgba(60,110,45,0.5); background:rgba(60,110,45,0.16); color:#356b28; }
 .spell-card-detail { margin-bottom:8px; }
 .spell-card-detail img { width:100%; max-width:430px; display:block; margin:0 auto; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,0.45); }
 /* ── Modal de sort : habillage glassmorph (cohérent avec les wizards) ── */
