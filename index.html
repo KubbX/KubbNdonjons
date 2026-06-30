@@ -14062,8 +14062,8 @@ window._tourGo = function(i){
       window._tourGo(i + (window._tourDir || 1)); return;
     }
     window._tourI = i;
-    if(el){ try { el.scrollIntoView({block:'center', behavior:'smooth'}); } catch(e){} }
-    setTimeout(function(){ _tourRender(step, el); }, el ? 260 : 0);
+    if(el){ try { el.scrollIntoView({block:'center', behavior:'instant'}); } catch(e){ try { el.scrollIntoView({block:'center'}); } catch(e2){} } }
+    setTimeout(function(){ _tourRender(step, el); }, el ? 200 : 0);
   }, step.tab ? 240 : 20);
 };
 
@@ -14091,9 +14091,12 @@ function _tourRender(step, el){
     tip.style.width = tw + 'px';
     tip.style.left = Math.min(Math.max(12, r.left), window.innerWidth - tw - 12) + 'px';
     var th = tip.offsetHeight || 190;
-    if(r.bottom + 14 + th <= window.innerHeight){ tip.style.top = (r.bottom + 14) + 'px'; }
-    else if(r.top - 14 - th >= 0){ tip.style.top = (r.top - 14 - th) + 'px'; }
-    else { tip.style.top = Math.max(12, (window.innerHeight - th)/2) + 'px'; }
+    var top;
+    if(r.bottom + 14 + th <= window.innerHeight){ top = r.bottom + 14; }
+    else if(r.top - 14 - th >= 0){ top = r.top - 14 - th; }
+    else { top = (window.innerHeight - th) / 2; }
+    top = Math.max(12, Math.min(top, window.innerHeight - th - 12));
+    tip.style.top = top + 'px';
   } else {
     spot.style.display = 'none';
     ov.classList.add('tour-dark');
