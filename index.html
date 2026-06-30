@@ -3841,6 +3841,7 @@ window._selectChar = (id) => {
     const _d = snap.data();
     window._syncGrantedSpells(snap.id, _d);
     renderCharSheet(snap.id, _d);
+    try { window._maybeSheetTour && window._maybeSheetTour(); } catch(e){}
   });
   window._showTab('tab-sheet');
 };
@@ -13966,7 +13967,19 @@ nav { transition: transform .28s ease; will-change: transform; }
 </script>
 <script>
 /* ===== Tour guidé KubbNd ===== */
-window._tourSteps = [
+window._sheetTourSteps = [
+  { center:true, title:"Ta fiche de personnage", body:"Petit tour des encarts de la fiche. Tu pourras relancer l'aide g\u00E9n\u00E9rale via \u2754 Aide." },
+  { sel:".sheet-header", tab:"tab-sheet", optional:true, title:"En-t\u00EAte", body:"Le nom, la race, la ou les classes et le niveau du personnage." },
+  { sel:".sheet-avatar-wrap", tab:"tab-sheet", optional:true, title:"Portrait", body:"Tape l'avatar pour le personnaliser (image, retrait du fond\u2026)." },
+  { sel:".stat-mini-grid", tab:"tab-sheet", optional:true, title:"Caract\u00E9ristiques", body:"Les six caract\u00E9ristiques et leurs modificateurs, calcul\u00E9s automatiquement." },
+  { sel:".sheet-combat-row", tab:"tab-sheet", optional:true, title:"Combat", body:"Classe d'armure, points de vie, initiative et vitesse \u2014 recalcul\u00E9s selon ton \u00E9quipement." },
+  { sel:".sheet-hp-delta", tab:"tab-sheet", optional:true, title:"Suivi des PV", body:"Saisis un nombre puis +/\u2212 pour soigner ou infliger des d\u00E9g\u00E2ts en un geste." },
+  { sel:".sheet-levelup-row", tab:"tab-sheet", optional:true, title:"Mont\u00E9e de niveau", body:"Lance L'Ascension pour gagner un niveau et d\u00E9bloquer les aptitudes correspondantes." },
+  { sel:'[onclick*="_openGrimoire"]', tab:"tab-sheet", optional:true, title:"Le Grimoire", body:"Apprends et pr\u00E9pare tes sorts, par classe et par niveau. Les sorts de domaine/serment sont accord\u00E9s d'office \uD83D\uDD12." },
+  { sel:".sheet-section", tab:"tab-sheet", optional:true, title:"Les encarts", body:"Inventaire, capacit\u00E9s, dons, attaques\u2026 Chaque encart a un bouton \u2795 pour ajouter un \u00E9l\u00E9ment depuis le compendium." },
+  { center:true, title:"Voil\u00E0 pour la fiche !", body:"Tu peux tout modifier d'un clic. Bon jeu ! \uD83C\uDFB2" }
+];
+window._mainTourSteps = [
   { center:true, title:"Bienvenue dans KubbNd \u2694\uFE0F", body:"Ce tour \u00E9clair te montre les zones principales de l'app et ce qui se cache derri\u00E8re chaque bouton. Tu peux le relancer quand tu veux via \u2754 Aide." },
   { sel:"nav", title:"La barre de navigation", body:"Elle te fait passer d'une section \u00E0 l'autre. Voyons-les une par une." },
   { sel:"#navList", tab:"tab-list", title:"Mes h\u00E9ros", body:"La liste de tous tes personnages \u2014 c'est l'\u00E9cran d'accueil apr\u00E8s connexion." },
@@ -13989,10 +14002,23 @@ window._tourSteps = [
 ];
 window._tourI = 0; window._tourDir = 1;
 
-window._startTour = function(){
+window._tourSteps = window._mainTourSteps;
+function _runTour(steps){
+  window._tourSteps = steps || window._mainTourSteps;
   window._tourI = 0; window._tourDir = 1;
   var ov = document.getElementById('tourOverlay'); if(ov) ov.classList.add('on');
   window._tourGo(0);
+}
+window._startTour = function(){ _runTour(window._mainTourSteps); };
+window._startSheetTour = function(){ _runTour(window._sheetTourSteps); };
+window._maybeSheetTour = function(){
+  try {
+    if(localStorage.getItem('kubbnd_sheet_tour_v1')) return;
+    var ov = document.getElementById('tourOverlay');
+    if(ov && ov.classList.contains('on')) return;
+    localStorage.setItem('kubbnd_sheet_tour_v1', '1');
+    setTimeout(function(){ try { window._startSheetTour(); } catch(e){} }, 700);
+  } catch(e){}
 };
 window._endTour = function(){
   var ov = document.getElementById('tourOverlay');
