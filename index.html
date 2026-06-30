@@ -10380,6 +10380,7 @@ window._showTab = (tabId) => {
       window._editorSearch();
     }, 100);
   }
+  if (tabId === 'tab-gm') { try { window._maybeGmTour && window._maybeGmTour(); } catch(e){} }
 };
 
 // ── Toggle inspiration (simple click, works for player + GM) ──
@@ -13979,6 +13980,16 @@ window._sheetTourSteps = [
   { sel:".sheet-section", tab:"tab-sheet", optional:true, title:"Les encarts", body:"Inventaire, capacit\u00E9s, dons, attaques\u2026 Chaque encart a un bouton \u2795 pour ajouter un \u00E9l\u00E9ment depuis le compendium." },
   { center:true, title:"Voil\u00E0 pour la fiche !", body:"Tu peux tout modifier d'un clic. Bon jeu ! \uD83C\uDFB2" }
 ];
+window._gmTourSteps = [
+  { center:true, title:"L'\u00C9cran du Ma\u00EEtre", body:"Tes outils de MJ r\u00E9unis sur une page. Petit tour des encarts." },
+  { sel:".gm-search", tab:"tab-gm", optional:true, title:"Surveiller un personnage", body:"Colle l'ID d'un personnage puis AJOUTER pour suivre ses PV, sa CA, son inspiration\u2026 en temps r\u00E9el." },
+  { sel:"#gmMonitor", tab:"tab-gm", optional:true, title:"Le moniteur", body:"Les fiches surveill\u00E9es s'affichent ici, mises \u00E0 jour en direct pendant la partie." },
+  { sel:"#combatPanel", tab:"tab-gm", optional:true, title:"Combat & initiative", body:"Lance un combat, ajoute des cr\u00E9atures, synchronise tes PJ et fais d\u00E9filer les tours d'initiative." },
+  { sel:"#soundPanel", tab:"tab-gm", optional:true, title:"Ambiances sonores", body:"Pilote Syrinscape : jour/nuit, lieux, ambiances, bruitages et volume, sans quitter l'\u00E9cran." },
+  { sel:".gm-phone", tab:"tab-gm", optional:true, title:"Console sonore", body:"Un acc\u00E8s rapide aux sons et aux raccourcis pendant la partie." },
+  { sel:"#projDock", tab:"tab-gm", optional:true, title:"Projection (\u00E9cran d\u00E9port\u00E9)", body:"D\u00E9plie le dock pour projeter une vue sur un second \u00E9cran ou vid\u00E9oprojecteur, fa\u00E7on OBS." },
+  { center:true, title:"Pr\u00EAt \u00E0 ma\u00EEtriser !", body:"Tu connais maintenant l'\u00C9cran du Ma\u00EEtre. \u00C0 toi de jouer ! \uD83C\uDFB2" }
+];
 window._mainTourSteps = [
   { center:true, title:"Bienvenue dans KubbNd \u2694\uFE0F", body:"Ce tour \u00E9clair te montre les zones principales de l'app et ce qui se cache derri\u00E8re chaque bouton. Tu peux le relancer quand tu veux via \u2754 Aide." },
   { sel:"nav", title:"La barre de navigation", body:"Elle te fait passer d'une section \u00E0 l'autre. Voyons-les une par une." },
@@ -14011,6 +14022,16 @@ function _runTour(steps){
 }
 window._startTour = function(){ _runTour(window._mainTourSteps); };
 window._startSheetTour = function(){ _runTour(window._sheetTourSteps); };
+window._startGmTour = function(){ _runTour(window._gmTourSteps); };
+window._maybeGmTour = function(){
+  try {
+    if(localStorage.getItem('kubbnd_gm_tour_v1')) return;
+    var ov = document.getElementById('tourOverlay');
+    if(ov && ov.classList.contains('on')) return;
+    localStorage.setItem('kubbnd_gm_tour_v1', '1');
+    setTimeout(function(){ try { window._startGmTour(); } catch(e){} }, 600);
+  } catch(e){}
+};
 window._maybeSheetTour = function(){
   try {
     if(localStorage.getItem('kubbnd_sheet_tour_v1')) return;
@@ -14036,6 +14057,7 @@ window._tourGo = function(i){
   if(step.tab){ try { window._showTab(step.tab); } catch(e){} }
   setTimeout(function(){
     var el = (step.sel && !step.center) ? document.querySelector(step.sel) : null;
+    if(el && !(el.offsetWidth>0 || el.offsetHeight>0 || el.getClientRects().length>0)) el = null;
     if(step.sel && !step.center && !el && step.optional){
       window._tourGo(i + (window._tourDir || 1)); return;
     }
