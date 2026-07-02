@@ -9325,6 +9325,7 @@ async function hibouSend(text){
   hibouAddMsg('user', hibouEsc(text.trim()));
   hibouHist.push({role:'user', content:text.trim()});
   const btn = document.getElementById('hibouBtn'); btn.classList.add('thinking');
+  if (window._hibouPose) window._hibouPose('question');
   document.getElementById('hibouSend').disabled = true;
   const typing = document.createElement('div'); typing.className='hibou-typing'; typing.textContent='Hibouquin feuillette le grimoire';
   document.getElementById('hibouMsgs').appendChild(typing); typing.scrollIntoView({block:'end'});
@@ -9383,9 +9384,11 @@ async function hibouSend(text){
     if (bubble && !full) bubble.remove();
     hibouAddMsg('err', hibouEsc('Hou… ' + (e.message || e)));
     hibouHist.pop();
+    if (window._hibouPose) window._hibouPose('colere');
   } finally {
     hibouBusy = false;
     btn.classList.remove('thinking');
+    if (full && window._hibouPose) window._hibouPose('lecture');
     document.getElementById('hibouSend').disabled = false;
   }
 }
@@ -9401,7 +9404,28 @@ function hibouToggleSettings(force){
 (function hibouInit(){
   const btn = document.getElementById('hibouBtn'), panel = document.getElementById('hibouPanel');
   if (!btn) return;
-  document.getElementById('hibouHeadOwl').innerHTML = btn.querySelector('svg').outerHTML;
+  const owlBox = document.getElementById('hibouHeadOwl');
+  owlBox.innerHTML = btn.querySelector('svg').outerHTML;
+  const HIBOU_POSES = 'assets/hibouquin/';
+  let poseImg = null, hibouIdleTimer = null;
+  window._hibouPose = function(nom){
+    if (poseImg === false) return;
+    if (!poseImg) {
+      poseImg = document.createElement('img');
+      poseImg.alt = 'Hibouquin';
+      poseImg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:9px;border:1px solid rgba(200,160,90,0.4);';
+      poseImg.onerror = () => { poseImg = false; owlBox.innerHTML = btn.querySelector('svg').outerHTML; };
+      poseImg.onload = () => { if (owlBox.firstChild !== poseImg) { owlBox.innerHTML=''; owlBox.appendChild(poseImg); } };
+    }
+    poseImg.src = HIBOU_POSES + nom + '.webp';
+  };
+  window._hibouPose('lecture');
+  const hibouWake = () => {
+    clearTimeout(hibouIdleTimer);
+    hibouIdleTimer = setTimeout(() => { if (panel.classList.contains('open') && !hibouBusy) window._hibouPose('dodo'); }, 180000);
+  };
+  panel.addEventListener('pointerdown', hibouWake); panel.addEventListener('keydown', hibouWake);
+  hibouWake();
   btn.addEventListener('click', () => {
     panel.classList.toggle('open');
     if (panel.classList.contains('open') && !localStorage.getItem(HIBOU_LS_KEY)) hibouToggleSettings(true);
@@ -9426,6 +9450,266 @@ function hibouToggleSettings(force){
   document.getElementById('hibouChips').addEventListener('click', e => {
     const c = e.target.closest('.hibou-chip');
     if (c) hibouSend(c.textContent);
+  });
+})();
+
+/* ══════════ RÉGISSEUR D'AMBIANCES — moteur ══════════ */
+const AMB_LS = 'kubbnd_ambiances';
+const amb = {
+  scenes: [], cur: null, intensity: 'calme',
+  a: new Audio(), b: new Audio(), live: 'a', fading: null,
+  vol: 0.6, urls: new Map(),   // cache blob->objectURL
+};
+amb.a.loop = amb.b.loop = true;
+
+/* ---------- stockage : méta en localStorage, blobs en IndexedDB ---------- */
+function ambDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('kubbnd_ambiance', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('files');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function ambPut(id, blob){ const db = await ambDB(); return new Promise((res,rej)=>{ const t=db.transaction('files','readwrite'); t.objectStore('files').put(blob,id); t.oncomplete=res; t.onerror=()=>rej(t.error); }); }
+async function ambGet(id){ const db = await ambDB(); return new Promise((res,rej)=>{ const q=db.transaction('files').objectStore('files').get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+async function ambDel(id){ const db = await ambDB(); return new Promise((res)=>{ const t=db.transaction('files','readwrite'); t.objectStore('files').delete(id); t.oncomplete=res; }); }
+
+function ambLoadScenes(){ try { amb.scenes = JSON.parse(localStorage.getItem(AMB_LS)) || []; } catch { amb.scenes = []; } }
+function ambSaveScenes(){ localStorage.setItem(AMB_LS, JSON.stringify(amb.scenes)); }
+
+async function ambResolve(src){          // {mode:'url'|'idb', ref} -> URL jouable
+  if (!src || !src.ref) return null;
+  if (src.mode === 'url') return src.ref;
+  if (amb.urls.has(src.ref)) return amb.urls.get(src.ref);
+  const blob = await ambGet(src.ref);
+  if (!blob) return null;
+  const u = URL.createObjectURL(blob);
+  amb.urls.set(src.ref, u);
+  return u;
+}
+
+/* ---------- moteur audio : fondu-enchaîné ---------- */
+function ambSetStatus(t){ const e=document.getElementById('ambStatus'); if(e) e.textContent=t; }
+function ambCrossfade(toUrl){
+  const outEl = amb[amb.live], inEl = amb[amb.live === 'a' ? 'b' : 'a'];
+  if (amb.fading) { clearInterval(amb.fading); amb.fading = null; }
+  if (!toUrl) {   // simple fondu de sortie
+    const v0 = outEl.volume, t0 = Date.now();
+    amb.fading = setInterval(() => {
+      const k = Math.min((Date.now()-t0)/2000, 1);
+      outEl.volume = v0 * (1-k);
+      if (k >= 1) { clearInterval(amb.fading); amb.fading=null; outEl.pause(); }
+    }, 60);
+    return;
+  }
+  inEl.src = toUrl; inEl.volume = 0;
+  inEl.play().catch(e => ambSetStatus('Lecture bloquée : ' + e.message));
+  const t0 = Date.now(), v0 = outEl.paused ? 0 : outEl.volume;
+  amb.fading = setInterval(() => {
+    const k = Math.min((Date.now()-t0)/3500, 1);
+    inEl.volume = amb.vol * k;
+    if (v0) outEl.volume = v0 * (1-k);
+    if (k >= 1) { clearInterval(amb.fading); amb.fading=null; outEl.pause(); outEl.volume = amb.vol; }
+  }, 60);
+  amb.live = amb.live === 'a' ? 'b' : 'a';
+}
+
+async function ambPlayCurrent(){
+  const sc = amb.scenes.find(s => s.id === amb.cur);
+  if (!sc) return;
+  const ordre = { calme:['calme','tension','combat'], tension:['tension','calme','combat'], combat:['combat','tension','calme'] }[amb.intensity];
+  let piste = null, choisi = null;
+  for (const p of ordre) { piste = await ambResolve(sc.pistes && sc.pistes[p]); if (piste) { choisi = p; break; } }
+  if (!piste) { ambSetStatus(`« ${sc.nom} » n'a aucune piste audio.`); ambCrossfade(null); return; }
+  ambCrossfade(piste);
+  ambSetStatus(`▶ ${sc.nom} — ${choisi}${choisi!==amb.intensity?` (pas de piste ${amb.intensity})`:''}`);
+}
+
+/* ---------- projection de l'image ---------- */
+function ambProjWin(){
+  if (typeof _proj !== 'undefined' && _proj.win && !_proj.win.closed) return _proj.win;
+  if (amb.win && !amb.win.closed) return amb.win;
+  return null;
+}
+function ambEnsureLayer(w){
+  let img = w.document.getElementById('ambimg');
+  if (!img) {
+    img = w.document.createElement('img'); img.id = 'ambimg';
+    img.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;z-index:50;opacity:0;transition:opacity 1.2s ease;background:#000;';
+    w.document.body.appendChild(img);
+  }
+  let noir = w.document.getElementById('ambnoir');
+  if (!noir) {
+    noir = w.document.createElement('div'); noir.id = 'ambnoir';
+    noir.style.cssText = 'position:fixed;inset:0;background:#000;z-index:60;opacity:0;transition:opacity 1.6s ease;pointer-events:none;';
+    w.document.body.appendChild(noir);
+  }
+  return { img, noir };
+}
+async function ambShowImage(sc){
+  let w = ambProjWin();
+  if (!w) {
+    w = window.open('', 'kubbnd_projection', 'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no');
+    if (!w) { ambSetStatus('Fenêtre de projection bloquée — autorise les popups.'); return; }
+    if (!w.document.getElementById('ambimg')) {
+      w.document.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Projection — KubbNd<\/title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}<\/style><\/head><body><\/body><\/html>');
+      w.document.close();
+    }
+    amb.win = w;
+  }
+  const { img, noir } = ambEnsureLayer(w);
+  const url = await ambResolve(sc && sc.image);
+  noir.style.opacity = '0';
+  if (url) { img.src = url; requestAnimationFrame(() => { img.style.opacity = '1'; }); }
+  else img.style.opacity = '0';
+}
+window._ambBlack = function(){
+  const w = ambProjWin(); if (!w) return;
+  const { noir } = ambEnsureLayer(w);
+  noir.style.opacity = noir.style.opacity === '1' ? '0' : '1';
+};
+
+/* ---------- actions publiques ---------- */
+window._ambActivate = async function(id){
+  amb.cur = id;
+  ambRender();
+  const sc = amb.scenes.find(s => s.id === id);
+  await ambPlayCurrent();
+  await ambShowImage(sc);
+};
+window._ambIntensity = function(i){
+  amb.intensity = i; ambRender();
+  if (amb.cur) ambPlayCurrent();
+};
+window._ambStop = function(){
+  amb.cur = null; ambCrossfade(null); ambRender();
+  const w = ambProjWin();
+  if (w) { const { img } = ambEnsureLayer(w); img.style.opacity = '0'; }
+  ambSetStatus('Ambiance coupée.');
+};
+window._ambToggle = function(){
+  const b = document.getElementById('ambBody'), c = document.getElementById('ambChevron');
+  const off = b.style.display === 'none';
+  b.style.display = off ? '' : 'none'; c.textContent = off ? '▾' : '▸';
+};
+
+/* ---------- rendu ---------- */
+async function ambRender(){
+  const cont = document.getElementById('ambScenes');
+  if (!cont) return;
+  if (!amb.scenes.length) { cont.innerHTML = '<div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div>'; }
+  else {
+    cont.innerHTML = amb.scenes.map((s,i) =>
+      `<button class="amb-scene${s.id===amb.cur?' on':''}" style="--amb-c:${s.couleur||'#caa258'}" onclick="window._ambActivate('${s.id}')">
+        <span class="amb-scene-vis" id="ambVis_${s.id}">${s.emoji||'🎬'}</span>
+        <span class="amb-scene-name">${(s.nom||'?').replace(/</g,'&lt;')}</span>
+        ${i<9?`<span class="amb-scene-key">Alt+${i+1}</span>`:''}
+      </button>`).join('');
+    for (const s of amb.scenes) {   // vignettes d'image en fond de tuile
+      const u = await ambResolve(s.image);
+      const v = document.getElementById('ambVis_'+s.id);
+      if (u && v) v.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.25),rgba(0,0,0,0.25)),url("${u}")`;
+    }
+  }
+  document.querySelectorAll('.amb-int').forEach(b => b.classList.toggle('on', b.dataset.int === amb.intensity));
+}
+
+/* ---------- éditeur ---------- */
+let ambEditId = null, ambPending = {};   // fichiers choisis avant sauvegarde
+window._ambOpenEditor = function(id){
+  ambEditId = id || null; ambPending = {};
+  document.getElementById('ambOv').classList.add('open');
+  ambRenderEditList();
+  ambFillForm(amb.scenes.find(s => s.id === ambEditId));
+};
+window._ambCloseEditor = function(){ document.getElementById('ambOv').classList.remove('open'); };
+function ambRenderEditList(){
+  const el = document.getElementById('ambListEdit');
+  el.innerHTML = amb.scenes.map(s => `<button class="${s.id===ambEditId?'sel':''}" onclick="window._ambOpenEditor('${s.id}')">${s.emoji||''} ${(s.nom||'?').replace(/</g,'&lt;')}</button>`).join('')
+    + `<button class="${!ambEditId?'sel':''}" onclick="window._ambOpenEditor()">＋ Nouvelle</button>`;
+}
+function ambFillForm(s){
+  document.getElementById('ambFNom').value = s?.nom || '';
+  document.getElementById('ambFEmoji').value = s?.emoji || '';
+  document.getElementById('ambFCouleur').value = s?.couleur || '#caa258';
+  document.getElementById('ambFImgUrl').value = (s?.image?.mode==='url') ? s.image.ref : '';
+  document.getElementById('ambFImgState').textContent = s?.image ? (s.image.mode==='idb'?'fichier local enregistré':'URL') : 'aucune image';
+  document.getElementById('ambFImgState').classList.toggle('none', !s?.image);
+  for (const p of ['Calme','Tension','Combat']) {
+    const key = p.toLowerCase(), src = s?.pistes?.[key];
+    document.getElementById('ambFUrl'+p).value = (src?.mode==='url') ? src.ref : '';
+    const st = document.getElementById('ambFSt'+p);
+    st.textContent = src ? (src.mode==='idb'?'fichier local enregistré':'URL') : 'vide';
+    st.classList.toggle('none', !src);
+  }
+  document.getElementById('ambFDel').style.display = s ? '' : 'none';
+}
+window._ambPickFile = function(slot){
+  const inp = document.getElementById('ambFileInput');
+  inp.accept = slot === 'image' ? 'image/*' : 'audio/*';
+  inp.onchange = () => {
+    if (!inp.files[0]) return;
+    ambPending[slot] = inp.files[0];
+    const st = document.getElementById(slot==='image' ? 'ambFImgState' : 'ambFSt'+slot[0].toUpperCase()+slot.slice(1));
+    st.textContent = '→ ' + inp.files[0].name; st.classList.remove('none');
+    inp.value = '';
+  };
+  inp.click();
+};
+window._ambSaveScene = async function(){
+  const nom = document.getElementById('ambFNom').value.trim();
+  if (!nom) { alert('Donne un nom à la scène.'); return; }
+  let s = amb.scenes.find(x => x.id === ambEditId);
+  if (!s) { s = { id:'amb_'+Date.now().toString(36), pistes:{} }; amb.scenes.push(s); }
+  s.nom = nom;
+  s.emoji = document.getElementById('ambFEmoji').value.trim();
+  s.couleur = document.getElementById('ambFCouleur').value;
+  const setSrc = async (slot, urlVal, target, key) => {
+    if (ambPending[slot]) {
+      const id = s.id + '_' + slot;
+      await ambPut(id, ambPending[slot]);
+      amb.urls.delete(id);
+      target[key] = { mode:'idb', ref:id };
+    } else if (urlVal) target[key] = { mode:'url', ref:urlVal };
+    else if (!(target[key] && target[key].mode === 'idb')) delete target[key];
+  };
+  await setSrc('image', document.getElementById('ambFImgUrl').value.trim(), s, 'image');
+  s.pistes = s.pistes || {};
+  for (const p of ['calme','tension','combat'])
+    await setSrc(p, document.getElementById('ambFUrl'+p[0].toUpperCase()+p.slice(1)).value.trim(), s.pistes, p);
+  ambSaveScenes(); ambEditId = s.id; ambPending = {};
+  ambRenderEditList(); ambFillForm(s); ambRender();
+};
+window._ambDeleteScene = async function(){
+  const s = amb.scenes.find(x => x.id === ambEditId);
+  if (!s || !confirm(`Supprimer la scène « ${s.nom} » ?`)) return;
+  for (const id of [s.id+'_image', s.id+'_calme', s.id+'_tension', s.id+'_combat']) await ambDel(id);
+  amb.scenes = amb.scenes.filter(x => x.id !== ambEditId);
+  if (amb.cur === ambEditId) window._ambStop();
+  ambSaveScenes(); ambEditId = null;
+  ambRenderEditList(); ambFillForm(null); ambRender();
+};
+
+/* ---------- volume + raccourcis (Stream Deck via hotkeys) ---------- */
+(function ambInit(){
+  const wrap = document.getElementById('ambWrap');
+  if (!wrap) return;
+  ambLoadScenes(); ambRender();
+  const vol = document.getElementById('ambVol');
+  vol.addEventListener('input', () => {
+    amb.vol = vol.value / 100;
+    amb[amb.live].volume = amb.vol;
+  });
+  document.addEventListener('keydown', e => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+    if (e.key >= '1' && e.key <= '9') { const s = amb.scenes[+e.key-1]; if (s) { e.preventDefault(); window._ambActivate(s.id); } }
+    else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); window._ambIntensity('calme'); }
+    else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window._ambIntensity('tension'); }
+    else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); window._ambIntensity('combat'); }
+    else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); window._ambBlack(); }
+    else if (e.key === '0') { e.preventDefault(); window._ambStop(); }
   });
 })();
 
@@ -11248,6 +11532,90 @@ nav { transition: transform .28s ease; will-change: transform; }
   .hibou-btn { right:12px; bottom:12px; width:58px; height:58px; }
 }
 
+
+/* ══════════ RÉGISSEUR D'AMBIANCES (écran MJ) ══════════ */
+.amb-wrap { margin:18px 0; border:1px solid rgba(160,120,65,0.4); border-radius:12px; overflow:hidden;
+  background:linear-gradient(rgba(0,0,0,0.22),rgba(0,0,0,0.06)); }
+.amb-head { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer;
+  background:rgba(0,0,0,0.25); border-bottom:1px solid rgba(160,120,65,0.25); }
+.amb-title { flex:1; font-family:'Cinzel',serif; font-size:1.05rem; color:#f0dfae; letter-spacing:0.04em; }
+.amb-head-btn { border:1px solid rgba(200,160,90,0.4); background:rgba(0,0,0,0.3); color:#e3cf9f;
+  border-radius:8px; padding:5px 11px; cursor:pointer; font-family:inherit; font-size:0.85rem; }
+.amb-head-btn:hover { background:rgba(185,140,72,0.18); }
+.amb-body { padding:12px 14px; }
+
+.amb-scenes { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+.amb-scene { position:relative; width:92px; display:flex; flex-direction:column; align-items:center; gap:5px;
+  background:none; border:none; cursor:pointer; padding:3px; font-family:inherit; }
+.amb-scene-vis { width:74px; height:74px; border-radius:12px; display:grid; place-items:center; font-size:1.9rem;
+  border:2px solid var(--amb-c, rgba(185,140,72,0.45)); background:rgba(0,0,0,0.35) center/cover no-repeat;
+  box-shadow:0 3px 10px rgba(0,0,0,0.4); transition:box-shadow .2s, transform .15s; text-shadow:0 2px 6px rgba(0,0,0,0.8); }
+.amb-scene:hover .amb-scene-vis { transform:translateY(-2px); }
+.amb-scene.on .amb-scene-vis { box-shadow:0 0 16px var(--amb-c, rgba(232,200,120,0.6)), 0 3px 10px rgba(0,0,0,0.4);
+  border-width:3px; animation:ambPulse 2.2s ease-in-out infinite; }
+@keyframes ambPulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.22)} }
+.amb-scene-name { font-size:0.78rem; color:#cbb88f; text-align:center; line-height:1.1; max-width:90px; }
+.amb-scene.on .amb-scene-name { color:#f3e4c2; font-weight:700; }
+.amb-scene-key { position:absolute; top:-2px; left:4px; font-size:0.62rem; color:#8a744c;
+  background:rgba(20,12,5,0.9); border:1px solid rgba(160,120,65,0.4); border-radius:5px; padding:0 4px; }
+.amb-empty { color:#8a744c; font-style:italic; font-size:0.9rem; padding:8px 4px; }
+
+.amb-controls { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.amb-intens { display:flex; border:1px solid rgba(160,120,65,0.45); border-radius:9px; overflow:hidden; }
+.amb-int { padding:8px 14px; border:none; background:rgba(0,0,0,0.3); color:#cbb88f; cursor:pointer;
+  font-family:inherit; font-size:0.92rem; border-right:1px solid rgba(160,120,65,0.3); }
+.amb-int:last-child { border-right:none; }
+.amb-int.on { background:linear-gradient(#caa258,#8a6326); color:#1a1206; font-weight:700; }
+.amb-int:disabled { opacity:0.35; cursor:default; }
+.amb-vol { display:flex; align-items:center; gap:7px; color:#cbb88f; font-size:0.9rem; }
+.amb-vol input[type=range] { width:110px; accent-color:#caa258; }
+.amb-ctl { border:1px solid rgba(160,120,65,0.45); background:rgba(0,0,0,0.3); color:#e3cf9f;
+  border-radius:9px; padding:8px 13px; cursor:pointer; font-family:inherit; font-size:0.92rem; }
+.amb-ctl:hover { background:rgba(185,140,72,0.16); }
+.amb-ctl.stop { border-color:rgba(200,90,60,0.5); color:#f0b8a4; }
+.amb-status { font-size:0.82rem; color:#8a744c; font-style:italic; margin-top:8px; min-height:1.1em; }
+
+/* éditeur */
+.amb-ov { position:fixed; inset:0; z-index:8800; display:none; align-items:center; justify-content:center;
+  padding:14px; background:rgba(8,5,2,0.85); }
+.amb-ov.open { display:flex; }
+.amb-modal { width:min(680px,96vw); max-height:92vh; display:flex; flex-direction:column; border-radius:13px;
+  border:1px solid rgba(160,120,65,0.5); background:radial-gradient(130% 110% at 50% 0%, #2a1d0f, #17100a 80%);
+  color:#e8dcc2; font-family:'Crimson Pro',Georgia,serif; overflow:hidden; }
+.amb-modal-head { display:flex; align-items:center; padding:12px 16px; border-bottom:1px solid rgba(160,120,65,0.3); }
+.amb-modal-head strong { flex:1; font-family:'Cinzel',serif; font-size:1.15rem; color:#f0dfae; }
+.amb-modal-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:14px 16px; }
+.amb-form { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+.amb-form .full { grid-column:1 / -1; }
+.amb-form label { display:block; font-size:0.82rem; color:#c9b485; font-variant:small-caps; letter-spacing:0.05em; margin-bottom:3px; }
+.amb-form input[type=text], .amb-form input[type=url], .amb-form input[type=color] {
+  width:100%; box-sizing:border-box; padding:8px 10px; border-radius:8px; border:1px solid rgba(160,120,65,0.45);
+  background:rgba(20,12,4,0.5); color:#f1e2bf; font-family:inherit; font-size:0.94rem; }
+.amb-form input[type=color] { height:38px; padding:3px; }
+.amb-track { border:1px dashed rgba(160,120,65,0.35); border-radius:9px; padding:9px 10px; }
+.amb-track-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.9rem; color:#e3cf9f; }
+.amb-track-state { font-size:0.78rem; color:#8fae6a; }
+.amb-track-state.none { color:#8a744c; font-style:italic; }
+.amb-file-row { display:flex; gap:7px; }
+.amb-file-row input { flex:1; min-width:0; }
+.amb-file-btn { border:1px solid rgba(160,120,65,0.45); background:rgba(0,0,0,0.3); color:#e3cf9f;
+  border-radius:8px; padding:7px 10px; cursor:pointer; font-size:0.82rem; font-family:inherit; white-space:nowrap; }
+.amb-modal-foot { display:flex; gap:10px; padding:12px 16px; border-top:1px solid rgba(160,120,65,0.3); }
+.amb-save { flex:1; padding:11px; border-radius:9px; border:1px solid rgba(200,160,90,0.5);
+  background:linear-gradient(160deg,#caa258,#8a6326); color:#1a1206; font-weight:700; cursor:pointer;
+  font-family:inherit; font-variant:small-caps; letter-spacing:0.05em; font-size:1rem; }
+.amb-del { padding:11px 16px; border-radius:9px; border:1px solid rgba(200,90,60,0.5);
+  background:rgba(60,20,12,0.5); color:#f0b8a4; cursor:pointer; font-family:inherit; }
+.amb-list-edit { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.amb-list-edit button { border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.3); color:#e3cf9f;
+  border-radius:8px; padding:7px 12px; cursor:pointer; font-family:inherit; }
+.amb-list-edit button.sel { background:rgba(185,140,72,0.22); border-color:rgba(232,200,120,0.6); color:#f3e4c2; }
+@media (max-width:560px){ .amb-form { grid-template-columns:1fr; } }
+
+
+.hibou-hello-img { width:min(220px,70%); border-radius:12px; border:1px solid rgba(200,160,90,0.4);
+  box-shadow:0 6px 18px rgba(0,0,0,0.45); margin-bottom:6px; }
+.hibou-head-owl { border-radius:9px; overflow:hidden; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -11331,6 +11699,75 @@ nav { transition: transform .28s ease; will-change: transform; }
       <input id="gmSearchId" type="text" placeholder="Coller l'ID du personnage à surveiller">
       <button class="btn-gold" onclick="window._watchChar()">AJOUTER</button>
     </div>
+<!-- ══════════ RÉGISSEUR D'AMBIANCES ══════════ -->
+<div class="amb-wrap" id="ambWrap">
+  <div class="amb-head" onclick="window._ambToggle()">
+    <span class="amb-title">🎭 Ambiances</span>
+    <button class="amb-head-btn" onclick="event.stopPropagation();window._ambOpenEditor()">⚙ Gérer les scènes</button>
+    <span id="ambChevron">▾</span>
+  </div>
+  <div class="amb-body" id="ambBody">
+    <div class="amb-scenes" id="ambScenes"><div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div></div>
+    <div class="amb-controls">
+      <div class="amb-intens">
+        <button class="amb-int" data-int="calme" onclick="window._ambIntensity('calme')">🕊 Calme</button>
+        <button class="amb-int" data-int="tension" onclick="window._ambIntensity('tension')">⚡ Tension</button>
+        <button class="amb-int" data-int="combat" onclick="window._ambIntensity('combat')">⚔ Combat</button>
+      </div>
+      <label class="amb-vol">🔊 <input type="range" id="ambVol" min="0" max="100" value="60"></label>
+      <button class="amb-ctl" onclick="window._ambBlack()" title="Fondu au noir sur l'écran projeté (Alt+N)">☾ Noir</button>
+      <button class="amb-ctl stop" onclick="window._ambStop()" title="Tout couper (Alt+0)">⏹ Stop</button>
+    </div>
+    <div class="amb-status" id="ambStatus">Raccourcis : Alt+1…9 scènes · Alt+C/T/B intensité · Alt+N noir · Alt+0 stop — compatibles Stream Deck.</div>
+  </div>
+</div>
+
+<div class="amb-ov" id="ambOv">
+  <div class="amb-modal">
+    <div class="amb-modal-head">
+      <strong>Scènes d'ambiance</strong>
+      <button class="hibou-hbtn" onclick="window._ambCloseEditor()">✕</button>
+    </div>
+    <div class="amb-modal-body">
+      <div class="amb-list-edit" id="ambListEdit"></div>
+      <div class="amb-form">
+        <div><label>Nom de la scène</label><input type="text" id="ambFNom" placeholder="Taverne du Sanglier"></div>
+        <div><label>Emoji</label><input type="text" id="ambFEmoji" placeholder="🍺" maxlength="4"></div>
+        <div><label>Couleur</label><input type="color" id="ambFCouleur" value="#caa258"></div>
+        <div>
+          <label>Image projetée</label>
+          <div class="amb-file-row">
+            <input type="url" id="ambFImgUrl" placeholder="URL ou fichier →">
+            <button class="amb-file-btn" onclick="window._ambPickFile('image')">📁 Fichier</button>
+          </div>
+          <span class="amb-track-state none" id="ambFImgState">aucune image</span>
+        </div>
+        <div class="full amb-track" data-t="calme">
+          <div class="amb-track-head">🕊 <b>Piste calme</b> <span class="amb-track-state none" id="ambFStCalme">vide</span></div>
+          <div class="amb-file-row"><input type="url" id="ambFUrlCalme" placeholder="URL audio ou fichier local →"><button class="amb-file-btn" onclick="window._ambPickFile('calme')">📁 Fichier</button></div>
+        </div>
+        <div class="full amb-track" data-t="tension">
+          <div class="amb-track-head">⚡ <b>Piste tension</b> <span class="amb-track-state none" id="ambFStTension">vide</span></div>
+          <div class="amb-file-row"><input type="url" id="ambFUrlTension" placeholder="URL audio ou fichier local →"><button class="amb-file-btn" onclick="window._ambPickFile('tension')">📁 Fichier</button></div>
+        </div>
+        <div class="full amb-track" data-t="combat">
+          <div class="amb-track-head">⚔ <b>Piste combat</b> <span class="amb-track-state none" id="ambFStCombat">vide</span></div>
+          <div class="amb-file-row"><input type="url" id="ambFUrlCombat" placeholder="URL audio ou fichier local →"><button class="amb-file-btn" onclick="window._ambPickFile('combat')">📁 Fichier</button></div>
+        </div>
+        <p class="amb-set-note full" style="font-size:0.8rem;color:#8a744c;font-style:italic;line-height:1.45;margin:2px 0 0;">
+          Les fichiers choisis sont stockés <b>dans ce navigateur</b> (IndexedDB) — rien n'est envoyé en ligne, tu peux donc utiliser n'importe quelle banque sonore dont la licence autorise l'usage à ta table. Formats conseillés : MP3/OGG pour l'audio, JPG/WebP pour les images.
+        </p>
+      </div>
+    </div>
+    <div class="amb-modal-foot">
+      <button class="amb-del" id="ambFDel" onclick="window._ambDeleteScene()">Supprimer</button>
+      <button class="amb-save" onclick="window._ambSaveScene()">Enregistrer la scène</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="ambFileInput" style="display:none">
+
+
 
     <!-- ══════════════════════════════════════════════════
          MODULE AMBIANCE SONORE — Syrinscape
@@ -12692,7 +13129,7 @@ window.addEventListener('keydown', function(e){
     <button class="hibou-hbtn" id="hibouClose" title="Fermer">✕</button>
   </div>
   <div class="hibou-msgs" id="hibouMsgs">
-    <div class="hibou-hello" id="hibouHello">Hou hou ! Je suis <b>Hibouquin</b>, gardien de ce grimoire.<br>Une règle, un sort, une idée de PNJ ? Demande !</div>
+    <div class="hibou-hello" id="hibouHello"><img class="hibou-hello-img" src="assets/hibouquin/joie.webp" alt="" onerror="this.remove()"><br>Hou hou ! Je suis <b>Hibouquin</b>, gardien de ce grimoire.<br>Une règle, un sort, une idée de PNJ ? Demande !</div>
     <div class="hibou-chips" id="hibouChips">
       <button class="hibou-chip">Comment marche la concentration ?</button>
       <button class="hibou-chip">Explique-moi le sort Hâte</button>
