@@ -9417,20 +9417,28 @@ function hibouToggleSettings(force){
 (function hibouInit(){
   const btn = document.getElementById('hibouBtn'), panel = document.getElementById('hibouPanel');
   if (!btn) return;
-  const owlBox = document.getElementById('hibouHeadOwl');
-  owlBox.innerHTML = btn.querySelector('svg').outerHTML;
   const HIBOU_POSES = 'assets/hibouquin/';
-  let poseImg = null, hibouIdleTimer = null;
+  console.log('[Hibouquin] poses attendues sous :', new URL(HIBOU_POSES, location.href).href);
+  const btnSvg = btn.querySelector('svg');
+  const btnImg = document.getElementById('hibouBtnImg');
+  const banner = document.getElementById('hibouBanner');
+  let hibouIdleTimer = null, poseWarned = false;
   window._hibouPose = function(nom){
-    if (poseImg === false) return;
-    if (!poseImg) {
-      poseImg = document.createElement('img');
-      poseImg.alt = 'Hibouquin';
-      poseImg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:9px;border:1px solid rgba(200,160,90,0.4);';
-      poseImg.onerror = () => { console.warn('[Hibouquin] pose introuvable :', poseImg.src, '— vérifie que le dossier assets/hibouquin/ est bien déployé à la racine du site.'); poseImg = false; owlBox.innerHTML = btn.querySelector('svg').outerHTML; };
-      poseImg.onload = () => { if (owlBox.firstChild !== poseImg) { owlBox.innerHTML=''; owlBox.appendChild(poseImg); } };
-    }
-    poseImg.src = HIBOU_POSES + nom + '.webp';
+    const url = HIBOU_POSES + nom + '.webp';
+    const probe = new Image();
+    probe.onload = () => {
+      poseWarned = false;
+      banner.src = url; banner.parentElement.style.display = '';
+      btnImg.src = url; btnImg.style.display = '';
+      if (btnSvg) btnSvg.style.visibility = 'hidden';
+    };
+    probe.onerror = () => {
+      if (!poseWarned) { poseWarned = true; console.warn('[Hibouquin] pose introuvable :', probe.src, '— teste cette URL directement dans le navigateur. Repli SVG en attendant, nouvel essai au prochain changement de pose.'); }
+      banner.parentElement.style.display = 'none';
+      btnImg.style.display = 'none';
+      if (btnSvg) btnSvg.style.visibility = '';
+    };
+    probe.src = url;
   };
   window._hibouPose('lecture');
   const hibouWake = () => {
@@ -11631,6 +11639,11 @@ nav { transition: transform .28s ease; will-change: transform; }
 .hibou-hello-img { width:min(220px,70%); border-radius:12px; border:1px solid rgba(200,160,90,0.4);
   box-shadow:0 6px 18px rgba(0,0,0,0.45); margin-bottom:6px; }
 .hibou-head-owl { border-radius:9px; overflow:hidden; }
+
+.hibou-banner { height:132px; flex:0 0 auto; overflow:hidden; background:#17100a;
+  border-bottom:1px solid rgba(160,120,65,0.3); }
+.hibou-banner img { width:100%; height:100%; object-fit:cover; object-position:center 18%; display:block; }
+@media (max-width:520px){ .hibou-banner { height:104px; } }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -13097,6 +13110,7 @@ window.addEventListener('keydown', function(e){
 
 <!-- ══════════ HIBOUQUIN — mascotte assistante ══════════ -->
 <button class="hibou-btn" id="hibouBtn" title="Hibouquin, l'assistant du grimoire" aria-label="Ouvrir l'assistant Hibouquin">
+  <img id="hibouBtnImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 18%;border-radius:50%;display:none;">
   <svg viewBox="0 0 64 64" aria-hidden="true">
     <defs>
       <radialGradient id="hibouBody" cx="50%" cy="40%" r="65%">
@@ -13137,13 +13151,13 @@ window.addEventListener('keydown', function(e){
 
 <div class="hibou-panel" id="hibouPanel" role="dialog" aria-label="Assistant Hibouquin">
   <div class="hibou-head">
-    <span class="hibou-head-owl" id="hibouHeadOwl"></span>
     <span class="hibou-head-name"><strong>Hibouquin</strong><em>érudit du grimoire</em></span>
     <button class="hibou-hbtn" id="hibouGear" title="Réglages">⚙</button>
     <button class="hibou-hbtn" id="hibouClose" title="Fermer">✕</button>
   </div>
+  <div class="hibou-banner" style="display:none"><img id="hibouBanner" alt="Hibouquin"></div>
   <div class="hibou-msgs" id="hibouMsgs">
-    <div class="hibou-hello" id="hibouHello"><img class="hibou-hello-img" src="assets/hibouquin/joie.webp" alt="" onerror="this.remove()"><br>Hou hou ! Je suis <b>Hibouquin</b>, gardien de ce grimoire.<br>Une règle, un sort, une idée de PNJ ? Demande !</div>
+    <div class="hibou-hello" id="hibouHello">Hou hou ! Je suis <b>Hibouquin</b>, gardien de ce grimoire.<br>Une règle, un sort, une idée de PNJ ? Demande !</div>
     <div class="hibou-chips" id="hibouChips">
       <button class="hibou-chip">Comment marche la concentration ?</button>
       <button class="hibou-chip">Explique-moi le sort Hâte</button>
