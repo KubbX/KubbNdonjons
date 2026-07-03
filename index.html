@@ -9256,7 +9256,7 @@ const HIBOU_PERSONA = `Tu es Hibouquin, un petit owlin mage érudit, mascotte de
 - Pour les questions sur l'application elle-même, appuie-toi sur le GUIDE DE L'APPLICATION.
 - Jamais de tableaux ; du texte simple, gras avec **…** pour les termes clés.`;
 
-const HIBOU_DOC = `GUIDE DE L'APPLICATION KubbNd : application compagnon D&D 5e. Onglets principaux : Personnages (liste des fiches ; bouton + pour créer via l'assistant de création en plusieurs étapes), Fiche de personnage (caractéristiques, compétences, équipement en poupée de papier, sorts avec emplacements, PV, repos), Écran MJ (accessible aux MJ : vue des fiches du groupe, lanceur de dés, console de sons Syrinscape, projection sur écran externe), Compendium (les 477 sorts avec cartes illustrées, objets, dons, monstres). Groupes : un MJ crée un groupe et partage son code d'invitation ; les joueurs le rejoignent depuis leur fiche (menu de la fiche > Groupes) pour donner au MJ l'accès en lecture. Grimoire : depuis la fiche, section Sorts, bouton du grimoire pour préparer/apprendre les sorts selon la classe (les clercs/druides préparent, les ensorceleurs connaissent). Montée de niveau : bouton sur la fiche, guidée étape par étape. Cartes de sorts : chaque sort a une carte illustrée recto/verso visible dans le compendium et le grimoire. Assistant Hibouquin : nécessite une clé API Anthropic personnelle, à saisir dans ses réglages (⚙).`;
+const HIBOU_DOC = `GUIDE DE L'APPLICATION KubbNd : application compagnon D&D 5e. Onglets principaux : Personnages (liste des fiches ; bouton + pour créer via l'assistant de création en plusieurs étapes), Fiche de personnage (caractéristiques, compétences, équipement en poupée de papier, sorts avec emplacements, PV, repos), Écran MJ (accessible aux MJ : vue des fiches du groupe, lanceur de dés, Régisseur d'ambiances (58 biomes avec musique par intensité calme/tension/combat et image projetée, réorganisables par glisser-déposer), projection sur écran externe), Compendium (les 477 sorts avec cartes illustrées, objets, dons, monstres). Groupes : un MJ crée un groupe et partage son code d'invitation ; les joueurs le rejoignent depuis leur fiche (menu de la fiche > Groupes) pour donner au MJ l'accès en lecture. Grimoire : depuis la fiche, section Sorts, bouton du grimoire pour préparer/apprendre les sorts selon la classe (les clercs/druides préparent, les ensorceleurs connaissent). Montée de niveau : bouton sur la fiche, guidée étape par étape. Cartes de sorts : chaque sort a une carte illustrée recto/verso visible dans le compendium et le grimoire. Assistant Hibouquin : nécessite une clé API Anthropic personnelle, à saisir dans ses réglages (⚙).`;
 
 function hibouNorm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
 
@@ -9695,15 +9695,18 @@ async function ambRender(){
   if (!amb.scenes.length) { cont.innerHTML = '<div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div>'; }
   else {
     cont.innerHTML = amb.scenes.map((s,i) =>
-      `<button class="amb-scene${s.id===amb.cur?' on':''}" style="--amb-c:${s.couleur||'#caa258'}" onclick="window._ambActivate('${s.id}')">
-        <span class="amb-scene-vis" id="ambVis_${s.id}">${s.emoji||'🎬'}</span>
+      `<button class="amb-scene${s.id===amb.cur?' on':''}" draggable="true" data-id="${s.id}" style="--amb-c:${s.couleur||'#caa258'}" onclick="window._ambActivate('${s.id}')">
+        <span class="amb-scene-vis" id="ambVis_${s.id}"><span class="amb-scene-emo">${s.emoji||'🎬'}</span></span>
         <span class="amb-scene-name">${(s.nom||'?').replace(/</g,'&lt;')}</span>
-        ${i<9?`<span class="amb-scene-key">Alt+${i+1}</span>`:''}
+        ${i<9?`<span class="amb-scene-key">${i+1}</span>`:''}
       </button>`).join('');
-    for (const s of amb.scenes) {   // vignettes d'image en fond de tuile
+    for (const s of amb.scenes) {   // l'image devient la bulle elle-même (sonde avant application)
       const u = await ambResolve(s.image);
       const v = document.getElementById('ambVis_'+s.id);
-      if (u && v) v.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.25),rgba(0,0,0,0.25)),url("${u}")`;
+      if (!u || !v) continue;
+      const im = new Image();
+      im.onload = () => { v.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.12),rgba(0,0,0,0.22)),url("${u}")`; v.classList.add('has-img'); };
+      im.src = u;
     }
   }
   document.querySelectorAll('.amb-int').forEach(b => b.classList.toggle('on', b.dataset.int === amb.intensity));
@@ -9873,6 +9876,25 @@ window._ambInstallCatalogue = function(){
   const wrap = document.getElementById('ambWrap');
   if (!wrap) return;
   ambLoadScenes(); ambRender();
+  const sc = document.getElementById('ambScenes');
+  sc.addEventListener('dragstart', e => {
+    const b = e.target.closest('.amb-scene'); if (!b) return;
+    b.classList.add('drag'); e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', b.dataset.id); } catch(_) {}
+  });
+  sc.addEventListener('dragover', e => {
+    const drag = sc.querySelector('.amb-scene.drag'); if (!drag) return;
+    e.preventDefault();
+    const apres = [...sc.querySelectorAll('.amb-scene:not(.drag)')]
+      .find(b => { const r = b.getBoundingClientRect(); return e.clientX < r.left + r.width / 2; });
+    if (apres) sc.insertBefore(drag, apres); else sc.appendChild(drag);
+  });
+  sc.addEventListener('dragend', () => {
+    const drag = sc.querySelector('.amb-scene.drag'); if (drag) drag.classList.remove('drag');
+    const ordre = [...sc.querySelectorAll('.amb-scene')].map(b => b.dataset.id);
+    amb.scenes.sort((a, b) => ordre.indexOf(a.id) - ordre.indexOf(b.id));
+    ambSaveScenes(); ambRender();
+  });
   const vol = document.getElementById('ambVol');
   vol.addEventListener('input', () => {
     amb.vol = vol.value / 100;
@@ -9894,58 +9916,12 @@ window._ambInstallCatalogue = function(){
 </script>
  
 <style>
-/* ── Écran MJ scindé : infos à gauche, Syrinscape Nova à droite ── */
+/* ── Écran MJ : colonne d'infos pleine largeur ── */
 .gm-split { display:flex; gap:18px; align-items:flex-start; }
 .gm-left { flex:1 1 auto; min-width:0; }
-.gm-right { flex:0 0 auto; }
-.gm-phone {
-  position:sticky; top:12px;
-  width:390px; max-width:100%;
-  background:linear-gradient(135deg,var(--brown-dark),var(--brown));
-  border:1px solid var(--gold); border-radius:24px;
-  padding:10px; box-shadow:var(--shadow);
-  display:flex; flex-direction:column;
-}
-.gm-phone-bar { display:flex; justify-content:space-between; align-items:center; padding:2px 6px 6px; }
-.gm-phone-title { font-family:'Cinzel'; font-size:0.8rem; color:var(--gold); letter-spacing:1px; }
-.gm-phone-btn { background:rgba(255,255,255,0.08); border:1px solid rgba(212,180,120,0.4); color:var(--gold); border-radius:6px; min-width:30px; height:28px; cursor:pointer; font-size:0.95rem; line-height:1; }
-.gm-phone-btn:hover { background:rgba(255,255,255,0.16); }
-.gm-phone-note { font-family:'Crimson Pro'; font-size:0.72rem; color:#c9b88a; padding:0 6px 8px; line-height:1.4; }
-.gm-phone-screen {
-  height:760px; max-height:calc(100vh - 140px);
-  border-radius:14px; overflow:hidden; background:#000;
-  border:1px solid rgba(0,0,0,0.4);
-}
 @media (max-width:1100px) {
   .gm-split { flex-direction:column; }
-  .gm-phone { position:relative; top:0; width:100%; }
-  .gm-phone-screen { height:600px; }
 }
-
-/* ── Console sonore native (API Syrinscape) dans le cadre smartphone ── */
-.sc-screen { display:flex; flex-direction:column; gap:10px; padding:12px; overflow-y:auto; color:#e8dcc0; font-family:'Crimson Pro'; }
-.sc-cta { text-align:center; padding:24px 10px; color:#c9b88a; }
-.sc-nowplaying { font-size:0.82rem; color:#cdbca0; min-height:1.2em; padding:2px 2px; border-bottom:1px solid rgba(212,180,120,0.2); display:flex; align-items:center; gap:6px; }
-.sc-nowplaying b { color:var(--gold-light); font-weight:600; }
-.sc-input { width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid rgba(212,180,120,0.4); border-radius:6px; background:var(--bg); color:#e8dcc0; font-family:'Crimson Pro'; font-size:0.9rem; }
-.sc-input::placeholder { color:#9a8e72; }
-.sc-chips { display:flex; gap:5px; flex-wrap:wrap; }
-.sc-chip { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:0.5px; padding:4px 8px; border-radius:12px; cursor:pointer; border:1px solid rgba(212,180,120,0.4); background:transparent; color:#c9b88a; }
-.sc-chip.active { background:var(--gold); color:#1a0f05; border-color:var(--gold); }
-.sc-label { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:1px; color:var(--gold); margin:4px 0 2px; }
-.sc-row { display:flex; align-items:center; gap:6px; padding:7px 8px; border:1px solid rgba(212,180,120,0.18); border-radius:6px; background:rgba(255,255,255,0.03); }
-.sc-row-name { flex:1; min-width:0; font-size:0.86rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
-.sc-row-name:hover { color:#fff; }
-.sc-mini { background:rgba(255,255,255,0.08); border:1px solid rgba(212,180,120,0.4); color:var(--gold); border-radius:5px; min-width:26px; height:24px; cursor:pointer; font-size:0.8rem; line-height:1; flex:0 0 auto; }
-.sc-mini:hover { background:rgba(255,255,255,0.16); }
-.sc-board { display:grid; grid-template-columns:repeat(auto-fill,minmax(82px,1fr)); gap:6px; }
-.sc-board-btn { position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 4px; border:1px solid rgba(212,180,120,0.35); border-radius:8px; background:rgba(255,255,255,0.04); color:#e8dcc0; cursor:pointer; font-family:'Crimson Pro'; }
-.sc-board-btn:hover { background:rgba(255,255,255,0.12); }
-.sc-board-btn .em { font-size:1.2rem; line-height:1; }
-.sc-board-btn .lb { font-size:0.68rem; text-align:center; line-height:1.15; max-width:100%; overflow:hidden; }
-.sc-board-btn .del { position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; border:none; background:var(--red); color:#fff; font-size:0.7rem; cursor:pointer; display:none; line-height:1; }
-.sc-board-btn:hover .del { display:block; }
-.sc-muted { font-size:0.76rem; color:#9a8e72; font-style:italic; }
 
 /* ── Paper doll : équipement visuel ── */
 .pd-wrap { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; padding:8px 10px 2px; }
@@ -10951,174 +10927,6 @@ em.ok { color:#7fc06a; font-style:normal; }
 .wiz-chip.big small { font-size:0.68rem; color:#cdb88c; }
 .wiz-chip:hover:not(:disabled) { border-color:rgba(255,210,120,0.6); }
 .wiz-chip.sel { background:rgba(184,134,11,0.4); border-color:var(--gold); color:#fff; box-shadow:0 0 10px rgba(200,150,40,0.3); }
-/* ── Console d'ambiances Syrinscape (glassmorph) ── */
-.amb-skin { display:flex; flex-direction:column; gap:14px; }
-.amb-label { font-family:'Cinzel'; font-size:0.62rem; letter-spacing:1.5px; color:var(--gold); margin-bottom:8px; text-transform:uppercase; }
-.amb-hint { font-family:'Crimson Pro'; font-size:0.72rem; letter-spacing:0; color:#9a8e72; font-style:italic; text-transform:none; }
-.amb-daynight { display:flex; gap:8px; }
-.amb-dn { flex:1; padding:9px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); color:#e3d8c2; font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; cursor:pointer; transition:all .15s; }
-.amb-dn:hover { border-color:rgba(255,210,120,0.55); }
-.amb-dn.sel { background:rgba(184,134,11,0.4); border-color:var(--gold); color:#fff; box-shadow:0 0 10px rgba(200,150,40,0.3); }
-.amb-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(82px,1fr)); gap:8px; }
-.amb-tile { display:flex; flex-direction:column; align-items:center; gap:5px; padding:11px 6px; border-radius:12px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); color:#e3d8c2; cursor:pointer; transition:all .15s; }
-.amb-tile:hover { transform:translateY(-2px); border-color:rgba(255,210,120,0.5); }
-.amb-tile.sel { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 6px 18px rgba(200,150,40,0.3); background:rgba(184,134,11,0.22); }
-.amb-tile-emoji { font-size:1.5rem; line-height:1; }
-.amb-tile-name { font-family:'Cinzel'; font-size:0.6rem; letter-spacing:0.4px; text-align:center; line-height:1.15; }
-.amb-moods { display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:8px; }
-.amb-mood { display:flex; align-items:center; justify-content:center; gap:6px; padding:11px 8px; border-radius:12px; border:1px solid rgba(255,255,255,0.18); background:rgba(0,0,0,0.28); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); color:#e8dcc0; font-family:'Cinzel'; font-size:0.7rem; letter-spacing:0.5px; cursor:pointer; transition:all .15s; }
-.amb-mood-emoji { font-size:1.15rem; }
-.amb-mood:hover { transform:translateY(-2px); border-color:rgba(255,210,120,0.6); }
-.amb-mood.sel { background:rgba(184,134,11,0.42); border-color:var(--gold); color:#fff; box-shadow:0 0 12px rgba(200,150,40,0.4); }
-.amb-overlays { display:flex; flex-wrap:wrap; gap:8px; }
-.amb-ov { display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:18px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#dcd0b8; font-family:'Crimson Pro'; font-size:0.85rem; cursor:pointer; transition:all .15s; }
-.amb-ov:hover { border-color:rgba(255,210,120,0.6); }
-.amb-ov.on { background:rgba(90,150,90,0.35); border-color:#7ec87e; color:#eafbe6; box-shadow:0 0 10px rgba(120,200,120,0.3); }
-.amb-empty { opacity:0.4; }
-.amb-controls { display:flex; align-items:center; gap:12px; }
-.amb-stop { flex:1; padding:10px; border-radius:10px; border:1px solid rgba(224,112,112,0.5); background:rgba(120,40,40,0.3); color:#f0c8c8; font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; cursor:pointer; transition:all .15s; }
-.amb-stop:hover { background:rgba(160,50,50,0.45); }
-.amb-vol { display:flex; align-items:center; gap:8px; font-size:1rem; color:var(--gold); }
-.amb-vol input { accent-color:var(--gold); width:90px; }
-.amb-sfx-wrap { border-top:1px solid rgba(212,180,120,0.2); padding-top:10px; }
-.amb-sfx-wrap summary { font-family:'Cinzel'; font-size:0.65rem; letter-spacing:1px; color:var(--gold); cursor:pointer; }
-.amb-sfx-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.wiz-chip.dis, .wiz-chip:disabled { opacity:0.42; cursor:not-allowed; text-decoration:line-through; }
-.wiz-chip.dis small { text-decoration:none; }
-
-/* bannières */
-.wiz-banner { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:0.88rem; line-height:1.5;
-  background:rgba(184,134,11,0.16); border:1px solid rgba(220,170,60,0.4); color:#f0dfb6; }
-.wiz-banner.warn { background:rgba(220,130,50,0.15); border-color:rgba(230,150,70,0.5); color:#f3cfa2; }
-.wiz-banner.ok { background:rgba(110,180,90,0.13); border-color:rgba(130,200,110,0.4); color:#cfe8c2; text-align:center; font-family:'Cinzel'; letter-spacing:1px; }
-
-/* étape stats */
-.wiz-pb-head { font-family:'Cinzel'; font-size:0.85rem; letter-spacing:1px; color:#d9c08a; margin-bottom:12px; }
-.wiz-pb-head strong { color:#fff; } .wiz-pb-head strong.ok { color:#7fc06a; }
-.wiz-statgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:12px; }
-.wiz-statcard { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-.wiz-statcard.boosted { border-color:rgba(220,170,60,0.45); }
-.wiz-statcard-name { font-family:'Cinzel'; font-size:0.72rem; letter-spacing:1.5px; color:#cdb88c; }
-.wiz-statcard-ctrl { display:flex; align-items:center; gap:10px; }
-.wiz-statcard-ctrl button { width:30px; height:30px; border-radius:8px; border:1px solid var(--gold); background:transparent; color:var(--gold); filter:brightness(1.3); font-size:1.1rem; cursor:pointer; line-height:1; }
-.wiz-statcard-ctrl button:hover { background:rgba(184,134,11,0.35); }
-.wiz-statcard-ctrl span { font-size:1.15rem; min-width:26px; text-align:center; }
-.wiz-statcard-sel, .wiz-statcard-inp { background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.2); color:#efe6d6; border-radius:7px; padding:6px 10px; font-size:1rem; width:74px; text-align:center; }
-.wiz-statcard-final { display:flex; align-items:baseline; gap:7px; }
-.wiz-statcard-final small { color:#9d8f78; font-size:0.7rem; }
-.wiz-statcard-final strong { font-size:1.5rem; color:#fff; font-family:'Cinzel'; }
-.wiz-statcard-final em { font-style:normal; color:#d9c08a; font-size:0.9rem; }
-
-/* étape identité */
-.wiz-form { max-width:640px; display:flex; flex-direction:column; gap:14px; }
-.wiz-field label { display:block; font-family:'Cinzel'; font-size:0.66rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:5px; }
-.wiz-field input, .wiz-field textarea { width:100%; box-sizing:border-box; background:rgba(0,0,0,0.32); border:1px solid rgba(255,255,255,0.18); border-radius:8px; color:#efe6d6; padding:9px 12px; font-family:'Crimson Pro'; font-size:0.95rem; resize:vertical; }
-.wiz-field input:focus, .wiz-field textarea:focus { outline:none; border-color:var(--gold); }
-.wiz-field.main input { font-size:1.2rem; font-family:'Cinzel'; padding:12px 14px; }
-.wiz-field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.wiz-align-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
-.wiz-align-grid .wiz-chip { border-radius:8px; text-align:center; }
-.wiz-fold { background:rgba(255,255,255,0.045); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 14px; }
-.wiz-fold summary { cursor:pointer; font-family:'Cinzel'; font-size:0.78rem; letter-spacing:1px; color:#d9c08a; }
-.wiz-fold .wiz-field { margin-top:10px; }
-.wiz-fold .wiz-field-row { margin-top:10px; }
-.wiz-featlist { display:flex; flex-direction:column; gap:5px; margin-top:10px; max-height:260px; overflow-y:auto; }
-.wiz-featrow { display:flex; flex-direction:column; gap:2px; text-align:left; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.13); border-radius:8px; padding:8px 11px; color:#e6dcc8; cursor:pointer; font-family:'Crimson Pro'; }
-.wiz-featrow:hover { border-color:var(--gold); }
-.wiz-featrow span { font-size:0.78rem; color:#a99; }
-
-/* panneau latéral */
-.wiz-side-hero { text-align:center; }
-.wiz-side-img { width:100%; aspect-ratio:16/10; border-radius:12px; background-size:cover; background-position:center top; border:1px solid rgba(255,255,255,0.18); }
-.wiz-side-name { font-family:'Cinzel'; font-size:1rem; color:#f3e9d2; margin-top:10px; letter-spacing:1px; }
-.wiz-side-name .dim, .dim { color:#9d8f78; }
-.wiz-side-line { font-size:0.84rem; color:#cdc0a8; margin-top:2px; }
-.wiz-side-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:14px; }
-.wiz-side-stat { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.13); border-radius:9px; padding:6px 4px; text-align:center; display:flex; flex-direction:column; }
-.wiz-side-stat.boosted { border-color:rgba(220,170,60,0.5); }
-.wiz-side-stat span { font-family:'Cinzel'; font-size:0.58rem; letter-spacing:1px; color:#cdb88c; }
-.wiz-side-stat strong { font-size:1.05rem; color:#fff; }
-.wiz-side-stat em { font-style:normal; font-size:0.72rem; color:#d9c08a; }
-.wiz-side-combat { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:8px; }
-.wiz-side-combat > div { background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.13); border-radius:9px; padding:6px 2px; text-align:center; display:flex; flex-direction:column; }
-.wiz-side-combat em { font-style:normal; font-size:0.8rem; }
-.wiz-side-combat strong { font-size:0.95rem; color:#fff; }
-.wiz-side-combat span { font-size:0.56rem; font-family:'Cinzel'; letter-spacing:1px; color:#cdb88c; }
-.wiz-side-block { margin-top:14px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; }
-.wiz-side-block h5 { font-family:'Cinzel'; font-size:0.66rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:7px; }
-.wiz-side-skill { font-size:0.85rem; display:flex; align-items:center; gap:7px; padding:2px 0; }
-.wiz-side-skill i { font-style:normal; font-size:0.58rem; font-family:'Cinzel'; width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.wiz-side-skill .tag-c { background:rgba(184,134,11,0.45); color:#ffe9b0; }
-.wiz-side-skill .tag-h { background:rgba(90,130,200,0.45); color:#cfe0ff; }
-.wiz-side-text { font-size:0.83rem; color:#d8ccb4; line-height:1.5; }
-.wiz-side-block.pending h5 { color:#e8a04c; }
-.wiz-side-block.ready h5 { color:#7fc06a; }
-.wiz-pending-item { display:block; width:100%; text-align:left; background:rgba(230,150,70,0.12); border:1px solid rgba(230,150,70,0.4); color:#f3cfa2; border-radius:8px; padding:6px 10px; margin-bottom:5px; cursor:pointer; font-family:'Crimson Pro'; font-size:0.82rem; }
-.wiz-pending-item span { color:#c9a; font-size:0.72rem; }
-.wiz-pending-item:hover { border-color:#e8a04c; }
-.wiz-pending-item.inline { display:inline-block; width:auto; margin:2px 3px 0 0; }
-.wiz-side-block.warn .wiz-pending-item { background:rgba(200,180,80,0.1); border-color:rgba(210,190,100,0.35); color:#e8dcae; }
-
-/* récap */
-.wiz-recap-hero { display:flex; gap:18px; align-items:center; background:rgba(255,255,255,0.055); border:1px solid rgba(255,255,255,0.14); border-radius:14px; padding:14px; }
-.wiz-recap-img { width:130px; aspect-ratio:1; border-radius:12px; background-size:cover; background-position:center top; flex-shrink:0; border:1px solid rgba(255,255,255,0.2); }
-.wiz-recap-hero-txt h3 { font-family:'Cinzel'; color:var(--gold); filter:brightness(1.4); font-size:1.3rem; letter-spacing:1.5px; }
-.wiz-recap-hero-txt p { margin-top:4px; font-size:0.95rem; }
-.wiz-recap-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:14px; }
-.wiz-recap-combat { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; background:rgba(0,0,0,0.28); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 16px; font-size:0.92rem; align-items:center; }
-.wiz-recap-combat strong { color:#fff; font-size:1.05rem; }
-.wiz-recap-combat small { color:#a99; }
-.wiz-recap-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; margin-top:14px; }
-.wiz-recap-group { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.13); border-radius:12px; padding:12px 15px; }
-.wiz-recap-group h5 { font-family:'Cinzel'; font-size:0.72rem; letter-spacing:1.5px; color:#cdb88c; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:6px; }
-.wiz-recap-group .wiz-trait { margin-bottom:5px; font-size:0.85rem; }
-
-/* pied de page */
-.wiz-foot { display:flex; align-items:center; gap:14px; padding:12px 22px;
-  background:rgba(0,0,0,0.4); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
-  border-top:1px solid rgba(255,255,255,0.1); z-index:2; }
-#wizFootHint { flex:1; font-size:0.82rem; color:#e8a04c; text-align:center; min-width:0; }
-#wizFootHint.flash { animation:wizflash 0.5s; }
-@keyframes wizflash { 0%,100%{transform:none} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
-.wiz-btn-gold { background:linear-gradient(135deg, var(--gold), #8a6508); border:none; color:#fff; font-family:'Cinzel'; letter-spacing:2px; font-size:0.8rem; padding:12px 24px; border-radius:8px; cursor:pointer; box-shadow:0 4px 16px rgba(180,130,30,0.35); transition:all 0.2s; white-space:nowrap; }
-.wiz-btn-gold:hover { filter:brightness(1.15); }
-.wiz-btn-gold.dim { opacity:0.45; }
-.wiz-btn-ghost { background:transparent; border:1px solid rgba(255,255,255,0.3); color:#cbb; font-family:'Cinzel'; letter-spacing:1px; font-size:0.74rem; padding:11px 18px; border-radius:8px; cursor:pointer; white-space:nowrap; }
-.wiz-btn-ghost:hover { border-color:#efe6d6; color:#efe6d6; }
-.wiz-side-toggle { display:none; }
-
-/* éditeur des visuels */
-#wizAssetsPanel { margin-top:24px; border-top:2px solid var(--line-gold); padding-top:14px; }
-.wiz-asset-row { display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--line); }
-.wiz-asset-thumb { width:42px; height:32px; border-radius:5px; background-size:cover; background-position:center; border:1px solid var(--line-gold); flex-shrink:0; }
-.wiz-asset-thumb.empty { display:flex; align-items:center; justify-content:center; color:#bbb; font-size:0.8rem; background:var(--surface); }
-.wiz-asset-name { width:190px; flex-shrink:0; font-size:0.85rem; }
-.wiz-asset-row input { flex:1; min-width:120px; font-size:0.8rem; padding:5px 8px; border:1px solid var(--line); border-radius:4px; font-family:'Crimson Pro'; }
-
-/* responsive */
-@media (max-width:940px) {
-  #wizSide, #lvlSide { position:fixed; right:0; top:0; bottom:0; width:min(320px,88vw); transform:translateX(105%); transition:transform 0.28s; z-index:5; background:rgba(20,14,8,0.92); box-shadow:-10px 0 40px rgba(0,0,0,0.6); }
-  #wizSide.mobile-open, #lvlSide.mobile-open { transform:none; }
-  .wiz-side-toggle { display:inline-block; }
-  .wiz-pstep-lbl { display:none; }
-  .wiz-recap-stats { grid-template-columns:repeat(3,1fr); }
-  .wiz-recap-hero { flex-direction:column; text-align:center; }
-  .wiz-field-row { grid-template-columns:1fr; }
-  .wiz-align-grid { grid-template-columns:repeat(2,1fr); }
-  #wizMain { padding:16px 14px 40px; }
-  .wiz-asset-name { width:110px; }
-}
-
-/* Footer wizard/ascension sur petit écran : indice sur sa propre ligne, boutons répartis, SUIVANT toujours visible */
-@media (max-width:560px) {
-  .wiz-foot { flex-wrap:wrap; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px)); }
-  #wizFootHint, #lvlFootHint { flex:1 0 100%; order:-1; text-align:center; font-size:0.76rem; line-height:1.25; }
-  .wiz-foot > button { flex:1 1 0; min-width:0; padding:11px 6px; font-size:0.7rem; letter-spacing:0.5px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #wizNext, #lvlNext { flex:1.6 1 0; }
-}
-
-
 /* ── L'ASCENSION (montée de niveau plein écran) ── */
 .lvl-die { width:96px; height:96px; margin:6px auto; display:flex; align-items:center; justify-content:center;
   font-family:'Cinzel'; font-size:1.6rem; color:#fff; cursor:pointer; user-select:none;
@@ -11596,15 +11404,6 @@ em.ok { color:#7fc06a; font-style:normal; }
 .proj-stop:hover:not(:disabled) { background:rgba(200,60,60,0.32); }
 .proj-status { font-size:0.74rem; color:#9a9aa2; font-style:italic; line-height:1.35; min-height:1em; }
 
-/* ── Console sonore : menu gestion & partage ── */
-.sc-manage { display:flex; flex-direction:column; gap:6px; }
-.sc-mbtn { width:100%; padding:9px 10px; border-radius:8px; border:1px solid rgba(212,180,120,0.4); background:rgba(255,255,255,0.06); color:#e8dcc0; font-family:'Cinzel'; font-size:0.64rem; letter-spacing:0.5px; cursor:pointer; transition:all .15s; line-height:1.2; }
-.sc-mbtn:hover { border-color:var(--gold); background:rgba(212,180,120,0.14); }
-.sc-mbtn-gold { background:linear-gradient(135deg, rgba(212,160,23,0.30), rgba(160,110,20,0.30)); border-color:var(--gold); color:#f0e0b0; }
-.sc-mbtn-gold:hover { background:linear-gradient(135deg, rgba(212,160,23,0.45), rgba(160,110,20,0.45)); }
-.sc-note { font-family:'Crimson Pro'; font-size:0.72rem; color:#9a8e72; line-height:1.4; margin:2px 0 0; }
-.sc-note strong { color:#c9b88a; }
-
 /* ── Mobile : masquer la barre d'onglets au défilement (plus de place à la fiche) ── */
 nav { transition: transform .28s ease; will-change: transform; }
 @media (max-width: 768px) { nav.nav-hidden { transform: translateY(-100%); } }
@@ -11722,17 +11521,25 @@ nav { transition: transform .28s ease; will-change: transform; }
 .amb-head-btn:hover { background:rgba(185,140,72,0.18); }
 .amb-body { padding:12px 14px; }
 
-.amb-scenes { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
-.amb-scene { position:relative; width:92px; display:flex; flex-direction:column; align-items:center; gap:5px;
-  background:none; border:none; cursor:pointer; padding:3px; font-family:inherit; }
-.amb-scene-vis { width:74px; height:74px; border-radius:12px; display:grid; place-items:center; font-size:1.9rem;
+.amb-scenes { display:flex; flex-wrap:nowrap; gap:8px; margin-bottom:12px; overflow-x:auto;
+  padding:4px 2px 8px; scroll-snap-type:x proximity; scrollbar-width:thin; }
+.amb-scenes::-webkit-scrollbar { height:7px; }
+.amb-scenes::-webkit-scrollbar-thumb { background:rgba(185,140,72,0.3); border-radius:4px; }
+.amb-scene { position:relative; flex:0 0 72px; width:72px; display:flex; flex-direction:column; align-items:center; gap:4px;
+  background:none; border:none; cursor:grab; padding:2px; font-family:inherit; scroll-snap-align:start; }
+.amb-scene.drag { opacity:0.35; }
+.amb-scene-emo { pointer-events:none; }
+.amb-scene-vis.has-img .amb-scene-emo { position:absolute; right:2px; bottom:2px; font-size:0.9rem;
+  background:rgba(10,7,3,0.62); border-radius:6px; padding:0 3px; line-height:1.3; }
+.amb-scene-vis { position:relative; width:64px; height:64px; border-radius:11px; display:grid; place-items:center; font-size:1.6rem;
   border:2px solid var(--amb-c, rgba(185,140,72,0.45)); background:rgba(0,0,0,0.35) center/cover no-repeat;
   box-shadow:0 3px 10px rgba(0,0,0,0.4); transition:box-shadow .2s, transform .15s; text-shadow:0 2px 6px rgba(0,0,0,0.8); }
 .amb-scene:hover .amb-scene-vis { transform:translateY(-2px); }
 .amb-scene.on .amb-scene-vis { box-shadow:0 0 16px var(--amb-c, rgba(232,200,120,0.6)), 0 3px 10px rgba(0,0,0,0.4);
   border-width:3px; animation:ambPulse 2.2s ease-in-out infinite; }
 @keyframes ambPulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.22)} }
-.amb-scene-name { font-size:0.78rem; color:#cbb88f; text-align:center; line-height:1.1; max-width:90px; }
+.amb-scene-name { font-size:0.66rem; color:#cbb88f; text-align:center; line-height:1.12; max-width:72px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .amb-scene.on .amb-scene-name { color:#f3e4c2; font-weight:700; }
 .amb-scene-key { position:absolute; top:-2px; left:4px; font-size:0.62rem; color:#8a744c;
   background:rgba(20,12,5,0.9); border:1px solid rgba(160,120,65,0.4); border-radius:5px; padding:0 4px; }
@@ -11901,7 +11708,7 @@ nav { transition: transform .28s ease; will-change: transform; }
       <button class="amb-ctl" onclick="window._ambBlack()" title="Fondu au noir sur l'écran projeté (Alt+N)">☾ Noir</button>
       <button class="amb-ctl stop" onclick="window._ambStop()" title="Tout couper (Alt+0)">⏹ Stop</button>
     </div>
-    <div class="amb-status" id="ambStatus">Raccourcis : Alt+1…9 scènes · Alt+C/T/B intensité · Alt+N noir · Alt+0 stop — compatibles Stream Deck.</div>
+    <div class="amb-status" id="ambStatus">Raccourcis : Alt+1…9 = les 9 premières bulles (glisse-les pour réordonner) · Alt+C/T/B intensité · Alt+N noir · Alt+0 stop — compatibles Stream Deck.</div>
   </div>
 </div>
 
@@ -11953,645 +11760,9 @@ nav { transition: transform .28s ease; will-change: transform; }
 
 
 
-    <!-- ══════════════════════════════════════════════════
-         MODULE AMBIANCE SONORE — Syrinscape
-    ══════════════════════════════════════════════════ -->
-    <div id="soundPanel" style="display:none">
-      <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(212,180,120,0.3);cursor:pointer" onclick="window._toggleSoundPanel()">
-        <span style="font-family:'Cinzel';font-size:0.85rem;color:var(--gold);letter-spacing:1px">🎵 AMBIANCE SONORE — Syrinscape</span>
-        <div style="display:flex;align-items:center;gap:12px">
-          <span id="soundStatus" style="font-family:'Crimson Pro';font-size:0.8rem;color:#aaa;font-style:italic">Inactif</span>
-          <span id="soundPanelChevron" style="color:var(--gold);font-size:0.8rem">▾</span>
-        </div>
-      </div>
 
-      <div id="soundPanelBody" style="padding:14px 16px">
+    <!-- (ancien module sonore externe retiré en V1.71 — remplacé par le Régisseur d'ambiances) -->
 
-        <!-- Console Syrinscape — accès direct aux interfaces complètes -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-          <button onclick="window._openNova()" class="btn-gold" style="flex:1;min-width:150px" title="Gérer l'ensemble des sons dans l'interface complète Nova">🚀 Ouvrir Syrinscape Nova</button>
-          <button onclick="window._openShareAudio()" class="btn-gm-action" style="flex:1;min-width:150px" title="Récupérer le lien « Share Audio » à donner aux joueurs">🔗 Partager l'audio</button>
-        </div>
-        <p style="font-family:'Crimson Pro';font-size:0.75rem;color:#9a8e72;margin:-4px 0 12px;line-height:1.45">
-          <strong style="color:#c9b88a">Nova</strong> s'ouvre dans un nouvel onglet (session Syrinscape) pour piloter <em>tous</em> les sons.
-          Les boutons rapides ci-dessous pilotent le même moteur audio via l'API.
-        </p>
-        <hr style="border:none;border-top:1px solid rgba(212,180,120,0.2);margin:0 0 12px">
-
-        <!-- CTA activation (avant premier clic) -->
-        <div id="syrinActivateCta" style="text-align:center;padding:6px 0 10px">
-          <button class="btn-gold" onclick="window._syrinActivate()" style="width:100%">🔊 Activer les contrôles rapides</button>
-          <p style="font-family:'Crimson Pro';font-size:0.78rem;color:#aaa;margin-top:6px;font-style:italic">Un clic suffit pour autoriser le son dans le navigateur</p>
-        </div>
-
-        <!-- Interface principale (masquée jusqu'à activation) -->
-        <div id="syrinInterface" style="display:none">
-        <div class="amb-skin">
-
-          <!-- Moment de la journée -->
-          <div class="amb-daynight">
-            <button class="amb-dn" data-dn="jour" onclick="window._ambSetDayNight('jour')">☀️ Jour</button>
-            <button class="amb-dn" data-dn="nuit" onclick="window._ambSetDayNight('nuit')">🌙 Nuit</button>
-          </div>
-
-          <!-- Localités -->
-          <div>
-            <div class="amb-label">Localité</div>
-            <div class="amb-grid" id="ambLocalities"></div>
-          </div>
-
-          <!-- Ambiances -->
-          <div>
-            <div class="amb-label">Ambiance <span class="amb-hint">— touchez pour lancer</span></div>
-            <div class="amb-moods" id="ambMoods"></div>
-          </div>
-
-          <!-- Surcouches sonores -->
-          <div>
-            <div class="amb-label">Surcouches <span class="amb-hint">— se superposent à l'ambiance</span></div>
-            <div class="amb-overlays" id="ambOverlays"></div>
-          </div>
-
-          <!-- Contrôles -->
-          <div class="amb-controls">
-            <button class="amb-stop" onclick="window._ambStop()">⏹ Tout arrêter</button>
-            <label class="amb-vol" title="Volume global">🔊
-              <input type="range" id="soundVolume" min="0" max="1.5" step="0.05" value="0.8" oninput="window._soundSetVolume()">
-            </label>
-          </div>
-
-          <!-- Effets ponctuels -->
-          <details class="amb-sfx-wrap">
-            <summary>💥 Effets ponctuels</summary>
-            <div class="amb-sfx-row">
-              <button onclick="window._soundSfx('sword')"   class="btn-gm-action" title="Coup d'épée"      style="font-size:1.1rem;padding:6px 10px">⚔️</button>
-              <button onclick="window._soundSfx('arrow')"   class="btn-gm-action" title="Flèche"           style="font-size:1.1rem;padding:6px 10px">🏹</button>
-              <button onclick="window._soundSfx('spell')"   class="btn-gm-action" title="Sort magique"     style="font-size:1.1rem;padding:6px 10px">✨</button>
-              <button onclick="window._soundSfx('door')"    class="btn-gm-action" title="Porte qui grince" style="font-size:1.1rem;padding:6px 10px">🚪</button>
-              <button onclick="window._soundSfx('thunder')" class="btn-gm-action" title="Tonnerre"         style="font-size:1.1rem;padding:6px 10px">⚡</button>
-              <button onclick="window._soundSfx('chest')"   class="btn-gm-action" title="Coffre"           style="font-size:1.1rem;padding:6px 10px">📦</button>
-              <button onclick="window._soundSfx('coin')"    class="btn-gm-action" title="Pièces"           style="font-size:1.1rem;padding:6px 10px">💰</button>
-              <button onclick="window._soundSfx('scream')"  class="btn-gm-action" title="Cri"              style="font-size:1.1rem;padding:6px 10px">😱</button>
-            </div>
-          </details>
-
-        </div>
-      </div><!-- /syrinInterface -->
-      </div>
-    </div>
-
-    <script>
-    // ══════════════════════════════════════════════════
-    // MODULE AMBIANCE SONORE — KubbNd V1.41
-    // Intégration Syrinscape JavaScript Player
-    // ══════════════════════════════════════════════════
-    (function() {
-
-      // ── Token & configuration ─────────────────────
-      // ⚠️ Ne pas publier ce token sur un repo GitHub public
-      // Régénérer sur : syrinscape.com/account/auth-token/
-      const SYRIN_TOKEN = '85144052c44779abd5404341d896f59f37b6b1f6';
-
-      // ── Correspondance thème+ambiance → Mood IDs Syrinscape ──
-      // IDs récupérés depuis l'API Syrinscape (soundsets gratuits)
-      // Format : [moodId, moodId2, ...] — un ID est choisi aléatoirement
-      // Tu peux compléter ces IDs depuis ton interface Syrinscape
-      // ── Mood IDs Syrinscape (vérifiés) ──────────
-      // Chaque tableau peut contenir plusieurs IDs → sélection aléatoire
-      const MOOD_MAP = {
-        taverne: {
-          normal:     [69],      // Friendly Tavern - Drinking time
-          joyeux:     [252833],  // Friendly Tavern - More music
-          sombre:     [70],      // Friendly Tavern - A quiet corner near the fire
-          mysterieux: [71],      // Friendly Tavern - Almost everyone's gone home
-        },
-        foret: {
-          normal:     [565152],  // Forest
-          joyeux:     [565152],
-          sombre:     [565152],
-          mysterieux: [565152],
-        },
-        donjon: {
-          normal:     [748294],  // Dungeon Depths
-          joyeux:     [748294],
-          sombre:     [748294],
-          mysterieux: [748294],
-        },
-        ville: {
-          normal:     [15112],   // Bustling Port Town
-          joyeux:     [15112],
-          sombre:     [15112],
-          mysterieux: [15112],
-        },
-        desert: {
-          normal:     [831],     // Desert
-          joyeux:     [831],
-          sombre:     [831],
-          mysterieux: [831],
-        },
-        mer: {
-          normal:     [15112],   // Bustling Port Town
-          joyeux:     [15112],
-          sombre:     [15112],
-          mysterieux: [15112],
-        },
-        temple: {
-          normal:     [1270],    // Bell Monk Temple
-          joyeux:     [1270],
-          sombre:     [1270],
-          mysterieux: [1270],
-        },
-        caverne: {
-          normal:     [779267],  // Cave
-          joyeux:     [779267],
-          sombre:     [779267],
-          mysterieux: [779267],
-        },
-      };
-
-      // Moods de combat (même ID pour toutes les ambiances pour l'instant)
-      const COMBAT_MOODS = {
-        normal:     [696964],  // Orc Battle
-        joyeux:     [696964],
-        sombre:     [696964],
-        mysterieux: [696964],
-      };
-
-      // Effets sonores — pour l'instant on utilise le même soundset combat
-      // Tu pourras affiner avec de vrais Element IDs plus tard
-      const SFX_MAP = {
-        sword:   [696964],
-        arrow:   [696964],
-        spell:   [696964],
-        door:    [748294],
-        thunder: [831],
-        chest:   [748294],
-        coin:    [69],
-        scream:  [696964],
-      };
-
-      // ── État ─────────────────────────────────────
-      let isCombatMode = false;
-      let isPlaying = false;
-      let playerReady = false;
-
-      // ── Helpers ───────────────────────────────────
-      function getTheme() { return document.getElementById('soundTheme')?.value || 'foret'; }
-      function getMood()  { return document.getElementById('soundMood')?.value  || 'normal'; }
-      function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-
-      function setStatus(txt, color='#aaa') {
-        const el = document.getElementById('soundStatus');
-        if (el) { el.textContent = txt; el.style.color = color; }
-      }
-
-      function getThemeLabel() {
-        const el = document.getElementById('soundTheme');
-        return el?.options[el?.selectedIndex]?.text || getTheme();
-      }
-      function getMoodLabel() {
-        return {normal:'Normale',joyeux:'Joyeuse',sombre:'Sombre',mysterieux:'Mystérieuse'}[getMood()] || getMood();
-      }
-
-      // ── Appel API Syrinscape ──────────────────────
-      function syrinCall(url) {
-        return fetch(url, {
-          method: 'POST',
-          headers: { 'authorization': 'token ' + SYRIN_TOKEN, 'accept': 'application/json' }
-        }).catch(err => console.warn('Syrinscape API error:', err));
-      }
-
-      function playMood(moodId) {
-        return syrinCall(`https://syrinscape.com/online/frontend-api/moods/${moodId}/play/`);
-      }
-
-      function playElement(elementId) {
-        return syrinCall(`https://syrinscape.com/online/frontend-api/elements/${elementId}/play/`);
-      }
-
-      function stopAll() {
-        return syrinCall('https://syrinscape.com/online/frontend-api/stop-all/');
-      }
-
-      function setVolume(val) {
-        return fetch(`https://syrinscape.com/online/frontend-api/global-volume/${val}/`, {
-          method: 'POST',
-          headers: { 'authorization': 'token ' + SYRIN_TOKEN }
-        }).catch(() => {});
-      }
-
-      // ══════════════════════════════════════════════
-      // AMBIANCES PRÉDÉFINIES — console glassmorph
-      // ══════════════════════════════════════════════
-      // Modèle éditable : localité -> ambiance -> Mood IDs Syrinscape.
-      // Une ambiance = [id, id2] (même piste jour/nuit) OU
-      //   {jour:[...], nuit:[...]} (pistes distinctes). [] = à compléter.
-      const MOODS = [
-        {id:'joyeuse',  label:'Joyeuse',  emoji:'😄'},
-        {id:'festive',  label:'Festive',  emoji:'🎉'},
-        {id:'calme',    label:'Calme',    emoji:'🕊️'},
-        {id:'tendue',   label:'Tendue',   emoji:'😨'},
-        {id:'intrigue', label:'Intrigue', emoji:'🕵️'},
-        {id:'combat',   label:'Combat',   emoji:'⚔️'},
-      ];
-      const AMBIANCES = {
-        taverne:   { label:'Taverne',    emoji:'🍺', moods:{ joyeuse:[69], festive:[252833], calme:{jour:[70],nuit:[71]}, tendue:[], intrigue:[71], combat:[696964] } },
-        ville:     { label:'Ville',      emoji:'🏰', moods:{ joyeuse:[15112], festive:[15112], calme:[15112], tendue:[], intrigue:[15112], combat:[696964] } },
-        foret:     { label:'Forêt',      emoji:'🌲', moods:{ joyeuse:[565152], festive:[565152], calme:[565152], tendue:[565152], intrigue:[565152], combat:[696964] } },
-        montagne:  { label:'Montagne',   emoji:'⛰️', moods:{ joyeuse:[], festive:[], calme:[], tendue:[], intrigue:[], combat:[696964] } },
-        desert:    { label:'Désert',     emoji:'🏜️', moods:{ joyeuse:[831], festive:[831], calme:[831], tendue:[831], intrigue:[831], combat:[696964] } },
-        donjon:    { label:'Donjon',     emoji:'🗝️', moods:{ joyeuse:[748294], festive:[748294], calme:[748294], tendue:[748294], intrigue:[748294], combat:[696964] } },
-        caverne:   { label:'Caverne',    emoji:'🕳️', moods:{ joyeuse:[779267], festive:[779267], calme:[779267], tendue:[779267], intrigue:[779267], combat:[696964] } },
-        mer:       { label:'Mer / Port', emoji:'⚓', moods:{ joyeuse:[15112], festive:[15112], calme:[15112], tendue:[15112], intrigue:[15112], combat:[696964] } },
-        temple:    { label:'Temple',     emoji:'⛩️', moods:{ joyeuse:[1270], festive:[1270], calme:[1270], tendue:[1270], intrigue:[1270], combat:[696964] } },
-        campement: { label:'Campement',  emoji:'🏕️', moods:{ joyeuse:[], festive:[], calme:[], tendue:[], intrigue:[], combat:[696964] } },
-      };
-      // Surcouches sonores (éléments superposés) — complète les Element IDs.
-      const OVERLAYS = [
-        {id:'feu',      label:'Feu de camp', emoji:'🔥',  element:[]},
-        {id:'murmures', label:'Murmures',    emoji:'💬',  element:[]},
-        {id:'vent',     label:'Vent',        emoji:'🌬️', element:[]},
-        {id:'eau',      label:'Eau',         emoji:'💧',  element:[]},
-        {id:'pluie',    label:'Pluie',       emoji:'🌧️', element:[]},
-        {id:'foule',    label:'Foule',       emoji:'👥',  element:[]},
-        {id:'cloches',  label:'Cloches',     emoji:'🔔',  element:[]},
-        {id:'hibou',    label:'Hibou',       emoji:'🦉',  element:[]},
-      ];
-
-      // ── État de la console d'ambiances ──
-      let ambLocality = 'taverne', ambMood = 'calme', ambDayNight = 'jour', ambPlaying = false, ambPending = null;
-      const ambActiveOverlays = new Set();
-
-      function resolveMoodIds(moodVal, dn){
-        if (!moodVal) return [];
-        if (Array.isArray(moodVal)) return moodVal;
-        return moodVal[dn] || moodVal.jour || moodVal.nuit || [];
-      }
-      function stopElement(elementId){
-        return syrinCall(`https://syrinscape.com/online/frontend-api/elements/${elementId}/stop/`);
-      }
-      function ambMoodLabel(id){ return (MOODS.find(m=>m.id===id)||{}).label || id; }
-
-      // ── Rendu des grilles ──
-      function renderAmbDayNight(){
-        document.querySelectorAll('.amb-dn').forEach(b => b.classList.toggle('sel', b.dataset.dn === ambDayNight));
-      }
-      function renderAmbLocalities(){
-        const box = document.getElementById('ambLocalities'); if (!box) return;
-        box.innerHTML = Object.entries(AMBIANCES).map(([id,a]) =>
-          `<button class="amb-tile ${id===ambLocality?'sel':''}" onclick="window._ambSelectLocality('${id}')"><span class="amb-tile-emoji">${a.emoji}</span><span class="amb-tile-name">${a.label}</span></button>`).join('');
-      }
-      function renderAmbMoods(){
-        const box = document.getElementById('ambMoods'); if (!box) return;
-        const amb = AMBIANCES[ambLocality];
-        box.innerHTML = MOODS.map(m => {
-          const ids = amb ? resolveMoodIds(amb.moods[m.id], ambDayNight) : [];
-          const empty = !ids.length;
-          return `<button class="amb-mood ${m.id===ambMood?'sel':''} ${empty?'amb-empty':''}" onclick="window._ambSelectMood('${m.id}')" ${empty?'title="Aucune piste définie — à compléter"':''}><span class="amb-mood-emoji">${m.emoji}</span><span>${m.label}</span></button>`;
-        }).join('');
-      }
-      function renderAmbOverlays(){
-        const box = document.getElementById('ambOverlays'); if (!box) return;
-        box.innerHTML = OVERLAYS.map(o => {
-          const empty = !o.element.length;
-          const on = ambActiveOverlays.has(o.id);
-          return `<button class="amb-ov ${on?'on':''} ${empty?'amb-empty':''}" onclick="window._ambToggleOverlay('${o.id}')" ${empty?'title="Élément non défini — à compléter"':''}><span>${o.emoji}</span><span class="amb-ov-name">${o.label}</span></button>`;
-        }).join('');
-      }
-      function renderAmbConsole(){ renderAmbDayNight(); renderAmbLocalities(); renderAmbMoods(); renderAmbOverlays(); }
-
-      // ── Lecture ──
-      function doAmbPlay(){
-        const amb = AMBIANCES[ambLocality]; if (!amb) return;
-        const ids = resolveMoodIds(amb.moods[ambMood], ambDayNight);
-        if (!ids.length){ setStatus(`⚠ ${amb.label} · ${ambMoodLabel(ambMood)} : aucune piste définie`, '#e09050'); ambPlaying = false; return; }
-        playMood(pickRandom(ids));
-        ambPlaying = true;
-        setStatus(`▶ ${amb.emoji} ${amb.label} · ${ambMoodLabel(ambMood)} · ${ambDayNight==='nuit'?'🌙 Nuit':'☀️ Jour'}`, '#7ec87e');
-        if (ambActiveOverlays.size){
-          setTimeout(() => ambActiveOverlays.forEach(id => {
-            const ov = OVERLAYS.find(o => o.id === id);
-            if (ov && ov.element.length) playElement(pickRandom(ov.element));
-          }), 600);
-        }
-      }
-      function ensureReadyThen(fn){
-        if (playerReady){ fn(); return; }
-        ambPending = fn;
-        setStatus('⏳ Activation du son…', '#aaa');
-        window._syrinActivate();
-      }
-      window._ambOnReady = function(){ if (ambPending){ const fn = ambPending; ambPending = null; setTimeout(fn, 250); } };
-
-      window._ambSetDayNight = function(v){ ambDayNight = v; renderAmbDayNight(); renderAmbMoods(); if (ambPlaying) doAmbPlay(); };
-      window._ambSelectLocality = function(loc){ ambLocality = loc; renderAmbLocalities(); renderAmbMoods(); if (ambPlaying) doAmbPlay(); };
-      window._ambSelectMood = function(mood){ ambMood = mood; renderAmbMoods(); ensureReadyThen(doAmbPlay); };
-      window._ambStop = function(){ ambPlaying = false; ambActiveOverlays.clear(); stopAll(); renderAmbOverlays(); setStatus('Inactif'); };
-      window._ambToggleOverlay = function(id){
-        const ov = OVERLAYS.find(o => o.id === id); if (!ov) return;
-        if (!ov.element.length){ setStatus(`⚠ « ${ov.label} » : élément non défini`, '#e09050'); return; }
-        ensureReadyThen(() => {
-          if (ambActiveOverlays.has(id)){ ambActiveOverlays.delete(id); ov.element.forEach(stopElement); }
-          else { ambActiveOverlays.add(id); playElement(pickRandom(ov.element)); }
-          renderAmbOverlays();
-        });
-      };
-
-      // Rendu initial des grilles (le DOM de la console est déjà présent)
-      renderAmbConsole();
-
-      // ── Chargement dynamique + init Syrinscape ───
-      function loadScript(src) {
-        return new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = src;
-          s.onload = resolve;
-          s.onerror = () => reject(new Error('Impossible de charger ' + src));
-          document.head.appendChild(s);
-        });
-      }
-
-      function startSyrinscape() {
-        syrinscape.player.init({
-          async configure() {
-            syrinscape.config.token = SYRIN_TOKEN;
-            await syrinscape.config.sync();
-          },
-          onActive() {
-            playerReady = true;
-            document.getElementById('syrinActivateCta').style.display = 'none';
-            document.getElementById('syrinInterface').style.display = 'block';
-            setStatus('✅ Prêt', '#7ec87e');
-            if (window._scReveal) window._scReveal(true);
-            if (window._ambOnReady) window._ambOnReady();
-          },
-          onInactive() {
-            playerReady = false;
-            setStatus('Inactif');
-            if (window._scReveal) window._scReveal(false);
-          },
-        });
-      }
-
-      // ── API PUBLIQUE ──────────────────────────────
-      window._syrinActivate = async function() {
-        const btn = document.querySelector('#syrinActivateCta button');
-        if (btn) { btn.disabled = true; btn.textContent = '⏳ Chargement…'; }
-        setStatus('⏳ Chargement des scripts…', '#aaa');
-
-        try {
-          // Charger les scripts Syrinscape si pas encore chargés
-          if (typeof window.syrinscape === 'undefined') {
-            await loadScript('https://syrinscape.com/integration.js');
-          }
-          if (typeof window.syrinscape === 'undefined' || !window.syrinscape.player) {
-            await loadScript('https://syrinscape.com/player.js');
-          }
-
-          // Petite pause pour laisser le temps aux scripts de s'initialiser
-          await new Promise(r => setTimeout(r, 300));
-
-          if (typeof window.syrinscape === 'undefined' || !window.syrinscape.player) {
-            throw new Error('Syrinscape player non disponible après chargement');
-          }
-
-          setStatus('⏳ Connexion à Syrinscape…', '#aaa');
-          startSyrinscape();
-
-        } catch(err) {
-          console.error('Syrinscape load error:', err);
-          setStatus('⚠ Erreur : ' + err.message, '#e05050');
-          if (btn) { btn.disabled = false; btn.textContent = '🔊 Réessayer'; }
-        }
-      };
-
-      window._soundPlay = function() {
-        if (!playerReady) { setStatus('⚠ Cliquer sur "Activer" d\'abord', '#e09050'); return; }
-        isPlaying = true;
-        const theme = getTheme();
-        const mood  = getMood();
-
-        if (isCombatMode) {
-          const ids = COMBAT_MOODS[mood] || COMBAT_MOODS.normal;
-          playMood(pickRandom(ids));
-          setStatus(`⚔ Combat — ${getThemeLabel()}`, '#e07070');
-        } else {
-          const ids = MOOD_MAP[theme]?.[mood] || MOOD_MAP.foret.normal;
-          playMood(pickRandom(ids));
-          setStatus(`▶ ${getThemeLabel()} · ${getMoodLabel()}`, '#7ec87e');
-        }
-      };
-
-      window._soundStop = function() {
-        isPlaying = false;
-        isCombatMode = false;
-        stopAll();
-        const btn = document.getElementById('btnSoundCombat');
-        if (btn) { btn.textContent = '⚔ Combat'; btn.style.background = ''; }
-        setStatus('Inactif');
-      };
-
-      window._soundApply = function() {
-        if (isPlaying) window._soundPlay();
-      };
-
-      window._soundSetVolume = function() {
-        const val = parseFloat(document.getElementById('soundVolume')?.value || 0.8);
-        setVolume(val.toFixed(2));
-        // Volume local aussi via le player JS
-        if (playerReady && syrinscape?.player?.audioSystem) {
-          syrinscape.player.audioSystem.setLocalVolume(val);
-        }
-      };
-
-      window._soundCombatToggle = function() {
-        isCombatMode = !isCombatMode;
-        const btn = document.getElementById('btnSoundCombat');
-        if (btn) {
-          btn.textContent = isCombatMode ? '✅ Combat ON' : '⚔ Combat';
-          btn.style.background = isCombatMode ? 'var(--red)' : '';
-        }
-        window._soundPlay();
-      };
-
-      window._soundSfx = function(key) {
-        if (!playerReady) return;
-        const ids = SFX_MAP[key];
-        if (ids) playElement(pickRandom(ids));
-      };
-
-      // ── Accès direct aux interfaces Syrinscape complètes ──
-      // Nova ne peut pas être encapsulé dans une iframe (moteur audio à
-      // isolation cross-origin + session de connexion), on ouvre donc un onglet.
-      window._openNova = function() {
-        window.open('https://nova.syrinscape.com/', 'syrinscape_nova');
-      };
-      // ════════════════════════════════════════════════
-      // CONSOLE SONORE — recherche API + soundboard de favoris
-      // ════════════════════════════════════════════════
-      let scKind = 'Moods';
-      let scListenersAttached = false;
-
-      // GET authentifié vers l'API Syrinscape (CORS OK : SDK prévu pour pages tierces)
-      async function syrinApiGet(url) {
-        try {
-          const r = await fetch(url, { headers: { 'authorization': 'token ' + SYRIN_TOKEN, 'accept': 'application/json' } });
-          if (!r.ok) { console.warn('[Syrinscape] HTTP', r.status, url); return null; }
-          return await r.json();
-        } catch (e) { console.warn('[Syrinscape] fetch échoué (CORS ?) :', e); return null; }
-      }
-
-      function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-      function scId(r)   { return r.pk ?? r.id ?? r.element_id ?? r.mood_id ?? null; }
-      function scName(r) { return r.title || r.name || r.full_name || r.label || (scId(r) != null ? '#' + scId(r) : '(sans nom)'); }
-
-      window._scSetKind = function(btn, kind) {
-        scKind = kind;
-        document.querySelectorAll('.sc-chip').forEach(c => c.classList.toggle('active', c === btn));
-        window._scSearch();
-      };
-
-      window._scSearch = async function() {
-        const q = (document.getElementById('scSearch')?.value || '').trim();
-        const box = document.getElementById('scResults');
-        if (!box) return;
-        if (!q) { box.innerHTML = '<p class="sc-muted">Tape un mot-clé (ex : taverne, dragon, pluie…)</p>'; return; }
-        box.innerHTML = '<p class="sc-muted">Recherche…</p>';
-        const url = 'https://syrinscape.com/search/?format=json&pp=25&kind=' + encodeURIComponent(scKind) + '&q=' + encodeURIComponent(q);
-        const data = await syrinApiGet(url);
-        const results = (data && (Array.isArray(data) ? data : data.results)) || [];
-        if (results[0]) console.log('[Syrinscape] exemple de résultat (pour vérifier les champs) :', results[0]);
-        if (!data)          { box.innerHTML = '<p class="sc-muted">Recherche indisponible (voir console). Le soundboard manuel ci-dessous fonctionne.</p>'; return; }
-        if (!results.length){ box.innerHTML = '<p class="sc-muted">Aucun résultat.</p>'; return; }
-        const type = (scKind === 'Moods') ? 'mood' : 'element';
-        box.innerHTML = '';
-        results.forEach(r => {
-          const id = scId(r); if (id == null) return;
-          const name = scName(r);
-          const row = document.createElement('div');
-          row.className = 'sc-row';
-          row.innerHTML =
-            '<span class="sc-row-name" title="Jouer">' + escapeHtml(name) + '</span>' +
-            '<button class="sc-mini" title="Jouer">▶</button>' +
-            '<button class="sc-mini" title="Ajouter aux favoris">＋</button>';
-          const nameEl = row.querySelector('.sc-row-name');
-          const minis  = row.querySelectorAll('.sc-mini');
-          const play = () => scPlay(type, id, name);
-          nameEl.onclick = play; minis[0].onclick = play;
-          minis[1].onclick = () => scBoardAdd({ type, id, label: name.slice(0,24), emoji: type==='mood'?'🎚️':'🔊' });
-          box.appendChild(row);
-        });
-      };
-
-      function scPlay(type, id, name) {
-        if (!playerReady) window._syrinActivate();
-        if (type === 'mood') playMood(id); else playElement(id);
-        scSetNowPlaying((type==='mood'?'🎚️ ':'🔊 ') + (name || ('#'+id)));
-      }
-
-      window._scStop = function() {
-        stopAll();
-        if (playerReady && window.syrinscape?.player?.controlSystem) {
-          try { syrinscape.player.controlSystem.stopAll(); } catch(e){}
-        }
-        scSetNowPlaying('— Rien en lecture —');
-      };
-
-      function scSetNowPlaying(txt) {
-        const el = document.getElementById('scNowPlaying');
-        if (el) el.textContent = txt;
-      }
-
-      // ── Soundboard (favoris) persistés sur l'appareil ──
-      function scBoardLoad() { try { return JSON.parse(localStorage.getItem('kubbnd-soundboard') || '[]'); } catch(e){ return []; } }
-      function scBoardSave(list) { try { localStorage.setItem('kubbnd-soundboard', JSON.stringify(list)); } catch(e){} }
-      function scBoardAdd(item) {
-        if (item.id == null) return;
-        const list = scBoardLoad();
-        if (list.some(x => x.type === item.type && String(x.id) === String(item.id))) { scRenderBoard(); return; }
-        list.push(item); scBoardSave(list); scRenderBoard();
-      }
-      window._scBoardDelete = function(type, id) {
-        scBoardSave(scBoardLoad().filter(x => !(x.type === type && String(x.id) === String(id))));
-        scRenderBoard();
-      };
-      function scRenderBoard() {
-        const board = document.getElementById('scBoard');
-        if (!board) return;
-        const list = scBoardLoad();
-        if (!list.length) { board.innerHTML = '<p class="sc-muted">Aucun favori. Ajoute des sons via ▶/＋ ou le bouton ＋.</p>'; return; }
-        board.innerHTML = '';
-        list.forEach(item => {
-          const btn = document.createElement('button');
-          btn.className = 'sc-board-btn';
-          btn.innerHTML =
-            '<span class="del" title="Retirer">✕</span>' +
-            '<span class="em">' + (item.emoji || '🎵') + '</span>' +
-            '<span class="lb">' + escapeHtml(item.label || ('#'+item.id)) + '</span>';
-          btn.onclick = (e) => { if (!e.target.classList.contains('del')) scPlay(item.type, item.id, item.label); };
-          btn.querySelector('.del').onclick = (e) => { e.stopPropagation(); window._scBoardDelete(item.type, item.id); };
-          board.appendChild(btn);
-        });
-      }
-
-      window._scToggleAdd = function() {
-        const f = document.getElementById('scAddForm');
-        if (f) f.style.display = (f.style.display === 'none' || !f.style.display) ? 'flex' : 'none';
-      };
-      window._scAddManual = function() {
-        const ref = (document.getElementById('scAddRef')?.value || '').trim();
-        let type = document.getElementById('scAddType')?.value || 'mood';
-        const emoji = (document.getElementById('scAddEmoji')?.value || '').trim() || (type==='mood'?'🎚️':'🔊');
-        const label = (document.getElementById('scAddLabel')?.value || '').trim() || 'Sans nom';
-        let id = null, m;
-        if ((m = ref.match(/\/moods\/(\d+)\//)))    { id = m[1]; type = 'mood'; }
-        if (id == null && (m = ref.match(/\/elements\/(\d+)\//))) { id = m[1]; type = 'element'; }
-        if (id == null && /^\d+$/.test(ref)) { id = ref; }
-        if (id == null) { alert('Colle un lien Syrinscape (…/moods/123/play/…) ou un ID numérique.'); return; }
-        scBoardAdd({ type, id, label: label.slice(0,24), emoji });
-        ['scAddRef','scAddLabel','scAddEmoji'].forEach(i => { const el = document.getElementById(i); if (el) el.value=''; });
-        window._scToggleAdd();
-      };
-
-      // ── Lecture en cours via les événements du SDK ──
-      function scAttachListeners() {
-        if (scListenersAttached || !window.syrinscape?.events) return;
-        scListenersAttached = true;
-        try {
-          syrinscape.events.startMood?.addListener(e => scSetNowPlaying('🎚️ ' + (e.detail?.moodTitle || ('mood #' + e.detail?.moodId))));
-          syrinscape.events.startElement?.addListener(e => scSetNowPlaying('🔊 élément #' + e.detail?.elementId));
-          syrinscape.events.stopAll?.addListener(() => scSetNowPlaying('— Rien en lecture —'));
-        } catch(e) { console.warn('[Syrinscape] listeners:', e); }
-      }
-
-      // Révèle la console quand le lecteur est prêt (appelé depuis onActive/onInactive)
-      function scReveal(ready) {
-        const cta = document.getElementById('phoneCta');
-        const cons = document.getElementById('phoneConsole');
-        if (cta)  cta.style.display  = ready ? 'none' : 'block';
-        if (cons) cons.style.display = ready ? 'flex' : 'none';
-        if (ready) { scAttachListeners(); window._scSearch(); scRenderBoard(); }
-      }
-      window._scReveal = scReveal;
-
-      // Affiche le soundboard dès le chargement (même avant activation)
-      document.addEventListener('DOMContentLoaded', scRenderBoard);
-      window._openShareAudio = function() {
-        // app.syrinscape.com = Web Player : menu ☰ → « Share Audio » pour le lien joueurs
-        window.open('https://app.syrinscape.com/', 'syrinscape_app');
-      };
-
-      window._toggleSoundPanel = function() {
-        const body = document.getElementById('soundPanelBody');
-        const chev = document.getElementById('soundPanelChevron');
-        if (!body) return;
-        const open = body.style.display !== 'none';
-        body.style.display = open ? 'none' : 'block';
-        if (chev) chev.textContent = open ? '▸' : '▾';
-      };
-
-    })();
-    </script>
 
     <!-- Combat tracker -->
     <div id="combatPanel" class="combat-panel">
@@ -12616,69 +11787,7 @@ nav { transition: transform .28s ease; will-change: transform; }
     </div>
     </div><!-- /gm-left -->
 
-    <div class="gm-right">
-      <div class="gm-phone">
-        <div class="gm-phone-bar">
-          <span class="gm-phone-title">🎵 Console sonore</span>
-          <span style="display:flex;gap:6px">
-            <button class="gm-phone-btn" title="Tout arrêter" onclick="window._scStop()">⏹</button>
-            <button class="gm-phone-btn" title="Ouvrir Syrinscape Nova (contrôle complet)" onclick="window._openNova()">↗</button>
-          </span>
-        </div>
-        <div class="gm-phone-screen">
-          <div class="sc-screen">
-            <div class="sc-banner">🎵 AMBIANCE SONORE — Syrinscape</div>
-            <!-- Gestion & partage (interfaces complètes Syrinscape) -->
-            <div class="sc-manage">
-              <button class="sc-mbtn sc-mbtn-gold" onclick="window._openNova()" title="Gérer l'ensemble des sons dans l'interface complète Nova">🚀 Ouvrir Syrinscape Nova</button>
-              <button class="sc-mbtn" onclick="window._openShareAudio()" title="Récupérer le lien « Share Audio » à donner aux joueurs">🔗 Partager l'audio</button>
-            </div>
-            <p class="sc-note"><strong>Nova</strong> ouvre la session Syrinscape (tous les sons). « Partager l'audio » récupère le lien à donner aux joueurs.</p>
-            <!-- CTA d'activation (audio nécessite un clic) -->
-            <div id="phoneCta" class="sc-cta">
-              <button class="btn-gold" onclick="window._syrinActivate()" style="width:100%">🔊 Activer le son</button>
-              <p style="font-size:0.76rem;margin-top:8px">Un clic autorise l'audio dans le navigateur.</p>
-            </div>
 
-            <!-- Console (révélée une fois le lecteur actif) -->
-            <div id="phoneConsole" style="display:none;flex-direction:column;gap:10px">
-              <div id="scNowPlaying" class="sc-nowplaying">— Rien en lecture —</div>
-
-              <input id="scSearch" class="sc-input" type="text" placeholder="Rechercher un son…"
-                onkeydown="if(event.key==='Enter')window._scSearch()">
-              <div class="sc-chips">
-                <button class="sc-chip active" data-kind="Moods"    onclick="window._scSetKind(this,'Moods')">Ambiances</button>
-                <button class="sc-chip"        data-kind="SFX"      onclick="window._scSetKind(this,'SFX')">Bruitages</button>
-                <button class="sc-chip"        data-kind="Oneshots" onclick="window._scSetKind(this,'Oneshots')">Ponctuels</button>
-                <button class="sc-chip"        data-kind="Music"    onclick="window._scSetKind(this,'Music')">Musique</button>
-              </div>
-              <div id="scResults"></div>
-
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
-                <span class="sc-label" style="margin:0">★ FAVORIS</span>
-                <button class="sc-mini" title="Ajouter manuellement (lien ou ID)" onclick="window._scToggleAdd()">＋</button>
-              </div>
-
-              <!-- Ajout manuel -->
-              <div id="scAddForm" style="display:none;flex-direction:column;gap:6px;border:1px dashed rgba(212,180,120,0.4);border-radius:6px;padding:8px">
-                <input id="scAddRef" class="sc-input" type="text" placeholder="Lien Syrinscape ou ID (ex: 696964)">
-                <div style="display:flex;gap:6px">
-                  <select id="scAddType" class="sc-input" style="flex:1">
-                    <option value="mood">Ambiance (mood)</option>
-                    <option value="element">Élément / bruitage</option>
-                  </select>
-                  <input id="scAddEmoji" class="sc-input" style="width:54px;text-align:center" type="text" placeholder="🎵" maxlength="2">
-                </div>
-                <input id="scAddLabel" class="sc-input" type="text" placeholder="Nom du bouton">
-                <button class="btn-gold" style="width:100%" onclick="window._scAddManual()">Ajouter aux favoris</button>
-              </div>
-
-              <div id="scBoard" class="sc-board"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div><!-- /gm-right -->
 
     </div><!-- /gm-split -->
 
@@ -13121,8 +12230,6 @@ window._gmTourSteps = [
   { sel:".gm-search", tab:"tab-gm", optional:true, title:"Surveiller un personnage", body:"Colle l'ID d'un personnage puis AJOUTER pour suivre ses PV, sa CA, son inspiration\u2026 en temps r\u00E9el." },
   { sel:"#gmMonitor", tab:"tab-gm", optional:true, title:"Le moniteur", body:"Les fiches surveill\u00E9es s'affichent ici, mises \u00E0 jour en direct pendant la partie." },
   { sel:"#combatPanel", tab:"tab-gm", optional:true, title:"Combat & initiative", body:"Lance un combat, ajoute des cr\u00E9atures, synchronise tes PJ et fais d\u00E9filer les tours d'initiative." },
-  { sel:"#soundPanel", tab:"tab-gm", optional:true, title:"Ambiances sonores", body:"Pilote Syrinscape : jour/nuit, lieux, ambiances, bruitages et volume, sans quitter l'\u00E9cran." },
-  { sel:".gm-phone", tab:"tab-gm", optional:true, title:"Console sonore", body:"Un acc\u00E8s rapide aux sons et aux raccourcis pendant la partie." },
   { sel:"#projDock", tab:"tab-gm", optional:true, title:"Projection (\u00E9cran d\u00E9port\u00E9)", body:"D\u00E9plie le dock pour projeter une vue sur un second \u00E9cran ou vid\u00E9oprojecteur, fa\u00E7on OBS." },
   { center:true, title:"Pr\u00EAt \u00E0 ma\u00EEtriser !", body:"Tu connais maintenant l'\u00C9cran du Ma\u00EEtre. \u00C0 toi de jouer ! \uD83C\uDFB2" }
 ];
