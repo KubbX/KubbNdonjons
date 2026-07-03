@@ -9480,10 +9480,80 @@ function hibouToggleSettings(force){
 const AMB_LS = 'kubbnd_ambiances';
 const amb = {
   scenes: [], cur: null, intensity: 'calme',
-  a: new Audio(), b: new Audio(), live: 'a', fading: null,
-  vol: 0.6, urls: new Map(),   // cache blob->objectURL
+  live: 'a', fading: null, vol: 0.6, urls: new Map(), ch: null,
 };
-amb.a.loop = amb.b.loop = true;
+function ambYtId(u){
+  const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+let ambYtReady = null;
+function ambYtApi(){
+  if (ambYtReady) return ambYtReady;
+  ambYtReady = new Promise(res => {
+    if (window.YT && window.YT.Player) return res();
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { if (prev) prev(); res(); };
+    const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  });
+  return ambYtReady;
+}
+function ambChannel(){
+  const audio = new Audio(); audio.loop = true;
+  let yt = null, kind = 'audio', ytVol = 0;
+  const ensureYt = async () => {
+    if (yt) return yt;
+    await ambYtApi();
+    let host = document.getElementById('ambYtHost');
+    if (!host) {
+      host = document.createElement('div'); host.id = 'ambYtHost';
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:320px;height:180px;';
+      document.body.appendChild(host);
+    }
+    const div = document.createElement('div'); host.appendChild(div);
+    yt = await new Promise(res => { const p = new YT.Player(div, {
+      width: 320, height: 180,
+      playerVars: { autoplay: 0, controls: 0, disablekb: 1, playsinline: 1 },
+      events: {
+        onReady: () => res(p),
+        onStateChange: e => { if (e.data === YT.PlayerState.ENDED) { p.seekTo(0); p.playVideo(); } },
+        onError: e => ambSetStatus('YouTube : vidéo indisponible ou intégration désactivée (code ' + e.data + ').'),
+      },
+    }); });
+    return yt;
+  };
+  return {
+    async play(handle){
+      if (handle.kind === 'yt') {
+        kind = 'yt'; audio.pause();
+        const p = await ensureYt();
+        ytVol = 0; try { p.setVolume(0); p.loadVideoById(handle.id); p.playVideo(); } catch(e) {}
+      } else {
+        kind = 'audio';
+        if (yt) { try { yt.stopVideo(); } catch(e) {} }
+        audio.src = handle.src; audio.volume = 0;
+        await audio.play();
+      }
+    },
+    setVolume(v){
+      if (kind === 'yt') { ytVol = v; if (yt) { try { yt.setVolume(Math.round(v * 100)); } catch(e) {} } }
+      else audio.volume = Math.min(1, Math.max(0, v));
+    },
+    getVolume(){ return kind === 'yt' ? ytVol : audio.volume; },
+    paused(){
+      if (kind === 'yt') { try { return !yt || yt.getPlayerState() !== YT.PlayerState.PLAYING; } catch(e) { return true; } }
+      return audio.paused;
+    },
+    stop(){ audio.pause(); if (yt) { try { yt.stopVideo(); } catch(e) {} } },
+  };
+}
+function ambChannels(){ if (!amb.ch) amb.ch = { a: ambChannel(), b: ambChannel() }; return amb.ch; }
+async function ambResolveAudio(srcDef){
+  if (!srcDef || !srcDef.ref) return null;
+  if (srcDef.mode === 'url') { const id = ambYtId(srcDef.ref); if (id) return { kind: 'yt', id }; }
+  const u = await ambResolve(srcDef);
+  return u ? { kind: 'audio', src: u } : null;
+}
 
 /* ---------- stockage : méta en localStorage, blobs en IndexedDB ---------- */
 function ambDB(){
@@ -9513,26 +9583,27 @@ async function ambResolve(src){          // {mode:'url'|'idb', ref} -> URL jouab
 
 /* ---------- moteur audio : fondu-enchaîné ---------- */
 function ambSetStatus(t){ const e=document.getElementById('ambStatus'); if(e) e.textContent=t; }
-function ambCrossfade(toUrl){
-  const outEl = amb[amb.live], inEl = amb[amb.live === 'a' ? 'b' : 'a'];
+function ambCrossfade(toHandle){
+  const ch = ambChannels();
+  const sortant = ch[amb.live], entrant = ch[amb.live === 'a' ? 'b' : 'a'];
   if (amb.fading) { clearInterval(amb.fading); amb.fading = null; }
-  if (!toUrl) {   // simple fondu de sortie
-    const v0 = outEl.volume, t0 = Date.now();
+  if (!toHandle) {   // simple fondu de sortie
+    const v0 = sortant.getVolume(), t0 = Date.now();
     amb.fading = setInterval(() => {
       const k = Math.min((Date.now()-t0)/2000, 1);
-      outEl.volume = v0 * (1-k);
-      if (k >= 1) { clearInterval(amb.fading); amb.fading=null; outEl.pause(); }
+      sortant.setVolume(v0 * (1-k));
+      if (k >= 1) { clearInterval(amb.fading); amb.fading=null; sortant.stop(); }
     }, 60);
     return;
   }
-  inEl.src = toUrl; inEl.volume = 0;
-  inEl.play().catch(e => ambSetStatus('Lecture bloquée : ' + e.message));
-  const t0 = Date.now(), v0 = outEl.paused ? 0 : outEl.volume;
+  const v0 = sortant.paused() ? 0 : sortant.getVolume();
+  entrant.play(toHandle).catch(e => ambSetStatus('Lecture bloquée : ' + ((e && e.message) || e)));
+  const t0 = Date.now();
   amb.fading = setInterval(() => {
     const k = Math.min((Date.now()-t0)/3500, 1);
-    inEl.volume = amb.vol * k;
-    if (v0) outEl.volume = v0 * (1-k);
-    if (k >= 1) { clearInterval(amb.fading); amb.fading=null; outEl.pause(); outEl.volume = amb.vol; }
+    entrant.setVolume(amb.vol * k);
+    if (v0) sortant.setVolume(v0 * (1-k));
+    if (k >= 1) { clearInterval(amb.fading); amb.fading=null; sortant.stop(); sortant.setVolume(amb.vol); }
   }, 60);
   amb.live = amb.live === 'a' ? 'b' : 'a';
 }
@@ -9542,7 +9613,7 @@ async function ambPlayCurrent(){
   if (!sc) return;
   const ordre = { calme:['calme','tension','combat'], tension:['tension','calme','combat'], combat:['combat','tension','calme'] }[amb.intensity];
   let piste = null, choisi = null;
-  for (const p of ordre) { piste = await ambResolve(sc.pistes && sc.pistes[p]); if (piste) { choisi = p; break; } }
+  for (const p of ordre) { piste = await ambResolveAudio(sc.pistes && sc.pistes[p]); if (piste) { choisi = p; break; } }
   if (!piste) { ambSetStatus(`« ${sc.nom} » n'a aucune piste audio.`); ambCrossfade(null); return; }
   ambCrossfade(piste);
   ambSetStatus(`▶ ${sc.nom} — ${choisi}${choisi!==amb.intensity?` (pas de piste ${amb.intensity})`:''}`);
@@ -9713,6 +9784,40 @@ window._ambDeleteScene = async function(){
   ambRenderEditList(); ambFillForm(null); ambRender();
 };
 
+/* ---------- catalogue de biomes ---------- */
+const AMB_CATALOGUE = [
+  ['Taverne','🍺','#caa258'],['Marché animé','🧺','#c9a15a'],['Rues de la cité','🏘','#b98c48'],
+  ['Palais royal','👑','#f2c14e'],['Temple','⛪','#d9c48a'],['Bibliothèque arcanique','📚','#8a6fb5'],
+  ['Forge','🔨','#e8551f'],['Port','⚓','#3a86b5'],['Bas-fonds & égouts','🐀','#6a705a'],
+  ['Prison','⛓','#7a7a7a'],['Cité naine','⛏','#b0713d'],['Cité elfique','🍃','#43aa8b'],
+  ['Festival','🎪','#e368a0'],['Auberge la nuit','🌙','#9b8ac4'],
+  ['Prairie','🌾','#a8c700'],['Forêt tempérée','🌲','#4a8f3f'],['Forêt ancienne','🍄','#2f6b46'],
+  ['Jungle','🐍','#2e8b57'],['Marais','🐸','#5f7d4a'],['Désert','🏜','#d8a24a'],
+  ['Oasis','🌴','#43aa8b'],['Steppe & toundra','🦬','#9aa0a6'],['Montagne','🗻','#8a8f98'],
+  ['Sommets enneigés','🏔','#7dc4c4'],['Canyon','🪨','#b0713d'],['Falaises côtières','🌊','#277da1'],
+  ['Île tropicale','🏝','#38b6a0'],['Rivière & gués','🛶','#4a90c4'],['Tempête','⛈','#5a6d8a'],
+  ['Bivouac nocturne','🏕','#3f4a6b'],
+  ['Donjon','🗝','#7a6a5a'],['Crypte & cimetière','⚰','#5a5a7a'],['Mine abandonnée','⛏','#8a6a3c'],
+  ['Grottes','🕳','#6a6a6a'],['Caverne de cristal','💎','#7dc4e8'],['Outreterre','🕷','#5d3a7a'],
+  ['Ruines anciennes','🏛','#a09878'],['Antre du dragon','🐉','#c23b22'],['Laboratoire du mage','🧪','#9b5de5'],
+  ['Haute mer','⛵','#277da1'],['Abysses marins','🧜','#1b4f72'],['Navire dans la tempête','🌀','#34495e'],
+  ['Féerie','✨','#e368a0'],['Gisombre','🌑','#4a4a5a'],['Plan du Feu','🔥','#e8551f'],
+  ["Plan de l'Eau",'💧','#2980b9'],["Plan de l'Air",'🌬','#aed6f1'],['Plan de la Terre','⛰','#8a6a3c'],
+  ['Plan Astral','🌌','#6c5ce7'],['Plan Éthéré','👻','#b2bec3'],['Les Neuf Enfers','😈','#a02c2c'],
+  ['Les Abysses','🩸','#7b241c'],['Mont Céleste','😇','#f7dc6f'],['Mécanus','⚙','#95a5a6'],
+  ['Combat de boss','💀','#c0392b'],['Poursuite','🏇','#d35400'],['Mystère & enquête','🔍','#5d6d7e'],
+  ['Repos au coin du feu','🪵','#b9770e'],
+];
+window._ambInstallCatalogue = function(){
+  let ajoutees = 0;
+  for (const [nom, emoji, couleur] of AMB_CATALOGUE) {
+    if (amb.scenes.some(s => (s.nom||'').toLowerCase() === nom.toLowerCase())) continue;
+    amb.scenes.push({ id: 'amb_' + Date.now().toString(36) + '_' + (ajoutees++), nom, emoji, couleur, pistes: {} });
+  }
+  ambSaveScenes(); ambRender(); ambRenderEditList();
+  ambSetStatus(ajoutees ? ajoutees + ' biomes ajoutés — ouvre chaque scène pour lui coller ses pistes (YouTube ou fichiers).' : 'Catalogue déjà installé.');
+};
+
 /* ---------- volume + raccourcis (Stream Deck via hotkeys) ---------- */
 (function ambInit(){
   const wrap = document.getElementById('ambWrap');
@@ -9721,7 +9826,7 @@ window._ambDeleteScene = async function(){
   const vol = document.getElementById('ambVol');
   vol.addEventListener('input', () => {
     amb.vol = vol.value / 100;
-    amb[amb.live].volume = amb.vol;
+    ambChannels()[amb.live].setVolume(amb.vol);
   });
   document.addEventListener('keydown', e => {
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -11754,6 +11859,7 @@ nav { transition: transform .28s ease; will-change: transform; }
   <div class="amb-modal">
     <div class="amb-modal-head">
       <strong>Scènes d'ambiance</strong>
+      <button class="amb-head-btn" onclick="window._ambInstallCatalogue()" title="Ajoute ~58 biomes prêts à remplir">📚 Catalogue de biomes</button>
       <button class="hibou-hbtn" onclick="window._ambCloseEditor()">✕</button>
     </div>
     <div class="amb-modal-body">
@@ -11772,18 +11878,18 @@ nav { transition: transform .28s ease; will-change: transform; }
         </div>
         <div class="full amb-track" data-t="calme">
           <div class="amb-track-head">🕊 <b>Piste calme</b> <span class="amb-track-state none" id="ambFStCalme">vide</span></div>
-          <div class="amb-file-row"><input type="url" id="ambFUrlCalme" placeholder="URL audio ou fichier local →"><button class="amb-file-btn" onclick="window._ambPickFile('calme')">📁 Fichier</button></div>
+          <div class="amb-file-row"><input type="url" id="ambFUrlCalme" placeholder="URL audio / YouTube ou fichier →"><button class="amb-file-btn" onclick="window._ambPickFile('calme')">📁 Fichier</button></div>
         </div>
         <div class="full amb-track" data-t="tension">
           <div class="amb-track-head">⚡ <b>Piste tension</b> <span class="amb-track-state none" id="ambFStTension">vide</span></div>
-          <div class="amb-file-row"><input type="url" id="ambFUrlTension" placeholder="URL audio ou fichier local →"><button class="amb-file-btn" onclick="window._ambPickFile('tension')">📁 Fichier</button></div>
+          <div class="amb-file-row"><input type="url" id="ambFUrlTension" placeholder="URL audio / YouTube ou fichier →"><button class="amb-file-btn" onclick="window._ambPickFile('tension')">📁 Fichier</button></div>
         </div>
         <div class="full amb-track" data-t="combat">
           <div class="amb-track-head">⚔ <b>Piste combat</b> <span class="amb-track-state none" id="ambFStCombat">vide</span></div>
-          <div class="amb-file-row"><input type="url" id="ambFUrlCombat" placeholder="URL audio ou fichier local →"><button class="amb-file-btn" onclick="window._ambPickFile('combat')">📁 Fichier</button></div>
+          <div class="amb-file-row"><input type="url" id="ambFUrlCombat" placeholder="URL audio / YouTube ou fichier →"><button class="amb-file-btn" onclick="window._ambPickFile('combat')">📁 Fichier</button></div>
         </div>
         <p class="amb-set-note full" style="font-size:0.8rem;color:#8a744c;font-style:italic;line-height:1.45;margin:2px 0 0;">
-          Les fichiers choisis sont stockés <b>dans ce navigateur</b> (IndexedDB) — rien n'est envoyé en ligne, tu peux donc utiliser n'importe quelle banque sonore dont la licence autorise l'usage à ta table. Formats conseillés : MP3/OGG pour l'audio, JPG/WebP pour les images.
+          Les fichiers choisis sont stockés <b>dans ce navigateur</b> (IndexedDB) — rien n'est envoyé en ligne, tu peux donc utiliser n'importe quelle banque sonore dont la licence autorise l'usage à ta table. Formats : MP3/OGG, JPG/WebP — ou colle une <b>URL YouTube</b> (lecteur officiel embarqué ; nécessite internet, une vidéo autorisée à l'intégration, et d'éventuelles pubs).
         </p>
       </div>
     </div>
