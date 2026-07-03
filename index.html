@@ -9258,7 +9258,7 @@ const HIBOU_PERSONA = `Tu es Hibouquin, un petit owlin mage érudit, mascotte de
 
 const HIBOU_DOC = `GUIDE DE L'APPLICATION KubbNd : application compagnon D&D 5e. Onglets principaux : Personnages (liste des fiches ; bouton + pour créer via l'assistant de création en plusieurs étapes), Fiche de personnage (caractéristiques, compétences, équipement en poupée de papier, sorts avec emplacements, PV, repos), Écran MJ (accessible aux MJ : vue des fiches du groupe, lanceur de dés, console de sons Syrinscape, projection sur écran externe), Compendium (les 477 sorts avec cartes illustrées, objets, dons, monstres). Groupes : un MJ crée un groupe et partage son code d'invitation ; les joueurs le rejoignent depuis leur fiche (menu de la fiche > Groupes) pour donner au MJ l'accès en lecture. Grimoire : depuis la fiche, section Sorts, bouton du grimoire pour préparer/apprendre les sorts selon la classe (les clercs/druides préparent, les ensorceleurs connaissent). Montée de niveau : bouton sur la fiche, guidée étape par étape. Cartes de sorts : chaque sort a une carte illustrée recto/verso visible dans le compendium et le grimoire. Assistant Hibouquin : nécessite une clé API Anthropic personnelle, à saisir dans ses réglages (⚙).`;
 
-function hibouNorm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+function hibouNorm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
 
 function hibouSearch(query){
   const terms = hibouNorm(query).split(' ').filter(t => t.length > 2);
@@ -9284,18 +9284,20 @@ function hibouSearch(query){
   scored.sort((a,b) => b[0]-a[0]);
   return scored.slice(0, 5).map(([_,type,e]) => {
     let head = `[${type}] ${e.name}`;
-    if (type === 'sort') head += ` — niveau ${e.level===0?'mineur':e.level}, ${e.school||''}, ${e.time||''}, portée ${e.range||''}, durée ${e.duration||''}, composantes ${e.components||''}, classes : ${(e.classes||[]).join(', ')}`;
+    if (type === 'sort') head += ` — niveau ${e.level===0?'mineur':e.level}, ${e.school||''}, ${e.time||''}, portée ${e.range||''}, durée ${e.duration||''}, composantes ${e.components||''}, classes : ${[].concat(e.classes||[]).join(', ')}`;
     const desc = (e.desc||'').slice(0, 700);
     return head + '\n' + desc + (e.desc && e.desc.length > 700 ? '…' : '');
   });
 }
 
 function hibouSheetContext(){
-  const d = window._currentSheetData;
-  if (!d || !d.name) return '';
-  const cls = (d.classes||[]).map(c => `${c.name||c.class||''} ${c.level||''}`.trim()).join(' / ');
-  const spells = (d.spells||[]).map(s => s.name||s).filter(Boolean).slice(0, 40).join(', ');
-  return `FICHE OUVERTE : ${d.name}${cls?` (${cls})`:''}${d.hp!=null?`, PV ${d.hp}${d.hpMax?'/'+d.hpMax:''}`:''}${spells?`. Sorts connus/préparés : ${spells}`:''}.`;
+  try {
+    const d = window._currentSheetData;
+    if (!d || !d.name) return '';
+    const cls = [].concat(d.classes||[]).map(c => (typeof c==='object' ? `${c.name||c.class||''} ${c.level||''}` : String(c)).trim()).filter(Boolean).join(' / ');
+    const spells = [].concat(d.spells||[]).map(s => (s && s.name) || s).filter(x => typeof x==='string').slice(0, 40).join(', ');
+    return `FICHE OUVERTE : ${d.name}${cls?` (${cls})`:''}${d.hp!=null?`, PV ${d.hp}${d.hpMax?'/'+d.hpMax:''}`:''}${spells?`. Sorts connus/préparés : ${spells}`:''}.`;
+  } catch(e) { console.warn('[Hibouquin] contexte fiche :', e); return ''; }
 }
 
 function hibouEsc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -9330,15 +9332,21 @@ async function hibouSend(text){
   const typing = document.createElement('div'); typing.className='hibou-typing'; typing.textContent='Hibouquin feuillette le grimoire';
   document.getElementById('hibouMsgs').appendChild(typing); typing.scrollIntoView({block:'end'});
 
-  const extraits = hibouSearch(text);
+  let extraits = [];
+  try { extraits = hibouSearch(text); } catch(e) { console.warn('[Hibouquin] recherche compendium :', e); }
   let system = HIBOU_PERSONA + '\n\n' + HIBOU_DOC;
   const sheet = hibouSheetContext();
   if (sheet) system += '\n\n' + sheet;
   if (extraits.length) system += '\n\nEXTRAITS DU GRIMOIRE :\n' + extraits.join('\n---\n');
 
   let bubble = null, full = '';
+  const ctrl = new AbortController();
+  const tmo = setTimeout(() => ctrl.abort(), 90000);
+  let model = localStorage.getItem(HIBOU_LS_MODEL) || 'claude-haiku-4-5-20251001';
+  if (model === 'claude-haiku-4-5') { model = 'claude-haiku-4-5-20251001'; localStorage.setItem(HIBOU_LS_MODEL, model); }
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      signal: ctrl.signal,
       method: 'POST',
       headers: {
         'x-api-key': key,
@@ -9347,7 +9355,7 @@ async function hibouSend(text){
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: localStorage.getItem(HIBOU_LS_MODEL) || 'claude-haiku-4-5',
+        model,
         max_tokens: 1200,
         system,
         messages: hibouHist.slice(-8),
@@ -9380,12 +9388,17 @@ async function hibouSend(text){
     hibouHist.push({role:'assistant', content: full || '…'});
     if (hibouHist.length > 16) hibouHist = hibouHist.slice(-16);
   } catch (e) {
+    console.error('[Hibouquin]', e);
     typing.remove();
     if (bubble && !full) bubble.remove();
-    hibouAddMsg('err', hibouEsc('Hou… ' + (e.message || e)));
+    const msg = e.name === 'AbortError' ? 'la réponse a mis trop de temps (90 s) — réessaie.'
+      : /Failed to fetch|NetworkError|load failed/i.test(e.message||'') ? 'appel réseau bloqué — vérifie ta connexion et désactive un éventuel bloqueur de pub sur api.anthropic.com.'
+      : (e.message || e);
+    hibouAddMsg('err', hibouEsc('Hou… ' + msg));
     hibouHist.pop();
     if (window._hibouPose) window._hibouPose('colere');
   } finally {
+    clearTimeout(tmo);
     hibouBusy = false;
     btn.classList.remove('thinking');
     if (full && window._hibouPose) window._hibouPose('lecture');
@@ -9414,7 +9427,7 @@ function hibouToggleSettings(force){
       poseImg = document.createElement('img');
       poseImg.alt = 'Hibouquin';
       poseImg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:9px;border:1px solid rgba(200,160,90,0.4);';
-      poseImg.onerror = () => { poseImg = false; owlBox.innerHTML = btn.querySelector('svg').outerHTML; };
+      poseImg.onerror = () => { console.warn('[Hibouquin] pose introuvable :', poseImg.src, '— vérifie que le dossier assets/hibouquin/ est bien déployé à la racine du site.'); poseImg = false; owlBox.innerHTML = btn.querySelector('svg').outerHTML; };
       poseImg.onload = () => { if (owlBox.firstChild !== poseImg) { owlBox.innerHTML=''; owlBox.appendChild(poseImg); } };
     }
     poseImg.src = HIBOU_POSES + nom + '.webp';
@@ -9439,7 +9452,9 @@ function hibouToggleSettings(force){
     hibouToggleSettings(false);
   });
   const sel = document.getElementById('hibouModel');
-  sel.value = localStorage.getItem(HIBOU_LS_MODEL) || 'claude-haiku-4-5';
+  let selv = localStorage.getItem(HIBOU_LS_MODEL) || 'claude-haiku-4-5-20251001';
+  if (selv === 'claude-haiku-4-5') selv = 'claude-haiku-4-5-20251001';
+  sel.value = selv;
   const input = document.getElementById('hibouInput');
   const envoyer = () => { const t = input.value; input.value = ''; input.style.height = ''; hibouSend(t); };
   document.getElementById('hibouSend').addEventListener('click', envoyer);
@@ -11455,7 +11470,7 @@ nav { transition: transform .28s ease; will-change: transform; }
 }
 
 /* ══════════ HIBOUQUIN — mascotte assistante ══════════ */
-.hibou-btn { position:fixed; right:18px; bottom:18px; z-index:8500; width:64px; height:64px;
+.hibou-btn { position:fixed; left:18px; bottom:18px; z-index:8500; width:64px; height:64px;
   border-radius:50%; border:2px solid rgba(200,160,90,0.55); cursor:pointer; padding:0;
   background:radial-gradient(circle at 35% 30%, #3a2a14, #17100a 75%);
   box-shadow:0 6px 20px rgba(0,0,0,0.5), 0 0 14px rgba(232,200,120,0.25);
@@ -11473,7 +11488,7 @@ nav { transition: transform .28s ease; will-change: transform; }
   color:#1a1206; font-size:0.62rem; font-weight:700; padding:2px 7px; border-radius:9px;
   border:1px solid rgba(255,240,200,0.4); font-family:'Cinzel',serif; letter-spacing:0.03em; }
 
-.hibou-panel { position:fixed; right:16px; bottom:92px; z-index:8600; width:min(392px, calc(100vw - 24px));
+.hibou-panel { position:fixed; left:16px; bottom:92px; z-index:8600; width:min(392px, calc(100vw - 24px));
   height:min(560px, calc(100vh - 116px)); display:none; flex-direction:column; border-radius:14px;
   overflow:hidden; border:1px solid rgba(160,120,65,0.5); color:#e8dcc2;
   font-family:'Crimson Pro', Georgia, serif;
@@ -11528,8 +11543,8 @@ nav { transition: transform .28s ease; will-change: transform; }
   font-family:inherit; font-variant:small-caps; letter-spacing:0.05em; font-size:1rem; }
 
 @media (max-width:520px) {
-  .hibou-panel { right:8px; left:8px; bottom:84px; width:auto; height:min(72vh, calc(100vh - 104px)); }
-  .hibou-btn { right:12px; bottom:12px; width:58px; height:58px; }
+  .hibou-panel { left:8px; right:8px; bottom:84px; width:auto; height:min(72vh, calc(100vh - 104px)); }
+  .hibou-btn { left:12px; bottom:12px; width:58px; height:58px; }
 }
 
 
@@ -13118,7 +13133,6 @@ window.addEventListener('keydown', function(e){
     <line x1="32" y1="52" x2="32" y2="60" stroke="#3f1a12" stroke-width="1"/>
     <path d="M29 55.5 h2 M33.5 55.5 h2" stroke="#e8cf9c" stroke-width="0.9"/>
   </svg>
-  <span class="hibou-badge">IA</span>
 </button>
 
 <div class="hibou-panel" id="hibouPanel" role="dialog" aria-label="Assistant Hibouquin">
@@ -13142,7 +13156,7 @@ window.addEventListener('keydown', function(e){
     <input type="password" id="hibouKey" placeholder="sk-ant-…" autocomplete="off">
     <label for="hibouModel">Modèle</label>
     <select id="hibouModel">
-      <option value="claude-haiku-4-5">Haiku — rapide et économique</option>
+      <option value="claude-haiku-4-5-20251001">Haiku — rapide et économique</option>
       <option value="claude-sonnet-4-6">Sonnet — plus malin</option>
     </select>
     <p class="hibou-set-note">Ta clé reste <b>uniquement dans ce navigateur</b> (localStorage) et part directement chez Anthropic — jamais sur un autre serveur. Crée-la sur console.anthropic.com. Chaque question coûte une fraction de centime en Haiku.</p>
