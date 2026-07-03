@@ -9481,7 +9481,93 @@ const AMB_LS = 'kubbnd_ambiances';
 const amb = {
   scenes: [], cur: null, intensity: 'calme',
   live: 'a', fading: null, vol: 0.6, urls: new Map(), ch: null,
+  theme: localStorage.getItem('kubbnd_amb_theme') || 'tous',
+  nappes: [], shots: [], volN: 0.5, napAudio: new Map(), editBoards: false,
 };
+const AMB_THEMES = [['tous','✦','Tous'],['ville','🏘','Ville'],['nature','🌲','Nature'],['souterrain','🗝','Souterrains'],['mer','⛵','Mer'],['plans','🌌','Plans'],['situation','⚔','Situations'],['perso','★','Mes scènes']];
+const AMB_NAPPES_DEFAUT = [
+  ['Vent','🌬','https://sounds.tabletopaudio.com/138_Desert_Winds.mp3'],
+  ['Pluie','🌧','https://sounds.tabletopaudio.com/40_The_Long_Rain.mp3'],
+  ['Orage lointain','⛈','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3'],
+  ['Vagues','🌊','https://sounds.tabletopaudio.com/132_Open_Ocean.mp3'],
+  ['Feu de camp','🔥','https://sounds.tabletopaudio.com/51_Woodland_Campsite.mp3'],
+  ['Foule','🗣','https://sounds.tabletopaudio.com/56_Medieval_Town.mp3'],
+];
+function ambVisibles(){ return amb.scenes.filter(s => amb.theme === 'tous' || (s.theme || 'perso') === amb.theme); }
+function ambSaveBoards(){ localStorage.setItem('kubbnd_amb_nappes', JSON.stringify(amb.nappes)); localStorage.setItem('kubbnd_amb_shots', JSON.stringify(amb.shots)); }
+function ambLoadBoards(){
+  try { amb.nappes = JSON.parse(localStorage.getItem('kubbnd_amb_nappes')) || []; } catch { amb.nappes = []; }
+  try { amb.shots = JSON.parse(localStorage.getItem('kubbnd_amb_shots')) || []; } catch { amb.shots = []; }
+}
+async function ambNappeToggle(id){
+  const n = amb.nappes.find(x => x.id === id); if (!n) return;
+  let a = amb.napAudio.get(id);
+  if (a && !a.paused) {
+    const v0 = a.volume, t0 = Date.now();
+    const f = setInterval(() => { const k = Math.min((Date.now()-t0)/400, 1); a.volume = v0*(1-k); if (k>=1){ clearInterval(f); a.pause(); } }, 40);
+  } else {
+    const h = await ambResolveAudio(n.src);
+    if (!h) { ambSetStatus('Nappe « ' + n.nom + ' » : source introuvable.'); return; }
+    if (h.kind === 'yt') { ambSetStatus('Les nappes ne prennent pas YouTube — utilise un fichier ou une URL audio.'); return; }
+    if (!a) { a = new Audio(); a.loop = true; amb.napAudio.set(id, a); }
+    a.src = h.src; a.volume = 0;
+    a.play().then(() => {
+      const t0 = Date.now();
+      const f = setInterval(() => { const k = Math.min((Date.now()-t0)/500, 1); a.volume = amb.volN*k; if (k>=1) clearInterval(f); }, 40);
+    }).catch(e => ambSetStatus('Nappe bloquée : ' + (e.message||e)));
+  }
+  setTimeout(ambRenderBoards, 450);
+}
+function ambShot(id){
+  const s = amb.shots.find(x => x.id === id); if (!s) return;
+  ambResolveAudio(s.src).then(h => {
+    if (!h || h.kind === 'yt') { ambSetStatus('One-shot « ' + s.nom + ' » : fichier ou URL audio directe uniquement.'); return; }
+    const a = new Audio(h.src); a.volume = Math.min(1, amb.vol * 1.15);
+    a.play().catch(e => ambSetStatus('One-shot bloqué : ' + (e.message||e)));
+  });
+}
+window._ambNappeToggle = ambNappeToggle;
+window._ambShot = ambShot;
+window._ambBoardsEdit = function(){ amb.editBoards = !amb.editBoards; ambRenderBoards(); };
+window._ambDelBoardItem = async function(type, id){
+  const arr = type === 'nappe' ? amb.nappes : amb.shots;
+  const it = arr.find(x => x.id === id); if (!it) return;
+  if (!confirm('Supprimer « ' + it.nom + ' » ?')) return;
+  if (it.src && it.src.mode === 'idb') await ambDel(it.src.ref);
+  const a = amb.napAudio.get(id); if (a) { a.pause(); amb.napAudio.delete(id); }
+  if (type === 'nappe') amb.nappes = arr.filter(x => x.id !== id); else amb.shots = arr.filter(x => x.id !== id);
+  ambSaveBoards(); ambRenderBoards();
+};
+window._ambAddBoardItem = function(type){
+  const nom = prompt(type === 'nappe' ? 'Nom de la nappe (ex : Rivière)' : 'Nom du one-shot (ex : Tonnerre)'); if (!nom) return;
+  const emoji = prompt('Emoji (optionnel)') || (type === 'nappe' ? '〰' : '💥');
+  const url = prompt('URL audio directe (mp3/ogg) — laisse vide pour choisir un fichier local');
+  const fin = (srcDef) => {
+    const it = { id: (type==='nappe'?'nap_':'sh_') + Math.random().toString(36).slice(2,8), nom: nom.slice(0,24), emoji, src: srcDef };
+    (type === 'nappe' ? amb.nappes : amb.shots).push(it);
+    ambSaveBoards(); ambRenderBoards();
+  };
+  if (url && url.trim()) { fin({ mode:'url', ref:url.trim() }); return; }
+  const inp = document.getElementById('ambFileInput');
+  inp.accept = 'audio/*';
+  inp.onchange = async () => {
+    if (!inp.files[0]) return;
+    const id = 'board_' + Date.now().toString(36);
+    await ambPut(id, inp.files[0]); inp.value = '';
+    fin({ mode:'idb', ref:id });
+  };
+  inp.click();
+};
+function ambRenderBoards(){
+  const nb = document.getElementById('ambNappes'), sb = document.getElementById('ambShots');
+  if (!nb) return;
+  const chip = (it, on, type) =>
+    `<button class="amb-chip2${on?' on':''}" onclick="window._amb${type==='nappe'?'NappeToggle':'Shot'}('${it.id}')">${it.emoji||''} ${it.nom.replace(/</g,'&lt;')}${amb.editBoards?`<span class="amb-chip2-x" onclick="event.stopPropagation();window._ambDelBoardItem('${type}','${it.id}')">✕</span>`:''}</button>`;
+  nb.innerHTML = amb.nappes.map(n => { const a = amb.napAudio.get(n.id); return chip(n, a && !a.paused, 'nappe'); }).join('')
+    || '<span class="amb-board-vide">aucune nappe</span>';
+  sb.innerHTML = amb.shots.map(s => chip(s, false, 'shot')).join('')
+    || '<span class="amb-board-vide">aucun one-shot — ajoute des fichiers CC0 (voir guide)</span>';
+}
 function ambYtId(u){
   const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
   return m ? m[1] : null;
@@ -9692,15 +9778,24 @@ window._ambToggle = function(){
 async function ambRender(){
   const cont = document.getElementById('ambScenes');
   if (!cont) return;
+  const cats = document.getElementById('ambCats');
+  if (cats) {
+    cats.innerHTML = AMB_THEMES.map(([id, emo, lbl]) => {
+      const n = id === 'tous' ? amb.scenes.length : amb.scenes.filter(s => (s.theme || 'perso') === id).length;
+      if (!n && id !== 'tous') return '';
+      return `<button class="amb-cat${amb.theme===id?' on':''}" onclick="window._ambTheme('${id}')">${emo} ${lbl}<span class="amb-cat-n">${n}</span></button>`;
+    }).join('');
+  }
   if (!amb.scenes.length) { cont.innerHTML = '<div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div>'; }
   else {
-    cont.innerHTML = amb.scenes.map((s,i) =>
+    const visibles = ambVisibles();
+    cont.innerHTML = visibles.map((s,i) =>
       `<button class="amb-scene${s.id===amb.cur?' on':''}" draggable="true" data-id="${s.id}" style="--amb-c:${s.couleur||'#caa258'}" onclick="window._ambActivate('${s.id}')">
         <span class="amb-scene-vis" id="ambVis_${s.id}"><span class="amb-scene-emo">${s.emoji||'🎬'}</span></span>
         <span class="amb-scene-name">${(s.nom||'?').replace(/</g,'&lt;')}</span>
         ${i<9?`<span class="amb-scene-key">${i+1}</span>`:''}
       </button>`).join('');
-    for (const s of amb.scenes) {   // l'image devient la bulle elle-même (sonde avant application)
+    for (const s of visibles) {   // l'image devient la bulle elle-même (sonde avant application)
       const u = await ambResolve(s.image);
       const v = document.getElementById('ambVis_'+s.id);
       if (!u || !v) continue;
@@ -9710,7 +9805,9 @@ async function ambRender(){
     }
   }
   document.querySelectorAll('.amb-int').forEach(b => b.classList.toggle('on', b.dataset.int === amb.intensity));
+  ambRenderBoards();
 }
+window._ambTheme = function(id){ amb.theme = id; localStorage.setItem('kubbnd_amb_theme', id); ambRender(); };
 
 /* ---------- éditeur ---------- */
 let ambEditId = null, ambPending = {};   // fichiers choisis avant sauvegarde
@@ -9730,6 +9827,7 @@ function ambFillForm(s){
   document.getElementById('ambFNom').value = s?.nom || '';
   document.getElementById('ambFEmoji').value = s?.emoji || '';
   document.getElementById('ambFCouleur').value = s?.couleur || '#caa258';
+  document.getElementById('ambFTheme').value = s?.theme || 'perso';
   document.getElementById('ambFImgUrl').value = (s?.image?.mode==='url') ? s.image.ref : '';
   document.getElementById('ambFImgState').textContent = s?.image ? (s.image.mode==='idb'?'fichier local enregistré':'URL') : 'aucune image';
   document.getElementById('ambFImgState').classList.toggle('none', !s?.image);
@@ -9762,6 +9860,7 @@ window._ambSaveScene = async function(){
   s.nom = nom;
   s.emoji = document.getElementById('ambFEmoji').value.trim();
   s.couleur = document.getElementById('ambFCouleur').value;
+  s.theme = document.getElementById('ambFTheme').value;
   const setSrc = async (slot, urlVal, target, key) => {
     if (ambPending[slot]) {
       const id = s.id + '_' + slot;
@@ -9790,79 +9889,85 @@ window._ambDeleteScene = async function(){
 
 /* ---------- catalogue de biomes ---------- */
 const AMB_CATALOGUE = [
-  ['Taverne','🍺','#caa258','taverne',['https://sounds.tabletopaudio.com/177_Tavern_Music.mp3','https://sounds.tabletopaudio.com/211_Thieves_Guild.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3']],
-  ['Marché animé','🧺','#c9a15a','marche-anime',['https://sounds.tabletopaudio.com/163_Medieval_Fair.mp3','https://sounds.tabletopaudio.com/294_Cutpurse_Pursuit.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3']],
-  ['Rues de la cité','🏘','#b98c48','rues-de-la-cite',['https://sounds.tabletopaudio.com/56_Medieval_Town.mp3','https://sounds.tabletopaudio.com/10_In_The_Shadows.mp3','https://sounds.tabletopaudio.com/97_City_Under_Siege.mp3']],
-  ['Palais royal','👑','#f2c14e','palais-royal',['https://sounds.tabletopaudio.com/175_Royal_Court.mp3','https://sounds.tabletopaudio.com/267_Court_of_the_Count.mp3','https://sounds.tabletopaudio.com/34_Clash_of_Kings.mp3']],
-  ['Temple','⛪','#d9c48a','temple',['https://sounds.tabletopaudio.com/46_Cathedral.mp3','https://sounds.tabletopaudio.com/236_Defiled_Temple.mp3','https://sounds.tabletopaudio.com/3_The_March_of_the_Faithful.mp3']],
-  ['Bibliothèque arcanique','📚','#8a6fb5','bibliotheque-arcanique',['https://sounds.tabletopaudio.com/73_Medieval_Library.mp3','https://sounds.tabletopaudio.com/174_Wizards_Tower.mp3','https://sounds.tabletopaudio.com/303_Summoning.mp3']],
-  ['Forge','🔨','#e8551f','forge',['https://sounds.tabletopaudio.com/80_Blacksmith_Shoppe.mp3','https://sounds.tabletopaudio.com/219_Tinkerers_Workshop.mp3','https://sounds.tabletopaudio.com/276_Forge_of_Fury.mp3']],
-  ['Port','⚓','#3a86b5','port',['https://sounds.tabletopaudio.com/75_Docks_District.mp3','https://sounds.tabletopaudio.com/292_Bleakwater_Docks.mp3','https://sounds.tabletopaudio.com/241_Pirates.mp3']],
-  ['Bas-fonds & égouts','🐀','#6a705a','bas-fonds-egouts',['https://sounds.tabletopaudio.com/85_Sewers.mp3','https://sounds.tabletopaudio.com/211_Thieves_Guild.mp3','https://sounds.tabletopaudio.com/209_Rat_Battle.mp3']],
-  ['Prison','⛓','#7a7a7a','prison',['https://sounds.tabletopaudio.com/172_Castle_Jail.mp3','https://sounds.tabletopaudio.com/229_Interrogation_Room.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3']],
-  ['Cité naine','⛏','#b0713d','cite-naine',['https://sounds.tabletopaudio.com/114_Dwarven_City.mp3','https://sounds.tabletopaudio.com/184_Underground_Lake.mp3','https://sounds.tabletopaudio.com/261_Unto_the_Breach.mp3']],
-  ['Cité elfique','🍃','#43aa8b','cite-elfique',['https://sounds.tabletopaudio.com/91_Elven_Glade.mp3','https://sounds.tabletopaudio.com/313_Dusk_of_the_Dryad.mp3','https://sounds.tabletopaudio.com/282_The_Wild_Hunt.mp3']],
-  ['Festival','🎪','#e368a0','festival',['https://sounds.tabletopaudio.com/133_Halfling_Festival.mp3','https://sounds.tabletopaudio.com/108_Carnival.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
-  ['Auberge la nuit','🌙','#9b8ac4','auberge-la-nuit',['https://sounds.tabletopaudio.com/255_The_Hearth_Inn.mp3','https://sounds.tabletopaudio.com/224_Mansion_Night.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
-  ['Prairie','🌾','#a8c700','prairie',['https://sounds.tabletopaudio.com/96_Windswept_Plains_b.mp3','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','https://sounds.tabletopaudio.com/79_Medieval_Battle.mp3']],
-  ['Forêt tempérée','🌲','#4a8f3f','foret-temperee',['https://sounds.tabletopaudio.com/161_Forest_Day.mp3','https://sounds.tabletopaudio.com/69_Forest_Night.mp3','https://sounds.tabletopaudio.com/227_Terror_in_the_Woods.mp3']],
-  ['Forêt ancienne','🍄','#2f6b46','foret-ancienne',['https://sounds.tabletopaudio.com/275_Lorekeeper_Grove.mp3','https://sounds.tabletopaudio.com/258_Blighted_Forest.mp3','https://sounds.tabletopaudio.com/282_The_Wild_Hunt.mp3']],
-  ['Jungle','🐍','#2e8b57','jungle',['https://sounds.tabletopaudio.com/20_Dark_Continent_aa.mp3','https://sounds.tabletopaudio.com/274_Jungle_Shaman.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
-  ['Marais','🐸','#5f7d4a','marais',['https://sounds.tabletopaudio.com/223_Salt_Marsh.mp3','https://sounds.tabletopaudio.com/286_Blastfire_Bog.mp3','https://sounds.tabletopaudio.com/311_Swamp_Thing.mp3']],
-  ['Désert','🏜','#d8a24a','desert',['https://sounds.tabletopaudio.com/7_The_Desert_Awaits.mp3','https://sounds.tabletopaudio.com/138_Desert_Winds.mp3','https://sounds.tabletopaudio.com/307_Sand_Raiders.mp3']],
-  ['Oasis','🌴','#43aa8b','oasis',['https://sounds.tabletopaudio.com/284_Oasis_City.mp3','https://sounds.tabletopaudio.com/5_Desert_Bazaar.mp3','https://sounds.tabletopaudio.com/307_Sand_Raiders.mp3']],
-  ['Steppe & toundra','🦬','#9aa0a6','steppe-toundra',['https://sounds.tabletopaudio.com/193_The_Steppes.mp3','https://sounds.tabletopaudio.com/130_Russian_Winter.mp3','https://sounds.tabletopaudio.com/244_Vikings.mp3']],
-  ['Montagne','🗻','#8a8f98','montagne',['https://sounds.tabletopaudio.com/64_Mountain_Pass.mp3','https://sounds.tabletopaudio.com/212_Witch_Mountain.mp3','https://sounds.tabletopaudio.com/79_Medieval_Battle.mp3']],
-  ['Sommets enneigés','🏔','#7dc4c4','sommets-enneiges',['https://sounds.tabletopaudio.com/296_The_Frozen_Trail.mp3','https://sounds.tabletopaudio.com/31_Frozen_Wastes.mp3','https://sounds.tabletopaudio.com/256_Ice_Dragon.mp3']],
-  ['Canyon','🪨','#b0713d','canyon',['https://sounds.tabletopaudio.com/176_Barren_Wastes.mp3','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3']],
-  ['Falaises côtières','🌊','#277da1','falaises-cotieres',['https://sounds.tabletopaudio.com/36_Down_by_the_Sea.mp3','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
-  ['Île tropicale','🏝','#38b6a0','ile-tropicale',['https://sounds.tabletopaudio.com/234_Lush_World.mp3','https://sounds.tabletopaudio.com/27_Xingu_Nights.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
-  ['Rivière & gués','🛶','#4a90c4','riviere-gues',['https://sounds.tabletopaudio.com/104_River_Town.mp3','https://sounds.tabletopaudio.com/196_Crossing_the_Styx.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3']],
-  ['Tempête','⛈','#5a6d8a','tempete',['https://sounds.tabletopaudio.com/11_Shelter_from_the_Storm.mp3','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','https://sounds.tabletopaudio.com/304_Fog_of_War.mp3']],
-  ['Bivouac nocturne','🏕','#3f4a6b','bivouac-nocturne',['https://sounds.tabletopaudio.com/51_Woodland_Campsite.mp3','https://sounds.tabletopaudio.com/10_In_The_Shadows.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
-  ['Donjon','🗝','#7a6a5a','donjon',['https://sounds.tabletopaudio.com/65_Dungeon_I.mp3','https://sounds.tabletopaudio.com/252_Vault_of_Terror.mp3','https://sounds.tabletopaudio.com/49_Goblin\'s_Cave.mp3']],
-  ['Crypte & cimetière','⚰','#5a5a7a','crypte-cimetiere',['https://sounds.tabletopaudio.com/147_Graveyard.mp3','https://sounds.tabletopaudio.com/37_Catacombs.mp3','https://sounds.tabletopaudio.com/74_Zombies!.mp3']],
-  ['Mine abandonnée','⛏','#8a6a3c','mine-abandonnee',['https://sounds.tabletopaudio.com/98_Lost_Mine.mp3','https://sounds.tabletopaudio.com/13_Cave_of_Time.mp3','https://sounds.tabletopaudio.com/49_Goblin\'s_Cave.mp3']],
-  ['Grottes','🕳','#6a6a6a','grottes',['https://sounds.tabletopaudio.com/263_Mysterious_Grotto.mp3','https://sounds.tabletopaudio.com/99_Cavern_of_Lost_Souls.mp3','https://sounds.tabletopaudio.com/218_Sleeping_Ogre.mp3']],
-  ['Caverne de cristal','💎','#7dc4e8','caverne-de-cristal',['https://sounds.tabletopaudio.com/301_Pool_of_Radiance.mp3','https://sounds.tabletopaudio.com/13_Cave_of_Time.mp3','https://sounds.tabletopaudio.com/303_Summoning.mp3']],
-  ['Outreterre','🕷','#5d3a7a','outreterre',['https://sounds.tabletopaudio.com/170_The_Underdark.mp3','https://sounds.tabletopaudio.com/238_Mind_Flayer_Chamber.mp3','https://sounds.tabletopaudio.com/242_Spiders_Den.mp3']],
-  ['Ruines anciennes','🏛','#a09878','ruines-anciennes',['https://sounds.tabletopaudio.com/243_Jungle_Ruins.mp3','https://sounds.tabletopaudio.com/289_Ancient_Artifact.mp3','https://sounds.tabletopaudio.com/42_Rise_of_the_Ancients.mp3']],
-  ['Antre du dragon','🐉','#c23b22','antre-du-dragon',['https://sounds.tabletopaudio.com/71_Sleeping_Dragon.mp3','https://sounds.tabletopaudio.com/100_Volcano.mp3','https://sounds.tabletopaudio.com/47_There_be_Dragons.mp3']],
-  ['Laboratoire du mage','🧪','#9b5de5','laboratoire-du-mage',['https://sounds.tabletopaudio.com/76_Alchemists_Lab.mp3','https://sounds.tabletopaudio.com/273_Arcane_Clockworks.mp3','https://sounds.tabletopaudio.com/303_Summoning.mp3']],
-  ['Haute mer','⛵','#277da1','haute-mer',['https://sounds.tabletopaudio.com/132_Open_Ocean.mp3','https://sounds.tabletopaudio.com/126_Endless_Voyage.mp3','https://sounds.tabletopaudio.com/241_Pirates.mp3']],
-  ['Abysses marins','🧜','#1b4f72','abysses-marins',['https://sounds.tabletopaudio.com/38_Into_the_Deep.mp3','https://sounds.tabletopaudio.com/253_Submerged.mp3','https://sounds.tabletopaudio.com/139_Sunken_Temple.mp3']],
-  ['Navire dans la tempête','🌀','#34495e','navire-dans-la-tempete',['https://sounds.tabletopaudio.com/217_Storm_at_Sea.mp3','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','https://sounds.tabletopaudio.com/241_Pirates.mp3']],
-  ['Féerie','✨','#e368a0','feerie',['https://sounds.tabletopaudio.com/169_The_Feywild.mp3','https://sounds.tabletopaudio.com/313_Dusk_of_the_Dryad.mp3','https://sounds.tabletopaudio.com/282_The_Wild_Hunt.mp3']],
-  ['Gisombre','🌑','#4a4a5a','gisombre',['https://sounds.tabletopaudio.com/198_Shadowfell.mp3','https://sounds.tabletopaudio.com/281_Escape_from_Shadow.mp3','https://sounds.tabletopaudio.com/162_Dark_Angel.mp3']],
-  ['Plan du Feu','🔥','#e8551f','plan-du-feu',['https://sounds.tabletopaudio.com/100_Volcano.mp3','https://sounds.tabletopaudio.com/213_Burning_Village.mp3','https://sounds.tabletopaudio.com/309_Bloodgate.mp3']],
-  ['Plan de l\'Eau','💧','#2980b9','plan-de-l-eau',['https://sounds.tabletopaudio.com/132_Open_Ocean.mp3','https://sounds.tabletopaudio.com/38_Into_the_Deep.mp3','https://sounds.tabletopaudio.com/217_Storm_at_Sea.mp3']],
-  ['Plan de l\'Air','🌬','#aed6f1','plan-de-l-air',['https://sounds.tabletopaudio.com/260_Skyship.mp3','https://sounds.tabletopaudio.com/33_Far_Above_the_World.mp3','https://sounds.tabletopaudio.com/304_Fog_of_War.mp3']],
-  ['Plan de la Terre','⛰','#8a6a3c','plan-de-la-terre',['https://sounds.tabletopaudio.com/184_Underground_Lake.mp3','https://sounds.tabletopaudio.com/13_Cave_of_Time.mp3','https://sounds.tabletopaudio.com/218_Sleeping_Ogre.mp3']],
-  ['Plan Astral','🌌','#6c5ce7','plan-astral',['https://sounds.tabletopaudio.com/113_Astral_Plane.mp3','https://sounds.tabletopaudio.com/287_The_Strange.mp3','https://sounds.tabletopaudio.com/187_Endgame.mp3']],
-  ['Plan Éthéré','👻','#b2bec3','plan-ethere',['https://sounds.tabletopaudio.com/112_Ethereal_Plane.mp3','https://sounds.tabletopaudio.com/12_Disembodied_Spirits.mp3','https://sounds.tabletopaudio.com/186_Haunted.mp3']],
-  ['Les Neuf Enfers','😈','#a02c2c','les-neuf-enfers',['https://sounds.tabletopaudio.com/298_Gateway_to_Hell.mp3','https://sounds.tabletopaudio.com/196_Crossing_the_Styx.mp3','https://sounds.tabletopaudio.com/309_Bloodgate.mp3']],
-  ['Les Abysses','🩸','#7b241c','les-abysses',['https://sounds.tabletopaudio.com/6_Abyssal_Gaze.mp3','https://sounds.tabletopaudio.com/82_Nightmare.mp3','https://sounds.tabletopaudio.com/58_Terror.mp3']],
-  ['Mont Céleste','😇','#f7dc6f','mont-celeste',['https://sounds.tabletopaudio.com/4_Solemn_Vow-a.mp3','https://sounds.tabletopaudio.com/3_The_March_of_the_Faithful.mp3','https://sounds.tabletopaudio.com/157_Field_of_Heroes.mp3']],
-  ['Mécanus','⚙','#95a5a6','mecanus',['https://sounds.tabletopaudio.com/273_Arcane_Clockworks.mp3','https://sounds.tabletopaudio.com/233_The_Orrery.mp3','https://sounds.tabletopaudio.com/90_Dungeon_II_Mechanical.mp3']],
-  ['Combat de boss','💀','#c0392b','combat-de-boss',['https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','https://sounds.tabletopaudio.com/261_Unto_the_Breach.mp3','https://sounds.tabletopaudio.com/187_Endgame.mp3']],
-  ['Poursuite','🏇','#d35400','poursuite',['https://sounds.tabletopaudio.com/294_Cutpurse_Pursuit.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3','https://sounds.tabletopaudio.com/171_Cry_Havoc.mp3']],
-  ['Mystère & enquête','🔍','#5d6d7e','mystere-enquete',['https://sounds.tabletopaudio.com/115_Antiquarian_Study.mp3','https://sounds.tabletopaudio.com/18_House_on_the_Hill.mp3','https://sounds.tabletopaudio.com/58_Terror.mp3']],
-  ['Repos au coin du feu','🪵','#b9770e','repos-au-coin-du-feu',['https://sounds.tabletopaudio.com/141_Hermit_Hut.mp3','https://sounds.tabletopaudio.com/128_Waiting_Time.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3']],
+  ['Taverne','🍺','#caa258','taverne',['https://sounds.tabletopaudio.com/177_Tavern_Music.mp3','https://sounds.tabletopaudio.com/211_Thieves_Guild.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3'],'ville'],
+  ['Marché animé','🧺','#c9a15a','marche-anime',['https://sounds.tabletopaudio.com/163_Medieval_Fair.mp3','https://sounds.tabletopaudio.com/294_Cutpurse_Pursuit.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3'],'ville'],
+  ['Rues de la cité','🏘','#b98c48','rues-de-la-cite',['https://sounds.tabletopaudio.com/56_Medieval_Town.mp3','https://sounds.tabletopaudio.com/10_In_The_Shadows.mp3','https://sounds.tabletopaudio.com/97_City_Under_Siege.mp3'],'ville'],
+  ['Palais royal','👑','#f2c14e','palais-royal',['https://sounds.tabletopaudio.com/175_Royal_Court.mp3','https://sounds.tabletopaudio.com/267_Court_of_the_Count.mp3','https://sounds.tabletopaudio.com/34_Clash_of_Kings.mp3'],'ville'],
+  ['Temple','⛪','#d9c48a','temple',['https://sounds.tabletopaudio.com/46_Cathedral.mp3','https://sounds.tabletopaudio.com/236_Defiled_Temple.mp3','https://sounds.tabletopaudio.com/3_The_March_of_the_Faithful.mp3'],'ville'],
+  ['Bibliothèque arcanique','📚','#8a6fb5','bibliotheque-arcanique',['https://sounds.tabletopaudio.com/73_Medieval_Library.mp3','https://sounds.tabletopaudio.com/174_Wizards_Tower.mp3','https://sounds.tabletopaudio.com/303_Summoning.mp3'],'ville'],
+  ['Forge','🔨','#e8551f','forge',['https://sounds.tabletopaudio.com/80_Blacksmith_Shoppe.mp3','https://sounds.tabletopaudio.com/219_Tinkerers_Workshop.mp3','https://sounds.tabletopaudio.com/276_Forge_of_Fury.mp3'],'ville'],
+  ['Port','⚓','#3a86b5','port',['https://sounds.tabletopaudio.com/75_Docks_District.mp3','https://sounds.tabletopaudio.com/292_Bleakwater_Docks.mp3','https://sounds.tabletopaudio.com/241_Pirates.mp3'],'ville'],
+  ['Bas-fonds & égouts','🐀','#6a705a','bas-fonds-egouts',['https://sounds.tabletopaudio.com/85_Sewers.mp3','https://sounds.tabletopaudio.com/211_Thieves_Guild.mp3','https://sounds.tabletopaudio.com/209_Rat_Battle.mp3'],'ville'],
+  ['Prison','⛓','#7a7a7a','prison',['https://sounds.tabletopaudio.com/172_Castle_Jail.mp3','https://sounds.tabletopaudio.com/229_Interrogation_Room.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3'],'ville'],
+  ['Cité naine','⛏','#b0713d','cite-naine',['https://sounds.tabletopaudio.com/114_Dwarven_City.mp3','https://sounds.tabletopaudio.com/184_Underground_Lake.mp3','https://sounds.tabletopaudio.com/261_Unto_the_Breach.mp3'],'ville'],
+  ['Cité elfique','🍃','#43aa8b','cite-elfique',['https://sounds.tabletopaudio.com/91_Elven_Glade.mp3','https://sounds.tabletopaudio.com/313_Dusk_of_the_Dryad.mp3','https://sounds.tabletopaudio.com/282_The_Wild_Hunt.mp3'],'ville'],
+  ['Festival','🎪','#e368a0','festival',['https://sounds.tabletopaudio.com/133_Halfling_Festival.mp3','https://sounds.tabletopaudio.com/108_Carnival.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'ville'],
+  ['Auberge la nuit','🌙','#9b8ac4','auberge-la-nuit',['https://sounds.tabletopaudio.com/255_The_Hearth_Inn.mp3','https://sounds.tabletopaudio.com/224_Mansion_Night.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'ville'],
+  ['Prairie','🌾','#a8c700','prairie',['https://sounds.tabletopaudio.com/96_Windswept_Plains_b.mp3','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','https://sounds.tabletopaudio.com/79_Medieval_Battle.mp3'],'nature'],
+  ['Forêt tempérée','🌲','#4a8f3f','foret-temperee',['https://sounds.tabletopaudio.com/161_Forest_Day.mp3','https://sounds.tabletopaudio.com/69_Forest_Night.mp3','https://sounds.tabletopaudio.com/227_Terror_in_the_Woods.mp3'],'nature'],
+  ['Forêt ancienne','🍄','#2f6b46','foret-ancienne',['https://sounds.tabletopaudio.com/275_Lorekeeper_Grove.mp3','https://sounds.tabletopaudio.com/258_Blighted_Forest.mp3','https://sounds.tabletopaudio.com/282_The_Wild_Hunt.mp3'],'nature'],
+  ['Jungle','🐍','#2e8b57','jungle',['https://sounds.tabletopaudio.com/20_Dark_Continent_aa.mp3','https://sounds.tabletopaudio.com/274_Jungle_Shaman.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'nature'],
+  ['Marais','🐸','#5f7d4a','marais',['https://sounds.tabletopaudio.com/223_Salt_Marsh.mp3','https://sounds.tabletopaudio.com/286_Blastfire_Bog.mp3','https://sounds.tabletopaudio.com/311_Swamp_Thing.mp3'],'nature'],
+  ['Désert','🏜','#d8a24a','desert',['https://sounds.tabletopaudio.com/7_The_Desert_Awaits.mp3','https://sounds.tabletopaudio.com/138_Desert_Winds.mp3','https://sounds.tabletopaudio.com/307_Sand_Raiders.mp3'],'nature'],
+  ['Oasis','🌴','#43aa8b','oasis',['https://sounds.tabletopaudio.com/284_Oasis_City.mp3','https://sounds.tabletopaudio.com/5_Desert_Bazaar.mp3','https://sounds.tabletopaudio.com/307_Sand_Raiders.mp3'],'nature'],
+  ['Steppe & toundra','🦬','#9aa0a6','steppe-toundra',['https://sounds.tabletopaudio.com/193_The_Steppes.mp3','https://sounds.tabletopaudio.com/130_Russian_Winter.mp3','https://sounds.tabletopaudio.com/244_Vikings.mp3'],'nature'],
+  ['Montagne','🗻','#8a8f98','montagne',['https://sounds.tabletopaudio.com/64_Mountain_Pass.mp3','https://sounds.tabletopaudio.com/212_Witch_Mountain.mp3','https://sounds.tabletopaudio.com/79_Medieval_Battle.mp3'],'nature'],
+  ['Sommets enneigés','🏔','#7dc4c4','sommets-enneiges',['https://sounds.tabletopaudio.com/296_The_Frozen_Trail.mp3','https://sounds.tabletopaudio.com/31_Frozen_Wastes.mp3','https://sounds.tabletopaudio.com/256_Ice_Dragon.mp3'],'nature'],
+  ['Canyon','🪨','#b0713d','canyon',['https://sounds.tabletopaudio.com/176_Barren_Wastes.mp3','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3'],'nature'],
+  ['Falaises côtières','🌊','#277da1','falaises-cotieres',['https://sounds.tabletopaudio.com/36_Down_by_the_Sea.mp3','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'nature'],
+  ['Île tropicale','🏝','#38b6a0','ile-tropicale',['https://sounds.tabletopaudio.com/234_Lush_World.mp3','https://sounds.tabletopaudio.com/27_Xingu_Nights.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'nature'],
+  ['Rivière & gués','🛶','#4a90c4','riviere-gues',['https://sounds.tabletopaudio.com/104_River_Town.mp3','https://sounds.tabletopaudio.com/196_Crossing_the_Styx.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3'],'nature'],
+  ['Tempête','⛈','#5a6d8a','tempete',['https://sounds.tabletopaudio.com/11_Shelter_from_the_Storm.mp3','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','https://sounds.tabletopaudio.com/304_Fog_of_War.mp3'],'nature'],
+  ['Bivouac nocturne','🏕','#3f4a6b','bivouac-nocturne',['https://sounds.tabletopaudio.com/51_Woodland_Campsite.mp3','https://sounds.tabletopaudio.com/10_In_The_Shadows.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'nature'],
+  ['Donjon','🗝','#7a6a5a','donjon',['https://sounds.tabletopaudio.com/65_Dungeon_I.mp3','https://sounds.tabletopaudio.com/252_Vault_of_Terror.mp3','https://sounds.tabletopaudio.com/49_Goblin\'s_Cave.mp3'],'souterrain'],
+  ['Crypte & cimetière','⚰','#5a5a7a','crypte-cimetiere',['https://sounds.tabletopaudio.com/147_Graveyard.mp3','https://sounds.tabletopaudio.com/37_Catacombs.mp3','https://sounds.tabletopaudio.com/74_Zombies!.mp3'],'souterrain'],
+  ['Mine abandonnée','⛏','#8a6a3c','mine-abandonnee',['https://sounds.tabletopaudio.com/98_Lost_Mine.mp3','https://sounds.tabletopaudio.com/13_Cave_of_Time.mp3','https://sounds.tabletopaudio.com/49_Goblin\'s_Cave.mp3'],'souterrain'],
+  ['Grottes','🕳','#6a6a6a','grottes',['https://sounds.tabletopaudio.com/263_Mysterious_Grotto.mp3','https://sounds.tabletopaudio.com/99_Cavern_of_Lost_Souls.mp3','https://sounds.tabletopaudio.com/218_Sleeping_Ogre.mp3'],'souterrain'],
+  ['Caverne de cristal','💎','#7dc4e8','caverne-de-cristal',['https://sounds.tabletopaudio.com/301_Pool_of_Radiance.mp3','https://sounds.tabletopaudio.com/13_Cave_of_Time.mp3','https://sounds.tabletopaudio.com/303_Summoning.mp3'],'souterrain'],
+  ['Outreterre','🕷','#5d3a7a','outreterre',['https://sounds.tabletopaudio.com/170_The_Underdark.mp3','https://sounds.tabletopaudio.com/238_Mind_Flayer_Chamber.mp3','https://sounds.tabletopaudio.com/242_Spiders_Den.mp3'],'souterrain'],
+  ['Ruines anciennes','🏛','#a09878','ruines-anciennes',['https://sounds.tabletopaudio.com/243_Jungle_Ruins.mp3','https://sounds.tabletopaudio.com/289_Ancient_Artifact.mp3','https://sounds.tabletopaudio.com/42_Rise_of_the_Ancients.mp3'],'souterrain'],
+  ['Antre du dragon','🐉','#c23b22','antre-du-dragon',['https://sounds.tabletopaudio.com/71_Sleeping_Dragon.mp3','https://sounds.tabletopaudio.com/100_Volcano.mp3','https://sounds.tabletopaudio.com/47_There_be_Dragons.mp3'],'souterrain'],
+  ['Laboratoire du mage','🧪','#9b5de5','laboratoire-du-mage',['https://sounds.tabletopaudio.com/76_Alchemists_Lab.mp3','https://sounds.tabletopaudio.com/273_Arcane_Clockworks.mp3','https://sounds.tabletopaudio.com/303_Summoning.mp3'],'souterrain'],
+  ['Haute mer','⛵','#277da1','haute-mer',['https://sounds.tabletopaudio.com/132_Open_Ocean.mp3','https://sounds.tabletopaudio.com/126_Endless_Voyage.mp3','https://sounds.tabletopaudio.com/241_Pirates.mp3'],'mer'],
+  ['Abysses marins','🧜','#1b4f72','abysses-marins',['https://sounds.tabletopaudio.com/38_Into_the_Deep.mp3','https://sounds.tabletopaudio.com/253_Submerged.mp3','https://sounds.tabletopaudio.com/139_Sunken_Temple.mp3'],'mer'],
+  ['Navire dans la tempête','🌀','#34495e','navire-dans-la-tempete',['https://sounds.tabletopaudio.com/217_Storm_at_Sea.mp3','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','https://sounds.tabletopaudio.com/241_Pirates.mp3'],'mer'],
+  ['Féerie','✨','#e368a0','feerie',['https://sounds.tabletopaudio.com/169_The_Feywild.mp3','https://sounds.tabletopaudio.com/313_Dusk_of_the_Dryad.mp3','https://sounds.tabletopaudio.com/282_The_Wild_Hunt.mp3'],'plans'],
+  ['Gisombre','🌑','#4a4a5a','gisombre',['https://sounds.tabletopaudio.com/198_Shadowfell.mp3','https://sounds.tabletopaudio.com/281_Escape_from_Shadow.mp3','https://sounds.tabletopaudio.com/162_Dark_Angel.mp3'],'plans'],
+  ['Plan du Feu','🔥','#e8551f','plan-du-feu',['https://sounds.tabletopaudio.com/100_Volcano.mp3','https://sounds.tabletopaudio.com/213_Burning_Village.mp3','https://sounds.tabletopaudio.com/309_Bloodgate.mp3'],'plans'],
+  ['Plan de l\'Eau','💧','#2980b9','plan-de-l-eau',['https://sounds.tabletopaudio.com/132_Open_Ocean.mp3','https://sounds.tabletopaudio.com/38_Into_the_Deep.mp3','https://sounds.tabletopaudio.com/217_Storm_at_Sea.mp3'],'plans'],
+  ['Plan de l\'Air','🌬','#aed6f1','plan-de-l-air',['https://sounds.tabletopaudio.com/260_Skyship.mp3','https://sounds.tabletopaudio.com/33_Far_Above_the_World.mp3','https://sounds.tabletopaudio.com/304_Fog_of_War.mp3'],'plans'],
+  ['Plan de la Terre','⛰','#8a6a3c','plan-de-la-terre',['https://sounds.tabletopaudio.com/184_Underground_Lake.mp3','https://sounds.tabletopaudio.com/13_Cave_of_Time.mp3','https://sounds.tabletopaudio.com/218_Sleeping_Ogre.mp3'],'plans'],
+  ['Plan Astral','🌌','#6c5ce7','plan-astral',['https://sounds.tabletopaudio.com/113_Astral_Plane.mp3','https://sounds.tabletopaudio.com/287_The_Strange.mp3','https://sounds.tabletopaudio.com/187_Endgame.mp3'],'plans'],
+  ['Plan Éthéré','👻','#b2bec3','plan-ethere',['https://sounds.tabletopaudio.com/112_Ethereal_Plane.mp3','https://sounds.tabletopaudio.com/12_Disembodied_Spirits.mp3','https://sounds.tabletopaudio.com/186_Haunted.mp3'],'plans'],
+  ['Les Neuf Enfers','😈','#a02c2c','les-neuf-enfers',['https://sounds.tabletopaudio.com/298_Gateway_to_Hell.mp3','https://sounds.tabletopaudio.com/196_Crossing_the_Styx.mp3','https://sounds.tabletopaudio.com/309_Bloodgate.mp3'],'plans'],
+  ['Les Abysses','🩸','#7b241c','les-abysses',['https://sounds.tabletopaudio.com/6_Abyssal_Gaze.mp3','https://sounds.tabletopaudio.com/82_Nightmare.mp3','https://sounds.tabletopaudio.com/58_Terror.mp3'],'plans'],
+  ['Mont Céleste','😇','#f7dc6f','mont-celeste',['https://sounds.tabletopaudio.com/4_Solemn_Vow-a.mp3','https://sounds.tabletopaudio.com/3_The_March_of_the_Faithful.mp3','https://sounds.tabletopaudio.com/157_Field_of_Heroes.mp3'],'plans'],
+  ['Mécanus','⚙','#95a5a6','mecanus',['https://sounds.tabletopaudio.com/273_Arcane_Clockworks.mp3','https://sounds.tabletopaudio.com/233_The_Orrery.mp3','https://sounds.tabletopaudio.com/90_Dungeon_II_Mechanical.mp3'],'plans'],
+  ['Combat de boss','💀','#c0392b','combat-de-boss',['https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','https://sounds.tabletopaudio.com/261_Unto_the_Breach.mp3','https://sounds.tabletopaudio.com/187_Endgame.mp3'],'situation'],
+  ['Poursuite','🏇','#d35400','poursuite',['https://sounds.tabletopaudio.com/294_Cutpurse_Pursuit.mp3','https://sounds.tabletopaudio.com/92_Skirmish.mp3','https://sounds.tabletopaudio.com/171_Cry_Havoc.mp3'],'situation'],
+  ['Mystère & enquête','🔍','#5d6d7e','mystere-enquete',['https://sounds.tabletopaudio.com/115_Antiquarian_Study.mp3','https://sounds.tabletopaudio.com/18_House_on_the_Hill.mp3','https://sounds.tabletopaudio.com/58_Terror.mp3'],'situation'],
+  ['Repos au coin du feu','🪵','#b9770e','repos-au-coin-du-feu',['https://sounds.tabletopaudio.com/141_Hermit_Hut.mp3','https://sounds.tabletopaudio.com/128_Waiting_Time.mp3','https://sounds.tabletopaudio.com/72_Monster_Attack.mp3'],'situation'],
 ];
 window._ambInstallCatalogue = function(){
   let ajoutees = 0, completees = 0;
-  for (const [nom, emoji, couleur, slug, urls] of AMB_CATALOGUE) {
+  for (const [nom, emoji, couleur, slug, urls, theme] of AMB_CATALOGUE) {
     const pistes = { calme:{mode:'url',ref:urls[0]}, tension:{mode:'url',ref:urls[1]}, combat:{mode:'url',ref:urls[2]} };
     const image = { mode:'url', ref:'assets/ambiances/' + slug + '.jpg' };
     const existante = amb.scenes.find(s => (s.nom||'').toLowerCase() === nom.toLowerCase());
     if (existante) {
       let maj = false;
+      if (!existante.theme) { existante.theme = theme; maj = true; }
       if (!existante.pistes || (!existante.pistes.calme && !existante.pistes.tension && !existante.pistes.combat)) { existante.pistes = pistes; maj = true; }
       if (!existante.image) { existante.image = image; maj = true; }
       if (maj) completees++;
       continue;
     }
-    amb.scenes.push({ id: 'amb_' + Date.now().toString(36) + '_' + (ajoutees++), nom, emoji, couleur, pistes, image });
+    amb.scenes.push({ id: 'amb_' + Date.now().toString(36) + '_' + (ajoutees++), nom, emoji, couleur, theme, pistes, image });
+  }
+  if (!amb.nappes.length) {
+    for (const [nom, emoji, url] of AMB_NAPPES_DEFAUT)
+      amb.nappes.push({ id: 'nap_' + Math.random().toString(36).slice(2,8), nom, emoji, src: { mode:'url', ref:url } });
+    ambSaveBoards();
   }
   ambSaveScenes(); ambRender(); ambRenderEditList();
   const msg = [];
@@ -9875,7 +9980,12 @@ window._ambInstallCatalogue = function(){
 (function ambInit(){
   const wrap = document.getElementById('ambWrap');
   if (!wrap) return;
-  ambLoadScenes(); ambRender();
+  ambLoadScenes(); ambLoadBoards(); ambRender();
+  const volN = document.getElementById('ambVolN');
+  volN.addEventListener('input', () => {
+    amb.volN = volN.value / 100;
+    for (const a of amb.napAudio.values()) if (!a.paused) a.volume = amb.volN;
+  });
   const sc = document.getElementById('ambScenes');
   sc.addEventListener('dragstart', e => {
     const b = e.target.closest('.amb-scene'); if (!b) return;
@@ -9892,7 +10002,10 @@ window._ambInstallCatalogue = function(){
   sc.addEventListener('dragend', () => {
     const drag = sc.querySelector('.amb-scene.drag'); if (drag) drag.classList.remove('drag');
     const ordre = [...sc.querySelectorAll('.amb-scene')].map(b => b.dataset.id);
-    amb.scenes.sort((a, b) => ordre.indexOf(a.id) - ordre.indexOf(b.id));
+    const estVisible = s => amb.theme === 'tous' || (s.theme || 'perso') === amb.theme;
+    const positions = amb.scenes.map((s, i) => estVisible(s) ? i : -1).filter(i => i >= 0);
+    const parId = Object.fromEntries(amb.scenes.map(s => [s.id, s]));
+    ordre.forEach((id, k) => { amb.scenes[positions[k]] = parId[id]; });
     ambSaveScenes(); ambRender();
   });
   const vol = document.getElementById('ambVol');
@@ -9904,7 +10017,7 @@ window._ambInstallCatalogue = function(){
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
-    if (e.key >= '1' && e.key <= '9') { const s = amb.scenes[+e.key-1]; if (s) { e.preventDefault(); window._ambActivate(s.id); } }
+    if (e.key >= '1' && e.key <= '9') { const s = ambVisibles()[+e.key-1]; if (s) { e.preventDefault(); window._ambActivate(s.id); } }
     else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); window._ambIntensity('calme'); }
     else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window._ambIntensity('tension'); }
     else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); window._ambIntensity('combat'); }
@@ -11521,6 +11634,22 @@ nav { transition: transform .28s ease; will-change: transform; }
 .amb-head-btn:hover { background:rgba(185,140,72,0.18); }
 .amb-body { padding:12px 14px; }
 
+.amb-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:9px; }
+.amb-cat { border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.28); color:#cbb88f;
+  border-radius:13px; padding:4px 10px; font-size:0.8rem; cursor:pointer; font-family:inherit; }
+.amb-cat.on { background:linear-gradient(#caa258,#8a6326); color:#1a1206; font-weight:700; border-color:rgba(232,200,120,0.7); }
+.amb-cat-n { opacity:0.65; font-size:0.7rem; margin-left:4px; }
+.amb-subrow { display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap; }
+.amb-sublabel { font-size:0.72rem; color:#8a744c; font-variant:small-caps; letter-spacing:0.06em; flex:0 0 62px; }
+.amb-chipsrow { display:flex; gap:6px; overflow-x:auto; flex:1; min-width:0; padding-bottom:2px; }
+.amb-chip2 { position:relative; border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.28); color:#e3cf9f;
+  border-radius:12px; padding:4px 10px; font-size:0.8rem; cursor:pointer; font-family:inherit; white-space:nowrap; }
+.amb-chip2.on { background:rgba(185,140,72,0.3); border-color:rgba(232,200,120,0.8); color:#f5ecd6;
+  box-shadow:0 0 8px rgba(232,200,120,0.35); }
+.amb-chip2-x { margin-left:6px; color:#f0b8a4; font-weight:700; }
+.amb-mini { border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.28); color:#e3cf9f;
+  border-radius:9px; padding:4px 9px; cursor:pointer; font-size:0.8rem; font-family:inherit; }
+.amb-board-vide { color:#6f5c3d; font-style:italic; font-size:0.76rem; align-self:center; }
 .amb-scenes { display:flex; flex-wrap:nowrap; gap:8px; margin-bottom:12px; overflow-x:auto;
   padding:4px 2px 8px; scroll-snap-type:x proximity; scrollbar-width:thin; }
 .amb-scenes::-webkit-scrollbar { height:7px; }
@@ -11697,6 +11826,7 @@ nav { transition: transform .28s ease; will-change: transform; }
     <span id="ambChevron">▾</span>
   </div>
   <div class="amb-body" id="ambBody">
+    <div class="amb-cats" id="ambCats"></div>
     <div class="amb-scenes" id="ambScenes"><div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div></div>
     <div class="amb-controls">
       <div class="amb-intens">
@@ -11707,6 +11837,18 @@ nav { transition: transform .28s ease; will-change: transform; }
       <label class="amb-vol">🔊 <input type="range" id="ambVol" min="0" max="100" value="60"></label>
       <button class="amb-ctl" onclick="window._ambBlack()" title="Fondu au noir sur l'écran projeté (Alt+N)">☾ Noir</button>
       <button class="amb-ctl stop" onclick="window._ambStop()" title="Tout couper (Alt+0)">⏹ Stop</button>
+    </div>
+    <div class="amb-subrow">
+      <span class="amb-sublabel">Nappes</span>
+      <div class="amb-chipsrow" id="ambNappes"></div>
+      <label class="amb-vol" title="Volume des nappes">〰 <input type="range" id="ambVolN" min="0" max="100" value="50"></label>
+    </div>
+    <div class="amb-subrow">
+      <span class="amb-sublabel">One-shots</span>
+      <div class="amb-chipsrow" id="ambShots"></div>
+      <button class="amb-mini" onclick="window._ambAddBoardItem('shot')" title="Ajouter un one-shot">＋</button>
+      <button class="amb-mini" onclick="window._ambAddBoardItem('nappe')" title="Ajouter une nappe">＋〰</button>
+      <button class="amb-mini" onclick="window._ambBoardsEdit()" title="Mode édition (supprimer)">✎</button>
     </div>
     <div class="amb-status" id="ambStatus">Raccourcis : Alt+1…9 = les 9 premières bulles (glisse-les pour réordonner) · Alt+C/T/B intensité · Alt+N noir · Alt+0 stop — compatibles Stream Deck.</div>
   </div>
@@ -11725,6 +11867,11 @@ nav { transition: transform .28s ease; will-change: transform; }
         <div><label>Nom de la scène</label><input type="text" id="ambFNom" placeholder="Taverne du Sanglier"></div>
         <div><label>Emoji</label><input type="text" id="ambFEmoji" placeholder="🍺" maxlength="4"></div>
         <div><label>Couleur</label><input type="color" id="ambFCouleur" value="#caa258"></div>
+        <div><label>Groupe</label><select id="ambFTheme">
+          <option value="perso">★ Mes scènes</option><option value="ville">🏘 Ville</option>
+          <option value="nature">🌲 Nature</option><option value="souterrain">🗝 Souterrains</option>
+          <option value="mer">⛵ Mer</option><option value="plans">🌌 Plans</option><option value="situation">⚔ Situations</option>
+        </select></div>
         <div>
           <label>Image projetée</label>
           <div class="amb-file-row">
