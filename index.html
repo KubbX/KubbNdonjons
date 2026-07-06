@@ -9481,7 +9481,7 @@ const AMB_LS = 'kubbnd_ambiances';
 const amb = {
   scenes: [], cur: null, intensity: 'calme',
   live: 'a', fading: null, vol: 0.6, urls: new Map(), ch: null,
-  theme: localStorage.getItem('kubbnd_amb_theme') || 'tous',
+  theme: localStorage.getItem('kubbnd_amb_theme') || 'ville',
   nappes: [], shots: [], volN: 0.5, napAudio: new Map(), editBoards: false,
 };
 const AMB_THEMES = [['tous','✦','Tous'],['ville','🏘','Ville'],['nature','🌲','Nature'],['souterrain','🗝','Souterrains'],['mer','⛵','Mer'],['plans','🌌','Plans'],['situation','⚔','Situations'],['perso','★','Mes scènes']];
@@ -9783,8 +9783,11 @@ async function ambRender(){
     cats.innerHTML = AMB_THEMES.map(([id, emo, lbl]) => {
       const n = id === 'tous' ? amb.scenes.length : amb.scenes.filter(s => (s.theme || 'perso') === id).length;
       if (!n && id !== 'tous') return '';
-      return `<button class="amb-cat${amb.theme===id?' on':''}" onclick="window._ambTheme('${id}')">${emo} ${lbl}<span class="amb-cat-n">${n}</span></button>`;
+      return `<option value="${id}"${amb.theme===id?' selected':''}>${emo} ${lbl} (${n})</option>`;
     }).join('');
+    if (![...cats.options].some(o => o.value === amb.theme) && cats.options.length) {
+      amb.theme = cats.options[0].value; cats.value = amb.theme;
+    }
   }
   if (!amb.scenes.length) { cont.innerHTML = '<div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div>'; }
   else {
@@ -9996,7 +9999,11 @@ window._ambInstallCatalogue = function(){
     const drag = sc.querySelector('.amb-scene.drag'); if (!drag) return;
     e.preventDefault();
     const apres = [...sc.querySelectorAll('.amb-scene:not(.drag)')]
-      .find(b => { const r = b.getBoundingClientRect(); return e.clientX < r.left + r.width / 2; });
+      .find(b => {
+        const r = b.getBoundingClientRect();
+        if (e.clientY < r.top - 2) return true;                              // rangée suivante du pointeur
+        return e.clientY <= r.bottom + 2 && e.clientX < r.left + r.width / 2; // même rangée, avant le centre
+      });
     if (apres) sc.insertBefore(drag, apres); else sc.appendChild(drag);
   });
   sc.addEventListener('dragend', () => {
@@ -11658,11 +11665,10 @@ nav { transition: transform .28s ease; will-change: transform; }
 .amb-head-btn:hover { background:rgba(185,140,72,0.18); }
 .amb-body { padding:12px 14px; }
 
-.amb-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:9px; }
-.amb-cat { border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.28); color:#cbb88f;
-  border-radius:13px; padding:4px 10px; font-size:0.8rem; cursor:pointer; font-family:inherit; }
-.amb-cat.on { background:linear-gradient(#caa258,#8a6326); color:#1a1206; font-weight:700; border-color:rgba(232,200,120,0.7); }
-.amb-cat-n { opacity:0.65; font-size:0.7rem; margin-left:4px; }
+.amb-catsel { margin-bottom:10px; padding:8px 12px; border-radius:9px; min-width:230px;
+  border:1px solid rgba(160,120,65,0.5); background:rgba(20,12,4,0.6); color:#f0dfae;
+  font-family:var(--font-title); font-size:0.95rem; cursor:pointer; }
+.amb-catsel option { background:#1c1309; color:#e8dcc2; font-family:'Crimson Pro',serif; }
 .amb-subrow { display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap; }
 .amb-sublabel { font-size:0.72rem; color:#8a744c; font-variant:small-caps; letter-spacing:0.06em; flex:0 0 62px; }
 .amb-chipsrow { display:flex; gap:6px; overflow-x:auto; flex:1; min-width:0; padding-bottom:2px; }
@@ -11674,12 +11680,12 @@ nav { transition: transform .28s ease; will-change: transform; }
 .amb-mini { border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.28); color:#e3cf9f;
   border-radius:9px; padding:4px 9px; cursor:pointer; font-size:0.8rem; font-family:inherit; }
 .amb-board-vide { color:#6f5c3d; font-style:italic; font-size:0.76rem; align-self:center; }
-.amb-scenes { display:flex; flex-wrap:nowrap; gap:8px; margin-bottom:12px; overflow-x:auto;
-  padding:4px 2px 8px; scroll-snap-type:x proximity; scrollbar-width:thin; }
-.amb-scenes::-webkit-scrollbar { height:7px; }
+.amb-scenes { display:flex; flex-wrap:wrap; gap:8px 6px; margin-bottom:12px; padding:4px 2px;
+  max-height:264px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.amb-scenes::-webkit-scrollbar { width:7px; }
 .amb-scenes::-webkit-scrollbar-thumb { background:rgba(185,140,72,0.3); border-radius:4px; }
 .amb-scene { position:relative; flex:0 0 72px; width:72px; display:flex; flex-direction:column; align-items:center; gap:4px;
-  background:none; border:none; cursor:grab; padding:2px; font-family:inherit; scroll-snap-align:start; }
+  background:none; border:none; cursor:grab; padding:2px; font-family:inherit; }
 .amb-scene.drag { opacity:0.35; }
 .amb-scene-emo { pointer-events:none; }
 .amb-scene-vis.has-img .amb-scene-emo { position:absolute; right:2px; bottom:2px; font-size:0.9rem;
@@ -11900,7 +11906,7 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     <span id="ambChevron">▾</span>
   </div>
   <div class="amb-body" id="ambBody">
-    <div class="amb-cats" id="ambCats"></div>
+    <select class="amb-catsel" id="ambCats" onchange="window._ambTheme(this.value)" title="Groupe d'ambiances"></select>
     <div class="amb-scenes" id="ambScenes"><div class="amb-empty">Aucune scène — clique sur « Gérer les scènes » pour créer ta première ambiance.</div></div>
     <div class="amb-controls">
       <div class="amb-intens">
