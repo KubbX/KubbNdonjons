@@ -9487,12 +9487,132 @@ const amb = {
 const AMB_THEMES = [['tous','✦','Tous'],['ville','🏘','Ville'],['nature','🌲','Nature'],['souterrain','🗝','Souterrains'],['mer','⛵','Mer'],['plans','🌌','Plans'],['situation','⚔','Situations'],['perso','★','Mes scènes']];
 const AMB_NAPPES_DEFAUT = [
   ['Vent','🌬','https://sounds.tabletopaudio.com/138_Desert_Winds.mp3'],
+  ['Blizzard','🌨','https://sounds.tabletopaudio.com/130_Russian_Winter.mp3'],
   ['Pluie','🌧','https://sounds.tabletopaudio.com/40_The_Long_Rain.mp3'],
+  ['Pluie au village','🏘','https://sounds.tabletopaudio.com/235_Rainy_Village.mp3'],
   ['Orage lointain','⛈','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3'],
-  ['Vagues','🌊','https://sounds.tabletopaudio.com/132_Open_Ocean.mp3'],
   ['Feu de camp','🔥','https://sounds.tabletopaudio.com/51_Woodland_Campsite.mp3'],
+  ['Taverne (brouhaha)','🍺','https://sounds.tabletopaudio.com/255_The_Hearth_Inn.mp3'],
   ['Foule','🗣','https://sounds.tabletopaudio.com/56_Medieval_Town.mp3'],
+  ['Nuit d\'été (criquets)','🦗','https://sounds.tabletopaudio.com/69_Forest_Night.mp3'],
+  ['Nuit de jungle','🌴','https://sounds.tabletopaudio.com/27_Xingu_Nights.mp3'],
+  ['Marais (grenouilles)','🐸','https://sounds.tabletopaudio.com/223_Salt_Marsh.mp3'],
+  ['Rivière','🛶','https://sounds.tabletopaudio.com/104_River_Town.mp3'],
+  ['Vagues','🌊','https://sounds.tabletopaudio.com/132_Open_Ocean.mp3'],
+  ['Mouettes du port','🕊','https://sounds.tabletopaudio.com/75_Docks_District.mp3'],
+  ['Craquements de navire','⛵','https://sounds.tabletopaudio.com/126_Endless_Voyage.mp3'],
+  ['Gouttes de caverne','💧','https://sounds.tabletopaudio.com/184_Underground_Lake.mp3'],
 ];
+const AMB_SHOTS_DEFAUT = [
+  ['Tonnerre','⚡','tonnerre'],['Porte qui claque','🚪','porte'],['Choc d\'épées','⚔','epees'],
+  ['Flèche','🏹','fleche'],['Éclat magique','✨','zap'],['Cor de guerre','📯','cor'],
+  ['Cloche','🔔','cloche'],['Battement de cœur','💓','coeur'],['Craquement','🪵','craquement'],
+  ['Hurlement spectral','👻','spectre'],
+];
+let ambCtx = null, ambNoiseBuf = null;
+function ambAudioCtx(){
+  if (!ambCtx) ambCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ambCtx.state === 'suspended') ambCtx.resume();
+  if (!ambNoiseBuf) {
+    ambNoiseBuf = ambCtx.createBuffer(1, ambCtx.sampleRate * 3, ambCtx.sampleRate);
+    const d = ambNoiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return ambCtx;
+}
+function ambEnv(ctx, t0, {a=0.005, d=0.3, pic=1, fin=0.0001}={}){
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(pic, t0 + a);
+  g.gain.exponentialRampToValueAtTime(fin, t0 + a + d);
+  return g;
+}
+function ambNoise(ctx){ const s = ctx.createBufferSource(); s.buffer = ambNoiseBuf; return s; }
+function ambSynthPlay(nom){
+  const ctx = ambAudioCtx(), t = ctx.currentTime, out = ctx.createGain();
+  out.gain.value = Math.min(1, amb.vol * 1.2);
+  out.connect(ctx.destination);
+  const fini = (n, dur) => { n.start(t); n.stop(t + dur); };
+  if (nom === 'tonnerre') {
+    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(420, t); f.frequency.exponentialRampToValueAtTime(60, t + 2.4);
+    const g = ambEnv(ctx, t, {a:0.02, d:2.6, pic:1});
+    n.connect(f).connect(g).connect(out); fini(n, 2.8);
+    const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 42;
+    const gs = ambEnv(ctx, t, {a:0.05, d:2.2, pic:0.5});
+    sub.connect(gs).connect(out); fini(sub, 2.5);
+  } else if (nom === 'porte') {
+    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300;
+    const g = ambEnv(ctx, t, {a:0.002, d:0.16, pic:0.9});
+    n.connect(f).connect(g).connect(out); fini(n, 0.25);
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(85, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+    const go = ambEnv(ctx, t, {a:0.002, d:0.22, pic:0.8});
+    o.connect(go).connect(out); fini(o, 0.3);
+  } else if (nom === 'epees') {
+    for (const [fr, dt] of [[2450, 0], [3100, 0.012], [1850, 0.02]]) {
+      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = fr;
+      const g = ambEnv(ctx, t + dt, {a:0.001, d:0.22, pic:0.16});
+      o.connect(g).connect(out); o.start(t + dt); o.stop(t + dt + 0.3);
+    }
+    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 3200;
+    const g = ambEnv(ctx, t, {a:0.001, d:0.12, pic:0.5});
+    n.connect(f).connect(g).connect(out); fini(n, 0.2);
+  } else if (nom === 'fleche') {
+    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 9;
+    f.frequency.setValueAtTime(700, t); f.frequency.exponentialRampToValueAtTime(2600, t + 0.28);
+    const g = ambEnv(ctx, t, {a:0.01, d:0.3, pic:0.5});
+    n.connect(f).connect(g).connect(out); fini(n, 0.35);
+    const o = ctx.createOscillator(); o.frequency.setValueAtTime(130, t + 0.3);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.4);
+    const go = ambEnv(ctx, t + 0.3, {a:0.002, d:0.12, pic:0.7});
+    o.connect(go).connect(out); o.start(t + 0.3); o.stop(t + 0.45);
+  } else if (nom === 'zap') {
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(1400, t); o.frequency.exponentialRampToValueAtTime(120, t + 0.4);
+    const g = ambEnv(ctx, t, {a:0.004, d:0.42, pic:0.5});
+    o.connect(g).connect(out); fini(o, 0.5);
+    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 5000;
+    const gn = ambEnv(ctx, t, {a:0.002, d:0.3, pic:0.25});
+    n.connect(f).connect(gn).connect(out); fini(n, 0.35);
+  } else if (nom === 'cor') {
+    for (const [fr, pic] of [[174, 0.5], [261, 0.3], [349, 0.18]]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(fr * 0.94, t);
+      o.frequency.linearRampToValueAtTime(fr, t + 0.18);
+      const g = ambEnv(ctx, t, {a:0.14, d:1.5, pic});
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1500;
+      o.connect(f).connect(g).connect(out); fini(o, 1.8);
+    }
+  } else if (nom === 'cloche') {
+    for (const [fr, pic, dur] of [[520, 0.5, 3], [693, 0.3, 2.4], [1247, 0.18, 1.8], [1560, 0.1, 1.2]]) {
+      const o = ctx.createOscillator(); o.frequency.value = fr;
+      const g = ambEnv(ctx, t, {a:0.003, d:dur, pic});
+      o.connect(g).connect(out); fini(o, dur + 0.2);
+    }
+  } else if (nom === 'coeur') {
+    for (const dt of [0, 0.32]) {
+      const o = ctx.createOscillator(); o.frequency.value = dt ? 48 : 58;
+      const g = ambEnv(ctx, t + dt, {a:0.015, d:0.22, pic: dt ? 0.6 : 0.85});
+      o.connect(g).connect(out); o.start(t + dt); o.stop(t + dt + 0.3);
+    }
+  } else if (nom === 'craquement') {
+    for (let i = 0; i < 7; i++) {
+      const dt = i * 0.045 + Math.random() * 0.02;
+      const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'bandpass';
+      f.frequency.value = 900 + Math.random() * 1800; f.Q.value = 4;
+      const g = ambEnv(ctx, t + dt, {a:0.001, d:0.05, pic:0.4});
+      n.connect(f).connect(g).connect(out); n.start(t + dt); n.stop(t + dt + 0.08);
+    }
+  } else if (nom === 'spectre') {
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(520, t); o.frequency.linearRampToValueAtTime(310, t + 1.6);
+    const v = ctx.createOscillator(); v.frequency.value = 6.5;
+    const vg = ctx.createGain(); vg.gain.value = 22;
+    v.connect(vg).connect(o.frequency);
+    const g = ambEnv(ctx, t, {a:0.25, d:1.7, pic:0.35});
+    o.connect(g).connect(out); fini(o, 2); fini(v, 2);
+  }
+}
 function ambVisibles(){ return amb.scenes.filter(s => amb.theme === 'tous' || (s.theme || 'perso') === amb.theme); }
 function ambSaveBoards(){ localStorage.setItem('kubbnd_amb_nappes', JSON.stringify(amb.nappes)); localStorage.setItem('kubbnd_amb_shots', JSON.stringify(amb.shots)); }
 function ambLoadBoards(){
@@ -9520,6 +9640,7 @@ async function ambNappeToggle(id){
 }
 function ambShot(id){
   const s = amb.shots.find(x => x.id === id); if (!s) return;
+  if (s.src && s.src.mode === 'synth') { try { ambSynthPlay(s.src.ref); } catch(e) { ambSetStatus('Synthèse audio indisponible : ' + (e.message||e)); } return; }
   ambResolveAudio(s.src).then(h => {
     if (!h || h.kind === 'yt') { ambSetStatus('One-shot « ' + s.nom + ' » : fichier ou URL audio directe uniquement.'); return; }
     const a = new Audio(h.src); a.volume = Math.min(1, amb.vol * 1.15);
@@ -9528,6 +9649,15 @@ function ambShot(id){
 }
 window._ambNappeToggle = ambNappeToggle;
 window._ambShot = ambShot;
+window._ambReseedDefaults = function(){
+  let n = 0;
+  for (const [nom, emoji, url] of AMB_NAPPES_DEFAUT)
+    if (!amb.nappes.some(x => x.nom === nom)) { amb.nappes.push({ id:'nap_'+Math.random().toString(36).slice(2,8), nom, emoji, src:{mode:'url',ref:url} }); n++; }
+  for (const [nom, emoji, ref] of AMB_SHOTS_DEFAUT)
+    if (!amb.shots.some(x => x.nom === nom)) { amb.shots.push({ id:'sh_'+Math.random().toString(36).slice(2,8), nom, emoji, src:{mode:'synth',ref} }); n++; }
+  if (n) { ambSaveBoards(); ambRenderBoards(); ambSetStatus(n + ' éléments par défaut (ré)installés.'); }
+  return n;
+};
 window._ambBoardsEdit = function(){ amb.editBoards = !amb.editBoards; ambRenderBoards(); };
 window._ambDelBoardItem = async function(type, id){
   const arr = type === 'nappe' ? amb.nappes : amb.shots;
@@ -9967,11 +10097,7 @@ window._ambInstallCatalogue = function(){
     }
     amb.scenes.push({ id: 'amb_' + Date.now().toString(36) + '_' + (ajoutees++), nom, emoji, couleur, theme, pistes, image });
   }
-  if (!amb.nappes.length) {
-    for (const [nom, emoji, url] of AMB_NAPPES_DEFAUT)
-      amb.nappes.push({ id: 'nap_' + Math.random().toString(36).slice(2,8), nom, emoji, src: { mode:'url', ref:url } });
-    ambSaveBoards();
-  }
+  window._ambReseedDefaults();
   ambSaveScenes(); ambRender(); ambRenderEditList();
   const msg = [];
   if (ajoutees) msg.push(ajoutees + ' biomes ajoutés');
@@ -11671,7 +11797,7 @@ nav { transition: transform .28s ease; will-change: transform; }
 .amb-catsel option { background:#1c1309; color:#e8dcc2; font-family:'Crimson Pro',serif; }
 .amb-subrow { display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap; }
 .amb-sublabel { font-size:0.72rem; color:#8a744c; font-variant:small-caps; letter-spacing:0.06em; flex:0 0 62px; }
-.amb-chipsrow { display:flex; gap:6px; overflow-x:auto; flex:1; min-width:0; padding-bottom:2px; }
+.amb-chipsrow { display:flex; flex-wrap:wrap; gap:6px; flex:1; min-width:0; padding-bottom:2px; }
 .amb-chip2 { position:relative; border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.28); color:#e3cf9f;
   border-radius:12px; padding:4px 10px; font-size:0.8rem; cursor:pointer; font-family:inherit; white-space:nowrap; }
 .amb-chip2.on { background:rgba(185,140,72,0.3); border-color:rgba(232,200,120,0.8); color:#f5ecd6;
@@ -11928,6 +12054,7 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
       <div class="amb-chipsrow" id="ambShots"></div>
       <button class="amb-mini" onclick="window._ambAddBoardItem('shot')" title="Ajouter un one-shot">＋</button>
       <button class="amb-mini" onclick="window._ambAddBoardItem('nappe')" title="Ajouter une nappe">＋〰</button>
+      <button class="amb-mini" onclick="window._ambReseedDefaults()" title="Réinstaller les nappes et one-shots par défaut">↺</button>
       <button class="amb-mini" onclick="window._ambBoardsEdit()" title="Mode édition (supprimer)">✎</button>
     </div>
     <div class="amb-status" id="ambStatus">Raccourcis : Alt+1…9 = les 9 premières bulles (glisse-les pour réordonner) · Alt+C/T/B intensité · Alt+N noir · Alt+0 stop — compatibles Stream Deck.</div>
