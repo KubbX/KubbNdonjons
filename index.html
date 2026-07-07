@@ -10406,20 +10406,27 @@ const bm = {
   maps: [], cur: null,
   view: { x: 40, y: 40, k: 0.5 },
   tool: 'move', fogMode: 'reveal', fogR: 100,
-  sel: null, projOn: false, showWalls: true,
-  imgs: new Map(), tokImgs: new Map(), fogCv: new Map(),
-  drag: null, saveT: null,
+  sel: null, projOn: false, showWalls: true, showRange: true,
+  calib: { cm: 60, lock: false },
+  wallDraft: null,
+  imgs: new Map(), tokImgs: new Map(), fogCv: new Map(), fogDirty: new Set(),
+  fogMix: null, drag: null, saveT: null, _projScrW: 0,
 };
+const BM_CASE_M = 1.5;      /* 1 case = 1,5 m (D&D 5e) */
+const BM_POUCE_MM = 25.4;
 function bmMap(){ return bm.maps.find(m => m.id === bm.cur) || null; }
 function bmSave(){
   clearTimeout(bm.saveT);
   bm.saveT = setTimeout(() => {
-    try { localStorage.setItem('kubbnd_bm', JSON.stringify({ maps: bm.maps, cur: bm.cur })); }
+    try { localStorage.setItem('kubbnd_bm', JSON.stringify({ maps: bm.maps, cur: bm.cur, calib: bm.calib, showRange: bm.showRange })); }
     catch(e) { bmStatus('Sauvegarde impossible (quota ?) : ' + (e.message||e)); }
   }, 250);
 }
 function bmLoad(){
-  try { const d = JSON.parse(localStorage.getItem('kubbnd_bm')); if (d) { bm.maps = d.maps || []; bm.cur = d.cur; } }
+  try { const d = JSON.parse(localStorage.getItem('kubbnd_bm'));
+    if (d) { bm.maps = d.maps || []; bm.cur = d.cur;
+      if (d.calib) bm.calib = d.calib;
+      if (d.showRange !== undefined) bm.showRange = d.showRange; } }
   catch { /* première utilisation */ }
 }
 function bmStatus(t){ const el = document.getElementById('bmStatus'); if (el) el.textContent = t; }
@@ -10524,23 +10531,99 @@ window._bmTokSize = function(d){ const t = bmSelTok(); if (!t) return; t.taille 
 window._bmTokColor = function(){ const t = bmSelTok(); if (!t) return; t.couleur = BM_COULEURS[(BM_COULEURS.indexOf(t.couleur) + 1) % BM_COULEURS.length]; bmSave(); bmRender(); };
 window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) return; m.tokens = m.tokens.filter(x => x.id !== t.id); bm.sel = null; bmSave(); bmRender(); };
 function bmSelTok(){ const m = bmMap(); return m ? m.tokens.find(t => t.id === bm.sel) : null; }
+function bmVitesse(t){
+  if (t.vitesse) return t.vitesse;
+  try {
+    const mo = (COMPENDIUM_DATA.monster || []).find(x => x.name === t.nom || x.name === t.nom.replace(/ \d+$/, ''));
+    if (mo && mo.speed) { const v = parseFloat(String(mo.speed).replace(',', '.')); if (v) return v; }
+  } catch(_){}
+  return 9;
+}
+window._bmTokTorch = function(){ const t = bmSelTok(); if (!t) return; t.torche = !t.torche; bmSave(); bmRefreshUI(); bmRender(); };
+window._bmTokSpeed = function(){
+  const t = bmSelTok(); if (!t) return;
+  const v = prompt('Vitesse de « ' + t.nom + ' » en mètres (9 = standard, case = 1,5 m)', bmVitesse(t));
+  if (v === null) return;
+  t.vitesse = Math.max(0, parseFloat(String(v).replace(',', '.')) || 9);
+  bmSave(); bmRender();
+};
+window._bmRangeToggle = function(){ bm.showRange = !bm.showRange; bmSave(); bmRefreshUI(); bmRender(); };
+window._bmLockToggle = function(){
+  bm.calib.lock = !bm.calib.lock;
+  bmSave(); bmRefreshUI(); bmProjRender();
+  bmStatus(bm.calib.lock
+    ? 'Projection verrouillée : 1 case = 1 pouce sur l\'écran (largeur saisie : ' + bm.calib.cm + ' cm). Vérifie avec le repère « 1″ » en bas à gauche de la projection — et pose tes figurines !'
+    : 'Verrou 1 pouce désactivé : la projection s\'ajuste à l\'écran.');
+};
+function bmCellCss(Wcss){
+  const scrW = bm._projScrW || Wcss;
+  if (!bm.calib.cm || !scrW) return 0;
+  return BM_POUCE_MM * scrW / (bm.calib.cm * 10);
+}
+window._bmWallDraw = function(){
+  const m = bmMap(); if (!m) return;
+  if (bm.tool === 'wall') { bmWallCommit(); bm.tool = 'move'; }
+  else { bm.tool = 'wall'; bm.wallDraft = []; bm.showWalls = true; }
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'wall'
+    ? 'Tracé de murs : clique pour poser des points, double-clic ou Échap pour terminer le tracé, reclique ✏🧱 pour sortir.'
+    : 'Outil déplacement.');
+};
+function bmWallCommit(){
+  const m = bmMap();
+  if (m && bm.wallDraft && bm.wallDraft.length > 1) { m.walls.push(bm.wallDraft); bmSave(); }
+  bm.wallDraft = null;
+}
+window._bmWallUndo = function(){
+  const m = bmMap(); if (!m) return;
+  if (bm.wallDraft && bm.wallDraft.length) { bm.wallDraft = []; }
+  else if (m.walls.length) { m.walls.pop(); bmSave(); }
+  bmRender();
+};
 
 /* ── brouillard de guerre ── */
 function bmFogCanvas(m){
   let cv = bm.fogCv.get(m.id);
-  if (!cv || cv.width !== m.w || cv.height !== m.h) {
+  const neuf = !cv || cv.width !== m.w || cv.height !== m.h;
+  if (neuf) {
     cv = document.createElement('canvas'); cv.width = m.w || 1; cv.height = m.h || 1;
     bm.fogCv.set(m.id, cv);
   }
-  const c = cv.getContext('2d');
-  c.globalCompositeOperation = 'source-over';
-  c.clearRect(0, 0, cv.width, cv.height);
-  c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height);
-  for (const op of m.fog) {
-    c.globalCompositeOperation = op.m === 'r' ? 'destination-out' : 'source-over';
-    c.beginPath(); c.arc(op.x, op.y, op.r, 0, 7); c.fill();
+  if (neuf || bm.fogDirty.has(m.id)) {
+    const c = cv.getContext('2d');
+    c.globalCompositeOperation = 'source-over';
+    c.clearRect(0, 0, cv.width, cv.height);
+    c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height);
+    for (const op of m.fog) {
+      c.globalCompositeOperation = op.m === 'r' ? 'destination-out' : 'source-over';
+      c.beginPath(); c.arc(op.x, op.y, op.r, 0, 7); c.fill();
+    }
+    bm.fogDirty.delete(m.id);
   }
   return cv;
+}
+function bmFogAvecLumieres(m){
+  const base = bmFogCanvas(m);
+  const torches = m.tokens.filter(t => t.torche);
+  if (!torches.length) return base;
+  if (!bm.fogMix || bm.fogMix.width !== base.width || bm.fogMix.height !== base.height) {
+    bm.fogMix = document.createElement('canvas');
+    bm.fogMix.width = base.width; bm.fogMix.height = base.height;
+  }
+  const c = bm.fogMix.getContext('2d');
+  c.globalCompositeOperation = 'source-over';
+  c.clearRect(0, 0, base.width, base.height);
+  c.drawImage(base, 0, 0);
+  c.globalCompositeOperation = 'destination-out';
+  for (const t of torches) {
+    const r = (t.lum || 6) * m.grid.px;         /* torche : 6 cases = 9 m */
+    const g = c.createRadialGradient(t.x, t.y, r * 0.45, t.x, t.y, r);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g;
+    c.beginPath(); c.arc(t.x, t.y, r, 0, 7); c.fill();
+  }
+  return bm.fogMix;
 }
 window._bmFogTool = function(){
   const m = bmMap(); if (!m) return;
@@ -10575,7 +10658,23 @@ function bmScene(ctx, W, H, mode){
   if (!m) return;
   const im = bm.imgs.get(m.id);
   let v = bm.view;
-  if (mode === 'player') { const k = Math.min(W / (m.w||1), H / (m.h||1)); v = { k, x: (W - m.w*k)/2, y: (H - m.h*k)/2 }; }
+  if (mode === 'player') {
+    if (bm.calib.lock && bmCellCss(W)) {
+      const k = bmCellCss(W) / (m.grid.px || 70);
+      const pjs = m.tokens.filter(t => t.torche || t.couleur === '#4a90d9');
+      const base = pjs.length ? pjs : m.tokens;
+      const cx = base.length ? base.reduce((a, t) => a + t.x, 0) / base.length : (m.w||0) / 2;
+      const cy = base.length ? base.reduce((a, t) => a + t.y, 0) / base.length : (m.h||0) / 2;
+      v = { k, x: W / 2 - cx * k, y: H / 2 - cy * k };
+      v.x = Math.min(20, Math.max(W - (m.w||0) * k - 20, v.x));
+      v.y = Math.min(20, Math.max(H - (m.h||0) * k - 20, v.y));
+      if ((m.w||0) * k < W) v.x = (W - m.w * k) / 2;
+      if ((m.h||0) * k < H) v.y = (H - m.h * k) / 2;
+    } else {
+      const k = Math.min(W / (m.w||1), H / (m.h||1));
+      v = { k, x: (W - m.w*k)/2, y: (H - m.h*k)/2 };
+    }
+  }
   ctx.setTransform(v.k, 0, 0, v.k, v.x, v.y);
   if (im) ctx.drawImage(im, 0, 0);
   else { ctx.fillStyle = '#241708'; ctx.fillRect(0, 0, m.w||800, m.h||600); }
@@ -10585,6 +10684,23 @@ function bmScene(ctx, W, H, mode){
     for (let x = 0; x <= (m.w||0); x += m.grid.px) { ctx.moveTo(x, 0); ctx.lineTo(x, m.h); }
     for (let y = 0; y <= (m.h||0); y += m.grid.px) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
     ctx.stroke();
+  }
+  const selT = m.tokens.find(t => t.id === bm.sel);
+  if (bm.showRange && selT && m.grid.px > 8) {
+    const cases = Math.max(1, Math.round(bmVitesse(selT) / BM_CASE_M));
+    const g = m.grid.px, demi = selT.taille % 2 ? g / 2 : 0;
+    const cx = Math.round((selT.x - demi) / g), cy = Math.round((selT.y - demi) / g);
+    ctx.fillStyle = 'rgba(240,200,90,0.13)';
+    ctx.strokeStyle = 'rgba(240,200,90,0.35)';
+    ctx.lineWidth = 1 / v.k;
+    for (let dx = -cases; dx <= cases; dx++)
+      for (let dy = -cases; dy <= cases; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > cases || (!dx && !dy)) continue;
+        const x = (cx + dx) * g + demi - g / 2, y = (cy + dy) * g + demi - g / 2;
+        if (x < -g || y < -g || x > m.w || y > m.h) continue;
+        ctx.fillRect(x, y, g, g);
+      }
+    ctx.strokeRect((cx - cases) * g + demi - g / 2, (cy - cases) * g + demi - g / 2, g * (2 * cases + 1), g * (2 * cases + 1));
   }
   for (const t of m.tokens) {
     const r = (m.grid.px * t.taille) / 2;
@@ -10608,8 +10724,32 @@ function bmScene(ctx, W, H, mode){
   }
   if (m.fogOn && m.w) {
     ctx.globalAlpha = mode === 'player' ? 1 : 0.55;
-    ctx.drawImage(bmFogCanvas(m), 0, 0);
+    ctx.drawImage(bmFogAvecLumieres(m), 0, 0);
     ctx.globalAlpha = 1;
+  }
+  if (mode === 'gm') {
+    for (const t of m.tokens) if (t.torche) {
+      ctx.strokeStyle = 'rgba(255,190,90,0.4)'; ctx.lineWidth = 2 / v.k;
+      ctx.setLineDash([8 / v.k, 6 / v.k]);
+      ctx.beginPath(); ctx.arc(t.x, t.y, (t.lum || 6) * m.grid.px, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (bm.wallDraft && bm.wallDraft.length) {
+      ctx.strokeStyle = 'rgba(120,220,255,0.9)'; ctx.lineWidth = 3 / v.k; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bm.wallDraft[0].x, bm.wallDraft[0].y);
+      for (let i = 1; i < bm.wallDraft.length; i++) ctx.lineTo(bm.wallDraft[i].x, bm.wallDraft[i].y);
+      ctx.stroke();
+    }
+  }
+  if (mode === 'player' && bm.calib.lock) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const cell = bmCellCss(W);
+    if (cell) {
+      ctx.strokeStyle = 'rgba(255,235,180,0.35)'; ctx.lineWidth = 1;
+      ctx.strokeRect(10, H - cell - 10, cell, cell);
+      ctx.fillStyle = 'rgba(255,235,180,0.4)'; ctx.font = '10px sans-serif';
+      ctx.fillText('1″', 14, H - cell - 14);
+    }
   }
   if (mode === 'gm' && bm.showWalls) {
     ctx.lineWidth = 3 / v.k; ctx.lineCap = 'round';
@@ -10667,6 +10807,11 @@ function bmInitCanvas(){
     const m = bmMap(); if (!m) return;
     cv.setPointerCapture(e.pointerId);
     const p = toMap(pos(e));
+    if (bm.tool === 'wall') {
+      if (!bm.wallDraft) bm.wallDraft = [];
+      bm.wallDraft.push({ x: Math.round(p.x), y: Math.round(p.y) });
+      bmRender(); return;
+    }
     if (bm.tool === 'fog') { bm.drag = { kind: 'fog' }; bmFogPaint(p); return; }
     const t = [...m.tokens].reverse().find(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2 + 4 / bm.view.k);
     if (t) { bm.sel = t.id; bm.drag = { kind: 'tok', id: t.id, dx: t.x - p.x, dy: t.y - p.y }; }
@@ -10704,6 +10849,10 @@ function bmInitCanvas(){
     cv.classList.remove('dragging');
     bmRender();
   };
+  cv.addEventListener('dblclick', () => { if (bm.tool === 'wall') { bmWallCommit(); bm.wallDraft = []; bmRender(); } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && bm.tool === 'wall') { bmWallCommit(); bm.tool = 'move'; bm.wallDraft = null; bmRefreshUI(); bmRender(); }
+  });
   cv.addEventListener('pointerup', fin);
   cv.addEventListener('pointercancel', fin);
   cv.addEventListener('wheel', e => {
@@ -10725,6 +10874,7 @@ function bmFogPaint(p){
   if (now - bmLastFog < 24) return;
   bmLastFog = now;
   m.fog.push({ x: Math.round(p.x), y: Math.round(p.y), r: bm.fogR, m: bm.fogMode === 'reveal' ? 'r' : 'h' });
+  bm.fogDirty.add(m.id);
   bmRender();
 }
 
@@ -10767,6 +10917,7 @@ window._bmProjToggle = function(){
   }
   cvs.style.display = 'block';
   bm.projOn = true; bm._projWin = w;
+  try { bm._projScrW = w.screen.width || 0; } catch(_) { bm._projScrW = 0; }
   bmRefreshUI(); bmProjRender();
   bmStatus('Carte projetée (vue joueurs : brouillard opaque, sans murs ni sélection). Glisse la fenêtre sur l’écran de table puis double-clique.');
 };
@@ -10798,6 +10949,12 @@ function bmRefreshUI(){
   if (f) { f.classList.toggle('on', bm.tool === 'fog'); f.textContent = bm.tool === 'fog' ? (bm.fogMode === 'reveal' ? '🌫 Révéler' : '🌫 Masquer') : '🌫 Brouillard'; }
   const wl = document.getElementById('bmWallBtn'); if (wl) wl.classList.toggle('on', bm.showWalls);
   const pj = document.getElementById('bmProjBtn'); if (pj) { pj.classList.toggle('on', bm.projOn); pj.textContent = bm.projOn ? '📽 Projection ON' : '📽 Projeter'; }
+  const wd = document.getElementById('bmWallDraw'); if (wd) wd.classList.toggle('on', bm.tool === 'wall');
+  const rg = document.getElementById('bmRangeBtn'); if (rg) rg.classList.toggle('on', bm.showRange);
+  const lk = document.getElementById('bmLockBtn'); if (lk) lk.classList.toggle('on', bm.calib.lock);
+  const cm = document.getElementById('bmCalCm'); if (cm && +cm.value !== bm.calib.cm) cm.value = bm.calib.cm;
+  const tb = document.getElementById('bmTorchBtn'); const st = bmSelTok();
+  if (tb) tb.style.opacity = (st && st.torche) ? '1' : '0.45';
   const gp = document.getElementById('bmGridPx'); if (gp && m) gp.value = m.grid.px;
   const cv = document.getElementById('bmCanvas'); if (cv) cv.classList.toggle('fog', bm.tool === 'fog');
 }
@@ -10810,6 +10967,8 @@ function bmRefreshUI(){
     gp.addEventListener('input', () => { const m = bmMap(); if (m) { m.grid.px = +gp.value; bmSave(); bmRender(); } });
     const fr = document.getElementById('bmFogR');
     fr.addEventListener('input', () => { bm.fogR = +fr.value; });
+    const cm = document.getElementById('bmCalCm');
+    cm.addEventListener('input', () => { bm.calib.cm = Math.max(20, +cm.value || 60); bmSave(); bmProjRender(); });
     (async () => {
       for (const m of bm.maps) { const im = await bmImage(m); if (im && (!m.w || !m.h)) { m.w = im.naturalWidth; m.h = im.naturalHeight; } }
       bmFit(); bmRefreshUI(); bmRender();
@@ -12598,6 +12757,8 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 .bm-btn.on { background:rgba(185,140,72,0.32); border-color:rgba(232,200,120,0.8); color:#f5ecd6; }
 .bm-btn.bm-proj.on { background:rgba(80,160,90,0.3); border-color:rgba(140,230,150,0.7); }
 .bm-range { width:82px; accent-color:var(--gold); }
+.bm-num { width:58px; padding:5px 6px; border-radius:8px; border:1px solid rgba(160,120,65,0.5);
+  background:rgba(20,12,4,0.6); color:#f0dfae; font-family:inherit; font-size:0.8rem; }
 .bm-sep { width:1px; height:22px; background:rgba(185,140,72,0.3); margin:0 2px; }
 .bm-canvas-wrap { position:relative; border-radius:10px; overflow:hidden; border:1px solid rgba(120,90,50,0.5);
   background:#0a0703; height:min(62vh, 640px); }
@@ -12745,6 +12906,12 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     <input type="range" id="bmFogR" class="bm-range" min="25" max="300" value="100" title="Rayon du pinceau de brouillard">
     <button class="bm-btn" id="bmWallBtn" onclick="window._bmWallsToggle()" title="Afficher les murs Dungeon Alchemist (visibles du MJ seulement)">🧱 Murs</button>
     <span class="bm-sep"></span>
+    <button class="bm-btn" id="bmWallDraw" onclick="window._bmWallDraw()" title="Dessiner des murs : clic = point, double-clic ou Échap = terminer le tracé">✏🧱</button>
+    <button class="bm-btn" id="bmWallUndo" onclick="window._bmWallUndo()" title="Effacer le dernier mur tracé">⌫</button>
+    <button class="bm-btn" id="bmRangeBtn" onclick="window._bmRangeToggle()" title="Afficher la portée de déplacement du pion sélectionné">👣</button>
+    <span class="bm-sep"></span>
+    <button class="bm-btn" id="bmLockBtn" onclick="window._bmLockToggle()" title="Verrouiller la projection : 1 case = 1 pouce sur l'écran physique (pour poser des figurines)">🔒 1″</button>
+    <input type="number" id="bmCalCm" class="bm-num" min="20" max="400" step="1" title="Largeur PHYSIQUE de l'écran de projection en cm (ex : télé 600×400 mm → 60)">
     <button class="bm-btn bm-proj" id="bmProjBtn" onclick="window._bmProjToggle()" title="Projeter la vue joueurs sur l'écran externe">📽 Projeter</button>
     <button class="bm-btn" onclick="window._bmDelete()" title="Supprimer la carte active">🗑</button>
   </div>
@@ -12754,6 +12921,8 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
       <button onclick="window._bmTokSize(-1)" title="Réduire">－</button>
       <button onclick="window._bmTokSize(1)" title="Agrandir">＋</button>
       <button onclick="window._bmTokColor()" title="Couleur">🎨</button>
+      <button onclick="window._bmTokTorch()" title="Torche : halo de lumière dans le brouillard" id="bmTorchBtn">🔥</button>
+      <button onclick="window._bmTokSpeed()" title="Vitesse de déplacement (mètres)">👣</button>
       <button onclick="window._bmTokDel()" title="Retirer">✕</button>
     </div>
   </div>
