@@ -9687,11 +9687,36 @@ const AMB_NAPPES_DEFAUT = [
   ['Craquements de navire','⛵','https://sounds.tabletopaudio.com/126_Endless_Voyage.mp3'],
   ['Gouttes de caverne','💧','https://sounds.tabletopaudio.com/184_Underground_Lake.mp3'],
 ];
+const AMB_SHOTS_URL = 'https://cdn.jsdelivr.net/gh/wesnoth/wesnoth@master/data/core/sounds/';
 const AMB_SHOTS_DEFAUT = [
-  ['Tonnerre','⚡','tonnerre'],['Porte qui claque','🚪','porte'],['Choc d\'épées','⚔','epees'],
-  ['Flèche','🏹','fleche'],['Éclat magique','✨','zap'],['Cor de guerre','📯','cor'],
-  ['Cloche','🔔','cloche'],['Battement de cœur','💓','coeur'],['Craquement','🪵','craquement'],
-  ['Hurlement spectral','👻','spectre'],
+  ['Tonnerre','⚡','lightning.ogg','url','tonnerre'],
+  ['Choc d\'épées','⚔','sword-1.ogg','url','epees'],
+  ['Hache','🪓','axe.ogg','url','epees'],
+  ['Masse d\'armes','🔨','mace.ogg','url','porte'],
+  ['Flèche','🏹','bow.ogg','url','fleche'],
+  ['Dague furtive','🗡','dagger-swish.wav','url','fleche'],
+  ['Explosion','💥','explosion.ogg','url','zap'],
+  ['Brasier','🔥','flame-big.ogg','url','zap'],
+  ['Magie sombre','🌑','magic-dark-big.ogg','url','zap'],
+  ['Magie sacrée','✨','magic-holy-1.ogg','url','zap'],
+  ['Soin','💚','heal.wav','url','cloche'],
+  ['Potion','🧪','potion.ogg','url','zap'],
+  ['Butin','💰','gold.ogg','url','cloche'],
+  ['Coffre','📦','open-chest.wav','url','porte'],
+  ['Torche','🔦','torch.ogg','url','craquement'],
+  ['Éboulement','🪨','cave-in.ogg','url','tonnerre'],
+  ['Grondement','🌋','rumble.ogg','url','tonnerre'],
+  ['Hurlement spectral','👻','wail.wav','url','spectre'],
+  ['Cri de rapace','🦅','gryphon-shriek-1.ogg','url','spectre'],
+  ['Loup blessé','🐺','wolf-die-1.ogg','url','craquement'],
+  ['Chauve-souris','🦇','bat-flapping.wav','url','craquement'],
+  ['Galop','🐴','horse-canter.wav','url','coeur'],
+  ['Jet d\'eau','🌊','water-blast.wav','url','zap'],
+  ['Pétrification','🗿','petrified.ogg','url','zap'],
+  ['Porte qui claque','🚪','porte','synth',null],
+  ['Cor de guerre','📯','cor','synth',null],
+  ['Cloche','🔔','cloche','synth',null],
+  ['Battement de cœur','💓','coeur','synth',null],
 ];
 let ambCtx = null, ambNoiseBuf = null;
 function ambAudioCtx(){
@@ -9828,7 +9853,9 @@ function ambShot(id){
   ambResolveAudio(s.src).then(h => {
     if (!h || h.kind === 'yt') { ambSetStatus('One-shot « ' + s.nom + ' » : fichier ou URL audio directe uniquement.'); return; }
     const a = new Audio(h.src); a.volume = Math.min(1, amb.vol * 1.15);
-    a.play().catch(e => ambSetStatus('One-shot bloqué : ' + (e.message||e)));
+    const repli = () => { const r = s.src && s.src.repli; if (r) { try { ambSynthPlay(r); } catch(_){} } };
+    a.onerror = repli;
+    a.play().catch(() => repli());
   });
 }
 window._ambNappeToggle = ambNappeToggle;
@@ -9837,8 +9864,14 @@ window._ambReseedDefaults = function(){
   let n = 0;
   for (const [nom, emoji, url] of AMB_NAPPES_DEFAUT)
     if (!amb.nappes.some(x => x.nom === nom)) { amb.nappes.push({ id:'nap_'+Math.random().toString(36).slice(2,8), nom, emoji, src:{mode:'url',ref:url} }); n++; }
-  for (const [nom, emoji, ref] of AMB_SHOTS_DEFAUT)
-    if (!amb.shots.some(x => x.nom === nom)) { amb.shots.push({ id:'sh_'+Math.random().toString(36).slice(2,8), nom, emoji, src:{mode:'synth',ref} }); n++; }
+  for (const [nom, emoji, ref, mode, repli] of AMB_SHOTS_DEFAUT) {
+    const srcDef = mode === 'url'
+      ? { mode:'url', ref: AMB_SHOTS_URL + ref, repli }
+      : { mode:'synth', ref };
+    const existant = amb.shots.find(x => x.nom === nom);
+    if (!existant) { amb.shots.push({ id:'sh_'+Math.random().toString(36).slice(2,8), nom, emoji, src: srcDef }); n++; }
+    else if (mode === 'url' && existant.src && existant.src.mode === 'synth') { existant.src = srcDef; n++; }
+  }
   if (n) { ambSaveBoards(); ambRenderBoards(); ambSetStatus(n + ' éléments par défaut (ré)installés.'); }
   return n;
 };
@@ -12427,7 +12460,10 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
         doc.write('<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Projection — KubbNd</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#v{width:100vw;height:100vh;object-fit:contain;background:#000;display:block}#fs{position:fixed;right:14px;bottom:14px;z-index:5;font:600 13px system-ui,sans-serif;background:rgba(0,0,0,0.55);color:#fff;border:1px solid rgba(255,255,255,0.35);border-radius:8px;padding:9px 13px;cursor:pointer;opacity:.85}#fs:hover{opacity:1}body:fullscreen #fs{display:none}#hint{position:fixed;left:0;right:0;bottom:54px;text-align:center;color:#777;font:500 13px system-ui;pointer-events:none}</style></head><body><video id="v" autoplay muted playsinline></video><button id="fs">\u26F6 Plein \u00E9cran</button><div id="hint">Double-clic ou bouton pour le plein \u00E9cran</div></body></html>');
         doc.close();
         const v = doc.getElementById('v');
-        const goFs = ()=>{ try{ const el=doc.documentElement; if(el.requestFullscreen) el.requestFullscreen().catch(()=>{}); }catch(_){} };
+        const goFs = ()=>{ try{ const el=doc.documentElement;
+          if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+          else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        }catch(_){} };
         const fsBtn = doc.getElementById('fs'); if(fsBtn) fsBtn.addEventListener('click', goFs);
         doc.body.addEventListener('dblclick', goFs);
         win.addEventListener('beforeunload', ()=>{ _proj.win=null; _proj.winVideo=null; setStatus('Fenêtre de projection fermée.'); refreshButtons(); });
