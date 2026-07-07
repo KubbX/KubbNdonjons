@@ -7578,7 +7578,12 @@ window._showResourceDetail = (catId, docId) => {
   document.getElementById('forgePrev').style.visibility = 'hidden';
   document.getElementById('forgeNext').style.display = 'none';
 
-  let html = `<div class="rd-sheet">${renderResourceDetail(catId, r)}</div>`;
+  let imgHtml = '';
+  if (catId === 'monster') {
+    const ms = spellSlug(r.name || '');
+    imgHtml = `<div class="rd-bimg-wrap"><img class="rd-bimg" src="assets/bestiaire/${ms}.jpg" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
+  }
+  let html = `<div class="rd-sheet">${imgHtml}${renderResourceDetail(catId, r)}</div>`;
 
   // Action buttons
   html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">`;
@@ -12122,6 +12127,11 @@ body::after { content:''; position:fixed; inset:0; pointer-events:none; z-index:
 @keyframes fxDerive { from { background-position:0 0, 0 0, 0 0; } to { background-position:46px -30px, -38px 24px, 30px -18px; } }
 html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 @media (prefers-reduced-motion: reduce) { #fxParticles { display:none !important; } }
+
+/* ── Portrait de créature (assets/bestiaire/{slug}.jpg) ── */
+.rd-bimg-wrap { margin:0 0 14px; border-radius:12px; overflow:hidden; display:flex; justify-content:center;
+  border:1px solid rgba(185,140,72,0.4); background:#120b05; box-shadow:0 4px 14px rgba(0,0,0,0.45); }
+.rd-bimg { width:100%; max-height:320px; object-fit:cover; object-position:center 22%; display:block; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
