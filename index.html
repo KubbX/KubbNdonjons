@@ -10531,6 +10531,137 @@ window._bmTokSize = function(d){ const t = bmSelTok(); if (!t) return; t.taille 
 window._bmTokColor = function(){ const t = bmSelTok(); if (!t) return; t.couleur = BM_COULEURS[(BM_COULEURS.indexOf(t.couleur) + 1) % BM_COULEURS.length]; bmSave(); bmRender(); };
 window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) return; m.tokens = m.tokens.filter(x => x.id !== t.id); bm.sel = null; bmSave(); bmRender(); };
 function bmSelTok(){ const m = bmMap(); return m ? m.tokens.find(t => t.id === bm.sel) : null; }
+
+/* ── géométrie partagée : murs -> segments (cache), intersections, visibilité, chemins ── */
+const bmGeo = { segs: new Map(), vis: new Map(), reach: new Map() };
+function bmGeoDirty(mapId){ bmGeo.segs.delete(mapId); bmGeo.vis.clear(); bmGeo.reach.clear(); }
+function bmSegs(m){
+  let s = bmGeo.segs.get(m.id);
+  if (s) return s;
+  s = [];
+  for (const poly of m.walls || [])
+    for (let i = 1; i < poly.length; i++)
+      s.push({ x1: poly[i-1].x, y1: poly[i-1].y, x2: poly[i].x, y2: poly[i].y });
+  bmGeo.segs.set(m.id, s);
+  return s;
+}
+function bmSegCoupe(ax, ay, bx, by, s){
+  const rX = bx - ax, rY = by - ay, sX = s.x2 - s.x1, sY = s.y2 - s.y1;
+  const d = rX * sY - rY * sX;
+  if (!d) return null;
+  const t = ((s.x1 - ax) * sY - (s.y1 - ay) * sX) / d;
+  const u = ((s.x1 - ax) * rY - (s.y1 - ay) * rX) / d;
+  return (t > 0.0001 && t < 0.9999 && u >= -0.0001 && u <= 1.0001) ? t : null;
+}
+function bmVisPoly(m, px, py, R){
+  const cle = m.id + '|' + Math.round(px) + ',' + Math.round(py) + ',' + Math.round(R);
+  if (bmGeo.vis.has(cle)) return bmGeo.vis.get(cle);
+  const proches = bmSegs(m).filter(s =>
+    Math.min(s.x1, s.x2) < px + R && Math.max(s.x1, s.x2) > px - R &&
+    Math.min(s.y1, s.y2) < py + R && Math.max(s.y1, s.y2) > py - R);
+  if (!proches.length) { bmGeo.vis.set(cle, null); return null; }
+  const angles = [];
+  for (const s of proches)
+    for (const [ex, ey] of [[s.x1, s.y1], [s.x2, s.y2]]) {
+      const a = Math.atan2(ey - py, ex - px);
+      angles.push(a - 0.0006, a, a + 0.0006);
+    }
+  for (let i = 0; i < 24; i++) angles.push(i * Math.PI / 12);
+  angles.sort((a, b) => a - b);
+  const pts = [];
+  for (const a of angles) {
+    const bx = px + Math.cos(a) * R, by = py + Math.sin(a) * R;
+    let tMin = 1;
+    for (const s of proches) {
+      const t = bmSegCoupe(px, py, bx, by, s);
+      if (t !== null && t < tMin) tMin = t;
+    }
+    pts.push({ x: px + (bx - px) * tMin, y: py + (by - py) * tMin });
+  }
+  bmGeo.vis.set(cle, pts);
+  if (bmGeo.vis.size > 60) bmGeo.vis.delete(bmGeo.vis.keys().next().value);
+  return pts;
+}
+function bmCellDe(m, t){
+  const g = m.grid.px, demi = t.taille % 2 ? g / 2 : 0;
+  return { cx: Math.round((t.x - demi) / g), cy: Math.round((t.y - demi) / g), demi };
+}
+function bmCentreCell(m, cx, cy, demi){ const g = m.grid.px; return { x: cx * g + demi, y: cy * g + demi }; }
+function bmPasLibre(m, x1, y1, x2, y2, segsProches){
+  for (const s of segsProches)
+    if (bmSegCoupe(x1, y1, x2, y2, s) !== null) return false;
+  return true;
+}
+function bmSegsAutour(m, x, y, R){
+  return bmSegs(m).filter(s =>
+    Math.min(s.x1, s.x2) < x + R && Math.max(s.x1, s.x2) > x - R &&
+    Math.min(s.y1, s.y2) < y + R && Math.max(s.y1, s.y2) > y - R);
+}
+function bmReach(m, t){
+  const cases = Math.max(1, Math.round(bmVitesse(t) / BM_CASE_M));
+  const { cx, cy, demi } = bmCellDe(m, t);
+  const cle = m.id + '|' + t.id + '|' + cx + ',' + cy + '|' + cases;
+  if (bmGeo.reach.has(cle)) return bmGeo.reach.get(cle);
+  const g = m.grid.px, R = (cases + 1.5) * g;
+  const segs = bmSegsAutour(m, t.x, t.y, R);
+  const ok = new Set([cx + ',' + cy]);
+  let front = [[cx, cy]];
+  for (let pas = 0; pas < cases; pas++) {
+    const next = [];
+    for (const [x, y] of front) {
+      const c1 = bmCentreCell(m, x, y, demi);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        if (!dx && !dy) continue;
+        const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
+        if (ok.has(k)) continue;
+        const c2 = bmCentreCell(m, nx, ny, demi);
+        if (c2.x < -g || c2.y < -g || c2.x > m.w + g || c2.y > m.h + g) continue;
+        if (!bmPasLibre(m, c1.x, c1.y, c2.x, c2.y, segs)) continue;
+        ok.add(k); next.push([nx, ny]);
+      }
+    }
+    front = next;
+    if (!front.length) break;
+  }
+  const res = { cells: ok, demi, cases };
+  bmGeo.reach.set(cle, res);
+  if (bmGeo.reach.size > 30) bmGeo.reach.delete(bmGeo.reach.keys().next().value);
+  return res;
+}
+function bmPath(m, t, cibleCx, cibleCy){
+  const { cx, cy, demi } = bmCellDe(m, t);
+  if (cx === cibleCx && cy === cibleCy) return [];
+  const g = m.grid.px;
+  const R = (Math.max(Math.abs(cibleCx - cx), Math.abs(cibleCy - cy)) + 3) * g;
+  const segs = bmSegsAutour(m, (t.x + cibleCx * g) / 2, (t.y + cibleCy * g) / 2, R);
+  const h = (x, y) => Math.max(Math.abs(x - cibleCx), Math.abs(y - cibleCy));
+  const open = [[h(cx, cy), 0, cx, cy]];
+  const gCost = new Map([[cx + ',' + cy, 0]]);
+  const parent = new Map();
+  let explore = 0;
+  while (open.length && explore++ < 6000) {
+    open.sort((a, b) => a[0] - b[0]);
+    const [, gc, x, y] = open.shift();
+    if (x === cibleCx && y === cibleCy) {
+      const chemin = [];
+      let k = x + ',' + y;
+      while (parent.has(k)) { const [px2, py2] = k.split(',').map(Number); chemin.unshift({ cx: px2, cy: py2 }); k = parent.get(k); }
+      return chemin;
+    }
+    if (gc > (gCost.get(x + ',' + y) ?? 1e9)) continue;
+    const c1 = bmCentreCell(m, x, y, demi);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      if (!dx && !dy) continue;
+      const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
+      const c2 = bmCentreCell(m, nx, ny, demi);
+      if (c2.x < -g || c2.y < -g || c2.x > m.w + g || c2.y > m.h + g) continue;
+      if (!bmPasLibre(m, c1.x, c1.y, c2.x, c2.y, segs)) continue;
+      const ng = gc + 1;
+      if (ng < (gCost.get(k) ?? 1e9)) { gCost.set(k, ng); parent.set(k, x + ',' + y); open.push([ng + h(nx, ny), ng, nx, ny]); }
+    }
+  }
+  return null;
+}
 function bmVitesse(t){
   if (t.vitesse) return t.vitesse;
   try {
@@ -10547,7 +10678,14 @@ window._bmTokSpeed = function(){
   t.vitesse = Math.max(0, parseFloat(String(v).replace(',', '.')) || 9);
   bmSave(); bmRender();
 };
-window._bmRangeToggle = function(){ bm.showRange = !bm.showRange; bmSave(); bmRefreshUI(); bmRender(); };
+window._bmRangeToggle = function(){
+  bm.tool = bm.tool === 'deplacement' ? 'move' : 'deplacement';
+  bm.hoverPath = null; bm.hoverInfo = null;
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'deplacement'
+    ? 'Déplacement : clique un pion (halo = cases atteignables, murs respectés), survole = distance par le chemin, second clic = déplace le pion (même au-delà de sa vitesse). Reclique 👣 pour sortir.'
+    : 'Outil déplacement standard.');
+};
 window._bmLockToggle = function(){
   bm.calib.lock = !bm.calib.lock;
   bmSave(); bmRefreshUI(); bmProjRender();
@@ -10571,13 +10709,13 @@ window._bmWallDraw = function(){
 };
 function bmWallCommit(){
   const m = bmMap();
-  if (m && bm.wallDraft && bm.wallDraft.length > 1) { m.walls.push(bm.wallDraft); bmSave(); }
+  if (m && bm.wallDraft && bm.wallDraft.length > 1) { m.walls.push(bm.wallDraft); bmGeoDirty(m.id); bmSave(); }
   bm.wallDraft = null;
 }
 window._bmWallUndo = function(){
   const m = bmMap(); if (!m) return;
   if (bm.wallDraft && bm.wallDraft.length) { bm.wallDraft = []; }
-  else if (m.walls.length) { m.walls.pop(); bmSave(); }
+  else if (m.walls.length) { m.walls.pop(); bmGeoDirty(m.id); bmSave(); }
   bmRender();
 };
 
@@ -10617,11 +10755,19 @@ function bmFogAvecLumieres(m){
   c.globalCompositeOperation = 'destination-out';
   for (const t of torches) {
     const r = (t.lum || 6) * m.grid.px;         /* torche : 6 cases = 9 m */
+    const poly = bmVisPoly(m, t.x, t.y, r);     /* les murs arrêtent la lumière */
+    c.save();
+    if (poly && poly.length > 2) {
+      c.beginPath(); c.moveTo(poly[0].x, poly[0].y);
+      for (let i = 1; i < poly.length; i++) c.lineTo(poly[i].x, poly[i].y);
+      c.closePath(); c.clip();
+    }
     const g = c.createRadialGradient(t.x, t.y, r * 0.45, t.x, t.y, r);
     g.addColorStop(0, 'rgba(0,0,0,1)');
     g.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = g;
     c.beginPath(); c.arc(t.x, t.y, r, 0, 7); c.fill();
+    c.restore();
   }
   return bm.fogMix;
 }
@@ -10686,21 +10832,22 @@ function bmScene(ctx, W, H, mode){
     ctx.stroke();
   }
   const selT = m.tokens.find(t => t.id === bm.sel);
-  if (bm.showRange && selT && m.grid.px > 8) {
-    const cases = Math.max(1, Math.round(bmVitesse(selT) / BM_CASE_M));
-    const g = m.grid.px, demi = selT.taille % 2 ? g / 2 : 0;
-    const cx = Math.round((selT.x - demi) / g), cy = Math.round((selT.y - demi) / g);
-    ctx.fillStyle = 'rgba(240,200,90,0.13)';
-    ctx.strokeStyle = 'rgba(240,200,90,0.35)';
-    ctx.lineWidth = 1 / v.k;
-    for (let dx = -cases; dx <= cases; dx++)
-      for (let dy = -cases; dy <= cases; dy++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) > cases || (!dx && !dy)) continue;
-        const x = (cx + dx) * g + demi - g / 2, y = (cy + dy) * g + demi - g / 2;
-        if (x < -g || y < -g || x > m.w || y > m.h) continue;
-        ctx.fillRect(x, y, g, g);
-      }
-    ctx.strokeRect((cx - cases) * g + demi - g / 2, (cy - cases) * g + demi - g / 2, g * (2 * cases + 1), g * (2 * cases + 1));
+  if (bm.tool === 'deplacement' && selT && m.grid.px > 8) {
+    const { cells, demi } = bmReach(m, selT);
+    const g = m.grid.px;
+    ctx.fillStyle = 'rgba(240,200,90,0.14)';
+    for (const k of cells) {
+      const [x, y] = k.split(',').map(Number);
+      ctx.fillRect(x * g + demi - g / 2, y * g + demi - g / 2, g, g);
+    }
+    if (bm.hoverPath && bm.hoverPath.length) {
+      ctx.strokeStyle = 'rgba(255,224,140,0.9)'; ctx.lineWidth = 3 / v.k;
+      ctx.setLineDash([10 / v.k, 7 / v.k]); ctx.lineCap = 'round';
+      const c0 = bmCentreCell(m, ...(() => { const c = bmCellDe(m, selT); return [c.cx, c.cy, c.demi]; })());
+      ctx.beginPath(); ctx.moveTo(c0.x, c0.y);
+      for (const p of bm.hoverPath) { const c = bmCentreCell(m, p.cx, p.cy, demi); ctx.lineTo(c.x, c.y); }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
   }
   for (const t of m.tokens) {
     const r = (m.grid.px * t.taille) / 2;
@@ -10785,6 +10932,19 @@ function bmRender(){
   ctx.save();
   bmScene(ctx, W, H, 'gm');
   ctx.restore();
+  if (bm.tool === 'deplacement' && bm.hoverInfo) {
+    const { sx, sy, txt, loin } = bm.hoverInfo;
+    ctx.setTransform(bmDPR(), 0, 0, bmDPR(), 0, 0);
+    ctx.font = 'bold 13px sans-serif';
+    const w2 = ctx.measureText(txt).width + 14;
+    ctx.fillStyle = 'rgba(14,9,3,0.88)';
+    ctx.strokeStyle = loin ? 'rgba(230,90,70,0.9)' : 'rgba(240,200,90,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(sx + 14, sy - 30, w2, 22, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = loin ? '#f6a08c' : '#f4dfa4';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, sx + 21, sy - 19);
+  }
   bmTokCtlPos();
   bmProjRender();
 }
@@ -10807,6 +10967,22 @@ function bmInitCanvas(){
     const m = bmMap(); if (!m) return;
     cv.setPointerCapture(e.pointerId);
     const p = toMap(pos(e));
+    if (bm.tool === 'deplacement') {
+      const t = [...m.tokens].reverse().find(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2 + 4 / bm.view.k);
+      if (t) { bm.sel = t.id; bm.hoverPath = null; bm.hoverInfo = null; }
+      else if (bm.sel) {
+        const st = m.tokens.find(x => x.id === bm.sel);
+        if (st) {
+          const g = m.grid.px, demi = st.taille % 2 ? g / 2 : 0;
+          const cx = Math.round((p.x - demi) / g), cy = Math.round((p.y - demi) / g);
+          const c = bmCentreCell(m, cx, cy, demi);
+          st.x = c.x; st.y = c.y;
+          bm.hoverPath = null; bm.hoverInfo = null;
+          bmSave();
+        }
+      }
+      bmRender(); return;
+    }
     if (bm.tool === 'wall') {
       if (!bm.wallDraft) bm.wallDraft = [];
       bm.wallDraft.push({ x: Math.round(p.x), y: Math.round(p.y) });
@@ -10818,7 +10994,30 @@ function bmInitCanvas(){
     else { bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
     bmRender();
   });
+  let bmHoverT = 0;
   cv.addEventListener('pointermove', e => {
+    if (!bm.drag && bm.tool === 'deplacement') {
+      const m = bmMap(); const st = bmSelTok();
+      if (!m || !st) return;
+      const now = performance.now();
+      if (now - bmHoverT < 45) return;
+      bmHoverT = now;
+      const p0 = pos(e), p = toMap(p0);
+      const g = m.grid.px, demi = st.taille % 2 ? g / 2 : 0;
+      const cx = Math.round((p.x - demi) / g), cy = Math.round((p.y - demi) / g);
+      const chemin = bmPath(m, st, cx, cy);
+      bm.hoverPath = chemin;
+      const cases = chemin ? chemin.length : null;
+      const vit = bmVitesse(st);
+      bm.hoverInfo = {
+        sx: p0.sx, sy: p0.sy,
+        txt: chemin === null ? '∞ — bloqué par les murs'
+           : (cases * BM_CASE_M).toLocaleString('fr-FR') + ' m (' + cases + ' case' + (cases > 1 ? 's' : '') + ')',
+        loin: chemin === null || cases * BM_CASE_M > vit,
+      };
+      bmRender();
+      return;
+    }
     if (!bm.drag) return;
     const m = bmMap(); if (!m) return;
     if (bm.drag.kind === 'pan') {
@@ -10950,7 +11149,7 @@ function bmRefreshUI(){
   const wl = document.getElementById('bmWallBtn'); if (wl) wl.classList.toggle('on', bm.showWalls);
   const pj = document.getElementById('bmProjBtn'); if (pj) { pj.classList.toggle('on', bm.projOn); pj.textContent = bm.projOn ? '📽 Projection ON' : '📽 Projeter'; }
   const wd = document.getElementById('bmWallDraw'); if (wd) wd.classList.toggle('on', bm.tool === 'wall');
-  const rg = document.getElementById('bmRangeBtn'); if (rg) rg.classList.toggle('on', bm.showRange);
+  const rg = document.getElementById('bmRangeBtn'); if (rg) rg.classList.toggle('on', bm.tool === 'deplacement');
   const lk = document.getElementById('bmLockBtn'); if (lk) lk.classList.toggle('on', bm.calib.lock);
   const cm = document.getElementById('bmCalCm'); if (cm && +cm.value !== bm.calib.cm) cm.value = bm.calib.cm;
   const tb = document.getElementById('bmTorchBtn'); const st = bmSelTok();
@@ -12908,7 +13107,7 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     <span class="bm-sep"></span>
     <button class="bm-btn" id="bmWallDraw" onclick="window._bmWallDraw()" title="Dessiner des murs : clic = point, double-clic ou Échap = terminer le tracé">✏🧱</button>
     <button class="bm-btn" id="bmWallUndo" onclick="window._bmWallUndo()" title="Effacer le dernier mur tracé">⌫</button>
-    <button class="bm-btn" id="bmRangeBtn" onclick="window._bmRangeToggle()" title="Afficher la portée de déplacement du pion sélectionné">👣</button>
+    <button class="bm-btn" id="bmRangeBtn" onclick="window._bmRangeToggle()" title="Outil déplacement : halo de cases atteignables, distance au survol (murs respectés), second clic = déplacer le pion">👣</button>
     <span class="bm-sep"></span>
     <button class="bm-btn" id="bmLockBtn" onclick="window._bmLockToggle()" title="Verrouiller la projection : 1 case = 1 pouce sur l'écran physique (pour poser des figurines)">🔒 1″</button>
     <input type="number" id="bmCalCm" class="bm-num" min="20" max="400" step="1" title="Largeur PHYSIQUE de l'écran de projection en cm (ex : télé 600×400 mm → 60)">
