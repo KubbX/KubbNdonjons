@@ -9263,7 +9263,7 @@ const HIBOU_PERSONA = `Tu es Hibouquin, un petit owlin mage érudit, mascotte de
 OUTILS : tu disposes d'outils pour AGIR dans l'application (naviguer, ouvrir une fiche du compendium, lancer des dés, piloter les ambiances du MJ, proposer des choix cliquables, créer un affrontement). Utilise-les quand l'utilisateur demande une ACTION ; réponds sans outil pour les questions de connaissance. Après un outil, commente brièvement le résultat.
 AFFRONTEMENT RAPIDE : quand le MJ demande un combat/une rencontre (ex : « un affrontement dans un marais pour 4 joueurs niveau 3 »), commence par proposer 2 à 4 compositions VARIÉES et adaptées via proposer_choix (libellés courts, ex : « 6 Hommes-lézards », « 2 Trolls des tourbières », « 1 Sorcière verte + 4 zombis ») en piochant des monstres qui existent dans les EXTRAITS DU GRIMOIRE ou que tu sais présents dans un bestiaire D&D standard, puis ATTENDS le clic. Quand l'utilisateur choisit (son message reprend le libellé), appelle creer_affrontement avec les monstres et quantités correspondants.`;
 
-const HIBOU_DOC = `GUIDE DE L'APPLICATION KubbNd : application compagnon D&D 5e. Onglets principaux : Personnages (liste des fiches ; bouton + pour créer via l'assistant de création en plusieurs étapes), Fiche de personnage (caractéristiques, compétences, équipement en poupée de papier, sorts avec emplacements, PV, repos), Écran MJ (accessible aux MJ : vue des fiches du groupe, lanceur de dés, Régisseur d'ambiances (58 biomes avec musique par intensité calme/tension/combat et image projetée, réorganisables par glisser-déposer), projection sur écran externe), Compendium (les 477 sorts avec cartes illustrées, objets, dons, monstres). Groupes : un MJ crée un groupe et partage son code d'invitation ; les joueurs le rejoignent depuis leur fiche (menu de la fiche > Groupes) pour donner au MJ l'accès en lecture. Grimoire : depuis la fiche, section Sorts, bouton du grimoire pour préparer/apprendre les sorts selon la classe (les clercs/druides préparent, les ensorceleurs connaissent). Montée de niveau : bouton sur la fiche, guidée étape par étape. Cartes de sorts : chaque sort a une carte illustrée recto/verso visible dans le compendium et le grimoire. Assistant Hibouquin : nécessite une clé API Anthropic personnelle, à saisir dans ses réglages (⚙).`;
+const HIBOU_DOC = `GUIDE DE L'APPLICATION KubbNd : application compagnon D&D 5e. Onglets principaux : Personnages (liste des fiches ; bouton + pour créer via l'assistant de création en plusieurs étapes), Fiche de personnage (caractéristiques, compétences, équipement en poupée de papier, sorts avec emplacements, PV, repos), Écran MJ (accessible aux MJ : vue des fiches du groupe, lanceur de dés, Régisseur d'ambiances (58 biomes avec musique par intensité calme/tension/combat et image projetée), Cartes de bataille (import d'images ou d'exports Dungeon Alchemist .dd2vtt avec grille auto-calibrée, pions issus du combat, brouillard de guerre, projection de la vue joueurs), projection sur écran externe), Compendium (les 477 sorts avec cartes illustrées, objets, dons, monstres). Groupes : un MJ crée un groupe et partage son code d'invitation ; les joueurs le rejoignent depuis leur fiche (menu de la fiche > Groupes) pour donner au MJ l'accès en lecture. Grimoire : depuis la fiche, section Sorts, bouton du grimoire pour préparer/apprendre les sorts selon la classe (les clercs/druides préparent, les ensorceleurs connaissent). Montée de niveau : bouton sur la fiche, guidée étape par étape. Cartes de sorts : chaque sort a une carte illustrée recto/verso visible dans le compendium et le grimoire. Assistant Hibouquin : nécessite une clé API Anthropic personnelle, à saisir dans ses réglages (⚙).`;
 
 const HIBOU_TOOLS = [
   { name:'naviguer', description:"Affiche un onglet de l'application KubbNd.",
@@ -10398,6 +10398,424 @@ window._ambInstallCatalogue = function(){
       localStorage.setItem('kubbnd-fx', cb.checked ? '1' : '0');
     });
   }
+})();
+
+
+/* ══════════ CARTES DE BATAILLE — canvas, import Dungeon Alchemist (UVTT), pions, brouillard, projection ══════════ */
+const bm = {
+  maps: [], cur: null,
+  view: { x: 40, y: 40, k: 0.5 },
+  tool: 'move', fogMode: 'reveal', fogR: 100,
+  sel: null, projOn: false, showWalls: true,
+  imgs: new Map(), tokImgs: new Map(), fogCv: new Map(),
+  drag: null, saveT: null,
+};
+function bmMap(){ return bm.maps.find(m => m.id === bm.cur) || null; }
+function bmSave(){
+  clearTimeout(bm.saveT);
+  bm.saveT = setTimeout(() => {
+    try { localStorage.setItem('kubbnd_bm', JSON.stringify({ maps: bm.maps, cur: bm.cur })); }
+    catch(e) { bmStatus('Sauvegarde impossible (quota ?) : ' + (e.message||e)); }
+  }, 250);
+}
+function bmLoad(){
+  try { const d = JSON.parse(localStorage.getItem('kubbnd_bm')); if (d) { bm.maps = d.maps || []; bm.cur = d.cur; } }
+  catch { /* première utilisation */ }
+}
+function bmStatus(t){ const el = document.getElementById('bmStatus'); if (el) el.textContent = t; }
+
+/* ── image de carte (IndexedDB via les primitives des ambiances) ── */
+async function bmImage(map){
+  if (bm.imgs.has(map.id)) return bm.imgs.get(map.id);
+  const blob = await ambGet('bm_' + map.id);
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  const im = new Image();
+  const p = new Promise(res => { im.onload = () => res(im); im.onerror = () => res(null); });
+  im.src = url;
+  const loaded = await p;
+  if (loaded) bm.imgs.set(map.id, loaded);
+  return loaded;
+}
+
+/* ── import : image simple OU Universal VTT (Dungeon Alchemist, .dd2vtt/.uvtt/.df2vtt) ── */
+function bmParseUVTT(txt){
+  const d = JSON.parse(txt);
+  if (!d.resolution || !d.image) throw new Error('fichier UVTT sans image/resolution');
+  const ppg = d.resolution.pixels_per_grid || 70;
+  const b64 = d.image;
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const blob = new Blob([buf], { type: 'image/png' });
+  const seg = pts => (pts || []).map(p => ({ x: p.x * ppg, y: p.y * ppg }));
+  const walls = (d.line_of_sight || []).map(seg).filter(s => s.length > 1);
+  for (const o of (d.objects_line_of_sight || [])) { const s = seg(o); if (s.length > 1) walls.push(s); }
+  const portals = (d.portals || []).map(p => seg(p.bounds)).filter(s => s.length > 1);
+  return { blob, ppg, walls, portals };
+}
+window._bmImport = function(){
+  const inp = document.getElementById('bmFile');
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return; inp.value = '';
+    const nom = f.name.replace(/\.(dd2vtt|uvtt|df2vtt|json|png|jpe?g|webp)$/i, '');
+    let blob = f, ppg = 70, walls = [], portals = [], da = false;
+    if (/\.(dd2vtt|uvtt|df2vtt|json)$/i.test(f.name)) {
+      try { const r = bmParseUVTT(await f.text()); blob = r.blob; ppg = r.ppg; walls = r.walls; portals = r.portals; da = true; }
+      catch(e) { bmStatus('Import Dungeon Alchemist raté : ' + (e.message||e)); return; }
+    }
+    const id = 'bm_' + Date.now().toString(36);
+    try { await ambPut('bm_' + id, blob); } catch(e) { bmStatus('Stockage impossible : ' + (e.message||e)); return; }
+    const map = { id, nom: nom || 'Carte', grid: { px: ppg, show: true, snap: true }, fogOn: false,
+                  walls, portals, tokens: [], fog: [], w: 0, h: 0 };
+    bm.maps.push(map); bm.cur = id;
+    const im = await bmImage(map);
+    if (im) { map.w = im.naturalWidth; map.h = im.naturalHeight; }
+    bmFit(); bmSave(); bmRefreshUI();
+    bmStatus(da
+      ? `« ${map.nom} » importée depuis Dungeon Alchemist : grille ${ppg}px calibrée, ${walls.length} murs, ${portals.length} portes (visibles du MJ via 🧱).`
+      : `« ${map.nom} » importée. Ajuste la grille au curseur ▦ si besoin.`);
+    bmRender();
+  };
+  inp.click();
+};
+window._bmSelect = function(id){ bm.cur = id || null; bm.sel = null; bmFit(); bmSave(); bmRefreshUI(); bmRender(); };
+window._bmDelete = async function(){
+  const m = bmMap(); if (!m) return;
+  if (!confirm('Supprimer la carte « ' + m.nom + ' » (pions et brouillard compris) ?')) return;
+  try { await ambDel('bm_' + m.id); } catch(_){}
+  bm.imgs.delete(m.id); bm.fogCv.delete(m.id);
+  bm.maps = bm.maps.filter(x => x.id !== m.id);
+  bm.cur = bm.maps.length ? bm.maps[0].id : null;
+  bmSave(); bmRefreshUI(); bmRender();
+};
+
+/* ── pions ── */
+const BM_COULEURS = ['#b03030', '#4a90d9', '#3f8f4a', '#b8862f', '#7a4f9d', '#3aa0a0', '#c25c8a', '#7c7f88'];
+function bmNewToken(nom, couleur, img, taille){
+  const m = bmMap(); if (!m) return null;
+  const c = { x: (m.w||2000)/2, y: (m.h||2000)/2 };
+  const n = m.tokens.length, a = n * 2.4, r = m.grid.px * (0.6 + n * 0.35);
+  return { id: 'tk_' + Math.random().toString(36).slice(2, 8), nom: nom.slice(0, 24),
+           x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r,
+           taille: taille || 1, couleur: couleur || BM_COULEURS[n % BM_COULEURS.length], img: img || '' };
+}
+window._bmAddToken = function(){
+  const m = bmMap(); if (!m) { bmStatus('Importe d’abord une carte.'); return; }
+  const nom = prompt('Nom du pion'); if (!nom) return;
+  m.tokens.push(bmNewToken(nom)); bmSave(); bmRender();
+};
+window._bmTokensFromCombat = function(){
+  const m = bmMap(); if (!m) { bmStatus('Importe d’abord une carte.'); return; }
+  const st = window._combatState;
+  if (!st || !st.active || !st.combatants || !st.combatants.length) { bmStatus('Aucun combat actif — démarre le tracker (ou demande à Hibouquin un affrontement).'); return; }
+  let n = 0;
+  for (const c of st.combatants) {
+    if (c.dead || m.tokens.some(t => t.nom === c.name)) continue;
+    const mon = c.kind === 'monster';
+    const gros = mon && /Géant|Dragon|TG|Gig/i.test(c.sub || '');
+    const img = mon && typeof spellSlug === 'function' ? 'assets/bestiaire/' + spellSlug(c.baseName || c.name) + '.jpg' : '';
+    m.tokens.push(bmNewToken(c.name, mon ? '#b03030' : '#4a90d9', img, gros ? 2 : 1)); n++;
+  }
+  bmSave(); bmRender();
+  bmStatus(n ? n + ' pions créés depuis le combat (portraits du bestiaire quand disponibles).' : 'Tous les combattants ont déjà leur pion.');
+};
+window._bmTokSize = function(d){ const t = bmSelTok(); if (!t) return; t.taille = Math.max(0.5, Math.min(4, t.taille + d * 0.5)); bmSave(); bmRender(); };
+window._bmTokColor = function(){ const t = bmSelTok(); if (!t) return; t.couleur = BM_COULEURS[(BM_COULEURS.indexOf(t.couleur) + 1) % BM_COULEURS.length]; bmSave(); bmRender(); };
+window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) return; m.tokens = m.tokens.filter(x => x.id !== t.id); bm.sel = null; bmSave(); bmRender(); };
+function bmSelTok(){ const m = bmMap(); return m ? m.tokens.find(t => t.id === bm.sel) : null; }
+
+/* ── brouillard de guerre ── */
+function bmFogCanvas(m){
+  let cv = bm.fogCv.get(m.id);
+  if (!cv || cv.width !== m.w || cv.height !== m.h) {
+    cv = document.createElement('canvas'); cv.width = m.w || 1; cv.height = m.h || 1;
+    bm.fogCv.set(m.id, cv);
+  }
+  const c = cv.getContext('2d');
+  c.globalCompositeOperation = 'source-over';
+  c.clearRect(0, 0, cv.width, cv.height);
+  c.fillStyle = '#000'; c.fillRect(0, 0, cv.width, cv.height);
+  for (const op of m.fog) {
+    c.globalCompositeOperation = op.m === 'r' ? 'destination-out' : 'source-over';
+    c.beginPath(); c.arc(op.x, op.y, op.r, 0, 7); c.fill();
+  }
+  return cv;
+}
+window._bmFogTool = function(){
+  const m = bmMap(); if (!m) return;
+  if (bm.tool !== 'fog') { bm.tool = 'fog'; bm.fogMode = 'reveal'; m.fogOn = true; }
+  else if (bm.fogMode === 'reveal') bm.fogMode = 'hide';
+  else { bm.tool = 'move'; }
+  bmSave(); bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'fog'
+    ? (bm.fogMode === 'reveal' ? 'Pinceau : RÉVÉLER (reclique pour masquer, puis pour revenir au déplacement). Le brouillard est opaque pour les joueurs, translucide pour toi.'
+                               : 'Pinceau : MASQUER (reclique pour revenir au déplacement).')
+    : 'Outil déplacement. Le brouillard reste actif — bouton 🌫 pour repeindre.');
+};
+window._bmGridToggle = function(){ const m = bmMap(); if (!m) return; m.grid.show = !m.grid.show; bmSave(); bmRefreshUI(); bmRender(); };
+window._bmWallsToggle = function(){ bm.showWalls = !bm.showWalls; bmRefreshUI(); bmRender(); };
+
+/* ── rendu ── */
+function bmDPR(){ return Math.min(2, window.devicePixelRatio || 1); }
+function bmFit(){
+  const m = bmMap(), wrap = document.getElementById('bmCanvasWrap');
+  if (!m || !wrap) return;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  if (m.w && m.h) {
+    bm.view.k = Math.min(W / m.w, H / m.h) * 0.96;
+    bm.view.x = (W - m.w * bm.view.k) / 2;
+    bm.view.y = (H - m.h * bm.view.k) / 2;
+  }
+}
+function bmScene(ctx, W, H, mode){
+  const m = bmMap();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#0a0703'; ctx.fillRect(0, 0, W, H);
+  if (!m) return;
+  const im = bm.imgs.get(m.id);
+  let v = bm.view;
+  if (mode === 'player') { const k = Math.min(W / (m.w||1), H / (m.h||1)); v = { k, x: (W - m.w*k)/2, y: (H - m.h*k)/2 }; }
+  ctx.setTransform(v.k, 0, 0, v.k, v.x, v.y);
+  if (im) ctx.drawImage(im, 0, 0);
+  else { ctx.fillStyle = '#241708'; ctx.fillRect(0, 0, m.w||800, m.h||600); }
+  if (m.grid.show && m.grid.px > 8) {
+    ctx.strokeStyle = 'rgba(255,240,200,0.16)'; ctx.lineWidth = 1 / v.k;
+    ctx.beginPath();
+    for (let x = 0; x <= (m.w||0); x += m.grid.px) { ctx.moveTo(x, 0); ctx.lineTo(x, m.h); }
+    for (let y = 0; y <= (m.h||0); y += m.grid.px) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
+    ctx.stroke();
+  }
+  for (const t of m.tokens) {
+    const r = (m.grid.px * t.taille) / 2;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, 7);
+    ctx.fillStyle = t.couleur; ctx.fill();
+    const ti = bm.tokImgs.get(t.img);
+    if (t.img && ti && ti.ok) { ctx.clip(); ctx.drawImage(ti.im, t.x - r, t.y - r, r * 2, r * 2); }
+    else if (t.img && !ti) bmLoadTokImg(t.img);
+    ctx.restore();
+    ctx.lineWidth = Math.max(2, r * 0.09);
+    ctx.strokeStyle = (mode === 'gm' && bm.sel === t.id) ? '#ffe9a8' : t.couleur;
+    ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(10, r * 0.5)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (!(t.img && ti && ti.ok)) ctx.fillText(bmInitiales(t.nom), t.x, t.y);
+    ctx.font = `${Math.max(9, r * 0.34)}px sans-serif`;
+    ctx.fillStyle = 'rgba(255,245,220,0.95)'; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 3;
+    ctx.strokeText(t.nom, t.x, t.y + r + 11 / v.k * v.k + Math.max(9, r*0.34)*0.7);
+    ctx.fillText(t.nom, t.x, t.y + r + 11 / v.k * v.k + Math.max(9, r*0.34)*0.7);
+  }
+  if (m.fogOn && m.w) {
+    ctx.globalAlpha = mode === 'player' ? 1 : 0.55;
+    ctx.drawImage(bmFogCanvas(m), 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  if (mode === 'gm' && bm.showWalls) {
+    ctx.lineWidth = 3 / v.k; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(230,70,60,0.85)';
+    for (const seg of m.walls || []) {
+      ctx.beginPath(); ctx.moveTo(seg[0].x, seg[0].y);
+      for (let i = 1; i < seg.length; i++) ctx.lineTo(seg[i].x, seg[i].y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,170,40,0.95)';
+    for (const seg of m.portals || []) {
+      ctx.beginPath(); ctx.moveTo(seg[0].x, seg[0].y);
+      for (let i = 1; i < seg.length; i++) ctx.lineTo(seg[i].x, seg[i].y);
+      ctx.stroke();
+    }
+  }
+}
+function bmInitiales(n){ return (n||'?').split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase(); }
+function bmLoadTokImg(src){
+  const im = new Image();
+  bm.tokImgs.set(src, { im, ok: false });
+  im.onload = () => { bm.tokImgs.set(src, { im, ok: true }); bmRender(); };
+  im.onerror = () => { bm.tokImgs.set(src, { im, ok: false }); };
+  im.src = src;
+}
+function bmRender(){
+  const cv = document.getElementById('bmCanvas'); if (!cv) return;
+  const wrap = cv.parentElement, dpr = bmDPR();
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.save();
+  bmScene(ctx, W, H, 'gm');
+  ctx.restore();
+  bmTokCtlPos();
+  bmProjRender();
+}
+function bmTokCtlPos(){
+  const el = document.getElementById('bmTokCtl'); if (!el) return;
+  const m = bmMap(), t = bmSelTok();
+  if (!m || !t) { el.style.display = 'none'; return; }
+  const r = (m.grid.px * t.taille) / 2;
+  el.style.display = 'flex';
+  el.style.left = Math.round(bm.view.x + t.x * bm.view.k - 44) + 'px';
+  el.style.top = Math.round(bm.view.y + (t.y - r) * bm.view.k - 40) + 'px';
+}
+
+/* ── interactions ── */
+function bmInitCanvas(){
+  const cv = document.getElementById('bmCanvas'); if (!cv) return;
+  const pos = e => { const b = cv.getBoundingClientRect(); return { sx: e.clientX - b.left, sy: e.clientY - b.top }; };
+  const toMap = p => ({ x: (p.sx - bm.view.x) / bm.view.k, y: (p.sy - bm.view.y) / bm.view.k });
+  cv.addEventListener('pointerdown', e => {
+    const m = bmMap(); if (!m) return;
+    cv.setPointerCapture(e.pointerId);
+    const p = toMap(pos(e));
+    if (bm.tool === 'fog') { bm.drag = { kind: 'fog' }; bmFogPaint(p); return; }
+    const t = [...m.tokens].reverse().find(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2 + 4 / bm.view.k);
+    if (t) { bm.sel = t.id; bm.drag = { kind: 'tok', id: t.id, dx: t.x - p.x, dy: t.y - p.y }; }
+    else { bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
+    bmRender();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!bm.drag) return;
+    const m = bmMap(); if (!m) return;
+    if (bm.drag.kind === 'pan') {
+      bm.view.x = bm.drag.vx + (e.clientX - bm.drag.x0);
+      bm.view.y = bm.drag.vy + (e.clientY - bm.drag.y0);
+    } else if (bm.drag.kind === 'tok') {
+      const p = toMap(pos(e)), t = m.tokens.find(x => x.id === bm.drag.id);
+      if (t) { t.x = p.x + bm.drag.dx; t.y = p.y + bm.drag.dy; }
+    } else if (bm.drag.kind === 'fog') {
+      bmFogPaint(toMap(pos(e)));
+      return; /* bmFogPaint rend déjà */
+    }
+    bmRender();
+  });
+  const fin = () => {
+    const m = bmMap();
+    if (m && bm.drag && bm.drag.kind === 'tok' && m.grid.snap && m.grid.show) {
+      const t = m.tokens.find(x => x.id === bm.drag.id);
+      if (t) {
+        const g = m.grid.px, demi = t.taille % 2 ? g / 2 : 0;
+        t.x = Math.round((t.x - demi) / g) * g + demi;
+        t.y = Math.round((t.y - demi) / g) * g + demi;
+      }
+    }
+    if (bm.drag && bm.drag.kind !== 'fog') bmSave();
+    if (bm.drag && bm.drag.kind === 'fog') { const mm = bmMap(); if (mm && mm.fog.length > 4000) mm.fog = mm.fog.slice(-4000); bmSave(); }
+    bm.drag = null;
+    cv.classList.remove('dragging');
+    bmRender();
+  };
+  cv.addEventListener('pointerup', fin);
+  cv.addEventListener('pointercancel', fin);
+  cv.addEventListener('wheel', e => {
+    const m = bmMap(); if (!m) return;
+    e.preventDefault();
+    const p = pos(e);
+    const k2 = Math.max(0.12, Math.min(5, bm.view.k * (e.deltaY < 0 ? 1.13 : 0.885)));
+    bm.view.x = p.sx - (p.sx - bm.view.x) * (k2 / bm.view.k);
+    bm.view.y = p.sy - (p.sy - bm.view.y) * (k2 / bm.view.k);
+    bm.view.k = k2;
+    bmRender();
+  }, { passive: false });
+  new ResizeObserver(() => bmRender()).observe(cv.parentElement);
+}
+let bmLastFog = 0;
+function bmFogPaint(p){
+  const m = bmMap(); if (!m) return;
+  const now = performance.now();
+  if (now - bmLastFog < 24) return;
+  bmLastFog = now;
+  m.fog.push({ x: Math.round(p.x), y: Math.round(p.y), r: bm.fogR, m: bm.fogMode === 'reveal' ? 'r' : 'h' });
+  bmRender();
+}
+
+/* ── projection (fenêtre partagée avec le régisseur) ── */
+function bmProjWin(){
+  try {
+    const w = window.open('', 'kubbnd_projection');
+    return (w && w.document) ? w : null;
+  } catch { return null; }
+}
+window._bmProjToggle = function(){
+  if (bm.projOn) { bm.projOn = false; bmProjHide(); bmRefreshUI(); bmStatus('Projection de carte arrêtée.'); return; }
+  const m = bmMap(); if (!m) { bmStatus('Importe une carte avant de projeter.'); return; }
+  let w = bmProjWin();
+  if (!w || !w.document.body || !w.document.body.childElementCount) {
+    w = window.open('', 'kubbnd_projection', 'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no');
+    if (!w) { bmStatus('Fenêtre bloquée — autorise les pop-ups pour ce site.'); return; }
+    if (!w.document.body || !w.document.body.childElementCount) {
+      w.document.write('<html><head><title>KubbNd — Projection</title></head><body style="margin:0;background:#000;overflow:hidden"></body></html>');
+      w.document.close();
+    }
+  }
+  let cvs = w.document.getElementById('bmproj');
+  if (!cvs) {
+    cvs = w.document.createElement('canvas'); cvs.id = 'bmproj';
+    cvs.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:55;background:#000;';
+    w.document.body.appendChild(cvs);
+    if (!w.document.getElementById('bmfshint')) {
+      const goFs = () => { try { const el = w.document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      } catch(_){} };
+      cvs.addEventListener('dblclick', goFs);
+      const hint = w.document.createElement('div'); hint.id = 'bmfshint';
+      hint.textContent = 'Double-clic : plein écran';
+      hint.style.cssText = 'position:fixed;bottom:8px;right:12px;z-index:56;color:rgba(255,255,255,0.45);font:12px sans-serif;pointer-events:none;';
+      w.document.body.appendChild(hint);
+      setTimeout(() => { try { hint.remove(); } catch(_){} }, 6000);
+    }
+  }
+  cvs.style.display = 'block';
+  bm.projOn = true; bm._projWin = w;
+  bmRefreshUI(); bmProjRender();
+  bmStatus('Carte projetée (vue joueurs : brouillard opaque, sans murs ni sélection). Glisse la fenêtre sur l’écran de table puis double-clique.');
+};
+function bmProjHide(){
+  const w = bm._projWin;
+  if (w && !w.closed) { const c = w.document.getElementById('bmproj'); if (c) c.style.display = 'none'; }
+}
+function bmProjRender(){
+  if (!bm.projOn) return;
+  const w = bm._projWin;
+  if (!w || w.closed) { bm.projOn = false; bmRefreshUI(); return; }
+  const cvs = w.document.getElementById('bmproj'); if (!cvs) return;
+  const W = w.innerWidth, H = w.innerHeight, dpr = 1;
+  if (cvs.width !== W || cvs.height !== H) { cvs.width = W; cvs.height = H; }
+  const ctx = cvs.getContext('2d');
+  ctx.save(); bmScene(ctx, W, H, 'player'); ctx.restore();
+}
+
+/* ── UI ── */
+function bmRefreshUI(){
+  const sel = document.getElementById('bmSel');
+  if (sel) {
+    sel.innerHTML = bm.maps.map(m => `<option value="${m.id}"${m.id===bm.cur?' selected':''}>${(m.nom||'?').replace(/</g,'&lt;')}</option>`).join('')
+      || '<option value="">— aucune carte —</option>';
+  }
+  const m = bmMap();
+  const g = document.getElementById('bmGridBtn'); if (g) g.classList.toggle('on', !!(m && m.grid.show));
+  const f = document.getElementById('bmFogBtn');
+  if (f) { f.classList.toggle('on', bm.tool === 'fog'); f.textContent = bm.tool === 'fog' ? (bm.fogMode === 'reveal' ? '🌫 Révéler' : '🌫 Masquer') : '🌫 Brouillard'; }
+  const wl = document.getElementById('bmWallBtn'); if (wl) wl.classList.toggle('on', bm.showWalls);
+  const pj = document.getElementById('bmProjBtn'); if (pj) { pj.classList.toggle('on', bm.projOn); pj.textContent = bm.projOn ? '📽 Projection ON' : '📽 Projeter'; }
+  const gp = document.getElementById('bmGridPx'); if (gp && m) gp.value = m.grid.px;
+  const cv = document.getElementById('bmCanvas'); if (cv) cv.classList.toggle('fog', bm.tool === 'fog');
+}
+(function bmInit(){
+  const go = () => {
+    if (!document.getElementById('bmCanvas')) return;
+    bmLoad();
+    bmInitCanvas();
+    const gp = document.getElementById('bmGridPx');
+    gp.addEventListener('input', () => { const m = bmMap(); if (m) { m.grid.px = +gp.value; bmSave(); bmRender(); } });
+    const fr = document.getElementById('bmFogR');
+    fr.addEventListener('input', () => { bm.fogR = +fr.value; });
+    (async () => {
+      for (const m of bm.maps) { const im = await bmImage(m); if (im && (!m.w || !m.h)) { m.w = im.naturalWidth; m.h = im.naturalHeight; } }
+      bmFit(); bmRefreshUI(); bmRender();
+    })();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 })();
 
 </script>
@@ -12165,6 +12583,33 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 .rd-bimg-wrap { margin:0 0 14px; border-radius:12px; overflow:hidden; display:flex; justify-content:center;
   border:1px solid rgba(185,140,72,0.4); background:#120b05; box-shadow:0 4px 14px rgba(0,0,0,0.45); }
 .rd-bimg { width:100%; max-height:320px; object-fit:cover; object-position:center 22%; display:block; }
+
+/* ── Cartes de bataille ── */
+.bm-wrap { margin-top:18px; border:1px solid rgba(185,140,72,0.4); border-radius:14px;
+  background:linear-gradient(180deg, rgba(28,18,8,0.85), rgba(16,10,4,0.9)); padding:12px 14px 10px; }
+.bm-head { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:9px; }
+.bm-title { font-family:var(--font-title); color:var(--gold); font-size:1.05rem; margin-right:4px; }
+.bm-sel { padding:6px 9px; border-radius:8px; border:1px solid rgba(160,120,65,0.5); min-width:140px;
+  background:rgba(20,12,4,0.6); color:#f0dfae; font-family:inherit; }
+.bm-sel option { background:#1c1309; color:#e8dcc2; }
+.bm-btn { border:1px solid rgba(160,120,65,0.4); background:rgba(0,0,0,0.3); color:#e3cf9f;
+  border-radius:9px; padding:6px 10px; cursor:pointer; font-family:inherit; font-size:0.82rem; }
+.bm-btn:hover { border-color:var(--gold); }
+.bm-btn.on { background:rgba(185,140,72,0.32); border-color:rgba(232,200,120,0.8); color:#f5ecd6; }
+.bm-btn.bm-proj.on { background:rgba(80,160,90,0.3); border-color:rgba(140,230,150,0.7); }
+.bm-range { width:82px; accent-color:var(--gold); }
+.bm-sep { width:1px; height:22px; background:rgba(185,140,72,0.3); margin:0 2px; }
+.bm-canvas-wrap { position:relative; border-radius:10px; overflow:hidden; border:1px solid rgba(120,90,50,0.5);
+  background:#0a0703; height:min(62vh, 640px); }
+#bmCanvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
+#bmCanvas.fog { cursor:crosshair; }
+#bmCanvas.dragging { cursor:grabbing; }
+.bm-tokctl { position:absolute; display:none; gap:4px; background:rgba(18,11,4,0.92); border:1px solid rgba(185,140,72,0.55);
+  border-radius:10px; padding:4px 6px; z-index:5; box-shadow:0 4px 12px rgba(0,0,0,0.5); }
+.bm-tokctl button { border:none; background:none; color:#e8d8ac; font-size:0.95rem; cursor:pointer; padding:2px 5px; }
+.bm-tokctl button:hover { color:#fff; }
+.bm-status { margin-top:8px; font-size:0.76rem; color:#8a744c; line-height:1.35; }
+@media (max-width:800px){ .bm-canvas-wrap { height:52vh; } .bm-range { width:60px; } }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -12283,6 +12728,37 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     </div>
     <div class="amb-status" id="ambStatus">Raccourcis : Alt+1…9 = les 9 premières bulles (glisse-les pour réordonner) · Alt+C/T/B intensité · Alt+N noir · Alt+0 stop — compatibles Stream Deck.</div>
   </div>
+</div>
+
+
+<div class="bm-wrap">
+  <div class="bm-head">
+    <strong class="bm-title">🗺 Cartes de bataille</strong>
+    <select id="bmSel" class="bm-sel" onchange="window._bmSelect(this.value)" title="Carte active"></select>
+    <button class="bm-btn" onclick="window._bmImport()" title="Importer une image ou un fichier Dungeon Alchemist (.dd2vtt)">📥 Importer</button>
+    <button class="bm-btn" onclick="window._bmTokensFromCombat()" title="Créer les pions depuis le tracker de combat">⚔ Pions du combat</button>
+    <button class="bm-btn" onclick="window._bmAddToken()" title="Ajouter un pion libre">＋ Pion</button>
+    <span class="bm-sep"></span>
+    <button class="bm-btn" id="bmGridBtn" onclick="window._bmGridToggle()" title="Afficher/masquer la grille">▦ Grille</button>
+    <input type="range" id="bmGridPx" class="bm-range" min="24" max="200" value="70" title="Taille de la grille (px)">
+    <button class="bm-btn" id="bmFogBtn" onclick="window._bmFogTool()" title="Brouillard de guerre : clic = changer d'outil (révéler / masquer / déplacer)">🌫 Brouillard</button>
+    <input type="range" id="bmFogR" class="bm-range" min="25" max="300" value="100" title="Rayon du pinceau de brouillard">
+    <button class="bm-btn" id="bmWallBtn" onclick="window._bmWallsToggle()" title="Afficher les murs Dungeon Alchemist (visibles du MJ seulement)">🧱 Murs</button>
+    <span class="bm-sep"></span>
+    <button class="bm-btn bm-proj" id="bmProjBtn" onclick="window._bmProjToggle()" title="Projeter la vue joueurs sur l'écran externe">📽 Projeter</button>
+    <button class="bm-btn" onclick="window._bmDelete()" title="Supprimer la carte active">🗑</button>
+  </div>
+  <div class="bm-canvas-wrap" id="bmCanvasWrap">
+    <canvas id="bmCanvas"></canvas>
+    <div id="bmTokCtl" class="bm-tokctl">
+      <button onclick="window._bmTokSize(-1)" title="Réduire">－</button>
+      <button onclick="window._bmTokSize(1)" title="Agrandir">＋</button>
+      <button onclick="window._bmTokColor()" title="Couleur">🎨</button>
+      <button onclick="window._bmTokDel()" title="Retirer">✕</button>
+    </div>
+  </div>
+  <div class="bm-status" id="bmStatus">Importe une image ou un export Dungeon Alchemist (.dd2vtt) — grille, murs et portes seront calibrés automatiquement. Molette = zoom, glisser = déplacer.</div>
+  <input type="file" id="bmFile" accept=".dd2vtt,.uvtt,.df2vtt,.json,image/png,image/jpeg,image/webp" style="display:none">
 </div>
 
 <div class="amb-ov" id="ambOv">
