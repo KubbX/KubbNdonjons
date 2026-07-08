@@ -10409,6 +10409,7 @@ const bm = {
   sel: null, projOn: false, showWalls: true, showRange: true,
   calib: { cm: 60, lock: false },
   wallDraft: null,
+  selGab: null, gabCouleurI: 0, pings: [], _pingRaf: null,
   imgs: new Map(), tokImgs: new Map(), fogCv: new Map(), fogDirty: new Set(),
   fogMix: null, drag: null, saveT: null, _projScrW: 0,
 };
@@ -10496,6 +10497,90 @@ window._bmDelete = async function(){
   bm.cur = bm.maps.length ? bm.maps[0].id : null;
   bmSave(); bmRefreshUI(); bmRender();
 };
+
+
+/* ── Gabarits de sorts (cône, sphère, ligne, cube — dimensions 5e) ── */
+const BM_GAB_COULEURS = ['rgba(230,90,60,VAR)', 'rgba(90,140,235,VAR)', 'rgba(120,200,90,VAR)', 'rgba(200,110,220,VAR)', 'rgba(235,190,70,VAR)'];
+function bmGabPx(m, metres){ return metres / BM_CASE_M * m.grid.px; }
+function bmSelGabObj(){ const m = bmMap(); return m ? (m.gabarits || []).find(g => g.id === bm.selGab) : null; }
+window._bmGabTool = function(){
+  const m = bmMap(); if (!m) { bmStatus('Importe d’abord une carte.'); return; }
+  bm.tool = bm.tool === 'gabarit' ? 'move' : 'gabarit';
+  bm.selGab = null;
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'gabarit'
+    ? 'Gabarits : choisis la forme et la taille (m), clique pour poser. Glisse pour déplacer, touche R pour pivoter (Maj+R en sens inverse), ✕ pour retirer. Visible des joueurs en projection.'
+    : 'Outil déplacement standard.');
+};
+window._bmGabRot = function(sens){
+  const g = bmSelGabObj(); if (!g) return;
+  g.angle = (g.angle + (sens || 1) * Math.PI / 12) % (Math.PI * 2);
+  bmSave(); bmRender();
+};
+window._bmGabDel = function(){
+  const m = bmMap(), g = bmSelGabObj(); if (!m || !g) return;
+  m.gabarits = m.gabarits.filter(x => x.id !== g.id);
+  bm.selGab = null; bmSave(); bmRender();
+};
+function bmGabPath(ctx, m, g){
+  const L = bmGabPx(m, g.taille);
+  const dx = Math.cos(g.angle), dy = Math.sin(g.angle);
+  const px = -dy, py = dx;
+  ctx.beginPath();
+  if (g.forme === 'sphere') ctx.arc(g.x, g.y, L, 0, 7);
+  else if (g.forme === 'cone') {
+    /* cône 5e : largeur finale = longueur */
+    ctx.moveTo(g.x, g.y);
+    ctx.lineTo(g.x + dx * L - px * L / 2, g.y + dy * L - py * L / 2);
+    ctx.lineTo(g.x + dx * L + px * L / 2, g.y + dy * L + py * L / 2);
+    ctx.closePath();
+  } else if (g.forme === 'ligne') {
+    const w = bmGabPx(m, 1.5) / 2;
+    ctx.moveTo(g.x - px * w, g.y - py * w);
+    ctx.lineTo(g.x + dx * L - px * w, g.y + dy * L - py * w);
+    ctx.lineTo(g.x + dx * L + px * w, g.y + dy * L + py * w);
+    ctx.lineTo(g.x + px * w, g.y + py * w);
+    ctx.closePath();
+  } else { /* cube (vu du dessus : carré) */
+    const c = L / 2;
+    const pts = [[-c,-c],[c,-c],[c,c],[-c,c]].map(([a,b]) => [g.x + a*dx - b*dy, g.y + a*dy + b*dx]);
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+  }
+}
+function bmGabHit(m, g, x, y){
+  const L = bmGabPx(m, g.taille) + 8;
+  if (g.forme === 'sphere' || g.forme === 'cube') return Math.hypot(g.x - x, g.y - y) <= L;
+  /* cône & ligne : proche du point d'origine OU du corps */
+  const dx = Math.cos(g.angle), dy = Math.sin(g.angle);
+  const t = (x - g.x) * dx + (y - g.y) * dy;
+  const d = Math.abs(-(x - g.x) * dy + (y - g.y) * dx);
+  return (t > -12 && t < L && d < L * 0.6) || Math.hypot(g.x - x, g.y - y) < 16;
+}
+
+/* ── Ping (double-clic ou Alt+clic) : impulsion visible MJ + projection ── */
+function bmPing(x, y){
+  bm.pings.push({ x, y, t0: performance.now() });
+  if (!bm._pingRaf) bmPingLoop();
+}
+function bmPingLoop(){
+  const vivants = bm.pings.some(p => performance.now() - p.t0 < 2200);
+  bm.pings = bm.pings.filter(p => performance.now() - p.t0 < 2200);
+  bmRender();
+  if (vivants) bm._pingRaf = requestAnimationFrame(bmPingLoop);
+  else bm._pingRaf = null;
+}
+window._bmTokHide = function(){
+  const t = bmSelTok(); if (!t) return;
+  t.cache = !t.cache;
+  bmSave(); bmRefreshUI(); bmRender();
+  bmStatus(t.cache ? '« ' + t.nom + ' » est caché : visible de toi seul (estompé), absent de la projection. Reclique 👁 pour le révéler.' : '« ' + t.nom + ' » est visible des joueurs.');
+};
+
+/* ── Guide MJ ── */
+window._bmGuideOpen = function(){ const o = document.getElementById('bmGuideOv'); if (o) o.style.display = 'flex'; };
+window._bmGuideClose = function(){ const o = document.getElementById('bmGuideOv'); if (o) o.style.display = 'none'; };
 
 /* ── pions ── */
 const BM_COULEURS = ['#b03030', '#4a90d9', '#3f8f4a', '#b8862f', '#7a4f9d', '#3aa0a0', '#c25c8a', '#7c7f88'];
@@ -10839,6 +10924,16 @@ function bmScene(ctx, W, H, mode){
     for (let y = 0; y <= (m.h||0); y += m.grid.px) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
     ctx.stroke();
   }
+  for (const gb of (m.gabarits || [])) {
+    bmGabPath(ctx, m, gb);
+    ctx.fillStyle = gb.couleur.replace('VAR', '0.22');
+    ctx.fill();
+    ctx.lineWidth = 2 / v.k;
+    ctx.strokeStyle = gb.couleur.replace('VAR', mode === 'gm' && bm.selGab === gb.id ? '1' : '0.75');
+    if (mode === 'gm' && bm.selGab === gb.id) ctx.setLineDash([8 / v.k, 5 / v.k]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   const selT = m.tokens.find(t => t.id === bm.sel);
   if (bm.tool === 'deplacement' && selT && m.grid.px > 8) {
     const { cells, demi } = bmReach(m, selT);
@@ -10858,8 +10953,10 @@ function bmScene(ctx, W, H, mode){
     }
   }
   for (const t of m.tokens) {
+    if (t.cache && mode === 'player') continue;
     const r = (m.grid.px * t.taille) / 2;
     ctx.save();
+    if (t.cache) ctx.globalAlpha = 0.45;
     ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, 7);
     ctx.fillStyle = t.couleur; ctx.fill();
     const ti = bm.tokImgs.get(t.img);
@@ -10872,6 +10969,8 @@ function bmScene(ctx, W, H, mode){
     ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(10, r * 0.5)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     if (!(t.img && ti && ti.ok)) ctx.fillText(bmInitiales(t.nom), t.x, t.y);
+    if (t.cache && mode === 'gm') { ctx.font = `${Math.max(11, r*0.45)}px sans-serif`; ctx.fillText('🙈', t.x + r * 0.75, t.y - r * 0.75); }
+    ctx.globalAlpha = 1;
     ctx.font = `${Math.max(9, r * 0.34)}px sans-serif`;
     ctx.fillStyle = 'rgba(255,245,220,0.95)'; ctx.strokeStyle = 'rgba(0,0,0,0.75)'; ctx.lineWidth = 3;
     ctx.strokeText(t.nom, t.x, t.y + r + 11 / v.k * v.k + Math.max(9, r*0.34)*0.7);
@@ -10895,6 +10994,19 @@ function bmScene(ctx, W, H, mode){
       for (let i = 1; i < bm.wallDraft.length; i++) ctx.lineTo(bm.wallDraft[i].x, bm.wallDraft[i].y);
       ctx.stroke();
     }
+  }
+  for (const p of bm.pings) {
+    const age = (performance.now() - p.t0) / 2200;
+    for (let i = 0; i < 3; i++) {
+      const ph = Math.max(0, Math.min(1, age * 1.6 - i * 0.22));
+      if (ph <= 0 || ph >= 1) continue;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 10 / v.k + ph * 70 / v.k, 0, 7);
+      ctx.strokeStyle = `rgba(255,214,110,${(1 - ph) * 0.9})`;
+      ctx.lineWidth = (4 - ph * 2.5) / v.k;
+      ctx.stroke();
+    }
+    if (age < 0.9) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 / v.k, 0, 7); ctx.fillStyle = 'rgba(255,224,140,0.95)'; ctx.fill(); }
   }
   if (mode === 'player' && bm.calib.lock) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -10954,7 +11066,16 @@ function bmRender(){
     ctx.fillText(txt, sx + 21, sy - 19);
   }
   bmTokCtlPos();
+  bmGabCtlPos();
   bmProjRender();
+}
+function bmGabCtlPos(){
+  const el = document.getElementById('bmGabCtl'); if (!el) return;
+  const m = bmMap(), g = bmSelGabObj();
+  if (!m || !g || bm.tool !== 'gabarit') { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.style.left = Math.round(bm.view.x + g.x * bm.view.k - 44) + 'px';
+  el.style.top = Math.round(bm.view.y + g.y * bm.view.k - 46) + 'px';
 }
 function bmTokCtlPos(){
   const el = document.getElementById('bmTokCtl'); if (!el) return;
@@ -10975,6 +11096,21 @@ function bmInitCanvas(){
     const m = bmMap(); if (!m) return;
     cv.setPointerCapture(e.pointerId);
     const p = toMap(pos(e));
+    if (e.altKey) { bmPing(p.x, p.y); return; }
+    if (bm.tool === 'gabarit') {
+      const hit = (m.gabarits || []).slice().reverse().find(g => bmGabHit(m, g, p.x, p.y));
+      if (hit) { bm.selGab = hit.id; bm.drag = { kind: 'gab', id: hit.id, dx: hit.x - p.x, dy: hit.y - p.y }; }
+      else {
+        if (!m.gabarits) m.gabarits = [];
+        const forme = document.getElementById('bmGabForme').value;
+        const taille = Math.max(1.5, parseFloat(document.getElementById('bmGabTaille').value) || 4.5);
+        const gb = { id: 'gb_' + Math.random().toString(36).slice(2, 8), forme, taille,
+                     x: p.x, y: p.y, angle: 0,
+                     couleur: BM_GAB_COULEURS[bm.gabCouleurI++ % BM_GAB_COULEURS.length] };
+        m.gabarits.push(gb); bm.selGab = gb.id; bmSave();
+      }
+      bmRender(); return;
+    }
     if (bm.tool === 'deplacement') {
       const t = [...m.tokens].reverse().find(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2 + 4 / bm.view.k);
       if (t) { bm.sel = t.id; bm.hoverPath = null; bm.hoverInfo = null; }
@@ -11034,6 +11170,10 @@ function bmInitCanvas(){
     } else if (bm.drag.kind === 'tok') {
       const p = toMap(pos(e)), t = m.tokens.find(x => x.id === bm.drag.id);
       if (t) { t.x = p.x + bm.drag.dx; t.y = p.y + bm.drag.dy; }
+    } else if (bm.drag.kind === 'gab') {
+      const p = toMap(pos(e));
+      const gb = (m.gabarits || []).find(g => g.id === bm.drag.id);
+      if (gb) { gb.x = p.x + bm.drag.dx; gb.y = p.y + bm.drag.dy; }
     } else if (bm.drag.kind === 'fog') {
       bmFogPaint(toMap(pos(e)));
       return; /* bmFogPaint rend déjà */
@@ -11050,15 +11190,25 @@ function bmInitCanvas(){
         t.y = Math.round((t.y - demi) / g) * g + demi;
       }
     }
-    if (bm.drag && bm.drag.kind !== 'fog') bmSave();
+    if (bm.drag && (bm.drag.kind === 'tok' || bm.drag.kind === 'gab' || bm.drag.kind === 'pan')) bmSave();
     if (bm.drag && bm.drag.kind === 'fog') { const mm = bmMap(); if (mm && mm.fog.length > 4000) mm.fog = mm.fog.slice(-4000); bmSave(); }
     bm.drag = null;
     cv.classList.remove('dragging');
     bmRender();
   };
-  cv.addEventListener('dblclick', () => { if (bm.tool === 'wall') { bmWallCommit(); bm.wallDraft = []; bmRender(); } });
+  cv.addEventListener('dblclick', e => {
+    if (bm.tool === 'wall') { bmWallCommit(); bm.wallDraft = []; bmRender(); return; }
+    const m = bmMap(); if (!m) return;
+    const p = toMap(pos(e));
+    const surPion = m.tokens.some(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2);
+    if (!surPion) bmPing(p.x, p.y);
+  });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && bm.tool === 'wall') { bmWallCommit(); bm.tool = 'move'; bm.wallDraft = null; bmRefreshUI(); bmRender(); }
+    else if (e.key === 'Escape' && bm.tool === 'gabarit') { bm.tool = 'move'; bm.selGab = null; bmRefreshUI(); bmRender(); }
+    else if ((e.key === 'r' || e.key === 'R') && bm.selGab && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+      window._bmGabRot(e.shiftKey ? -1 : 1);
+    }
   });
   cv.addEventListener('pointerup', fin);
   cv.addEventListener('pointercancel', fin);
@@ -11162,6 +11312,9 @@ function bmRefreshUI(){
   const cm = document.getElementById('bmCalCm'); if (cm && +cm.value !== bm.calib.cm) cm.value = bm.calib.cm;
   const tb = document.getElementById('bmTorchBtn'); const st = bmSelTok();
   if (tb) tb.style.opacity = (st && st.torche) ? '1' : '0.45';
+  const hb = document.getElementById('bmHideBtn');
+  if (hb) { hb.style.opacity = (st && st.cache) ? '1' : '0.45'; hb.textContent = (st && st.cache) ? '🙈' : '👁'; }
+  const gbn = document.getElementById('bmGabBtn'); if (gbn) gbn.classList.toggle('on', bm.tool === 'gabarit');
   const gp = document.getElementById('bmGridPx'); if (gp && m) gp.value = m.grid.px;
   const cv = document.getElementById('bmCanvas'); if (cv) cv.classList.toggle('fog', bm.tool === 'fog');
 }
@@ -12978,6 +13131,16 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 .bm-tokctl button:hover { color:#fff; }
 .bm-status { margin-top:8px; font-size:0.76rem; color:#8a744c; line-height:1.35; }
 @media (max-width:800px){ .bm-canvas-wrap { height:52vh; } .bm-range { width:60px; } }
+
+.bm-guide { max-height:64vh; overflow-y:auto; padding-right:6px; font-size:0.86rem; line-height:1.5; color:#d9c9a3; }
+.bm-guide h4 { font-family:var(--font-title); color:var(--gold); margin:14px 0 5px; font-size:0.98rem; }
+.bm-guide h4:first-child { margin-top:2px; }
+.bm-guide p { margin:0 0 8px; }
+.bm-guide strong { color:#f0e2b8; }
+#bmGabCtl { position:absolute; display:none; gap:4px; background:rgba(18,11,4,0.92); border:1px solid rgba(185,140,72,0.55);
+  border-radius:10px; padding:4px 6px; z-index:5; box-shadow:0 4px 12px rgba(0,0,0,0.5); }
+#bmGabCtl button { border:none; background:none; color:#e8d8ac; font-size:0.95rem; cursor:pointer; padding:2px 5px; }
+#bmGabCtl button:hover { color:#fff; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -13113,6 +13276,16 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     <input type="range" id="bmFogR" class="bm-range" min="25" max="300" value="100" title="Rayon du pinceau de brouillard">
     <button class="bm-btn" id="bmWallBtn" onclick="window._bmWallsToggle()" title="Afficher les murs Dungeon Alchemist (visibles du MJ seulement)">🧱 Murs</button>
     <span class="bm-sep"></span>
+
+    <span class="bm-sep"></span>
+    <select id="bmGabForme" class="bm-sel" style="min-width:88px" title="Forme du gabarit de sort">
+      <option value="cone">Cône</option>
+      <option value="sphere">Sphère</option>
+      <option value="ligne">Ligne</option>
+      <option value="cube">Cube</option>
+    </select>
+    <input type="number" id="bmGabTaille" class="bm-num" min="1.5" max="36" step="1.5" value="4.5" title="Taille du gabarit en mètres (cône/ligne : longueur, sphère : rayon, cube : côté)">
+    <button class="bm-btn" id="bmGabBtn" onclick="window._bmGabTool()" title="Poser des gabarits de sorts (cône, sphère, ligne, cube) — visibles des joueurs">🎯 Gabarit</button>
     <button class="bm-btn" id="bmWallDraw" onclick="window._bmWallDraw()" title="Dessiner des murs : clic = point, double-clic ou Échap = terminer le tracé">✏🧱</button>
     <button class="bm-btn" id="bmWallUndo" onclick="window._bmWallUndo()" title="Effacer le dernier mur tracé">⌫</button>
     <button class="bm-btn" id="bmRangeBtn" onclick="window._bmRangeToggle()" title="Outil déplacement : halo de cases atteignables, distance au survol (murs respectés), second clic = déplacer le pion">👣</button>
@@ -13121,20 +13294,54 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     <input type="number" id="bmCalCm" class="bm-num" min="20" max="400" step="1" title="Largeur PHYSIQUE de l'écran de projection en cm (ex : télé 600×400 mm → 60)">
     <button class="bm-btn bm-proj" id="bmProjBtn" onclick="window._bmProjToggle()" title="Projeter la vue joueurs sur l'écran externe">📽 Projeter</button>
     <button class="bm-btn" onclick="window._bmDelete()" title="Supprimer la carte active">🗑</button>
+    <button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">❓ Guide</button>
   </div>
   <div class="bm-canvas-wrap" id="bmCanvasWrap">
     <canvas id="bmCanvas"></canvas>
+    <div id="bmGabCtl">
+      <button onclick="window._bmGabRot(1)" title="Pivoter (R)">↻</button>
+      <button onclick="window._bmGabRot(-1)" title="Pivoter en sens inverse (Maj+R)">↺</button>
+      <button onclick="window._bmGabDel()" title="Retirer le gabarit">✕</button>
+    </div>
     <div id="bmTokCtl" class="bm-tokctl">
       <button onclick="window._bmTokSize(-1)" title="Réduire">－</button>
       <button onclick="window._bmTokSize(1)" title="Agrandir">＋</button>
       <button onclick="window._bmTokColor()" title="Couleur">🎨</button>
       <button onclick="window._bmTokTorch()" title="Torche : halo de lumière dans le brouillard" id="bmTorchBtn">🔥</button>
       <button onclick="window._bmTokSpeed()" title="Vitesse de déplacement (mètres)">👣</button>
+      <button onclick="window._bmTokHide()" title="Cacher/révéler aux joueurs" id="bmHideBtn">👁</button>
       <button onclick="window._bmTokDel()" title="Retirer">✕</button>
     </div>
   </div>
   <div class="bm-status" id="bmStatus">Importe une image ou un export Dungeon Alchemist (.dd2vtt) — grille, murs et portes seront calibrés automatiquement. Molette = zoom, glisser = déplacer.</div>
   <input type="file" id="bmFile" accept=".dd2vtt,.uvtt,.df2vtt,.json,image/png,image/jpeg,image/webp" style="display:none">
+</div>
+
+
+<div class="amb-ov" id="bmGuideOv">
+  <div class="amb-modal" style="max-width:720px">
+    <div class="amb-modal-head">
+      <strong>❓ Guide de l'écran MJ</strong>
+      <button class="amb-head-btn" onclick="window._bmGuideClose()">Fermer ✕</button>
+    </div>
+    <div class="bm-guide">
+      <h4>⚔ Tracker de combat</h4>
+      <p>Ajoute les monstres depuis le compendium (sélection multiple puis « Ajouter au combat ») — RC, PV et bonus d'initiative sont lus du bestiaire. Lance toutes les initiatives d'un clic, avance les tours, gère PV et morts. Astuce : demande à <strong>Hibouquin</strong> « prépare un affrontement pour 4 joueurs niveau 3 dans des égouts » — il propose des compositions cliquables et lance le combat tout seul.</p>
+      <h4>🎭 Régisseur d'ambiances</h4>
+      <p>Chaque <strong>bulle</strong> est une scène (58 fournies via le catalogue ⤓, triées par groupes dans le menu). Un clic = musique + image projetée ; les boutons 🕊/⚔/🔥 changent l'intensité (calme, tension, combat). Les <strong>nappes</strong> (vent, pluie, taverne, feu de camp…) se superposent librement à la musique. Les <strong>one-shots</strong> (⚡ tonnerre, ⚔ épées, 💰 butin…) sont des bruitages instantanés — sons réels avec repli synthétique automatique. Raccourcis clavier : Alt+1…9 déclenchent les 9 premières bulles visibles, Alt+C/T/B l'intensité, Alt+N le noir, Alt+0 stop — compatibles Stream Deck. Réordonne les bulles par glisser-déposer, ↺ restaure/met à niveau la planche par défaut.</p>
+      <h4>🗺 Cartes de bataille</h4>
+      <p><strong>Importer</strong> : une image (PNG/JPG) ou un export <strong>Dungeon Alchemist</strong> (Export → Universal VTT → .dd2vtt) — dans ce cas grille, murs et portes sont calibrés automatiquement. Molette = zoom, glisser = déplacer la vue. Tout est stocké dans le navigateur.</p>
+      <p><strong>Pions</strong> : ⚔ crée un pion par combattant du tracker (bleu = PJ, rouge = monstre, portrait du bestiaire si présent, taille 2 pour les géants), ＋ ajoute un pion libre. Sélectionne un pion pour ses contrôles : taille ±, 🎨 couleur, 🔥 <strong>torche</strong> (halo de lumière dans le brouillard, arrêté par les murs), 👣 vitesse, 👁 <strong>cacher</strong> (estompé pour toi, invisible des joueurs — parfait pour une embuscade), ✕ retirer.</p>
+      <p><strong>Brouillard</strong> 🌫 : premier clic = pinceau « révéler », second = « masquer », troisième = retour au déplacement ; rayon au curseur. Translucide pour toi, opaque en projection. Les pions porteurs de torche découpent leur propre lumière en direct.</p>
+      <p><strong>Murs</strong> : 🧱 affiche/masque les murs (rouge) et portes (orange) — visibles de toi seul. ✏🧱 trace de nouveaux murs (clic = point, double-clic ou Échap = terminer, ⌫ = effacer le dernier). Les murs bloquent la lumière des torches <em>et</em> les déplacements.</p>
+      <p><strong>Déplacement</strong> 👣 : clique un pion → halo doré des cases atteignables (murs respectés) ; survole → distance réelle en mètres par le chemin (rouge si au-delà de la vitesse, « ∞ » si emmuré) ; second clic → déplace le pion, même trop loin — c'est toi qui décides.</p>
+      <p><strong>Gabarits de sorts</strong> 🎯 : choisis forme et taille en mètres (cône 4,5 m, sphère rayon 6 m, ligne 18 m, cube 4,5 m…), clique pour poser. Glisse pour déplacer, <strong>R</strong> pivote (Maj+R en sens inverse), ✕ retire. Les joueurs les voient en projection — idéal pour matérialiser une boule de feu ou un souffle.</p>
+      <p><strong>Ping</strong> 📍 : <strong>double-clic</strong> sur la carte (ou Alt+clic dans n'importe quel outil) → une impulsion dorée pulse quelques secondes, sur ton écran <em>et</em> sur la projection — le « regardez ici » de la table.</p>
+      <p><strong>Calibrage figurines</strong> 🔒 1″ : saisis la largeur physique de l'écran de projection en cm (télé 600×400 mm → 60). Verrouillé, chaque case fait exactement 1 pouce sur l'écran — vérifie avec le repère « 1″ » en bas à gauche de la projection, et pose tes figurines. La vue suit alors le groupe (PJ et porteurs de torche). Déverrouille pour revenir à l'ajustement automatique.</p>
+      <h4>📽 Projection</h4>
+      <p>Une seule fenêtre externe partagée : les scènes d'ambiance y affichent leur image, la carte s'y projette en <strong>vue joueurs</strong> (brouillard opaque, sans murs, sans pions cachés, sans contrôles). Glisse la fenêtre sur l'écran de table puis double-clique pour le plein écran (tous navigateurs ; la sélection automatique d'écran est un bonus Chrome/Edge). Alt+N = fondu au noir côté ambiances.</p>
+    </div>
+  </div>
 </div>
 
 <div class="amb-ov" id="ambOv">
