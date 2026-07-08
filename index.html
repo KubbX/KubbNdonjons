@@ -9838,7 +9838,7 @@ async function ambNappeToggle(id){
     const h = await ambResolveAudio(n.src);
     if (!h) { ambSetStatus('Nappe « ' + n.nom + ' » : source introuvable.'); return; }
     if (h.kind === 'yt') { ambSetStatus('Les nappes ne prennent pas YouTube — utilise un fichier ou une URL audio.'); return; }
-    if (!a) { a = new Audio(); a.loop = true; amb.napAudio.set(id, a); }
+    if (!a) { a = ambSink(new Audio()); a.loop = true; amb.napAudio.set(id, a); }
     a.src = h.src; a.volume = 0;
     a.play().then(() => {
       const t0 = Date.now();
@@ -9852,7 +9852,7 @@ function ambShot(id){
   if (s.src && s.src.mode === 'synth') { try { ambSynthPlay(s.src.ref); } catch(e) { ambSetStatus('Synthèse audio indisponible : ' + (e.message||e)); } return; }
   ambResolveAudio(s.src).then(h => {
     if (!h || h.kind === 'yt') { ambSetStatus('One-shot « ' + s.nom + ' » : fichier ou URL audio directe uniquement.'); return; }
-    const a = new Audio(h.src); a.volume = Math.min(1, amb.vol * 1.15);
+    const a = ambSink(new Audio(h.src)); a.volume = Math.min(1, amb.vol * 1.15);
     const repli = () => { const r = s.src && s.src.repli; if (r) { try { ambSynthPlay(r); } catch(_){} } };
     a.onerror = repli;
     a.play().catch(() => repli());
@@ -9931,8 +9931,45 @@ function ambYtApi(){
   });
   return ambYtReady;
 }
+/* ── sortie audio sélectionnable (setSinkId) : tous les lecteurs passent par ambSink ── */
+function ambSink(a){
+  (window._ambAllAudio || (window._ambAllAudio = [])).push(a);
+  const id = localStorage.getItem('kubbnd_sink') || '';
+  if (id && a.setSinkId) a.setSinkId(id).catch(() => {});
+  return a;
+}
+function ambSinkApplyAll(id){
+  for (const a of (window._ambAllAudio || []))
+    if (a.setSinkId) a.setSinkId(id || '').catch(() => {});
+}
+window._ambSinkPick = async function(){
+  const selEl = document.getElementById('ambSinkSel');
+  try {
+    if (!('setSinkId' in HTMLMediaElement.prototype)) {
+      bmStatus('Ton navigateur ne permet pas de choisir la sortie audio (Safari) — règle la sortie au niveau du système.'); return;
+    }
+    if (navigator.mediaDevices.selectAudioOutput) {
+      const d = await navigator.mediaDevices.selectAudioOutput();
+      localStorage.setItem('kubbnd_sink', d.deviceId);
+      ambSinkApplyAll(d.deviceId);
+      bmStatus('Sortie audio : « ' + (d.label || 'périphérique choisi') + ' » — musiques, nappes et one-shots y sont redirigés (les pistes YouTube ne peuvent pas l\'être).');
+      return;
+    }
+    const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+    flux.getTracks().forEach(t => t.stop());
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput');
+    if (!devs.length) { bmStatus('Aucune sortie audio détectée.'); return; }
+    selEl.innerHTML = '<option value="">Sortie par défaut</option>' +
+      devs.map(d => `<option value="${d.deviceId}">${(d.label || 'Sortie ' + d.deviceId.slice(0, 6)).replace(/</g, '&lt;')}</option>`).join('');
+    selEl.value = localStorage.getItem('kubbnd_sink') || '';
+    selEl.style.display = '';
+    bmStatus('Choisis la sortie audio (la télé en HDMI apparaît dans la liste). S\'applique aux musiques, nappes et one-shots — pas aux pistes YouTube.');
+  } catch (e) {
+    bmStatus('Sélection de sortie audio impossible : ' + (e.message || e));
+  }
+};
 function ambChannel(){
-  const audio = new Audio(); audio.loop = true;
+  const audio = ambSink(new Audio()); audio.loop = true;
   let yt = null, kind = 'audio', ytVol = 0;
   const ensureYt = async () => {
     if (yt) return yt;
@@ -10469,8 +10506,13 @@ window._bmImport = function(){
     const nom = f.name.replace(/\.(dd2vtt|uvtt|df2vtt|json|png|jpe?g|webp)$/i, '');
     let blob = f, ppg = 70, walls = [], portals = [], da = false;
     if (/\.(dd2vtt|uvtt|df2vtt|json)$/i.test(f.name)) {
-      try { const r = bmParseUVTT(await f.text()); blob = r.blob; ppg = r.ppg; walls = r.walls; portals = r.portals; da = true; }
-      catch(e) { bmStatus('Import Dungeon Alchemist raté : ' + (e.message||e)); return; }
+      const txt = await f.text();
+      try {
+        const j = JSON.parse(txt);
+        if (j && j.kubbmap) { await bmRestoreKubbmap(j); return; }
+      } catch(_){ /* pas du JSON : on tente l'UVTT qui donnera une vraie erreur */ }
+      try { const r = bmParseUVTT(txt); blob = r.blob; ppg = r.ppg; walls = r.walls; portals = r.portals; da = true; }
+      catch(e) { bmStatus('Import raté (ni .kubbmap ni Dungeon Alchemist valide) : ' + (e.message||e)); return; }
     }
     const id = 'bm_' + Date.now().toString(36);
     try { await ambPut('bm_' + id, blob); } catch(e) { bmStatus('Stockage impossible : ' + (e.message||e)); return; }
@@ -11257,7 +11299,7 @@ window._bmProjToggle = function(){
   let cvs = w.document.getElementById('bmproj');
   if (!cvs) {
     cvs = w.document.createElement('canvas'); cvs.id = 'bmproj';
-    cvs.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:55;background:#000;';
+    cvs.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:55;background:#000;opacity:0;transition:opacity .8s ease;';
     w.document.body.appendChild(cvs);
     if (!w.document.getElementById('bmfshint')) {
       const goFs = () => { try { const el = w.document.documentElement;
@@ -11273,6 +11315,8 @@ window._bmProjToggle = function(){
     }
   }
   cvs.style.display = 'block';
+  requestAnimationFrame(() => { cvs.style.opacity = '1'; });
+  window._bmSrcOff && window._bmSrcOff();          /* la carte reprend le dessus sur la source libre */
   bm.projOn = true; bm._projWin = w;
   try { bm._projScrW = w.screen.width || 0; } catch(_) { bm._projScrW = 0; }
   bmRefreshUI(); bmProjRender();
@@ -11280,7 +11324,83 @@ window._bmProjToggle = function(){
 };
 function bmProjHide(){
   const w = bm._projWin;
-  if (w && !w.closed) { const c = w.document.getElementById('bmproj'); if (c) c.style.display = 'none'; }
+  if (w && !w.closed) { const c = w.document.getElementById('bmproj'); if (c) c.style.opacity = '0'; }
+}
+/* ── source libre : une image projetée par-dessus tout, dans un fondu ── */
+window._bmSrcOff = function(){
+  const w = bmProjWin();
+  if (w && !w.closed) { const s = w.document.getElementById('prjsrc'); if (s) s.style.opacity = '0'; }
+  bm.srcOn = false;
+  const b = document.getElementById('bmSrcBtn'); if (b) b.classList.remove('on');
+};
+window._bmSrcToggle = function(){
+  if (bm.srcOn) { window._bmSrcOff(); bmStatus('Source libre retirée — la projection revient à la couche du dessous (carte ou ambiance).'); return; }
+  const inp = document.getElementById('bmSrcFile');
+  inp.onchange = () => {
+    const f = inp.files[0]; if (!f) return; inp.value = '';
+    let w = bmProjWin();
+    if (!w || !w.document.body || !w.document.body.childElementCount) {
+      w = window.open('', 'kubbnd_projection', 'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no');
+      if (!w) { bmStatus('Fenêtre bloquée — autorise les pop-ups pour ce site.'); return; }
+      if (!w.document.body || !w.document.body.childElementCount) {
+        w.document.write('<html><head><title>KubbNd — Projection</title></head><body style="margin:0;background:#000;overflow:hidden"></body></html>');
+        w.document.close();
+      }
+    }
+    let s = w.document.getElementById('prjsrc');
+    if (!s) {
+      s = w.document.createElement('img'); s.id = 'prjsrc';
+      s.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;z-index:58;background:#000;opacity:0;transition:opacity .8s ease;pointer-events:none;';
+      w.document.body.appendChild(s);
+      if (!w.document._kbFs) {
+        w.document._kbFs = true;
+        w.document.addEventListener('dblclick', () => { try { const el = w.document.documentElement;
+          if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+          else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        } catch(_){} });
+      }
+    }
+    if (bm._srcUrl) { try { URL.revokeObjectURL(bm._srcUrl); } catch(_){} }
+    bm._srcUrl = URL.createObjectURL(f);
+    s.src = bm._srcUrl;
+    requestAnimationFrame(() => { s.style.opacity = '1'; });
+    bm.srcOn = true; bm._projWin = w;
+    const b = document.getElementById('bmSrcBtn'); if (b) b.classList.add('on');
+    bmStatus('« ' + f.name + ' » projetée en fondu par-dessus tout. Reclique 🖼 pour la retirer, ou 📽 pour redonner le dessus à la carte.');
+  };
+  inp.click();
+};
+/* ── export / import de préparation (.kubbmap.json : carte + pions + murs + brouillard + gabarits) ── */
+window._bmExport = async function(){
+  const m = bmMap(); if (!m) { bmStatus('Aucune carte à exporter.'); return; }
+  const blob = await ambGet('bm_' + m.id);
+  if (!blob) { bmStatus('Image de la carte introuvable en stockage local.'); return; }
+  const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+  const out = { kubbmap: 1, nom: m.nom, grid: m.grid, fogOn: m.fogOn, walls: m.walls, portals: m.portals,
+                tokens: m.tokens, fog: m.fog, gabarits: m.gabarits || [], w: m.w, h: m.h, image: dataUrl };
+  const j = new Blob([JSON.stringify(out)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(j);
+  a.download = (m.nom || 'carte').replace(/[^\w\u00C0-\u017F -]/g, '') + '.kubbmap.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  bmStatus('Préparation exportée : « ' + a.download + ' » — réimporte-la le jour J via 📥 (pions, murs, brouillard et gabarits compris).');
+};
+async function bmRestoreKubbmap(d){
+  const bin = atob(d.image.split(',')[1]);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const blob = new Blob([buf], { type: (d.image.match(/^data:([^;]+)/) || [,'image/png'])[1] });
+  const id = 'bm_' + Date.now().toString(36);
+  await ambPut('bm_' + id, blob);
+  const map = { id, nom: d.nom || 'Carte préparée', grid: d.grid || { px: 70, show: true, snap: true },
+                fogOn: !!d.fogOn, walls: d.walls || [], portals: d.portals || [],
+                tokens: d.tokens || [], fog: d.fog || [], gabarits: d.gabarits || [], w: d.w || 0, h: d.h || 0 };
+  bm.maps.push(map); bm.cur = id;
+  const im = await bmImage(map);
+  if (im) { map.w = im.naturalWidth; map.h = im.naturalHeight; }
+  bmFit(); bmSave(); bmRefreshUI(); bmRender();
+  bmStatus('Préparation « ' + map.nom + ' » restaurée : ' + map.tokens.length + ' pions, ' + map.walls.length + ' murs, brouillard et gabarits inclus. Prêt à projeter.');
 }
 function bmProjRender(){
   if (!bm.projOn) return;
@@ -13292,6 +13412,11 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
     <span class="bm-sep"></span>
     <button class="bm-btn" id="bmLockBtn" onclick="window._bmLockToggle()" title="Verrouiller la projection : 1 case = 1 pouce sur l'écran physique (pour poser des figurines)">🔒 1″</button>
     <input type="number" id="bmCalCm" class="bm-num" min="20" max="400" step="1" title="Largeur PHYSIQUE de l'écran de projection en cm (ex : télé 600×400 mm → 60)">
+    <button class="bm-btn" onclick="window._ambSinkPick()" title="Choisir la sortie audio (ex : la télé en HDMI) — musiques, nappes et one-shots">🔊</button>
+    <select id="ambSinkSel" class="bm-sel" style="display:none;min-width:120px;max-width:170px"
+      onchange="localStorage.setItem('kubbnd_sink', this.value); (window._ambAllAudio||[]).forEach(a=>a.setSinkId&&a.setSinkId(this.value||'').catch(()=>{}));"></select>
+    <button class="bm-btn" id="bmSrcBtn" onclick="window._bmSrcToggle()" title="Projeter une image libre (portrait de boss, document…) par-dessus tout, dans un fondu">🖼 Source</button>
+    <button class="bm-btn" onclick="window._bmExport()" title="Exporter la carte préparée (image, pions, murs, brouillard, gabarits) dans un fichier à réimporter le jour J">💾</button>
     <button class="bm-btn bm-proj" id="bmProjBtn" onclick="window._bmProjToggle()" title="Projeter la vue joueurs sur l'écran externe">📽 Projeter</button>
     <button class="bm-btn" onclick="window._bmDelete()" title="Supprimer la carte active">🗑</button>
     <button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">❓ Guide</button>
@@ -13315,6 +13440,7 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
   </div>
   <div class="bm-status" id="bmStatus">Importe une image ou un export Dungeon Alchemist (.dd2vtt) — grille, murs et portes seront calibrés automatiquement. Molette = zoom, glisser = déplacer.</div>
   <input type="file" id="bmFile" accept=".dd2vtt,.uvtt,.df2vtt,.json,image/png,image/jpeg,image/webp" style="display:none">
+  <input type="file" id="bmSrcFile" accept="image/*" style="display:none">
 </div>
 
 
@@ -13339,7 +13465,8 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
       <p><strong>Ping</strong> 📍 : <strong>double-clic</strong> sur la carte (ou Alt+clic dans n'importe quel outil) → une impulsion dorée pulse quelques secondes, sur ton écran <em>et</em> sur la projection — le « regardez ici » de la table.</p>
       <p><strong>Calibrage figurines</strong> 🔒 1″ : saisis la largeur physique de l'écran de projection en cm (télé 600×400 mm → 60). Verrouillé, chaque case fait exactement 1 pouce sur l'écran — vérifie avec le repère « 1″ » en bas à gauche de la projection, et pose tes figurines. La vue suit alors le groupe (PJ et porteurs de torche). Déverrouille pour revenir à l'ajustement automatique.</p>
       <h4>📽 Projection</h4>
-      <p>Une seule fenêtre externe partagée : les scènes d'ambiance y affichent leur image, la carte s'y projette en <strong>vue joueurs</strong> (brouillard opaque, sans murs, sans pions cachés, sans contrôles). Glisse la fenêtre sur l'écran de table puis double-clique pour le plein écran (tous navigateurs ; la sélection automatique d'écran est un bonus Chrome/Edge). Alt+N = fondu au noir côté ambiances.</p>
+      <p><strong>Sortie audio</strong> 🔊 : choisis le périphérique de sortie (ta télé en HDMI) — musiques, nappes et one-shots y sont redirigés d'un coup (limite : les pistes YouTube restent sur la sortie système ; Safari ne propose pas ce choix). <strong>Source libre</strong> 🖼 : projette n'importe quelle image (portrait de boss, document) en fondu par-dessus tout — reclique pour la retirer, ou 📽 pour redonner le dessus à la carte. <strong>Préparation</strong> 💾 : exporte la carte complète (pions, murs, brouillard, gabarits) en fichier .kubbmap.json, à réimporter le jour J via 📥.</p>
+      <p>Une seule fenêtre externe partagée : les scènes d'ambiance y affichent leur image, la carte s'y projette en <strong>vue joueurs</strong> (brouillard opaque, sans murs, sans pions cachés, sans contrôles) — chaque bascule (ambiance ↔ carte ↔ source libre) se fait en fondu, la dernière action explicite prend le dessus. Glisse la fenêtre sur l'écran de table puis double-clique pour le plein écran (tous navigateurs ; la sélection automatique d'écran est un bonus Chrome/Edge). Alt+N = fondu au noir côté ambiances.</p>
     </div>
   </div>
 </div>
