@@ -10635,6 +10635,11 @@ function bmPath(m, t, cibleCx, cibleCy){
   const R = (Math.max(Math.abs(cibleCx - cx), Math.abs(cibleCy - cy)) + 3) * g;
   const segs = bmSegsAutour(m, (t.x + cibleCx * g) / 2, (t.y + cibleCy * g) / 2, R);
   const h = (x, y) => Math.max(Math.abs(x - cibleCx), Math.abs(y - cibleCy));
+  /* départage : coller à la ligne droite idéale (le compte de cases ne change pas) */
+  const dxL = cibleCx - cx, dyL = cibleCy - cy;
+  const nL = Math.hypot(dxL, dyL) || 1;
+  const ecart = (x, y) => Math.abs((x - cx) * dyL - (y - cy) * dxL) / nL;
+  const VOISINS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
   const open = [[h(cx, cy), 0, cx, cy]];
   const gCost = new Map([[cx + ',' + cy, 0]]);
   const parent = new Map();
@@ -10648,16 +10653,19 @@ function bmPath(m, t, cibleCx, cibleCy){
       while (parent.has(k)) { const [px2, py2] = k.split(',').map(Number); chemin.unshift({ cx: px2, cy: py2 }); k = parent.get(k); }
       return chemin;
     }
-    if (gc > (gCost.get(x + ',' + y) ?? 1e9)) continue;
+    if (gc > (gCost.get(x + ',' + y) ?? 1e9) + 0.01) continue;
     const c1 = bmCentreCell(m, x, y, demi);
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-      if (!dx && !dy) continue;
+    for (const [dx, dy] of VOISINS) {
       const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
       const c2 = bmCentreCell(m, nx, ny, demi);
       if (c2.x < -g || c2.y < -g || c2.x > m.w + g || c2.y > m.h + g) continue;
       if (!bmPasLibre(m, c1.x, c1.y, c2.x, c2.y, segs)) continue;
-      const ng = gc + 1;
-      if (ng < (gCost.get(k) ?? 1e9)) { gCost.set(k, ng); parent.set(k, x + ',' + y); open.push([ng + h(nx, ny), ng, nx, ny]); }
+      const ng = gc + 1 + (dx && dy ? 0.0001 : 0);   /* la diagonale ne sert que si nécessaire */
+      if (ng < (gCost.get(k) ?? 1e9)) {
+        gCost.set(k, ng);
+        parent.set(k, x + ',' + y);
+        open.push([ng + h(nx, ny) + ecart(nx, ny) * 0.002, ng, nx, ny]);
+      }
     }
   }
   return null;
@@ -11007,7 +11015,7 @@ function bmInitCanvas(){
       const cx = Math.round((p.x - demi) / g), cy = Math.round((p.y - demi) / g);
       const chemin = bmPath(m, st, cx, cy);
       bm.hoverPath = chemin;
-      const cases = chemin ? chemin.length : null;
+      const cases = chemin ? chemin.length : null;   /* longueur = nombre de pas, inchangée par le départage */
       const vit = bmVitesse(st);
       bm.hoverInfo = {
         sx: p0.sx, sy: p0.sy,
