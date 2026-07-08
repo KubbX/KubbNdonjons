@@ -13527,6 +13527,59 @@ html .combat-row.combat-active, html .combat-monster-pick.selected {
 html .cond-sheet-item { background:rgba(255,255,255,0.06); color:#e8dcc2; }
 /* les grimoires restent des pages claires : on leur rend leurs champs sombres sur crème */
 html .grim-search input { background:rgba(30,20,8,0.5); color:#f0e4c4; }
+
+/* ══ Retouches lisibilité (captures) ══ */
+/* grille des caractéristiques : les interlignes #eee transparaissaient sous le verre */
+html .stats-grid { background:rgba(196,154,58,0.3); border-radius:12px; overflow:hidden; }
+html .stat-mod { color:#f2e6c4; }
+html .stat-val { color:#bda87d; border-bottom-color:rgba(196,154,58,0.45); }
+html .stat-mini-val { color:#f0e2b8; }
+html .stat-mini-mod { color:#b9a67e; }
+html .char-card-stats { color:#b9a67e; }
+/* bloc de stats des monstres (feuille de détail) : mêmes interlignes crème */
+html .rd-stat-block { background:rgba(196,154,58,0.3); }
+html .rd-stat-val { color:#f0e2b8; }
+html .rd-stat-mod { color:#b9a67e; }
+/* compétences : le #444 codé en dur les rendait illisibles */
+html .skill-name { color:#dccda6; }
+html .skill-row { color:#c9b689; }
+html .skill-val { color:#f0e2b8; }
+html .skill-check { color:#dccda6; }
+html .skill-sort-select { background:rgba(14,9,3,0.55); color:#e8dcc2; border-color:rgba(196,154,58,0.35); }
+/* emplacements de sorts : cases sur --surface-hi */
+html .spell-slot-box {
+  background:linear-gradient(160deg, rgba(255,244,220,0.07), rgba(18,11,4,0.55));
+  border:1px solid rgba(196,154,58,0.3);
+  border-top-color:rgba(255,236,190,0.2);
+  border-radius:10px;
+  color:#e8dcc2;
+}
+/* bandeaux d'en-tête clairs (Niveau X, catégories) : même langage que les autres titres */
+html .spell-level, html .grim-bg3 .grim-grid-lvl, html .spell-level-header {
+  background:linear-gradient(90deg, rgba(196,154,58,0.2), rgba(196,154,58,0.05));
+  border:1px solid rgba(196,154,58,0.3);
+  border-radius:8px;
+  color:#e3c574;
+  padding:4px 10px;
+}
+/* la checkbox native : le carré blanc sous les caractéristiques */
+html input[type="checkbox"] {
+  appearance:none; -webkit-appearance:none;
+  width:16px; height:16px; min-width:16px;
+  background:rgba(14,9,3,0.55);
+  border:1px solid rgba(196,154,58,0.5);
+  border-radius:4px;
+  display:inline-block; vertical-align:middle;
+  position:relative; cursor:pointer; padding:0;
+}
+html input[type="checkbox"]:checked { background:rgba(196,154,58,0.4); border-color:var(--gold-light); }
+html input[type="checkbox"]:checked::after {
+  content:'✓'; position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  color:#ffe9a8; font-size:11px; font-weight:700; line-height:1;
+}
+/* rangée de stats MJ hors carte (surface-soft) */
+html .gm-stats-row { background:rgba(255,255,255,0.05); }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
