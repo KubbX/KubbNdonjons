@@ -13457,6 +13457,76 @@ html .rd-sheet { padding:16px 18px; }
     backdrop-filter:blur(8px) saturate(1.15);
   }
 }
+
+/* ══ Lisibilité verre : textes clairs + cases blanches converties ══ */
+/* — textes des panneaux convertis au verre — */
+html .sheet-section, html .sheet-section label, html .rd-sheet, html .combat-panel,
+html .comp-container, html #editorPanel { color:#e8dcc2; }
+html .rd-desc { color:#cfc1a0; }
+html .rd-sheet h1, html .rd-sheet h2, html .rd-sheet h3, html .rd-sheet strong,
+html .sheet-section strong, html .section-title { color:#f0e2b8; }
+html .weapon-table, html .weapon-table th, html .weapon-table td { color:#e2d4ae; }
+html .weapon-table th { color:#c9b280; }
+html .weapon-table td:hover { background:rgba(236,204,126,0.12); color:#f5ecd6; }
+
+/* — champs de saisie : la plus grande famille de cases blanches — */
+html input, html select, html textarea {
+  background:rgba(14,9,3,0.55);
+  color:#efe3c2;
+  border:1px solid rgba(196,154,58,0.35);
+  border-radius:8px;
+  caret-color:var(--gold);
+}
+html input::placeholder, html textarea::placeholder { color:rgba(220,200,160,0.42); }
+html input:focus, html select:focus, html textarea:focus {
+  outline:none; border-color:rgba(236,204,126,0.7);
+  box-shadow:0 0 0 2px rgba(196,154,58,0.18);
+}
+html select option { background:#1c1309; color:#e8dcc2; }
+html .sheet-hp-delta-input { background:rgba(14,9,3,0.6) !important; color:#efe3c2 !important; }
+html .sheet-hp-delta-btn { background:rgba(196,154,58,0.22); color:#f0e2b8; border:1px solid rgba(196,154,58,0.45); }
+html .sheet-hp-delta-btn:hover { background:rgba(196,154,58,0.38); }
+
+/* — cases et boîtes : recette verre légère (sans blur : elles sont nombreuses) — */
+html .stat-box, html .stat-mini, html .combat-box, html .cast-slot-btn,
+html .gm-charge, html .gm-slot, html .gm-char, html .gm-card .gm-char,
+html .cond-picker-item, html .familiar-stat, html .rd-stat-cell,
+html .charge-box, html .lvlup-section, html .char-card, html .delchar-box,
+html .comp-cat-btn, html .comp-sort-select, html .spell-filter-chip,
+html .spell-filter-select, html .spell-filter-toggle, html .combat-mod-cell button {
+  background:linear-gradient(160deg, rgba(255,244,220,0.07), rgba(18,11,4,0.55));
+  color:#e8dcc2;
+  border:1px solid rgba(196,154,58,0.3);
+  border-top-color:rgba(255,236,190,0.2);
+}
+html .stat-box, html .combat-box, html .char-card, html .lvlup-section { border-radius:12px; }
+html .stat-box b, html .stat-box strong, html .combat-value, html .combat-label { color:#f0e2b8; }
+html .char-card-main:hover { background:rgba(34,22,10,0.75); }
+html .delchar-cancel { background:rgba(0,0,0,0.35); color:#e8dcc2; border:1px solid rgba(196,154,58,0.3); }
+html .familiar-card { background:linear-gradient(160deg, rgba(255,244,220,0.06), rgba(18,11,4,0.5)); color:#e8dcc2; border-color:rgba(196,154,58,0.3); }
+html #editorPanel {
+  background:linear-gradient(155deg, rgba(255,244,220,0.05), rgba(18,11,4,0.55));
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  border:1px solid rgba(196,154,58,0.3); border-radius:14px;
+}
+html .editor-list-item:hover { background:rgba(236,204,126,0.12) !important; }
+html .gm-card .gm-input, html .gm-card .gm-notes-area {
+  background:rgba(14,9,3,0.55); color:#efe3c2; border:1px solid rgba(196,154,58,0.3);
+}
+html .inv-equipped { background:rgba(120,200,110,0.13); color:#d7ecc8; border-color:rgba(140,220,120,0.35); }
+html .ws-info-bar { background:rgba(196,154,58,0.14); color:#e8dcc2; border-color:rgba(196,154,58,0.35); }
+html .ws-warn { background:rgba(230,140,60,0.16); color:#f2d7b0; }
+html .form-over-cr { background:rgba(230,140,60,0.12); color:#e8cba4; }
+html .form-over-cr:hover { background:rgba(230,140,60,0.22) !important; }
+html .spell-known-item:hover { background:rgba(236,204,126,0.1); }
+html .combat-row.combat-active, html .combat-monster-pick.selected {
+  background:rgba(236,204,126,0.16);
+  color:#f5ecd6;
+  box-shadow:inset 3px 0 0 var(--gold);
+}
+html .cond-sheet-item { background:rgba(255,255,255,0.06); color:#e8dcc2; }
+/* les grimoires restent des pages claires : on leur rend leurs champs sombres sur crème */
+html .grim-search input { background:rgba(30,20,8,0.5); color:#f0e4c4; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
