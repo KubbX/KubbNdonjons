@@ -3689,6 +3689,7 @@ async function wizSave(b) {
     const skillProf = {};
     b.skills.forEach(s => skillProf[s.name] = 'prof');
     const saves = {};
+  if (WIZ.feat && /^R[ée]silient$/i.test(WIZ.feat.name||'') && WIZ.featStatPick) saves[WIZ.featStatPick] = true;
     (c.saves||[]).forEach(s => saves[s] = true);
 
     const features = b.features.map(f => ({...f}));
@@ -4327,7 +4328,7 @@ function renderCharSheet(id, d) {
         <div class="save-list">
           ${['str','dex','con','int','wis','cha'].map(s=>`
           <div class="save-row">
-            <span class="prof-dot ${d.saveProficiencies?.[s]?'filled':''}"></span>
+            <span class="prof-dot clickable ${d.saveProficiencies?.[s]?'filled':''}" onclick="window._toggleSaveProf('${id}','${s}')" title="Clic : basculer la maîtrise du jet de sauvegarde"></span>
             <span class="save-val">${fmtB(saveBonus(s))}</span>
             <span class="save-name">${{str:'Force',dex:'Dextérité',con:'Constitution',int:'Intelligence',wis:'Sagesse',cha:'Charisme'}[s]}</span>
           </div>`).join('')}
@@ -5170,6 +5171,17 @@ window._selectFeatForLevelUp = (name, desc, statBonus) => {
     }
   }
   document.getElementById('lvlup_feat_selected').innerHTML = html;
+  (function(){
+    const nomF = document.getElementById('lvlup_feat_name')?.value || '';
+    const fd = ((typeof getAllResourcesForCategory==='function'&&getAllResourcesForCategory('feat').length?getAllResourcesForCategory('feat'):null)||COMPENDIUM_DATA.feat||[]).find(x => x.name === nomF);
+    const sel = document.getElementById('lvlup_feat_selected');
+    if (fd?.statBonus?.choice && sel && !document.getElementById('lvlup_feat_stat')) {
+      const FR = {str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'};
+      sel.insertAdjacentHTML('beforeend',
+        `<div class="field-group" style="margin-top:8px"><label>Caractéristique du don (+1${/R[ée]silient/i.test(nomF)?' et maîtrise du jet de sauvegarde':''})</label>
+         <select id="lvlup_feat_stat">${fd.statBonus.choice.map(s=>`<option value="${s}">${FR[s]}</option>`).join('')}</select></div>`);
+    }
+  })();
   // Scroll to show selection
   document.getElementById('lvlup_feat_selected').scrollIntoView({behavior:'smooth',block:'nearest'});
 };
@@ -5235,6 +5247,9 @@ window._confirmLevelUp = async (charId) => {
       if (featStatEl && featStatEl.value) {
         const fStat = featStatEl.value;
         newStats[fStat] = Math.min(20, (newStats[fStat]||10) + 1);
+        window.__lvlResilientGrant = null;
+        const _fNom = document.getElementById('lvlup_feat_name')?.value || '';
+        if (/^R[ée]silient$/i.test(_fNom) && fStat) window.__lvlResilientGrant = fStat;
       }
     } else {
       const s1 = document.getElementById('lvlup_asi_stat1')?.value;
@@ -5256,6 +5271,7 @@ window._confirmLevelUp = async (charId) => {
   }
 
   const update = {classes:newClasses,class:classDisplayStr,level:newTotalLevel,stats:newStats,
+    ...(window.__lvlResilientGrant ? { saveProficiencies: { ...(d.saveProficiencies||{}), [window.__lvlResilientGrant]: true } } : {}),
     hpMax:(d.hpMax||0)+hpGain,hp:(d.hp||0)+hpGain,profBonus:newPB,hitDice:hitDiceStr,
     features:[...(d.features||[]),...newFeatures],subclasses:newSubclasses,...spellUpdate};
   await updateDoc(doc(db,"characters",charId),update);
@@ -5759,6 +5775,8 @@ async function lvlSave(b) {
     }
     await updateDoc(doc(db,"characters",LVL.charId), {
       classes:newClasses, class:classDisplay, level:newTotal, stats:b.newStats,
+      ...((LVL.feat && /^R[ée]silient$/i.test(LVL.feat.name||'') && LVL.featStatPick)
+        ? { saveProficiencies: { ...(d.saveProficiencies||{}), [LVL.featStatPick]: true } } : {}),
       hpMax:(d.hpMax||0)+b.hpGain, hp:(d.hp||0)+b.hpGain, profBonus:newPB, hitDice:hitDiceStr,
       features:[...(d.features||[]), ...newFeatures], subclasses:newSubclasses, ...spellUpdate
     });
@@ -8733,6 +8751,16 @@ window._removeAvatar = async (charId) => {
 };
 
 // ── Cycle skill proficiency: none → prof → expert → none ──
+window._toggleSaveProf = async function(id, stat) {
+  try {
+    const ref = doc(db, "characters", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const sp = { ...(snap.data().saveProficiencies || {}) };
+    sp[stat] = !sp[stat];
+    await updateDoc(ref, { saveProficiencies: sp });
+  } catch(e) { console.warn('toggleSaveProf:', e); }
+};
 window._cycleSkillProf = async (charId, skillName) => {
   const snap = await getDoc(doc(db, "characters", charId));
   if (!snap.exists()) return;
