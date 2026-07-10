@@ -10652,6 +10652,154 @@ window._bmTokHide = function(){
 window._bmGuideOpen = function(){ const o = document.getElementById('bmGuideOv'); if (o) o.style.display = 'flex'; };
 window._bmGuideClose = function(){ const o = document.getElementById('bmGuideOv'); if (o) o.style.display = 'none'; };
 
+/* ══ Journal de session : timeline auto + notes rapides ══ */
+const jn = { sessions: [], cur: null };
+function jnLoad(){
+  try { const d = JSON.parse(localStorage.getItem('kubbnd_journal')); if (d) { jn.sessions = d.sessions || []; jn.cur = d.cur; } } catch(_){}
+}
+function jnSave(){
+  if (jn.sessions.length > 30) jn.sessions = jn.sessions.slice(-30);
+  try { localStorage.setItem('kubbnd_journal', JSON.stringify(jn)); } catch(_){}
+}
+function jnSess(){ return jn.sessions.find(s => s.id === jn.cur) || null; }
+function jnOuvre(){
+  const s = { id: 'js_' + Date.now().toString(36),
+              titre: 'Session du ' + new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' }),
+              debut: Date.now(), fin: null, entrees: [] };
+  jn.sessions.push(s); jn.cur = s.id; jnSave(); jnRender();
+  return s;
+}
+function jnAjoute(type, txt){
+  let s = jnSess();
+  if (!s || s.fin) s = jnOuvre();
+  s.entrees.push({ t: Date.now(), type, txt: String(txt).slice(0, 400) });
+  if (s.entrees.length > 800) s.entrees = s.entrees.slice(-800);
+  jnSave(); jnRender();
+}
+window._jnNote = function(v){
+  v = (v || '').trim(); if (!v) return;
+  jnAjoute('note', v);
+  jnFlashOk();
+};
+function jnEvt(txt){ jnAjoute('evt', txt); }
+window._jnSession = function(){
+  const s = jnSess();
+  if (s && !s.fin) {
+    s.fin = Date.now();
+    jnEvtDirect(s, '⏹ Session close');
+    jnSave(); jnRender();
+  } else jnOuvre();
+};
+function jnEvtDirect(s, txt){ s.entrees.push({ t: Date.now(), type: 'evt', txt }); }
+window._jnDel = function(sid, i){
+  const s = jn.sessions.find(x => x.id === sid); if (!s) return;
+  s.entrees.splice(i, 1); jnSave(); jnRender();
+};
+window._jnClear = function(){
+  const s = jnSess(); if (!s) return;
+  if (!confirm('Supprimer « ' + s.titre + ' » et ses ' + s.entrees.length + ' entrées ?')) return;
+  jn.sessions = jn.sessions.filter(x => x.id !== s.id);
+  jn.cur = jn.sessions.length ? jn.sessions[jn.sessions.length - 1].id : null;
+  jnSave(); jnRender();
+};
+window._jnExport = function(){
+  const s = jnSess(); if (!s) return;
+  const md = ['# ' + s.titre, ''];
+  for (const e of s.entrees) {
+    const h = new Date(e.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    md.push(e.type === 'note' ? `- **${h}** — ${e.txt}` : `- ${h} · _${e.txt}_`);
+  }
+  const b = new Blob([md.join('\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = s.titre.replace(/[^\w\u00C0-\u017F -]/g, '') + '.md';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+};
+function jnRender(){
+  const el = document.getElementById('jnListe'); if (!el) return;
+  const s = jnSess();
+  const bs = document.getElementById('jnSessionBtn');
+  if (bs) bs.textContent = (s && !s.fin) ? '⏹ Clore' : '▶ Session';
+  if (!s) { el.innerHTML = '<div class="jn-e">Aucune session — ▶ pour commencer, ou note simplement quelque chose : la session s\'ouvrira toute seule.</div>'; return; }
+  const rows = ['<div class="jn-titre-session">' + s.titre + (s.fin ? ' — close' : '') + '</div>'];
+  s.entrees.slice().reverse().forEach((e, ri) => {
+    const i = s.entrees.length - 1 - ri;
+    const h = new Date(e.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    rows.push(`<div class="jn-e ${e.type}"><time>${h}</time><div>${e.txt.replace(/</g,'&lt;')}</div><button class="jn-x" onclick="window._jnDel('${s.id}',${i})" title="Supprimer">✕</button></div>`);
+  });
+  el.innerHTML = rows.join('');
+}
+/* ── capture rapide Alt+J : surcouche flottante globale ── */
+function jnFlashEl(){
+  let f = document.getElementById('jnFlash');
+  if (!f) {
+    f = document.createElement('div'); f.id = 'jnFlash';
+    f.innerHTML = '<span>📓</span><input type="text" placeholder="Note rapide — Entrée pour consigner, Échap pour fermer">';
+    document.body.appendChild(f);
+    const inp = f.querySelector('input');
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { window._jnNote(inp.value); inp.value = ''; f.classList.remove('on'); }
+      else if (e.key === 'Escape') { inp.value = ''; f.classList.remove('on'); }
+      e.stopPropagation();
+    });
+  }
+  return f;
+}
+function jnFlashOk(){
+  const f = jnFlashEl(), inp = f.querySelector('input');
+  inp.placeholder = '✓ Consigné au journal';
+  setTimeout(() => { inp.placeholder = 'Note rapide — Entrée pour consigner, Échap pour fermer'; }, 1600);
+}
+document.addEventListener('keydown', e => {
+  if (e.altKey && (e.key === 'j' || e.key === 'J')) {
+    e.preventDefault();
+    const f = jnFlashEl();
+    f.classList.add('on');
+    setTimeout(() => f.querySelector('input').focus(), 60);
+  }
+});
+/* ── crochets d'événements : la table alimente le journal ── */
+function jnHook(nom, fab){
+  const f = window[nom];
+  if (typeof f !== 'function') return;
+  window[nom] = function(...a){
+    const r = f.apply(this, a);
+    try { fab(a, r); } catch(_){}
+    return r;
+  };
+}
+if (!window.__jnHooked) {
+  window.__jnHooked = true;
+  jnHook('_ambActivate', (a) => {
+    try { const sc = (amb.scenes || []).find(s => s.id === a[0]); if (sc) jnEvt('🎭 Scène « ' + sc.nom + ' »'); }
+    catch(_) { jnEvt('🎭 Scène d\'ambiance activée'); }
+  });
+  jnHook('_ambIntensity', (a) => {
+    const FR = { calme: 'calme 🕊', tension: 'tension ⚔', combat: 'combat 🔥' };
+    jnEvt('🎚 Intensité : ' + (FR[a[0]] || a[0]));
+  });
+  jnHook('_ambBlack', () => jnEvt('⬛ Fondu au noir'));
+  jnHook('_combatStart', () => {
+    try {
+      const cs = window._combatState;
+      const noms = (cs.combatants || []).map(c => c.name).slice(0, 8).join(', ');
+      jnEvt('⚔ Combat lancé — ' + (cs.combatants || []).length + ' combattants : ' + noms + ((cs.combatants||[]).length > 8 ? '…' : ''));
+    } catch(_) { jnEvt('⚔ Combat lancé'); }
+  });
+  jnHook('_combatEnd', () => {
+    try { jnEvt('🕊 Fin du combat (round ' + (window._combatState.round || '?') + ')'); }
+    catch(_) { jnEvt('🕊 Fin du combat'); }
+  });
+  jnHook('_bmProjToggle', () => {
+    try {
+      const m = bm.maps.find(x => x.id === bm.cur);
+      jnEvt(bm.projOn ? '📽 Carte « ' + (m ? m.nom : '?') + ' » projetée' : '📽 Projection carte coupée');
+    } catch(_){}
+  });
+}
+jnLoad();
+setTimeout(jnRender, 0);
+
 /* ── pions ── */
 const BM_COULEURS = ['#b03030', '#4a90d9', '#3f8f4a', '#b8862f', '#7a4f9d', '#3aa0a0', '#c25c8a', '#7c7f88'];
 function bmNewToken(nom, couleur, img, taille){
@@ -13428,7 +13576,7 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 
 /* ══ Modernisation verre : compendium, écran MJ, fiche ══ */
 html .comp-container, html .combat-panel, html .gm-search, html .sheet-section,
-html .rd-sheet, html .amb-wrap, html .bm-wrap {
+html .rd-sheet, html .amb-wrap, html .bm-wrap, html .jn-wrap {
   background:linear-gradient(155deg, rgba(255,244,220,0.05), rgba(20,12,5,0.5) 42%, rgba(12,7,3,0.62));
   -webkit-backdrop-filter:blur(12px) saturate(1.25);
   backdrop-filter:blur(12px) saturate(1.25);
@@ -13608,6 +13756,28 @@ html input[type="checkbox"]:checked::after {
 }
 /* rangée de stats MJ hors carte (surface-soft) */
 html .gm-stats-row { background:rgba(255,255,255,0.05); }
+
+/* ── Journal de session ── */
+.jn-wrap { margin-top:18px; padding:14px 16px; }
+.jn-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.jn-hint { font-size:0.72rem; color:#8a744c; font-style:italic; margin-left:auto; }
+.jn-quick input { width:100%; padding:9px 12px; font-size:0.9rem; }
+.jn-liste { max-height:340px; overflow-y:auto; margin-top:10px; display:flex; flex-direction:column; gap:4px; }
+.jn-e { display:flex; gap:9px; padding:6px 9px; border-radius:9px; font-size:0.84rem; line-height:1.4;
+  background:rgba(255,255,255,0.03); border:1px solid rgba(196,154,58,0.14); color:#d9c9a3; }
+.jn-e.note { background:rgba(196,154,58,0.1); border-color:rgba(196,154,58,0.35); color:#f0e2b8; }
+.jn-e time { flex:0 0 auto; font-size:0.72rem; color:#8a744c; padding-top:2px; font-variant-numeric:tabular-nums; }
+.jn-e .jn-x { margin-left:auto; border:none; background:none; color:#8a744c; cursor:pointer; font-size:0.8rem; }
+.jn-e .jn-x:hover { color:#e08080; }
+.jn-titre-session { font-family:var(--font-title); color:var(--gold); font-size:0.8rem; letter-spacing:1px;
+  padding:7px 4px 3px; border-bottom:1px dotted rgba(196,154,58,0.3); }
+#jnFlash { position:fixed; top:14px; left:50%; transform:translateX(-50%) translateY(-70px); z-index:12000;
+  width:min(520px,92vw); display:flex; gap:8px; padding:10px 12px; border-radius:14px;
+  background:rgba(16,10,4,0.92); border:1px solid rgba(196,154,58,0.55); box-shadow:0 12px 34px rgba(0,0,0,0.6);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); transition:transform .25s ease; }
+#jnFlash.on { transform:translateX(-50%) translateY(0); }
+#jnFlash input { flex:1; font-size:0.92rem; padding:8px 10px; }
+#jnFlash span { align-self:center; font-size:1.1rem; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -13791,6 +13961,19 @@ html .gm-stats-row { background:rgba(255,255,255,0.05); }
 </div>
 
 
+<div class="jn-wrap" id="jnWrap">
+  <div class="jn-head">
+    <span class="bm-title">📓 Journal de session</span>
+    <button class="bm-btn" id="jnSessionBtn" onclick="window._jnSession()" title="Ouvrir ou clore la session du jour">▶ Session</button>
+    <button class="bm-btn" onclick="window._jnExport()" title="Exporter la session affichée en Markdown">💾 .md</button>
+    <button class="bm-btn" onclick="window._jnClear()" title="Supprimer la session affichée">🗑</button>
+    <span class="jn-hint">Alt+J : note rapide depuis n'importe quel écran</span>
+  </div>
+  <div class="jn-quick">
+    <input id="jnInput" type="text" placeholder="Note rapide… (Entrée pour consigner)" onkeydown="if(event.key==='Enter')window._jnNote(this.value),this.value=''">
+  </div>
+  <div class="jn-liste" id="jnListe"></div>
+</div>
 <div class="amb-ov" id="bmGuideOv">
   <div class="amb-modal" style="max-width:720px">
     <div class="amb-modal-head">
@@ -13811,6 +13994,8 @@ html .gm-stats-row { background:rgba(255,255,255,0.05); }
       <p><strong>Gabarits de sorts</strong> 🎯 : choisis forme et taille en mètres (cône 4,5 m, sphère rayon 6 m, ligne 18 m, cube 4,5 m…), clique pour poser. Glisse pour déplacer, <strong>R</strong> pivote (Maj+R en sens inverse), ✕ retire. Les joueurs les voient en projection — idéal pour matérialiser une boule de feu ou un souffle.</p>
       <p><strong>Ping</strong> 📍 : <strong>double-clic</strong> sur la carte (ou Alt+clic dans n'importe quel outil) → une impulsion dorée pulse quelques secondes, sur ton écran <em>et</em> sur la projection — le « regardez ici » de la table.</p>
       <p><strong>Calibrage figurines</strong> 🔒 1″ : saisis la largeur physique de l'écran de projection en cm (télé 600×400 mm → 60). Verrouillé, chaque case fait exactement 1 pouce sur l'écran — vérifie avec le repère « 1″ » en bas à gauche de la projection, et pose tes figurines. La vue suit alors le groupe (PJ et porteurs de torche). Déverrouille pour revenir à l'ajustement automatique.</p>
+      <h4>📓 Journal de session</h4>
+      <p>La table écrit son propre compte-rendu : scènes d'ambiance activées, changements d'intensité, combats lancés (avec la liste des combattants), fins de combat, projections de cartes — tout se consigne horodaté. Ajoute tes propres notes à tout moment : champ du panneau Journal, ou <strong>Alt+J depuis n'importe quel écran</strong> (une barre flottante s'ouvre, Entrée consigne, Échap ferme). La session s'ouvre toute seule à la première entrée du jour, ▶/⏹ pour la gérer explicitement, 💾 exporte en Markdown — parfait pour le récap d'entre-sessions à tes joueurs. Stockage local au navigateur.</p>
       <h4>📽 Projection</h4>
       <p><strong>Sortie audio</strong> 🔊 : choisis le périphérique de sortie (ta télé en HDMI) — musiques, nappes et one-shots y sont redirigés d'un coup (limite : les pistes YouTube restent sur la sortie système ; Safari ne propose pas ce choix). <strong>Source libre</strong> 🖼 : projette n'importe quelle image (portrait de boss, document) en fondu par-dessus tout — reclique pour la retirer, ou 📽 pour redonner le dessus à la carte. <strong>Préparation</strong> 💾 : exporte la carte complète (pions, murs, brouillard, gabarits) en fichier .kubbmap.json, à réimporter le jour J via 📥.</p>
       <p>Une seule fenêtre externe partagée : les scènes d'ambiance y affichent leur image, la carte s'y projette en <strong>vue joueurs</strong> (brouillard opaque, sans murs, sans pions cachés, sans contrôles) — chaque bascule (ambiance ↔ carte ↔ source libre) se fait en fondu, la dernière action explicite prend le dessus. Glisse la fenêtre sur l'écran de table puis double-clique pour le plein écran (tous navigateurs ; la sélection automatique d'écran est un bonus Chrome/Edge). Alt+N = fondu au noir côté ambiances.</p>
