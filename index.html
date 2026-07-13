@@ -4812,7 +4812,13 @@ function renderCharSheet(id, d) {
               <button class="inv-remove-btn" onclick="window._invLiberer('${id}')" title="Libérer l'invocation">✕</button>
             </div>
             <div class="familiar-stats">
-              <div class="familiar-stat"><span class="familiar-stat-label">PV</span><span>${famT.hp||'?'}</span></div>
+              <div class="familiar-stat fam-pv-track"><span class="familiar-stat-label">PV</span>
+                <span>
+                  <button class="fam-pv-btn" onclick="window._famPv('${id}',-1,true)">−</button>
+                  <strong>${famT.pv ?? famPvMax(famT)}</strong>/${famPvMax(famT)}
+                  <button class="fam-pv-btn" onclick="window._famPv('${id}',1,true)">＋</button>
+                </span>
+              </div>
               <div class="familiar-stat"><span class="familiar-stat-label">CA</span><span>${famT.ac||'?'}</span></div>
               <div class="familiar-stat"><span class="familiar-stat-label">RC</span><span>${famT.cr||'?'}</span></div>
               <div class="familiar-stat"><span class="familiar-stat-label">Taille</span><span>${famT.size||'?'}</span></div>
@@ -4829,12 +4835,19 @@ function renderCharSheet(id, d) {
               <button class="inv-remove-btn" onclick="window._removeFamiliar('${id}')" title="Retirer le familier">✕</button>
             </div>
             <div class="familiar-stats">
-              <div class="familiar-stat"><span class="familiar-stat-label">PV</span><span>${fam.hp||'?'}</span></div>
+              <div class="familiar-stat fam-pv-track"><span class="familiar-stat-label">PV</span>
+                 <span>
+                   <button class="fam-pv-btn" onclick="window._famPv('${id}',-1,false)">−</button>
+                   <strong>${fam.pv ?? famPvMax(fam)}</strong>/${famPvMax(fam)}
+                   <button class="fam-pv-btn" onclick="window._famPv('${id}',1,false)">＋</button>
+                 </span>
+               </div>
+               <div class="familiar-stat"><span class="familiar-stat-label">Dés de vie</span><span>${fam.hp||'?'}</span></div>
               <div class="familiar-stat"><span class="familiar-stat-label">CA</span><span>${fam.ac||'?'}</span></div>
               <div class="familiar-stat"><span class="familiar-stat-label">Vitesse</span><span>${fam.speed||'?'}</span></div>
             </div>
             ${fam.attacks && fam.attacks !== '—' ? `<div class="familiar-detail"><span class="familiar-detail-label">Attaques :</span> ${fam.attacks}</div>` : ''}
-            ${fam.traits && fam.traits !== '—' ? `<div class="familiar-detail"><span class="familiar-detail-label">Traits :</span> ${fam.traits}</div>` : ''}
+            ${fam.traits && fam.traits !== '—' ? `<div class="familiar-detail"><span class="familiar-detail-label">Capacités & compétences :</span> ${fam.traits}</div>` : ''}
             ${fam.desc ? `<div class="familiar-desc">${fam.desc}</div>` : ''}
             <div style="font-size:0.7rem;color:#aaa;margin-top:4px;font-style:italic">${fam.source||'MM'}</div>
           </div>`;
@@ -6089,6 +6102,20 @@ window._combatSyncPcs = (silent) => {
         init:'', initBonus:_combatMod(stats.dex||10),
         hp:d.hp||0, hpMax:d.hpMax||0, ac:d.ac||10, dead:false
       });
+      /* le familier et l'invocation active suivent leur maître dans le combat (et sur la carte) */
+      for (const [champF, badge] of [['familiar','🐾'],['familiarTemp','🪄']]) {
+        const fm = d[champF];
+        if (fm && fm.name) {
+          const maxF = parseInt(String(fm.hp||'').match(/\d+/)?.[0]) || 1;
+          const pvF = fm.pv ?? maxF;
+          window._combatState.combatants.push({
+            kind:'pc', refId: id + '_' + champF, baseName: fm.name,
+            name: badge + ' ' + fm.name + ' (' + (d.name||'?') + ')',
+            sub: (champF==='familiar' ? 'Familier' : 'Invocation') + ' · RC ' + (fm.cr||'?'),
+            init:'', initBonus: 0, hp: pvF, hpMax: maxF, ac: parseInt(fm.ac)||10, dead: pvF<=0
+          });
+        }
+      }
       window._combatRender();
     } catch(e) { console.warn(e); }
   });
@@ -6382,6 +6409,12 @@ function renderGMCard(id, d) {
       <button class="btn-remove" onclick="window._removeGMWatch('${id}')">✕</button>
     </div>
     ${d.formeSauvage ? `<div class="gm-ws">🐻 <strong>${d.formeSauvage.nom}</strong> — PV forme <strong>${d.formeSauvage.pv}/${d.formeSauvage.pvMax}</strong> · CA ${d.formeSauvage.ca} <em>(les dégâts touchent la forme d'abord)</em></div>` : ''}
+    ${d.familiar ? `<div class="gm-ws gm-fam">🐾 <strong>${d.familiar.name}</strong> — PV <strong>${d.familiar.pv ?? (String(d.familiar.hp||'').match(/\d+/)||['?'])[0]}/${(String(d.familiar.hp||'').match(/\d+/)||['?'])[0]}</strong> · CA ${d.familiar.ac||'?'}
+      <button class="fam-pv-btn" onclick="window._gmFamDelta('${id}',false,-1)" title="Blesser le familier (valeur du champ PV, 1 par défaut)">−</button>
+      <button class="fam-pv-btn" onclick="window._gmFamDelta('${id}',false,1)" title="Soigner le familier">＋</button></div>` : ''}
+    ${d.familiarTemp ? `<div class="gm-ws gm-fam">🪄 <strong>${d.familiarTemp.name}</strong> <em>(${d.familiarTemp.sort||'invocation'})</em> — PV <strong>${d.familiarTemp.pv ?? (String(d.familiarTemp.hp||'').match(/\d+/)||['?'])[0]}/${(String(d.familiarTemp.hp||'').match(/\d+/)||['?'])[0]}</strong> · CA ${d.familiarTemp.ac||'?'}
+      <button class="fam-pv-btn" onclick="window._gmFamDelta('${id}',true,-1)" title="Blesser l'invocation">−</button>
+      <button class="fam-pv-btn" onclick="window._gmFamDelta('${id}',true,1)" title="Soigner l'invocation">＋</button></div>` : ''}
     <div class="gm-hp-bar-wrap">
       <div class="gm-hp-bar" style="width:${hpPct}%;background:${hpColor}"></div>
     </div>
@@ -10922,11 +10955,15 @@ function invRegles(sp){
   if (n.startsWith('metamorphose'))
     return { mode:'forme', titre:'🐻 Métamorphose : choisir la bête', filtre: mo => T('Bête')(mo) };
   if (n.includes('invocation d') || n.includes('convocation') || n.includes('invoquer') || n.includes('esprit')) {
-    const d2 = ((sp.desc||'') + ' ' + n).toLowerCase();
-    const types = [['élémentaire','Élémentaire',5],['fée','Fée',2],['fiélon','Fiélon',6],['céleste','Céleste',4],['mort-vivant','Mort-vivant',5],['bête','Bête',2],['animaux','Bête',2]];
+    const types = [['animaux','Bête',2],['bête','Bête',2],['élémentaire','Élémentaire',5],['fiélon','Fiélon',6],['céleste','Céleste',4],['mort-vivant','Mort-vivant',5],['fée','Fée',2]];
+    const regle = (type, crCap) => ({ mode:'temp', titre:'🪄 Choisir la créature invoquée',
+      filtre: mo => (mo.type||'').startsWith(type) && invCrNum(mo.cr) <= Math.max(crCap, lvlSort) });
+    /* le NOM du sort prime sur la description (« esprits fées en forme de bêtes »…) */
     for (const [mot, type, crCap] of types)
-      if (d2.includes(mot) && (sp.school||'').startsWith('Invocation'))
-        return { mode:'temp', titre:'🪄 Choisir la créature invoquée', filtre: mo => (mo.type||'').startsWith(type) && invCrNum(mo.cr) <= Math.max(crCap, lvlSort) };
+      if (n.includes(mot) && (sp.school||'').startsWith('Invocation')) return regle(type, crCap);
+    const d2 = (sp.desc||'').toLowerCase();
+    for (const [mot, type, crCap] of types)
+      if (d2.includes(mot) && (sp.school||'').startsWith('Invocation')) return regle(type, crCap);
   }
   return null;
 }
@@ -10993,6 +11030,20 @@ window._wildShapePv = async function(charId, delta){
     return;
   }
   await updateDoc(doc(db, 'characters', charId), { formeSauvage: ws });
+};
+function famPvMax(f){ const v = parseInt(String(f.hp||'').match(/\d+/)?.[0]); return isNaN(v) ? 1 : v; }
+window._famPv = async function(charId, delta, temp){
+  const ref = doc(db, 'characters', charId);
+  const snap = await getDoc(ref); if (!snap.exists()) return;
+  const champ = temp ? 'familiarTemp' : 'familiar';
+  const f = snap.data()[champ]; if (!f) return;
+  const max = famPvMax(f);
+  const nf = { ...f, pv: Math.max(0, Math.min(max, (f.pv ?? max) + delta)) };
+  await updateDoc(ref, { [champ]: nf });
+};
+window._gmFamDelta = async function(charId, temp, sens){
+  const val = Math.abs(parseInt(document.getElementById('gmhp_' + charId)?.value) || 1);
+  await window._famPv(charId, sens * val, temp);
 };
 window._invLiberer = async function(charId){
   await updateDoc(doc(db, 'characters', charId), { familiarTemp: null });
@@ -14132,6 +14183,13 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
 .gm-ws { margin:6px 0 4px; padding:6px 10px; border-radius:9px; font-size:0.78rem;
   background:rgba(120,200,110,0.12); border:1px solid rgba(140,220,120,0.4); color:#d7ecc8; }
 .gm-ws em { color:#9cc287; font-size:0.68rem; }
+
+.fam-pv-btn { border:1px solid rgba(196,154,58,0.4); background:rgba(0,0,0,0.3); color:#e8dcc2;
+  border-radius:6px; padding:0 7px; cursor:pointer; font-size:0.85rem; margin:0 2px; }
+.fam-pv-btn:hover { background:rgba(196,154,58,0.28); }
+.gm-fam { background:rgba(155,89,182,0.1); border-color:rgba(155,89,182,0.4); color:#e2d2ec; }
+.gm-fam em { color:#b39cc4; }
+.fam-pv-track strong { color:#f0e2b8; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
