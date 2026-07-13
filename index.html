@@ -6381,6 +6381,7 @@ function renderGMCard(id, d) {
       </div>
       <button class="btn-remove" onclick="window._removeGMWatch('${id}')">✕</button>
     </div>
+    ${d.formeSauvage ? `<div class="gm-ws">🐻 <strong>${d.formeSauvage.nom}</strong> — PV forme <strong>${d.formeSauvage.pv}/${d.formeSauvage.pvMax}</strong> · CA ${d.formeSauvage.ca} <em>(les dégâts touchent la forme d'abord)</em></div>` : ''}
     <div class="gm-hp-bar-wrap">
       <div class="gm-hp-bar" style="width:${hpPct}%;background:${hpColor}"></div>
     </div>
@@ -6491,6 +6492,13 @@ window._gmHeal = async (id) => {
   const snap = await getDoc(doc(db, "characters", id));
   if(!snap.exists()) return;
   const d = snap.data();
+  if (d.formeSauvage) {
+    /* sous forme sauvage, les soins vont à la forme */
+    const ws = { ...d.formeSauvage };
+    ws.pv = Math.min(ws.pvMax, (ws.pv||0) + Math.abs(val));
+    await updateDoc(doc(db, "characters", id), { formeSauvage: ws });
+    return;
+  }
   const newHp = Math.min(d.hpMax, (d.hp||0) + Math.abs(val));
   await updateDoc(doc(db, "characters", id), {hp: newHp});
 };
@@ -6503,13 +6511,22 @@ window._gmDamage = async (id) => {
   let remaining = val;
   let tmpHp = d.tmpHp || 0;
   let hp = d.hp || 0;
-  if (tmpHp > 0) {
+  const majGm = {};
+  /* forme sauvage : la forme encaisse d'abord, l'excédent passe au personnage (règle PHB) */
+  if (d.formeSauvage && (d.formeSauvage.pv||0) > 0) {
+    const ws = { ...d.formeSauvage };
+    const absorbe = Math.min(ws.pv, remaining);
+    ws.pv -= absorbe;
+    remaining -= absorbe;
+    majGm.formeSauvage = ws.pv > 0 ? ws : null;
+  }
+  if (tmpHp > 0 && remaining > 0) {
     const absorbed = Math.min(tmpHp, remaining);
     tmpHp -= absorbed;
     remaining -= absorbed;
   }
   hp = Math.max(0, hp - remaining);
-  await updateDoc(doc(db, "characters", id), { hp, tmpHp });
+  await updateDoc(doc(db, "characters", id), { hp, tmpHp, ...majGm });
 
   // Concentration check
   if ((d.conditions||[]).includes('concentrating') && d.concentratingOn && val > 0) {
@@ -10944,9 +10961,24 @@ function invFormeDepuis(mo, extra){
 }
 window._wildShapeOn = async function(charId, idx){
   const snap = await getDoc(doc(db, 'characters', charId)); if (!snap.exists()) return;
-  const f = (snap.data().prepared_forms||[])[idx]; if (!f) return;
+  const d2 = snap.data();
+  const f = (d2.prepared_forms||[])[idx]; if (!f) return;
   const mo = invMonstres().find(x => x.name === f.name) || f;
-  await updateDoc(doc(db, 'characters', charId), { formeSauvage: invFormeDepuis({ ...f, str: mo.str, dex: mo.dex, con: mo.con }) });
+  const maj = { formeSauvage: invFormeDepuis({ ...f, str: mo.str, dex: mo.dex, con: mo.con }) };
+  try {
+    const charges = (typeof getCharacterCharges === 'function') ? getCharacterCharges(d2) : [];
+    const ch = charges.find(c => /forme sauvage/i.test(c.name||''));
+    if (ch) {
+      if (ch.remaining <= 0) {
+        if (!confirm('Plus aucune charge de Forme sauvage — se transformer quand même ?')) return;
+      } else {
+        const usedCharges = { ...(d2.usedCharges || {}) };
+        usedCharges[ch.id] = (usedCharges[ch.id] || 0) + 1;
+        maj.usedCharges = usedCharges;
+      }
+    }
+  } catch(_){}
+  await updateDoc(doc(db, 'characters', charId), maj);
 };
 window._wildShapeOff = async function(charId){
   await updateDoc(doc(db, 'characters', charId), { formeSauvage: null });
@@ -14052,6 +14084,54 @@ html .wiz-pending-item:hover { background:rgba(230,150,50,0.26); border-color:rg
 html .wiz-pending-item span { color:#d8a860; font-size:0.72rem; white-space:nowrap; }
 html .wiz-side-block.pending h5 { color:#e8a84c; }
 html .wiz-side-block.ready h5 { color:#a8d494; }
+
+/* ══ Mobile : volet résumé escamotable (forge & niveau sup) ══ */
+@media (max-width:940px){
+  #wizSide, #lvlSide {
+    position:fixed !important;
+    top:0; right:0; bottom:0;
+    width:min(86vw, 360px);
+    max-width:none;
+    z-index:11000;
+    transform:translateX(106%);
+    transition:transform .28s ease;
+    overflow-y:auto;
+    background:linear-gradient(155deg, rgba(30,19,8,0.98), rgba(14,9,3,0.99));
+    border-left:1px solid rgba(196,154,58,0.45);
+    box-shadow:-14px 0 40px rgba(0,0,0,0.6);
+    padding:14px;
+    pointer-events:none;
+  }
+  #wizSide.mobile-open, #lvlSide.mobile-open {
+    transform:translateX(0);
+    pointer-events:auto;
+  }
+  #wizSide.mobile-open::before, #lvlSide.mobile-open::before {
+    content:'⟶ toucher 📜 Résumé pour fermer';
+    display:block;
+    font-size:0.68rem; color:#8a744c; font-style:italic;
+    margin-bottom:8px;
+  }
+}
+/* ══ Mobile : performance — blur et couches d'effets coupés ══ */
+@media (max-width:800px){
+  html .comp-container, html .combat-panel, html .gm-search, html .sheet-section,
+  html .rd-sheet, html .amb-wrap, html .bm-wrap, html .jn-wrap, html #editorPanel,
+  html .forge-footer, html .comp-cats button, html .comp-toolbar input, html .gm-search input,
+  html .combat-box, html input, html select, html textarea {
+    -webkit-backdrop-filter:none !important;
+    backdrop-filter:none !important;
+  }
+  html .comp-container, html .combat-panel, html .gm-search, html .sheet-section,
+  html .rd-sheet, html .amb-wrap, html .bm-wrap, html .jn-wrap, html #editorPanel {
+    background:linear-gradient(155deg, rgba(36,23,10,0.93), rgba(16,10,4,0.96));
+  }
+  #fxParticles::before, #fxParticles::after { display:none; }
+  html .comp-card, html .comp-card:hover { transition:none; transform:none; }
+}
+.gm-ws { margin:6px 0 4px; padding:6px 10px; border-radius:9px; font-size:0.78rem;
+  background:rgba(120,200,110,0.12); border:1px solid rgba(140,220,120,0.4); color:#d7ecc8; }
+.gm-ws em { color:#9cc287; font-size:0.68rem; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
