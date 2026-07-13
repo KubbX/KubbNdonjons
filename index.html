@@ -6665,7 +6665,13 @@ window._openCastSpell = (charId, level, indexInLevel) => {
   // Spell detail in rd-sheet style
   const _cardTxt = window._spellCardText(sp.name);
   let html = '<div class="spell-detail-modal" hidden></div>' + (_cardTxt
-    ? `<div class="spell-card-detail"><img src="${_cardTxt}" alt="${(sp.name||'').replace(/"/g,'&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="rd-sheet" style="display:none">${_renderSpellDetail(sp)}</div></div>`
+    ? `<div class="spell-card-detail">
+        <div class="spell-card-head">
+          <strong>${sp.name||''}</strong>
+          <span class="spell-card-sub">${sp.level ? 'Niveau ' + sp.level : 'Tour de magie'}${sp.school ? ' · ' + sp.school : ''}</span>
+          <button class="spell-card-txtbtn" onclick="const c=this.closest('.spell-card-detail');const im=c.querySelector('img');const tx=c.querySelector('.rd-sheet');const versImg=im.style.display==='none';im.style.display=versImg?'':'none';tx.style.display=versImg?'none':'block';this.textContent=versImg?'📄 Fiche texte':'🖼 Carte';" title="Basculer entre la carte illustrée et la fiche texte (utile si un verso est mal apparié)">📄 Fiche texte</button>
+        </div>
+        <img src="${_cardTxt}" alt="${(sp.name||'').replace(/"/g,'&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="rd-sheet" style="display:none">${_renderSpellDetail(sp)}</div></div>`
     : `<div class="rd-sheet">${_renderSpellDetail(sp)}</div>`);
 
   // Cast section — cantrips don't use slots
@@ -14178,7 +14184,17 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
     background:linear-gradient(155deg, rgba(36,23,10,0.93), rgba(16,10,4,0.96));
   }
   #fxParticles::before, #fxParticles::after { display:none; }
+  #fxParticles { display:none !important; }   /* l'animation background-position repeint à chaque frame sur mobile */
   html .comp-card, html .comp-card:hover { transition:none; transform:none; }
+  /* le navigateur ne rend que ce qui est visible au défilement */
+  html .sheet-section, html .comp-card, html .jn-e, html .familiar-card {
+    content-visibility:auto;
+    contain-intrinsic-size:auto 220px;
+  }
+  html .comp-container, html .combat-panel, html .gm-search, html .sheet-section,
+  html .rd-sheet, html .amb-wrap, html .bm-wrap, html .jn-wrap, html #editorPanel {
+    box-shadow:none;
+  }
 }
 .gm-ws { margin:6px 0 4px; padding:6px 10px; border-radius:9px; font-size:0.78rem;
   background:rgba(120,200,110,0.12); border:1px solid rgba(140,220,120,0.4); color:#d7ecc8; }
@@ -14190,6 +14206,17 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
 .gm-fam { background:rgba(155,89,182,0.1); border-color:rgba(155,89,182,0.4); color:#e2d2ec; }
 .gm-fam em { color:#b39cc4; }
 .fam-pv-track strong { color:#f0e2b8; }
+
+.spell-card-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:8px 10px; margin-bottom:8px; border-radius:10px;
+  background:linear-gradient(90deg, rgba(196,154,58,0.2), rgba(196,154,58,0.05));
+  border:1px solid rgba(196,154,58,0.3); }
+.spell-card-head strong { font-family:var(--font-title); color:#f0e2b8; font-size:1.02rem; }
+.spell-card-sub { color:#b9a67e; font-size:0.76rem; }
+.spell-card-txtbtn { margin-left:auto; border:1px solid rgba(196,154,58,0.45);
+  background:rgba(0,0,0,0.3); color:#e8dcc2; border-radius:8px; padding:4px 10px;
+  cursor:pointer; font-size:0.76rem; }
+.spell-card-txtbtn:hover { background:rgba(196,154,58,0.25); }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
