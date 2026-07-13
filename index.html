@@ -4313,6 +4313,35 @@ function renderCharSheet(id, d) {
       <!-- Caractéristiques -->
       <div class="sheet-section">
         <div class="section-title">Caractéristiques</div>
+        ${(()=>{
+          const ws = d.formeSauvage;
+          if (!ws) return '';
+          const mod = v => { const m2 = Math.floor((v-10)/2); return (m2>=0?'+':'')+m2; };
+          const mien = k => d.stats?.[k] ?? 10;
+          return `<div class="ws-active">
+            <div class="ws-active-head">
+              <span>🐻 <strong>${ws.nom}</strong> ${ws.sort ? `<em class="ws-src">— ${ws.sort}${ws.concentration?' (concentration)':''}</em>` : `<em class="ws-src">— forme sauvage</em>`}</span>
+              <button class="section-add-btn" onclick="window._wildShapeOff('${id}')">↩ Reprendre forme</button>
+            </div>
+            <div class="ws-grid">
+              ${[['FOR',ws.str,1],['DEX',ws.dex,1],['CON',ws.con,1],['INT',mien('int'),0],['SAG',mien('wis'),0],['CHA',mien('cha'),0]].map(([l,v,b])=>`
+                <div class="ws-cell ${b?'ws-bete':''}" title="${b?'Caractéristique de la bête':'Ta caractéristique (conservée)'}">
+                  <div class="ws-l">${l}${b?'':' ·toi'}</div><div class="ws-m">${mod(v)}</div><div class="ws-v">${v}</div>
+                </div>`).join('')}
+            </div>
+            <div class="ws-line">
+              <span>CA <strong>${ws.ca}</strong></span><span>Vitesse <strong>${ws.vitesse}</strong></span>
+              <span class="ws-pv">PV forme
+                <button onclick="window._wildShapePv('${id}',-5)">−5</button>
+                <button onclick="window._wildShapePv('${id}',-1)">−1</button>
+                <strong>${ws.pv}/${ws.pvMax}</strong>
+                <button onclick="window._wildShapePv('${id}',1)">+1</button>
+              </span>
+            </div>
+            ${ws.attaques && ws.attaques!=='—' ? `<div class="ws-att">${String(ws.attaques).slice(0,260)}</div>` : ''}
+            <div class="ws-note">À 0 PV, tu reprends ta forme normale — l'excédent de dégâts passe sur tes PV.</div>
+          </div>`;
+        })()}
         <div class="stats-grid">
           ${['str','dex','con','int','wis','cha'].map(s=>`
           <div class="stat-box" title="${{str:'Force',dex:'Dextérité',con:'Constitution',int:'Intelligence',wis:'Sagesse',cha:'Charisme'}[s]}">
@@ -4759,7 +4788,7 @@ function renderCharSheet(id, d) {
                       <strong>${f.name||'?'}</strong>
                       <span class="spell-known-meta">${f.type||''} · Taille ${f.size||'?'} · CA ${f.ac||'?'} · PV ${f.hp||'?'} · ${f.speed||'?'}</span>
                     </div>
-                    <button class="inv-remove-btn" onclick="window._removePreparedForm('${id}',${realIdx})">✕</button>
+                    <button class="section-add-btn" onclick="window._wildShapeOn('${id}',${realIdx})" title="Prendre cette forme : tes caractéristiques physiques deviennent celles de la bête">🐻 Se transformer</button><button class="inv-remove-btn" onclick="window._removePreparedForm('${id}',${realIdx})">✕</button>
                   </div>`;
                 }).join('')}
               </div>`).join('')}
@@ -4773,9 +4802,25 @@ function renderCharSheet(id, d) {
       <div class="sheet-section">
         <div class="section-title">Familier <button class="section-add-btn" onclick="window._openFamiliarPicker('${id}')">+ Choisir</button></div>
         ${(()=>{
+          const famT = d.familiarTemp;
+          const tmpHtml = famT ? `<div class="familiar-card fam-temp">
+            <div class="familiar-header">
+              <div>
+                <div class="familiar-name">🪄 ${famT.name}</div>
+                <div class="familiar-sub">Invocation — ${famT.sort}${famT.concentration ? ' · concentration' : ''} · ${famT.duree || ''}</div>
+              </div>
+              <button class="inv-remove-btn" onclick="window._invLiberer('${id}')" title="Libérer l'invocation">✕</button>
+            </div>
+            <div class="familiar-stats">
+              <div class="familiar-stat"><span class="familiar-stat-label">PV</span><span>${famT.hp||'?'}</span></div>
+              <div class="familiar-stat"><span class="familiar-stat-label">CA</span><span>${famT.ac||'?'}</span></div>
+              <div class="familiar-stat"><span class="familiar-stat-label">RC</span><span>${famT.cr||'?'}</span></div>
+              <div class="familiar-stat"><span class="familiar-stat-label">Taille</span><span>${famT.size||'?'}</span></div>
+            </div>
+          </div>` : '';
           const fam = d.familiar;
-          if (!fam) return '<div style="color:#aaa;font-style:italic;font-size:0.82rem;padding:4px 0">Aucun familier — cliquez sur + Choisir pour en sélectionner un.</div>';
-          return `<div class="familiar-card">
+          if (!fam) return tmpHtml || '<div style="color:#aaa;font-style:italic;font-size:0.82rem;padding:4px 0">Aucun familier — cliquez sur + Choisir pour en sélectionner un.</div>';
+          return tmpHtml + `<div class="familiar-card">
             <div class="familiar-header">
               <div>
                 <div class="familiar-name">${fam.name||'?'}</div>
@@ -10801,6 +10846,159 @@ if (!window.__jnHooked) {
 jnLoad();
 setTimeout(jnRender, 0);
 
+/* ══ Invocations & métamorphoses au lancement + forme sauvage active ══ */
+function invCrNum(cr){
+  if (cr === undefined || cr === null) return 99;
+  const s = String(cr).trim();
+  if (s.includes('/')) { const [a,b] = s.split('/'); return (+a)/(+b) || 0; }
+  const v = parseFloat(s.replace(',','.'));
+  return isNaN(v) ? 99 : v;
+}
+function invMonstres(){ return COMPENDIUM_DATA.monster || []; }
+function invOuvrePicker(titre, sousTitre, filtreFn, cb){
+  let ov = document.getElementById('invOv');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'invOv'; ov.className = 'amb-ov';
+    ov.innerHTML = `<div class="amb-modal" style="max-width:560px">
+      <div class="amb-modal-head"><strong id="invTitre"></strong>
+        <button class="amb-head-btn" onclick="document.getElementById('invOv').style.display='none'">Annuler ✕</button></div>
+      <div id="invSous" style="font-size:0.8rem;color:#b9a67e;margin:2px 0 8px"></div>
+      <input id="invRech" type="text" placeholder="Rechercher…" style="width:100%;margin-bottom:8px">
+      <div id="invListe" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
+    </div>`;
+    document.body.appendChild(ov);
+  }
+  document.getElementById('invTitre').textContent = titre;
+  document.getElementById('invSous').textContent = sousTitre || '';
+  const base = invMonstres().filter(filtreFn)
+    .sort((a,b) => invCrNum(a.cr) - invCrNum(b.cr) || a.name.localeCompare(b.name));
+  const liste = document.getElementById('invListe');
+  const rech = document.getElementById('invRech');
+  const rend = () => {
+    const q = (rech.value||'').toLowerCase();
+    const f = q ? base.filter(x => x.name.toLowerCase().includes(q)) : base;
+    liste.innerHTML = f.slice(0,150).map((x,i) =>
+      `<div class="jn-e inv-item" data-n="${x.name.replace(/"/g,'&quot;')}">
+         <strong>${x.name}</strong><span style="margin-left:auto;color:#b9a67e">RC ${x.cr||'?'} · ${x.size||''} ${((x.type||'').split(' (')[0])}</span></div>`).join('')
+      + (f.length>150 ? '<div class="jn-e">…affine la recherche</div>' : '')
+      + (!f.length ? '<div class="jn-e">Aucune créature ne correspond.</div>' : '');
+  };
+  rech.value=''; rech.oninput = rend; rend();
+  liste.onclick = e => {
+    const it = e.target.closest('.inv-item'); if (!it) return;
+    const mo = invMonstres().find(x => x.name === it.dataset.n);
+    ov.style.display = 'none';
+    if (mo) cb(mo);
+  };
+  ov.style.display = 'flex';
+  setTimeout(() => rech.focus(), 60);
+}
+function invRegles(sp){
+  const n = (sp.name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const lvlSort = sp.level || 1;
+  const T = t => mo => (mo.type||'').startsWith(t);
+  if (n.includes('appel de familier'))
+    return { mode:'familier', titre:'🐾 Choisir la forme du familier', filtre: mo => T('Bête')(mo) && invCrNum(mo.cr) === 0 };
+  if (n.includes('appel de destrier'))
+    return { mode:'temp', titre:'🐴 Choisir le destrier', filtre: mo => ['Cheval de guerre','Poney','Élan','Chameau','Pégase','Licorne'].some(x => mo.name.startsWith(x)) };
+  if (n.startsWith('metamorphose'))
+    return { mode:'forme', titre:'🐻 Métamorphose : choisir la bête', filtre: mo => T('Bête')(mo) };
+  if (n.includes('invocation d') || n.includes('convocation') || n.includes('invoquer') || n.includes('esprit')) {
+    const d2 = ((sp.desc||'') + ' ' + n).toLowerCase();
+    const types = [['élémentaire','Élémentaire',5],['fée','Fée',2],['fiélon','Fiélon',6],['céleste','Céleste',4],['mort-vivant','Mort-vivant',5],['bête','Bête',2],['animaux','Bête',2]];
+    for (const [mot, type, crCap] of types)
+      if (d2.includes(mot) && (sp.school||'').startsWith('Invocation'))
+        return { mode:'temp', titre:'🪄 Choisir la créature invoquée', filtre: mo => (mo.type||'').startsWith(type) && invCrNum(mo.cr) <= Math.max(crCap, lvlSort) };
+  }
+  return null;
+}
+function invChercheSort(nom){
+  const tous = (typeof getAllResourcesForCategory==='function' && getAllResourcesForCategory('spell').length ? getAllResourcesForCategory('spell') : null) || COMPENDIUM_DATA.spell || [];
+  return tous.find(s => s.name === nom);
+}
+async function invApresLancement(charId, spellName){
+  const sp = invChercheSort(spellName); if (!sp) return;
+  const regle = invRegles(sp); if (!regle) return;
+  const conc = /concentration/i.test(sp.duration||'');
+  invOuvrePicker(regle.titre, `${sp.name} — ${sp.duration||''}`, regle.filtre, async mo => {
+    const ref = doc(db, 'characters', charId);
+    if (regle.mode === 'familier') {
+      await updateDoc(ref, { familiar: { name: mo.name, cr: mo.cr||'0', type: mo.type||'', size: mo.size||'TP', hp: mo.hp||'?', ac: mo.ac||'?' } });
+    } else if (regle.mode === 'forme') {
+      await updateDoc(ref, { formeSauvage: invFormeDepuis(mo, { sort: sp.name, concentration: conc }) });
+    } else {
+      await updateDoc(ref, { familiarTemp: { name: mo.name, cr: mo.cr||'?', type: mo.type||'', size: mo.size||'M',
+        hp: mo.hp||'?', ac: mo.ac||'?', sort: sp.name, duree: sp.duration||'', concentration: conc } });
+    }
+  });
+}
+function invFormeDepuis(mo, extra){
+  const pv = parseInt(mo.hp) || 10;
+  return Object.assign({
+    nom: mo.name, taille: mo.size||'M', ca: mo.ac||'?', vitesse: mo.speed||'?',
+    pv, pvMax: pv,
+    str: +mo.str||10, dex: +mo.dex||10, con: +mo.con||10,
+    attaques: mo.attacks && mo.attacks!=='—' ? mo.attacks : (mo.traits||''),
+  }, extra||{});
+}
+window._wildShapeOn = async function(charId, idx){
+  const snap = await getDoc(doc(db, 'characters', charId)); if (!snap.exists()) return;
+  const f = (snap.data().prepared_forms||[])[idx]; if (!f) return;
+  const mo = invMonstres().find(x => x.name === f.name) || f;
+  await updateDoc(doc(db, 'characters', charId), { formeSauvage: invFormeDepuis({ ...f, str: mo.str, dex: mo.dex, con: mo.con }) });
+};
+window._wildShapeOff = async function(charId){
+  await updateDoc(doc(db, 'characters', charId), { formeSauvage: null });
+};
+window._wildShapePv = async function(charId, delta){
+  const snap = await getDoc(doc(db, 'characters', charId)); if (!snap.exists()) return;
+  const ws = snap.data().formeSauvage; if (!ws) return;
+  ws.pv = Math.max(0, Math.min(ws.pvMax, (ws.pv||0) + delta));
+  if (ws.pv === 0) {
+    await updateDoc(doc(db, 'characters', charId), { formeSauvage: null });
+    alert('💥 La forme tombe à 0 PV : ' + (ws.nom) + ' se dissipe, tu reprends ta forme normale. Reporte l\'excédent de dégâts sur tes PV.');
+    return;
+  }
+  await updateDoc(doc(db, 'characters', charId), { formeSauvage: ws });
+};
+window._invLiberer = async function(charId){
+  await updateDoc(doc(db, 'characters', charId), { familiarTemp: null });
+};
+/* enveloppes : lancement de sort -> sélecteur ; rupture de concentration -> libération */
+if (!window.__invHooked) {
+  window.__invHooked = true;
+  const castOrig = window._castSpell;
+  window._castSpell = async function(charId, slotLevel, slotKey, spellName){
+    const r = await castOrig.apply(this, arguments);
+    try {
+      const snap = await getDoc(doc(db, 'characters', charId));
+      if (snap.exists()) {
+        const d2 = snap.data(), maj = {};
+        if (d2.familiarTemp?.concentration && d2.concentratingOn !== d2.familiarTemp.sort) maj.familiarTemp = null;
+        if (d2.formeSauvage?.concentration && d2.concentratingOn !== d2.formeSauvage.sort) maj.formeSauvage = null;
+        if (Object.keys(maj).length) await updateDoc(doc(db, 'characters', charId), maj);
+      }
+      await invApresLancement(charId, spellName);
+    } catch(e){ console.warn('invocation:', e); }
+    return r;
+  };
+  const breakOrig = window._breakConcentration;
+  if (typeof breakOrig === 'function') window._breakConcentration = async function(charId){
+    const r = await breakOrig.apply(this, arguments);
+    try {
+      const snap = await getDoc(doc(db, 'characters', charId));
+      if (snap.exists()) {
+        const d2 = snap.data(), maj = {};
+        if (d2.familiarTemp?.concentration) maj.familiarTemp = null;
+        if (d2.formeSauvage?.concentration) maj.formeSauvage = null;
+        if (Object.keys(maj).length) await updateDoc(doc(db, 'characters', charId), maj);
+      }
+    } catch(_){}
+    return r;
+  };
+}
+
 /* ── pions ── */
 const BM_COULEURS = ['#b03030', '#4a90d9', '#3f8f4a', '#b8862f', '#7a4f9d', '#3aa0a0', '#c25c8a', '#7c7f88'];
 function bmNewToken(nom, couleur, img, taille){
@@ -13779,6 +13977,30 @@ html .gm-stats-row { background:rgba(255,255,255,0.05); }
 #jnFlash.on { transform:translateX(-50%) translateY(0); }
 #jnFlash input { flex:1; font-size:0.92rem; padding:8px 10px; }
 #jnFlash span { align-self:center; font-size:1.1rem; }
+
+/* ── forme sauvage active + invocation temporaire ── */
+.ws-active { margin:0 0 12px; padding:12px 14px; border-radius:14px;
+  background:linear-gradient(155deg, rgba(120,200,110,0.1), rgba(14,10,4,0.55));
+  border:1px solid rgba(140,220,120,0.4); border-top-color:rgba(210,255,190,0.3); }
+.ws-active-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:9px; color:#dff0cf; }
+.ws-src { color:#9cc287; font-size:0.78rem; font-style:italic; }
+.ws-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; }
+.ws-cell { text-align:center; padding:6px 2px; border-radius:9px; background:rgba(0,0,0,0.3); border:1px solid rgba(196,154,58,0.22); }
+.ws-cell.ws-bete { background:rgba(120,200,110,0.14); border-color:rgba(140,220,120,0.45); }
+.ws-l { font-size:0.58rem; letter-spacing:1px; color:#b9a67e; }
+.ws-cell.ws-bete .ws-l { color:#a8d494; }
+.ws-m { font-size:1.05rem; font-weight:700; color:#f0e2b8; }
+.ws-v { font-size:0.68rem; color:#8a744c; }
+.ws-line { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-top:9px; font-size:0.85rem; color:#d9c9a3; }
+.ws-pv button { border:1px solid rgba(196,154,58,0.4); background:rgba(0,0,0,0.3); color:#e8dcc2;
+  border-radius:7px; padding:1px 7px; cursor:pointer; margin:0 2px; }
+.ws-pv button:hover { background:rgba(196,154,58,0.25); }
+.ws-att { margin-top:8px; font-size:0.78rem; color:#c9b689; line-height:1.4; }
+.ws-note { margin-top:7px; font-size:0.7rem; color:#8a744c; font-style:italic; }
+.familiar-card.fam-temp { border-color:rgba(155,89,182,0.55); background:linear-gradient(155deg, rgba(155,89,182,0.12), rgba(14,10,4,0.55)); margin-bottom:10px; }
+.inv-item { cursor:pointer; }
+.inv-item:hover { border-color:rgba(236,204,126,0.6); background:rgba(196,154,58,0.14); }
+@media (max-width:640px){ .ws-grid { grid-template-columns:repeat(3,1fr); } }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
