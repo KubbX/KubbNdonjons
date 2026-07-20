@@ -10575,6 +10575,7 @@ const bm = {
   tool: 'move', fogMode: 'reveal', fogR: 100,
   sel: null, projOn: false, showWalls: true, showRange: true,
   calib: { cm: 60, lock: false },
+  projFollow: true, projCentre: null, alignP1: null,
   wallDraft: null,
   selGab: null, gabCouleurI: 0, pings: [], _pingRaf: null,
   imgs: new Map(), tokImgs: new Map(), fogCv: new Map(), fogDirty: new Set(),
@@ -11175,9 +11176,13 @@ function bmVisPoly(m, px, py, R){
 }
 function bmCellDe(m, t){
   const g = m.grid.px, demi = t.taille % 2 ? g / 2 : 0;
-  return { cx: Math.round((t.x - demi) / g), cy: Math.round((t.y - demi) / g), demi };
+  const ox = m.grid.ox||0, oy = m.grid.oy||0;
+  return { cx: Math.round((t.x - demi - ox) / g), cy: Math.round((t.y - demi - oy) / g), demi };
 }
-function bmCentreCell(m, cx, cy, demi){ const g = m.grid.px; return { x: cx * g + demi, y: cy * g + demi }; }
+function bmCentreCell(m, cx, cy, demi){
+  const g = m.grid.px;
+  return { x: (m.grid.ox||0) + cx * g + demi, y: (m.grid.oy||0) + cy * g + demi };
+}
 function bmPasLibre(m, x1, y1, x2, y2, segsProches){
   for (const s of segsProches)
     if (bmSegCoupe(x1, y1, x2, y2, s) !== null) return false;
@@ -11277,6 +11282,51 @@ window._bmTokSpeed = function(){
   t.vitesse = Math.max(0, parseFloat(String(v).replace(',', '.')) || 9);
   bmSave(); bmRender();
 };
+window._bmToolMove = function(){
+  bmWallCommit(); bm.tool = 'move'; bm.wallDraft = null; bm.hoverPath = null; bm.hoverInfo = null;
+  bmRefreshUI(); bmRender();
+  bmStatus('Sélection : glisse la vue, déplace les pions librement.');
+};
+window._bmFogSet = function(mode){
+  const m = bmMap(); if (!m) return;
+  if (bm.tool === 'fog' && bm.fogMode === mode) { bm.tool = 'move'; }
+  else { bm.tool = 'fog'; bm.fogMode = mode; if (!m.fogOn) { m.fogOn = true; bmSave(); } }
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'fog'
+    ? (mode === 'reveal' ? 'Pinceau Révéler : peins pour dévoiler la carte aux joueurs.' : 'Pinceau Masquer : peins pour recouvrir de brouillard.')
+    : 'Pinceau rangé.');
+};
+window._bmAlign = function(){
+  const m = bmMap(); if (!m) { bmStatus('Importe d\'abord une carte.'); return; }
+  if (bm.tool === 'aligner') { bm.tool = 'move'; bm.alignP1 = null; }
+  else { bm.tool = 'aligner'; bm.alignP1 = null; m.grid.show = true; }
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'aligner'
+    ? 'Ajustage : clique le coin supérieur gauche d\'une case de l\'image, puis son coin inférieur droit. La grille se cale toute seule.'
+    : 'Ajustage annulé.');
+};
+window._bmGridNudge = function(dx, dy){
+  const m = bmMap(); if (!m) return;
+  m.grid.ox = (m.grid.ox||0) + dx;
+  m.grid.oy = (m.grid.oy||0) + dy;
+  bmGeoDirty(m.id); bmSave(); bmRender();
+};
+window._bmFollow = function(){
+  bm.projFollow = !bm.projFollow;
+  if (bm.projFollow) bm.projCentre = null;
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.projFollow ? 'Suivi automatique : la projection reste centrée sur le groupe.' : 'Suivi coupé : utilise Cadrage pour choisir la zone projetée.');
+};
+window._bmCadrage = function(){
+  const m = bmMap(); if (!m) return;
+  if (!bm.calib.lock) { bmStatus('Le cadrage sert quand les cases sont verrouillées à 2,5 cm — active d\'abord ce verrou.'); return; }
+  bm.tool = bm.tool === 'cadrage' ? 'move' : 'cadrage';
+  if (bm.tool === 'cadrage') bm.projFollow = false;
+  bmRefreshUI(); bmRender();
+  bmStatus(bm.tool === 'cadrage'
+    ? 'Cadrage : clique ou glisse sur la carte — le cadre doré montre exactement ce que voient les joueurs.'
+    : 'Cadrage terminé.');
+};
 window._bmRangeToggle = function(){
   bm.tool = bm.tool === 'deplacement' ? 'move' : 'deplacement';
   bm.hoverPath = null; bm.hoverInfo = null;
@@ -11292,6 +11342,15 @@ window._bmLockToggle = function(){
     ? 'Projection verrouillée : 1 case = 1 pouce sur l\'écran (largeur saisie : ' + bm.calib.cm + ' cm). Vérifie avec le repère « 1″ » en bas à gauche de la projection — et pose tes figurines !'
     : 'Verrou 1 pouce désactivé : la projection s\'ajuste à l\'écran.');
 };
+function bmProjCentre(m){
+  if (!bm.projFollow && bm.projCentre) return bm.projCentre;
+  const pjs = m.tokens.filter(t => t.torche || t.couleur === '#4a90d9');
+  const base = pjs.length ? pjs : m.tokens;
+  return {
+    x: base.length ? base.reduce((a, t) => a + t.x, 0) / base.length : (m.w||0) / 2,
+    y: base.length ? base.reduce((a, t) => a + t.y, 0) / base.length : (m.h||0) / 2,
+  };
+}
 function bmCellCss(Wcss){
   const scrW = bm._projScrW || Wcss;
   if (!bm.calib.cm || !scrW) return 0;
@@ -11406,10 +11465,8 @@ function bmScene(ctx, W, H, mode){
   if (mode === 'player') {
     if (bm.calib.lock && bmCellCss(W)) {
       const k = bmCellCss(W) / (m.grid.px || 70);
-      const pjs = m.tokens.filter(t => t.torche || t.couleur === '#4a90d9');
-      const base = pjs.length ? pjs : m.tokens;
-      const cx = base.length ? base.reduce((a, t) => a + t.x, 0) / base.length : (m.w||0) / 2;
-      const cy = base.length ? base.reduce((a, t) => a + t.y, 0) / base.length : (m.h||0) / 2;
+      const c = bmProjCentre(m);
+      const cx = c.x, cy = c.y;
       v = { k, x: W / 2 - cx * k, y: H / 2 - cy * k };
       v.x = Math.min(20, Math.max(W - (m.w||0) * k - 20, v.x));
       v.y = Math.min(20, Math.max(H - (m.h||0) * k - 20, v.y));
@@ -11424,18 +11481,32 @@ function bmScene(ctx, W, H, mode){
   if (im) ctx.drawImage(im, 0, 0);
   else { ctx.fillStyle = '#241708'; ctx.fillRect(0, 0, m.w||800, m.h||600); }
   if (m.grid.show && m.grid.px > 8) {
+    const ox = ((m.grid.ox||0) % m.grid.px + m.grid.px) % m.grid.px;
+    const oy = ((m.grid.oy||0) % m.grid.px + m.grid.px) % m.grid.px;
     ctx.strokeStyle = 'rgba(255,240,200,0.16)'; ctx.lineWidth = 1 / v.k;
     ctx.beginPath();
-    for (let x = 0; x <= (m.w||0); x += m.grid.px) { ctx.moveTo(x, 0); ctx.lineTo(x, m.h); }
-    for (let y = 0; y <= (m.h||0); y += m.grid.px) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
+    for (let x = ox - m.grid.px; x <= (m.w||0) + m.grid.px; x += m.grid.px) { ctx.moveTo(x, 0); ctx.lineTo(x, m.h); }
+    for (let y = oy - m.grid.px; y <= (m.h||0) + m.grid.px; y += m.grid.px) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
+    ctx.stroke();
+  }
+  if (mode === 'gm' && bm.alignP1) {
+    ctx.strokeStyle = 'rgba(120,220,255,0.95)'; ctx.lineWidth = 2 / v.k;
+    ctx.beginPath();
+    ctx.moveTo(bm.alignP1.x - 14 / v.k, bm.alignP1.y); ctx.lineTo(bm.alignP1.x + 14 / v.k, bm.alignP1.y);
+    ctx.moveTo(bm.alignP1.x, bm.alignP1.y - 14 / v.k); ctx.lineTo(bm.alignP1.x, bm.alignP1.y + 14 / v.k);
     ctx.stroke();
   }
   for (const gb of (m.gabarits || [])) {
     bmGabPath(ctx, m, gb);
-    ctx.fillStyle = gb.couleur.replace('VAR', '0.22');
+    ctx.fillStyle = gb.couleur.replace('VAR', '0.18');
     ctx.fill();
-    ctx.lineWidth = 2 / v.k;
-    ctx.strokeStyle = gb.couleur.replace('VAR', mode === 'gm' && bm.selGab === gb.id ? '1' : '0.75');
+    ctx.lineWidth = 3.5 / v.k;
+    ctx.strokeStyle = gb.couleur.replace('VAR', '0.95');
+    ctx.stroke();
+    bmGabPath(ctx, m, gb);
+    ctx.lineWidth = 1 / v.k;
+    ctx.strokeStyle = 'rgba(255,248,225,0.5)';
+    if (false) ctx.strokeStyle = gb.couleur.replace('VAR', mode === 'gm' && bm.selGab === gb.id ? '1' : '0.75');
     if (mode === 'gm' && bm.selGab === gb.id) ctx.setLineDash([8 / v.k, 5 / v.k]);
     ctx.stroke();
     ctx.setLineDash([]);
@@ -11447,7 +11518,7 @@ function bmScene(ctx, W, H, mode){
     ctx.fillStyle = 'rgba(240,200,90,0.14)';
     for (const k of cells) {
       const [x, y] = k.split(',').map(Number);
-      ctx.fillRect(x * g + demi - g / 2, y * g + demi - g / 2, g, g);
+      ctx.fillRect((m.grid.ox||0) + x * g + demi - g / 2, (m.grid.oy||0) + y * g + demi - g / 2, g, g);
     }
     if (bm.hoverPath && bm.hoverPath.length) {
       ctx.strokeStyle = 'rgba(255,224,140,0.9)'; ctx.lineWidth = 3 / v.k;
@@ -11513,6 +11584,30 @@ function bmScene(ctx, W, H, mode){
       ctx.stroke();
     }
     if (age < 0.9) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 / v.k, 0, 7); ctx.fillStyle = 'rgba(255,224,140,0.95)'; ctx.fill(); }
+  }
+  if (mode === 'gm' && bm.projOn && bm.calib.lock && bm._projWH && bm._projWH.w) {
+    const kp = bmCellCss(bm._projWH.w) / (m.grid.px || 70);
+    if (kp > 0) {
+      const rw = bm._projWH.w / kp, rh = bm._projWH.h / kp;
+      const c = bmProjCentre(m);
+      let rx = c.x - rw / 2, ry = c.y - rh / 2;
+      rx = Math.max(-20 / kp, Math.min((m.w||0) - rw + 20 / kp, rx));
+      ry = Math.max(-20 / kp, Math.min((m.h||0) - rh + 20 / kp, ry));
+      if ((m.w||0) < rw) rx = ((m.w||0) - rw) / 2;
+      if ((m.h||0) < rh) ry = ((m.h||0) - rh) / 2;
+      ctx.strokeStyle = 'rgba(232,196,120,0.55)'; ctx.lineWidth = 1.5 / v.k;
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.strokeStyle = 'rgba(240,210,140,0.95)'; ctx.lineWidth = 3.5 / v.k;
+      const L = Math.min(rw, rh) * 0.09;
+      for (const [px2, py2, sx2, sy2] of [[rx,ry,1,1],[rx+rw,ry,-1,1],[rx,ry+rh,1,-1],[rx+rw,ry+rh,-1,-1]]) {
+        ctx.beginPath();
+        ctx.moveTo(px2 + sx2 * L, py2); ctx.lineTo(px2, py2); ctx.lineTo(px2, py2 + sy2 * L);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(240,210,140,0.8)';
+      ctx.font = `${13 / v.k}px sans-serif`;
+      ctx.fillText('ZONE PROJETÉE', rx + 8 / v.k, ry - 6 / v.k);
+    }
   }
   if (mode === 'player' && bm.calib.lock) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -11596,13 +11691,36 @@ function bmTokCtlPos(){
 /* ── interactions ── */
 function bmInitCanvas(){
   const cv = document.getElementById('bmCanvas'); if (!cv) return;
-  const pos = e => { const b = cv.getBoundingClientRect(); return { sx: e.clientX - b.left, sy: e.clientY - b.top }; };
+  const pos = e => {
+    const b = cv.getBoundingClientRect();
+    const lw = cv.width / bmDPR(), lh = cv.height / bmDPR();
+    const fx = b.width ? lw / b.width : 1, fy = b.height ? lh / b.height : 1;
+    return { sx: (e.clientX - b.left) * fx, sy: (e.clientY - b.top) * fy };
+  };
   const toMap = p => ({ x: (p.sx - bm.view.x) / bm.view.k, y: (p.sy - bm.view.y) / bm.view.k });
   cv.addEventListener('pointerdown', e => {
     const m = bmMap(); if (!m) return;
     cv.setPointerCapture(e.pointerId);
     const p = toMap(pos(e));
     if (e.altKey) { bmPing(p.x, p.y); return; }
+    if (bm.tool === 'aligner') {
+      if (!bm.alignP1) { bm.alignP1 = { x: p.x, y: p.y }; bmStatus('Coin 1 posé — clique maintenant le coin inférieur droit de la même case.'); bmRender(); return; }
+      const dx = Math.abs(p.x - bm.alignP1.x), dy = Math.abs(p.y - bm.alignP1.y);
+      const px = Math.max(12, Math.min(400, Math.round((dx + dy) / 2)));
+      m.grid.px = px;
+      m.grid.ox = ((Math.min(bm.alignP1.x, p.x) % px) + px) % px;
+      m.grid.oy = ((Math.min(bm.alignP1.y, p.y) % px) + px) % px;
+      bm.alignP1 = null; bm.tool = 'move';
+      bmGeoDirty(m.id); bmSave(); bmRefreshUI(); bmRender();
+      bmStatus('Grille calée : case de ' + px + ' px. Affine au besoin avec les flèches de décalage et le champ de taille.');
+      return;
+    }
+    if (bm.tool === 'cadrage') {
+      bm.projFollow = false;
+      bm.projCentre = { x: p.x, y: p.y };
+      bm.drag = { kind: 'cadr' };
+      bmRender(); return;
+    }
     if (bm.tool === 'gabarit') {
       const hit = (m.gabarits || []).slice().reverse().find(g => bmGabHit(m, g, p.x, p.y));
       if (hit) { bm.selGab = hit.id; bm.drag = { kind: 'gab', id: hit.id, dx: hit.x - p.x, dy: hit.y - p.y }; }
@@ -11624,7 +11742,7 @@ function bmInitCanvas(){
         const st = m.tokens.find(x => x.id === bm.sel);
         if (st) {
           const g = m.grid.px, demi = st.taille % 2 ? g / 2 : 0;
-          const cx = Math.round((p.x - demi) / g), cy = Math.round((p.y - demi) / g);
+          const cx = Math.round((p.x - demi - (m.grid.ox||0)) / g), cy = Math.round((p.y - demi - (m.grid.oy||0)) / g);
           const c = bmCentreCell(m, cx, cy, demi);
           st.x = c.x; st.y = c.y;
           bm.hoverPath = null; bm.hoverInfo = null;
@@ -11654,7 +11772,7 @@ function bmInitCanvas(){
       bmHoverT = now;
       const p0 = pos(e), p = toMap(p0);
       const g = m.grid.px, demi = st.taille % 2 ? g / 2 : 0;
-      const cx = Math.round((p.x - demi) / g), cy = Math.round((p.y - demi) / g);
+      const cx = Math.round((p.x - demi - (m.grid.ox||0)) / g), cy = Math.round((p.y - demi - (m.grid.oy||0)) / g);
       const chemin = bmPath(m, st, cx, cy);
       bm.hoverPath = chemin;
       const cases = chemin ? chemin.length : null;   /* longueur = nombre de pas, inchangée par le départage */
@@ -11676,6 +11794,9 @@ function bmInitCanvas(){
     } else if (bm.drag.kind === 'tok') {
       const p = toMap(pos(e)), t = m.tokens.find(x => x.id === bm.drag.id);
       if (t) { t.x = p.x + bm.drag.dx; t.y = p.y + bm.drag.dy; }
+    } else if (bm.drag.kind === 'cadr') {
+      const p = toMap(pos(e));
+      bm.projCentre = { x: p.x, y: p.y };
     } else if (bm.drag.kind === 'gab') {
       const p = toMap(pos(e));
       const gb = (m.gabarits || []).find(g => g.id === bm.drag.id);
@@ -11692,8 +11813,8 @@ function bmInitCanvas(){
       const t = m.tokens.find(x => x.id === bm.drag.id);
       if (t) {
         const g = m.grid.px, demi = t.taille % 2 ? g / 2 : 0;
-        t.x = Math.round((t.x - demi) / g) * g + demi;
-        t.y = Math.round((t.y - demi) / g) * g + demi;
+        t.x = (m.grid.ox||0) + Math.round((t.x - demi - (m.grid.ox||0)) / g) * g + demi;
+        t.y = (m.grid.oy||0) + Math.round((t.y - demi - (m.grid.oy||0)) / g) * g + demi;
       }
     }
     if (bm.drag && (bm.drag.kind === 'tok' || bm.drag.kind === 'gab' || bm.drag.kind === 'pan')) bmSave();
@@ -11783,6 +11904,7 @@ window._bmProjToggle = function(){
   window._bmSrcOff && window._bmSrcOff();          /* la carte reprend le dessus sur la source libre */
   bm.projOn = true; bm._projWin = w;
   try { bm._projScrW = w.screen.width || 0; } catch(_) { bm._projScrW = 0; }
+  try { bm._projWH = { w: w.innerWidth, h: w.innerHeight }; } catch(_){}
   bmRefreshUI(); bmProjRender();
   bmStatus('Carte projetée (vue joueurs : brouillard opaque, sans murs ni sélection). Glisse la fenêtre sur l’écran de table puis double-clique.');
 };
@@ -11899,6 +12021,15 @@ function bmRefreshUI(){
   const hb = document.getElementById('bmHideBtn');
   if (hb) { hb.style.opacity = (st && st.cache) ? '1' : '0.45'; hb.textContent = (st && st.cache) ? '🙈' : '👁'; }
   const gbn = document.getElementById('bmGabBtn'); if (gbn) gbn.classList.toggle('on', bm.tool === 'gabarit');
+  const mv = document.getElementById('bmToolMove'); if (mv) mv.classList.toggle('on', bm.tool === 'move');
+  const fr2 = document.getElementById('bmFogRev'); if (fr2) fr2.classList.toggle('on', bm.tool === 'fog' && bm.fogMode === 'reveal');
+  const fm2 = document.getElementById('bmFogMask'); if (fm2) fm2.classList.toggle('on', bm.tool === 'fog' && bm.fogMode === 'hide');
+  const al = document.getElementById('bmAlignBtn'); if (al) al.classList.toggle('on', bm.tool === 'aligner');
+  const cd = document.getElementById('bmCadrBtn'); if (cd) cd.classList.toggle('on', bm.tool === 'cadrage');
+  const fo = document.getElementById('bmFollowBtn'); if (fo) fo.classList.toggle('on', !!bm.projFollow);
+  const gpx = document.getElementById('bmGridPx');
+  const mm2 = bmMap();
+  if (gpx && mm2 && +gpx.value !== mm2.grid.px && document.activeElement !== gpx) gpx.value = mm2.grid.px;
   const gp = document.getElementById('bmGridPx'); if (gp && m) gp.value = m.grid.px;
   const cv = document.getElementById('bmCanvas'); if (cv) cv.classList.toggle('fog', bm.tool === 'fog');
 }
@@ -14217,6 +14348,40 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
   background:rgba(0,0,0,0.3); color:#e8dcc2; border-radius:8px; padding:4px 10px;
   cursor:pointer; font-size:0.76rem; }
 .spell-card-txtbtn:hover { background:rgba(196,154,58,0.25); }
+
+/* ══ Console de carte : langage BG3 — libellés capitales, or sur sombre ══ */
+.bm-head { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; padding:10px 12px;
+  background:linear-gradient(180deg, rgba(10,7,3,0.5), rgba(24,16,7,0.35));
+  border:1px solid rgba(196,154,58,0.25); border-radius:10px; margin-bottom:10px; }
+.bmc-grp { display:flex; align-items:center; gap:5px; flex-wrap:wrap; padding:4px 8px 6px;
+  border-left:1px solid rgba(196,154,58,0.28); position:relative; }
+.bmc-grp:first-child { border-left:none; }
+.bmc-lab { position:absolute; top:-9px; left:8px; font-size:0.56rem; letter-spacing:2px;
+  text-transform:uppercase; color:#a8905c; background:rgba(20,13,6,0.9); padding:0 6px; border-radius:3px; }
+html .bm-btn {
+  font-size:0.66rem; letter-spacing:0.8px; text-transform:uppercase;
+  padding:7px 12px; border-radius:4px; cursor:pointer;
+  color:#e2d2a8;
+  background:linear-gradient(180deg, rgba(46,32,14,0.85), rgba(22,15,6,0.95));
+  border:1px solid rgba(200,168,90,0.45);
+  box-shadow:inset 0 1px 0 rgba(255,240,200,0.08);
+  transition:border-color .12s ease, color .12s ease, box-shadow .12s ease;
+}
+html .bm-btn:hover { border-color:rgba(240,210,140,0.9); color:#fff3d6;
+  box-shadow:inset 0 1px 0 rgba(255,240,200,0.12), 0 0 10px rgba(200,160,70,0.25); }
+html .bm-btn.on {
+  background:linear-gradient(180deg, #d8b264, #a9812f);
+  color:#1c1207; border-color:#f0d89a; font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.35), 0 0 12px rgba(216,178,100,0.35);
+}
+html .bm-btn.bmc-mini { padding:7px 8px; }
+html .bm-num { width:62px; font-size:0.74rem; padding:6px; }
+html .bm-tokctl button, html #bmGabCtl button {
+  font-size:0.62rem; letter-spacing:0.6px; text-transform:uppercase;
+  color:#e2d2a8; background:rgba(28,19,8,0.95);
+  border:1px solid rgba(200,168,90,0.4); border-radius:4px; padding:4px 8px; cursor:pointer;
+}
+html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(240,210,140,0.9); color:#fff3d6; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -14340,58 +14505,69 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
 
 <div class="bm-wrap">
   <div class="bm-head">
-    <strong class="bm-title">🗺 Cartes de bataille</strong>
-    <select id="bmSel" class="bm-sel" onchange="window._bmSelect(this.value)" title="Carte active"></select>
-    <button class="bm-btn" onclick="window._bmImport()" title="Importer une image ou un fichier Dungeon Alchemist (.dd2vtt)">📥 Importer</button>
-    <button class="bm-btn" onclick="window._bmTokensFromCombat()" title="Créer les pions depuis le tracker de combat">⚔ Pions du combat</button>
-    <button class="bm-btn" onclick="window._bmAddToken()" title="Ajouter un pion libre">＋ Pion</button>
-    <span class="bm-sep"></span>
-    <button class="bm-btn" id="bmGridBtn" onclick="window._bmGridToggle()" title="Afficher/masquer la grille">▦ Grille</button>
-    <input type="range" id="bmGridPx" class="bm-range" min="24" max="200" value="70" title="Taille de la grille (px)">
-    <button class="bm-btn" id="bmFogBtn" onclick="window._bmFogTool()" title="Brouillard de guerre : clic = changer d'outil (révéler / masquer / déplacer)">🌫 Brouillard</button>
-    <input type="range" id="bmFogR" class="bm-range" min="25" max="300" value="100" title="Rayon du pinceau de brouillard">
-    <button class="bm-btn" id="bmWallBtn" onclick="window._bmWallsToggle()" title="Afficher les murs Dungeon Alchemist (visibles du MJ seulement)">🧱 Murs</button>
-    <span class="bm-sep"></span>
-
-    <span class="bm-sep"></span>
-    <select id="bmGabForme" class="bm-sel" style="min-width:88px" title="Forme du gabarit de sort">
-      <option value="cone">Cône</option>
-      <option value="sphere">Sphère</option>
-      <option value="ligne">Ligne</option>
-      <option value="cube">Cube</option>
-    </select>
-    <input type="number" id="bmGabTaille" class="bm-num" min="1.5" max="36" step="1.5" value="4.5" title="Taille du gabarit en mètres (cône/ligne : longueur, sphère : rayon, cube : côté)">
-    <button class="bm-btn" id="bmGabBtn" onclick="window._bmGabTool()" title="Poser des gabarits de sorts (cône, sphère, ligne, cube) — visibles des joueurs">🎯 Gabarit</button>
-    <button class="bm-btn" id="bmWallDraw" onclick="window._bmWallDraw()" title="Dessiner des murs : clic = point, double-clic ou Échap = terminer le tracé">✏🧱</button>
-    <button class="bm-btn" id="bmWallUndo" onclick="window._bmWallUndo()" title="Effacer le dernier mur tracé">⌫</button>
-    <button class="bm-btn" id="bmRangeBtn" onclick="window._bmRangeToggle()" title="Outil déplacement : halo de cases atteignables, distance au survol (murs respectés), second clic = déplacer le pion">👣</button>
-    <span class="bm-sep"></span>
-    <button class="bm-btn" id="bmLockBtn" onclick="window._bmLockToggle()" title="Verrouiller la projection : 1 case = 1 pouce sur l'écran physique (pour poser des figurines)">🔒 1″</button>
-    <input type="number" id="bmCalCm" class="bm-num" min="20" max="400" step="1" title="Largeur PHYSIQUE de l'écran de projection en cm (ex : télé 600×400 mm → 60)">
-    <button class="bm-btn" onclick="window._ambSinkPick()" title="Choisir la sortie audio (ex : la télé en HDMI) — musiques, nappes et one-shots">🔊</button>
-    <select id="ambSinkSel" class="bm-sel" style="display:none;min-width:120px;max-width:170px"
-      onchange="localStorage.setItem('kubbnd_sink', this.value); (window._ambAllAudio||[]).forEach(a=>a.setSinkId&&a.setSinkId(this.value||'').catch(()=>{}));"></select>
-    <button class="bm-btn" id="bmSrcBtn" onclick="window._bmSrcToggle()" title="Projeter une image libre (portrait de boss, document…) par-dessus tout, dans un fondu">🖼 Source</button>
-    <button class="bm-btn" onclick="window._bmExport()" title="Exporter la carte préparée (image, pions, murs, brouillard, gabarits) dans un fichier à réimporter le jour J">💾</button>
-    <button class="bm-btn bm-proj" id="bmProjBtn" onclick="window._bmProjToggle()" title="Projeter la vue joueurs sur l'écran externe">📽 Projeter</button>
-    <button class="bm-btn" onclick="window._bmDelete()" title="Supprimer la carte active">🗑</button>
-    <button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">❓ Guide</button>
+    <div class="bmc-grp"><span class="bmc-lab">Carte</span>
+      <select id="bmSel" class="bm-sel" onchange="window._bmSelect(this.value)" title="Carte active"></select>
+      <button class="bm-btn" onclick="window._bmImport()" title="Image, Dungeon Alchemist (.dd2vtt) ou préparation (.kubbmap.json)">Importer</button>
+      <button class="bm-btn" onclick="window._bmExport()" title="Exporter la préparation complète (.kubbmap.json)">Exporter</button>
+      <button class="bm-btn" onclick="window._bmDelete()" title="Supprimer la carte active">Supprimer</button>
+    </div>
+    <div class="bmc-grp"><span class="bmc-lab">Pions</span>
+      <button class="bm-btn" onclick="window._bmTokensFromCombat()" title="Créer les pions depuis le tracker de combat">Depuis le combat</button>
+      <button class="bm-btn" onclick="window._bmAddToken()" title="Ajouter un pion libre">Ajouter</button>
+    </div>
+    <div class="bmc-grp"><span class="bmc-lab">Outils</span>
+      <button class="bm-btn" id="bmToolMove" onclick="window._bmToolMove()" title="Déplacer la vue et les pions librement">Sélection</button>
+      <button class="bm-btn" id="bmFogRev" onclick="window._bmFogSet('reveal')" title="Pinceau : révéler le brouillard">Révéler</button>
+      <button class="bm-btn" id="bmFogMask" onclick="window._bmFogSet('hide')" title="Pinceau : masquer le brouillard">Masquer</button>
+      <input type="number" id="bmFogR" class="bm-num" min="25" max="300" step="25" value="100" title="Rayon du pinceau (px)">
+      <button class="bm-btn" id="bmWallDraw" onclick="window._bmWallDraw()" title="Tracer des murs : clic = point, double-clic ou Échap = terminer">Tracer murs</button>
+      <button class="bm-btn" id="bmWallUndo" onclick="window._bmWallUndo()" title="Effacer le dernier mur tracé">Annuler mur</button>
+      <button class="bm-btn" id="bmWallBtn" onclick="window._bmWallsToggle()" title="Afficher ou masquer les murs (visibles du MJ seulement)">Murs visibles</button>
+      <button class="bm-btn" id="bmRangeBtn" onclick="window._bmRangeToggle()" title="Mesurer et déplacer : halo des cases atteignables, distance au survol, second clic pour déplacer">Déplacement</button>
+      <select id="bmGabForme" class="bm-sel" style="min-width:82px" title="Forme du gabarit de sort">
+        <option value="cone">Cône</option><option value="sphere">Sphère</option>
+        <option value="ligne">Ligne</option><option value="cube">Cube</option>
+      </select>
+      <input type="number" id="bmGabTaille" class="bm-num" min="1.5" max="36" step="1.5" value="4.5" title="Taille du gabarit (mètres)">
+      <button class="bm-btn" id="bmGabBtn" onclick="window._bmGabTool()" title="Poser des gabarits de sorts, visibles des joueurs">Gabarit</button>
+    </div>
+    <div class="bmc-grp"><span class="bmc-lab">Grille</span>
+      <button class="bm-btn" id="bmGridBtn" onclick="window._bmGridToggle()" title="Afficher ou masquer la grille">Afficher</button>
+      <button class="bm-btn" id="bmAlignBtn" onclick="window._bmAlign()" title="Caler la grille sur l'image : clique le coin supérieur gauche d'une case, puis son coin inférieur droit">Ajuster</button>
+      <input type="number" id="bmGridPx" class="bm-num" min="12" max="400" value="70" title="Taille d'une case (px image)">
+      <button class="bm-btn bmc-mini" onclick="window._bmGridNudge(-2,0)" title="Décaler la grille vers la gauche">◀</button>
+      <button class="bm-btn bmc-mini" onclick="window._bmGridNudge(2,0)" title="Décaler la grille vers la droite">▶</button>
+      <button class="bm-btn bmc-mini" onclick="window._bmGridNudge(0,-2)" title="Décaler la grille vers le haut">▲</button>
+      <button class="bm-btn bmc-mini" onclick="window._bmGridNudge(0,2)" title="Décaler la grille vers le bas">▼</button>
+    </div>
+    <div class="bmc-grp"><span class="bmc-lab">Projection</span>
+      <button class="bm-btn bm-proj" id="bmProjBtn" onclick="window._bmProjToggle()" title="Projeter la vue joueurs sur l'écran externe">Projeter</button>
+      <button class="bm-btn" id="bmLockBtn" onclick="window._bmLockToggle()" title="Verrouiller : 1 case = 2,5 cm sur l'écran physique (figurines)">Cases 2,5 cm</button>
+      <input type="number" id="bmCalCm" class="bm-num" min="20" max="400" step="1" title="Largeur physique de l'écran de projection (cm)">
+      <button class="bm-btn" id="bmFollowBtn" onclick="window._bmFollow()" title="La projection suit automatiquement le groupe">Suivi auto</button>
+      <button class="bm-btn" id="bmCadrBtn" onclick="window._bmCadrage()" title="Choisir la zone projetée : glisse le cadre doré sur la carte">Cadrage</button>
+      <button class="bm-btn" id="bmSrcBtn" onclick="window._bmSrcToggle()" title="Projeter une image libre par-dessus tout (portrait, document)">Source image</button>
+      <button class="bm-btn" onclick="window._ambSinkPick()" title="Choisir la sortie audio (télé HDMI) pour musiques, nappes et bruitages">Sortie audio</button>
+      <select id="ambSinkSel" class="bm-sel" style="display:none;min-width:120px;max-width:170px"
+        onchange="localStorage.setItem('kubbnd_sink', this.value); (window._ambAllAudio||[]).forEach(a=>a.setSinkId&&a.setSinkId(this.value||'').catch(()=>{}));"></select>
+      <button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">Guide</button>
+    </div>
   </div>
   <div class="bm-canvas-wrap" id="bmCanvasWrap">
     <canvas id="bmCanvas"></canvas>
     <div id="bmGabCtl">
-      <button onclick="window._bmGabRot(1)" title="Pivoter (R)">↻</button>
-      <button onclick="window._bmGabRot(-1)" title="Pivoter en sens inverse (Maj+R)">↺</button>
-      <button onclick="window._bmGabDel()" title="Retirer le gabarit">✕</button>
+      <button onclick="window._bmGabRot(-1)" title="Pivoter de 15° (Maj+R)">Rot −15°</button>
+      <button onclick="window._bmGabRot(1)" title="Pivoter de 15° (R)">Rot +15°</button>
+      <button onclick="window._bmGabDel()">Retirer</button>
     </div>
     <div id="bmTokCtl" class="bm-tokctl">
-      <button onclick="window._bmTokSize(-1)" title="Réduire">－</button>
-      <button onclick="window._bmTokSize(1)" title="Agrandir">＋</button>
-      <button onclick="window._bmTokColor()" title="Couleur">🎨</button>
-      <button onclick="window._bmTokTorch()" title="Torche : halo de lumière dans le brouillard" id="bmTorchBtn">🔥</button>
-      <button onclick="window._bmTokSpeed()" title="Vitesse de déplacement (mètres)">👣</button>
-      <button onclick="window._bmTokHide()" title="Cacher/révéler aux joueurs" id="bmHideBtn">👁</button>
-      <button onclick="window._bmTokDel()" title="Retirer">✕</button>
+      <button onclick="window._bmTokSize(-1)">Taille −</button>
+      <button onclick="window._bmTokSize(1)">Taille +</button>
+      <button onclick="window._bmTokColor()">Couleur</button>
+      <button onclick="window._bmTokTorch()" id="bmTorchBtn" title="Halo de lumière dans le brouillard, arrêté par les murs">Torche</button>
+      <button onclick="window._bmTokSpeed()" title="Vitesse de déplacement (mètres)">Vitesse</button>
+      <button onclick="window._bmTokHide()" id="bmHideBtn" title="Invisible des joueurs en projection">Cacher</button>
+      <button onclick="window._bmTokDel()">Retirer</button>
     </div>
   </div>
   <div class="bm-status" id="bmStatus">Importe une image ou un export Dungeon Alchemist (.dd2vtt) — grille, murs et portes seront calibrés automatiquement. Molette = zoom, glisser = déplacer.</div>
@@ -14431,12 +14607,12 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
       <h4>🗺 Cartes de bataille</h4>
       <p><strong>Importer</strong> 📥 : une image, un export <strong>Dungeon Alchemist</strong> (.dd2vtt — grille, murs et portes calibrés automatiquement) ou une préparation .kubbmap.json. Molette = zoom, glisser = vue.</p>
       <p><strong>Pions</strong> : ⚔ importe les combattants du tracker (bleu = PJ, rouge = monstre, portraits du bestiaire, taille 2 pour les géants), ＋ pion libre. Contrôles sur sélection : taille ±, 🎨 couleur, 🔥 <strong>torche</strong>, 👣 vitesse, 👁 <strong>cacher</strong> (estompé pour toi, invisible en projection — l'embuscade parfaite), ✕ retirer.</p>
-      <p><strong>Brouillard</strong> 🌫 : pinceau révéler → masquer → retour (clics successifs), rayon réglable. Translucide côté MJ, opaque côté joueurs. Les <strong>torches découpent leur lumière en direct, arrêtée par les murs</strong> (ligne de vue dynamique) — le couloir s'éclaire, la salle d'à côté reste noire.</p>
+      <p><strong>Brouillard</strong> : deux pinceaux distincts, Révéler et Masquer, rayon réglable — translucide côté MJ, opaque côté joueurs. Les <strong>torches découpent leur lumière en direct, arrêtée par les murs</strong> (ligne de vue dynamique).</p>
       <p><strong>Murs</strong> : 🧱 affiche/masque (rouge = murs, orange = portes, visibles de toi seul), ✏🧱 en trace de nouveaux (clic = point, double-clic/Échap = terminer, ⌫ = annuler). Ils bloquent lumière <em>et</em> déplacements.</p>
       <p><strong>Déplacement</strong> 👣 : clique un pion → halo doré des cases atteignables (murs contournés) ; survole → distance réelle en mètres par le chemin (rouge si trop loin, ∞ si emmuré) ; second clic → déplace, même au-delà — l'outil informe, tu décides. Vitesses lues du bestiaire pour les monstres.</p>
       <p><strong>Gabarits de sorts</strong> 🎯 : cône, sphère, ligne, cube aux dimensions 5e, taille en mètres. Clic pose, glisser déplace, <strong>R</strong> pivote (Maj+R inverse), ✕ retire. Visibles des joueurs — la boule de feu se matérialise sur la table.</p>
       <p><strong>Ping</strong> : <strong>double-clic</strong> (ou Alt+clic) → impulsion dorée sur ton écran et la projection. Le « regardez ici » silencieux.</p>
-      <p><strong>Verrou figurines</strong> 🔒 1″ : saisis la largeur physique de l'écran (télé 600×400 mm → 60), verrouille : chaque case fait exactement 1 pouce — vérifie au repère « 1″ » en bas de projection, pose tes figurines. La vue suit le groupe automatiquement.</p>
+      <p><strong>Grille</strong> : Ajuster cale la grille sur l'image en deux clics (coin supérieur gauche puis inférieur droit d'une même case), les flèches décalent finement, le champ règle la taille. <strong>Cases 2,5 cm</strong> : saisis la largeur physique de l'écran (télé 600×400 mm → 60) et verrouille — chaque case fait exactement 2,5 cm sur l'écran, pose tes figurines. <strong>Cadrage</strong> : quand la carte déborde, un cadre doré sur ta vue montre la zone projetée — glisse-le pour la déplacer, ou laisse Suivi auto centrer sur le groupe.</p>
       <h4>📽 Projection unifiée</h4>
       <p>Une seule fenêtre externe, en couches : image d'ambiance en fond, <strong>carte</strong> par-dessus (📽), <strong>source libre</strong> 🖼 au sommet (portrait de boss, document — n'importe quelle image), noir Alt+N tout en haut. Chaque bascule se fait <strong>en fondu</strong>, la dernière action explicite gagne : réactive 📽 et la carte reprend le dessus. Double-clic dans la fenêtre = plein écran.</p>
       <p><strong>Sortie audio</strong> 🔊 : choisis le périphérique (la télé en HDMI) — musiques, nappes et one-shots y basculent ensemble. Limites : pistes YouTube non redirigeables, Safari sans ce choix. <strong>Préparation</strong> 💾 : exporte la carte complète (pions, murs, brouillard, gabarits, image) en .kubbmap.json, à réimporter le jour J via 📥.</p>
