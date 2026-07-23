@@ -6100,6 +6100,7 @@ window._combatSyncPcs = (silent) => {
         kind:'pc', refId:id, name:d.name||'PJ',
         sub:`${d.race||''} ${classesDisplayFull(d)} (Niv.${totalLevel(d)})`.trim(),
         init:'', initBonus:_combatMod(stats.dex||10),
+        avatar: d.avatarUrl || '',
         hp:d.hp||0, hpMax:d.hpMax||0, ac:d.ac||10, dead:false
       });
       /* le familier et l'invocation active suivent leur maître dans le combat (et sur la carte) */
@@ -9820,32 +9821,35 @@ const AMB_NAPPES_DEFAUT = [
 const AMB_SHOTS_URL = 'https://cdn.jsdelivr.net/gh/wesnoth/wesnoth@master/data/core/sounds/';
 const AMB_SHOTS_DEFAUT = [
   ['Tonnerre','⚡','lightning.ogg','url','tonnerre'],
-  ['Choc d\'épées','⚔','sword-1.ogg','url','epees'],
-  ['Hache','🪓','axe.ogg','url','epees'],
+  ['Choc d\'épées','⚔','clash','synth',null],
+  ['Hache','🪓','hache','synth',null],
   ['Masse d\'armes','🔨','mace.ogg','url','porte'],
   ['Flèche','🏹','bow.ogg','url','fleche'],
-  ['Dague furtive','🗡','dagger-swish.wav','url','fleche'],
+  ['Dague furtive','🗡','throwing-knife.ogg','url','fleche'],
   ['Explosion','💥','explosion.ogg','url','zap'],
-  ['Brasier','🔥','flame-big.ogg','url','zap'],
-  ['Magie sombre','🌑','magic-dark-big.ogg','url','zap'],
-  ['Magie sacrée','✨','magic-holy-1.ogg','url','zap'],
+  ['Brasier','🔥','brasier','synth',null],
+  ['Torche','🔦','torche','synth',null],
+  ['Éclat magique','✨','eclat','synth',null],
+  ['Magie sombre','🌑','sombre','synth',null],
   ['Soin','💚','heal.wav','url','cloche'],
   ['Potion','🧪','potion.ogg','url','zap'],
   ['Butin','💰','gold.ogg','url','cloche'],
   ['Coffre','📦','open-chest.wav','url','porte'],
-  ['Torche','🔦','torch.ogg','url','craquement'],
   ['Éboulement','🪨','cave-in.ogg','url','tonnerre'],
   ['Grondement','🌋','rumble.ogg','url','tonnerre'],
-  ['Hurlement spectral','👻','wail.wav','url','spectre'],
+  ['Craquement','🪵','craquement2','synth',null],
+  ['Hurlement spectral','👻','wail-sml.wav','url','spectre'],
   ['Cri de rapace','🦅','gryphon-shriek-1.ogg','url','spectre'],
-  ['Loup blessé','🐺','wolf-die-1.ogg','url','craquement'],
-  ['Chauve-souris','🦇','bat-flapping.wav','url','craquement'],
-  ['Galop','🐴','horse-canter.wav','url','coeur'],
-  ['Jet d\'eau','🌊','water-blast.wav','url','zap'],
-  ['Pétrification','🗿','petrified.ogg','url','zap'],
-  ['Porte qui claque','🚪','porte','synth',null],
+  ['Hurlement de loup','🐺','loup','synth',null],
+  ['Rugissement de monstre','🐉','rugissement','synth',null],
+  ['Chauve-souris','🦇','chauves','synth',null],
+  ['Galop','🐴','galop','synth',null],
+  ['Jet d\'eau','🌊','eau','synth',null],
+  ['Pétrification','🗿','petrif','synth',null],
+  ['Porte qui claque','🚪','porte2','synth',null],
   ['Cor de guerre','📯','cor','synth',null],
-  ['Cloche','🔔','cloche','synth',null],
+  ['Corne de brume','🚢','brume','synth',null],
+  ['Cloche','🔔','cloche2','synth',null],
   ['Battement de cœur','💓','coeur','synth',null],
 ];
 let ambCtx = null, ambNoiseBuf = null;
@@ -9871,85 +9875,250 @@ function ambSynthPlay(nom){
   const ctx = ambAudioCtx(), t = ctx.currentTime, out = ctx.createGain();
   out.gain.value = Math.min(1, amb.vol * 1.2);
   out.connect(ctx.destination);
-  const fini = (n, dur) => { n.start(t); n.stop(t + dur); };
-  if (nom === 'tonnerre') {
-    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'lowpass';
-    f.frequency.setValueAtTime(420, t); f.frequency.exponentialRampToValueAtTime(60, t + 2.4);
-    const g = ambEnv(ctx, t, {a:0.02, d:2.6, pic:1});
-    n.connect(f).connect(g).connect(out); fini(n, 2.8);
-    const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 42;
-    const gs = ambEnv(ctx, t, {a:0.05, d:2.2, pic:0.5});
-    sub.connect(gs).connect(out); fini(sub, 2.5);
-  } else if (nom === 'porte') {
-    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300;
-    const g = ambEnv(ctx, t, {a:0.002, d:0.16, pic:0.9});
-    n.connect(f).connect(g).connect(out); fini(n, 0.25);
-    const o = ctx.createOscillator(); o.type = 'sine';
-    o.frequency.setValueAtTime(85, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
-    const go = ambEnv(ctx, t, {a:0.002, d:0.22, pic:0.8});
-    o.connect(go).connect(out); fini(o, 0.3);
-  } else if (nom === 'epees') {
-    for (const [fr, dt] of [[2450, 0], [3100, 0.012], [1850, 0.02]]) {
-      const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = fr;
-      const g = ambEnv(ctx, t + dt, {a:0.001, d:0.22, pic:0.16});
-      o.connect(g).connect(out); o.start(t + dt); o.stop(t + dt + 0.3);
-    }
-    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 3200;
-    const g = ambEnv(ctx, t, {a:0.001, d:0.12, pic:0.5});
-    n.connect(f).connect(g).connect(out); fini(n, 0.2);
-  } else if (nom === 'fleche') {
-    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 9;
-    f.frequency.setValueAtTime(700, t); f.frequency.exponentialRampToValueAtTime(2600, t + 0.28);
-    const g = ambEnv(ctx, t, {a:0.01, d:0.3, pic:0.5});
-    n.connect(f).connect(g).connect(out); fini(n, 0.35);
-    const o = ctx.createOscillator(); o.frequency.setValueAtTime(130, t + 0.3);
-    o.frequency.exponentialRampToValueAtTime(70, t + 0.4);
-    const go = ambEnv(ctx, t + 0.3, {a:0.002, d:0.12, pic:0.7});
-    o.connect(go).connect(out); o.start(t + 0.3); o.stop(t + 0.45);
-  } else if (nom === 'zap') {
-    const o = ctx.createOscillator(); o.type = 'sawtooth';
-    o.frequency.setValueAtTime(1400, t); o.frequency.exponentialRampToValueAtTime(120, t + 0.4);
-    const g = ambEnv(ctx, t, {a:0.004, d:0.42, pic:0.5});
-    o.connect(g).connect(out); fini(o, 0.5);
-    const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 5000;
-    const gn = ambEnv(ctx, t, {a:0.002, d:0.3, pic:0.25});
-    n.connect(f).connect(gn).connect(out); fini(n, 0.35);
-  } else if (nom === 'cor') {
-    for (const [fr, pic] of [[174, 0.5], [261, 0.3], [349, 0.18]]) {
-      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(fr * 0.94, t);
-      o.frequency.linearRampToValueAtTime(fr, t + 0.18);
-      const g = ambEnv(ctx, t, {a:0.14, d:1.5, pic});
-      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1500;
-      o.connect(f).connect(g).connect(out); fini(o, 1.8);
-    }
-  } else if (nom === 'cloche') {
-    for (const [fr, pic, dur] of [[520, 0.5, 3], [693, 0.3, 2.4], [1247, 0.18, 1.8], [1560, 0.1, 1.2]]) {
-      const o = ctx.createOscillator(); o.frequency.value = fr;
-      const g = ambEnv(ctx, t, {a:0.003, d:dur, pic});
-      o.connect(g).connect(out); fini(o, dur + 0.2);
-    }
-  } else if (nom === 'coeur') {
-    for (const dt of [0, 0.32]) {
-      const o = ctx.createOscillator(); o.frequency.value = dt ? 48 : 58;
-      const g = ambEnv(ctx, t + dt, {a:0.015, d:0.22, pic: dt ? 0.6 : 0.85});
-      o.connect(g).connect(out); o.start(t + dt); o.stop(t + dt + 0.3);
-    }
-  } else if (nom === 'craquement') {
-    for (let i = 0; i < 7; i++) {
-      const dt = i * 0.045 + Math.random() * 0.02;
-      const n = ambNoise(ctx), f = ctx.createBiquadFilter(); f.type = 'bandpass';
-      f.frequency.value = 900 + Math.random() * 1800; f.Q.value = 4;
-      const g = ambEnv(ctx, t + dt, {a:0.001, d:0.05, pic:0.4});
-      n.connect(f).connect(g).connect(out); n.start(t + dt); n.stop(t + dt + 0.08);
-    }
-  } else if (nom === 'spectre') {
-    const o = ctx.createOscillator(); o.type = 'sine';
-    o.frequency.setValueAtTime(520, t); o.frequency.linearRampToValueAtTime(310, t + 1.6);
-    const v = ctx.createOscillator(); v.frequency.value = 6.5;
-    const vg = ctx.createGain(); vg.gain.value = 22;
-    v.connect(vg).connect(o.frequency);
-    const g = ambEnv(ctx, t, {a:0.25, d:1.7, pic:0.35});
-    o.connect(g).connect(out); fini(o, 2); fini(v, 2);
+  const osc = (type, f, t0) => { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t0 ?? t); return o; };
+  const bruit = () => ambNoise(ctx);
+  const filtre = (type, f, q) => { const x = ctx.createBiquadFilter(); x.type = type; x.frequency.value = f; if (q) x.Q.value = q; return x; };
+  const dist = (k2) => { const w = ctx.createWaveShaper(); const c = new Float32Array(512);
+    for (let i2 = 0; i2 < 512; i2++){ const x = i2/256 - 1; c[i2] = Math.tanh(x * k2); } w.curve = c; return w; };
+  const chaine = (...n) => { for (let i2 = 0; i2 < n.length - 1; i2++) n[i2].connect(n[i2+1]); return n[n.length-1]; };
+
+  switch (nom) {
+    case 'tonnerre': { const s = bruit(); const f = filtre('lowpass', 300);
+      f.frequency.exponentialRampToValueAtTime(60, t + 2.4);
+      chaine(s, f, ambEnv(ctx, t, {a:0.01, d:2.6, pic:1}), out); s.start(t); s.stop(t + 2.8); break; }
+
+    case 'clash': { /* choc d'épées : impact + résonances métalliques désaccordées, double frappe */
+      for (const dt of [0, 0.32]) {
+        const b = bruit(); const hp = filtre('highpass', 2400, 1.5);
+        chaine(b, hp, ambEnv(ctx, t + dt, {a:0.002, d:0.09, pic: dt ? 0.55 : 0.85}), out);
+        b.start(t + dt); b.stop(t + dt + 0.12);
+        for (const [f, g] of [[1870, 0.32],[2519, 0.24],[3466, 0.16],[5210, 0.09]]) {
+          const o = osc('sine', f * (1 + (Math.random()-0.5)*0.01), t + dt);
+          chaine(o, ambEnv(ctx, t + dt + 0.004, {a:0.001, d:0.9 - dt*0.4, pic: g * (dt ? 0.7 : 1)}), out);
+          o.start(t + dt); o.stop(t + dt + 1.1);
+        }
+      } break; }
+
+    case 'hache': { /* sifflement lourd puis impact et bois fendu */
+      const w = bruit(); const bp = filtre('bandpass', 300, 1.2);
+      bp.frequency.exponentialRampToValueAtTime(900, t + 0.28);
+      chaine(w, bp, ambEnv(ctx, t, {a:0.03, d:0.26, pic:0.5}), out); w.start(t); w.stop(t + 0.32);
+      const th = osc('sine', 82, t + 0.3); th.frequency.exponentialRampToValueAtTime(46, t + 0.42);
+      chaine(th, ambEnv(ctx, t + 0.3, {a:0.003, d:0.22, pic:0.95}), out); th.start(t + 0.3); th.stop(t + 0.62);
+      for (let i2 = 0; i2 < 5; i2++) { const dt = 0.31 + i2 * 0.028 + Math.random()*0.012;
+        const c = bruit(); const f = filtre('bandpass', 1400 + Math.random()*900, 5);
+        chaine(c, f, ambEnv(ctx, t + dt, {a:0.001, d:0.05, pic:0.4}), out); c.start(t + dt); c.stop(t + dt + 0.07); }
+      break; }
+
+    case 'eclat': { /* éclat magique : glissando scintillant + poussière d'étoiles */
+      for (const [f0, f1, g] of [[620, 1980, 0.3],[830, 2620, 0.22],[1040, 3320, 0.16],[415, 1245, 0.2]]) {
+        const o = osc('sine', f0); o.frequency.exponentialRampToValueAtTime(f1, t + 1.1);
+        chaine(o, ambEnv(ctx, t, {a:0.05, d:2.1, pic:g}), out); o.start(t); o.stop(t + 2.4);
+      }
+      const sc = bruit(); const hp = filtre('highpass', 6500, 2);
+      const lfo = osc('square', 13); const lg = ctx.createGain(); lg.gain.value = 0.5;
+      const sg = ctx.createGain(); sg.gain.value = 0.5;
+      lfo.connect(lg); lg.connect(sg.gain);
+      chaine(sc, hp, sg, ambEnv(ctx, t + 0.15, {a:0.1, d:2, pic:0.28}), out);
+      lfo.start(t); sc.start(t); sc.stop(t + 2.4); lfo.stop(t + 2.4); break; }
+
+    case 'sombre': { /* magie sombre : houle grave + cloche fêlée descendante */
+      const sub = osc('sine', 68); sub.frequency.exponentialRampToValueAtTime(41, t + 2.6);
+      chaine(sub, ambEnv(ctx, t, {a:0.25, d:2.7, pic:0.8}), out); sub.start(t); sub.stop(t + 3.1);
+      for (const [f, g] of [[311, 0.3],[467, 0.2],[701, 0.12]]) {
+        const o = osc('sine', f); o.frequency.exponentialRampToValueAtTime(f * 0.82, t + 2.4);
+        chaine(o, ambEnv(ctx, t + 0.1, {a:0.02, d:2.4, pic:g}), out); o.start(t + 0.1); o.stop(t + 2.8);
+      } break; }
+
+    case 'cloche2': { /* cloche d'église : partiels inharmoniques, frappe, 7 s de résonance */
+      const F = 220;
+      for (const [r, g, dur] of [[0.5, 0.5, 7],[1, 0.42, 6.4],[1.183, 0.14, 4.5],[1.506, 0.2, 5.2],[2.0, 0.16, 4.2],[2.514, 0.1, 3],[2.662, 0.07, 2.6],[3.011, 0.05, 2.2],[4.166, 0.035, 1.6]]) {
+        const o = osc('sine', F * r);
+        chaine(o, ambEnv(ctx, t, {a:0.004, d:dur, pic:g}), out); o.start(t); o.stop(t + dur + 0.3);
+      }
+      const fr = bruit(); const bp = filtre('bandpass', 2600, 3);
+      chaine(fr, bp, ambEnv(ctx, t, {a:0.001, d:0.05, pic:0.5}), out); fr.start(t); fr.stop(t + 0.08); break; }
+
+    case 'craquement2': { /* bois qui cède : trois salves de fibres */
+      for (const [t0, n2, pic] of [[0, 4, 0.5],[0.45, 6, 0.8],[0.85, 3, 0.4]])
+        for (let i2 = 0; i2 < n2; i2++) {
+          const dt = t0 + i2 * 0.03 + Math.random()*0.02;
+          const c = bruit(); const f = filtre('bandpass', 700 + Math.random()*1600, 6);
+          chaine(c, f, ambEnv(ctx, t + dt, {a:0.001, d:0.05, pic: pic * (0.6 + Math.random()*0.4)}), out);
+          c.start(t + dt); c.stop(t + dt + 0.08);
+        }
+      const th = osc('sine', 95, t + 0.85); th.frequency.exponentialRampToValueAtTime(55, t + 1.05);
+      chaine(th, ambEnv(ctx, t + 0.85, {a:0.005, d:0.25, pic:0.5}), out); th.start(t + 0.85); th.stop(t + 1.2); break; }
+
+    case 'loup': { /* hurlement : deux voix vibrées, montée-plateau-retombée */
+      for (const [det, g, dly] of [[1, 0.55, 0],[1.007, 0.3, 0.12]]) {
+        const o = osc('sine', 340 * det, t + dly);
+        o.frequency.exponentialRampToValueAtTime(720 * det, t + dly + 0.7);
+        o.frequency.setValueAtTime(720 * det, t + dly + 1.5);
+        o.frequency.exponentialRampToValueAtTime(430 * det, t + dly + 2.6);
+        const vib = osc('sine', 5.2); const vg = ctx.createGain(); vg.gain.value = 11;
+        vib.connect(vg); vg.connect(o.frequency);
+        const fm = filtre('bandpass', 900, 0.8);
+        chaine(o, fm, ambEnv(ctx, t + dly, {a:0.25, d:2.7, pic:g}), out);
+        vib.start(t + dly); o.start(t + dly); o.stop(t + dly + 3); vib.stop(t + dly + 3);
+        const h = osc('sine', 680 * det, t + dly);
+        h.frequency.exponentialRampToValueAtTime(1440 * det, t + dly + 0.7);
+        h.frequency.setValueAtTime(1440 * det, t + dly + 1.5);
+        h.frequency.exponentialRampToValueAtTime(860 * det, t + dly + 2.6);
+        chaine(h, ambEnv(ctx, t + dly, {a:0.3, d:2.5, pic:g*0.22}), out);
+        h.start(t + dly); h.stop(t + dly + 3);
+      }
+      const souffle = bruit(); const bf = filtre('bandpass', 1000, 1.5);
+      chaine(souffle, bf, ambEnv(ctx, t, {a:0.4, d:2.6, pic:0.06}), out);
+      souffle.start(t); souffle.stop(t + 3); break; }
+
+    case 'rugissement': { /* dragon : gorge saturée + formant qui s'ouvre, retombée grave */
+      const g1 = osc('sawtooth', 58); g1.frequency.exponentialRampToValueAtTime(36, t + 2.6);
+      const g2 = osc('sawtooth', 87.5); g2.frequency.exponentialRampToValueAtTime(54, t + 2.6);
+      const grr = osc('sine', 24); const gg = ctx.createGain(); gg.gain.value = 16;
+      grr.connect(gg); gg.connect(g1.frequency);
+      const mix = ctx.createGain(); g1.connect(mix); g2.connect(mix);
+      const fo = filtre('bandpass', 220, 1.1); fo.frequency.exponentialRampToValueAtTime(760, t + 0.5);
+      fo.frequency.exponentialRampToValueAtTime(180, t + 2.7);
+      chaine(mix, dist(4.5), fo, ambEnv(ctx, t, {a:0.12, d:2.9, pic:0.9}), out);
+      const air = bruit(); const af = filtre('bandpass', 900, 0.7);
+      chaine(air, af, ambEnv(ctx, t, {a:0.1, d:2.6, pic:0.22}), out);
+      grr.start(t); g1.start(t); g2.start(t); air.start(t);
+      for (const n2 of [grr, g1, g2]) n2.stop(t + 3.2); air.stop(t + 3); break; }
+
+    case 'chauves': { /* nuée : battements amples + trisses aiguës */
+      const b = bruit(); const hp = filtre('highpass', 1800, 1);
+      const flap = osc('sine', 11); const fg = ctx.createGain(); fg.gain.value = 0.5;
+      const vca = ctx.createGain(); vca.gain.value = 0.5;
+      flap.connect(fg); fg.connect(vca.gain);
+      chaine(b, hp, vca, ambEnv(ctx, t, {a:0.15, d:2.8, pic:0.5}), out);
+      flap.start(t); b.start(t); b.stop(t + 3.1); flap.stop(t + 3.1);
+      for (const dt of [0.5, 1.15, 1.7, 2.3]) {
+        const c = osc('sine', 7600 + Math.random()*1200, t + dt);
+        c.frequency.exponentialRampToValueAtTime(5200, t + dt + 0.09);
+        chaine(c, ambEnv(ctx, t + dt, {a:0.004, d:0.09, pic:0.16}), out);
+        c.start(t + dt); c.stop(t + dt + 0.12);
+      } break; }
+
+    case 'galop': { /* triolets de sabots, 4 secondes */
+      const motif = [0, 0.11, 0.22];
+      for (let cycle = 0; cycle < 8; cycle++)
+        motif.forEach((m2, im) => {
+          const dt = cycle * 0.46 + m2;
+          const o = osc('sine', im === 2 ? 68 : 88, t + dt);
+          o.frequency.exponentialRampToValueAtTime(40, t + dt + 0.09);
+          chaine(o, ambEnv(ctx, t + dt, {a:0.002, d:0.11, pic: im === 2 ? 0.8 : 0.45}), out);
+          o.start(t + dt); o.stop(t + dt + 0.15);
+          const c = bruit(); const f = filtre('bandpass', 1500, 3);
+          chaine(c, f, ambEnv(ctx, t + dt, {a:0.001, d:0.025, pic:0.1}), out);
+          c.start(t + dt); c.stop(t + dt + 0.04);
+        });
+      break; }
+
+    case 'eau': { /* jet d'eau : gerbe + gouttes + ruissellement */
+      const j = bruit(); const bp = filtre('bandpass', 950, 0.9);
+      bp.frequency.exponentialRampToValueAtTime(420, t + 1.2);
+      chaine(j, bp, ambEnv(ctx, t, {a:0.015, d:1.3, pic:0.8}), out); j.start(t); j.stop(t + 1.5);
+      for (let i2 = 0; i2 < 9; i2++) {
+        const dt = 0.25 + Math.random()*1.5;
+        const g = osc('sine', 1900 + Math.random()*2400, t + dt);
+        g.frequency.exponentialRampToValueAtTime(700, t + dt + 0.05);
+        chaine(g, ambEnv(ctx, t + dt, {a:0.002, d:0.06, pic:0.12}), out);
+        g.start(t + dt); g.stop(t + dt + 0.09);
+      }
+      const r = bruit(); const hp = filtre('highpass', 2600);
+      chaine(r, hp, ambEnv(ctx, t + 0.5, {a:0.3, d:1.6, pic:0.12}), out); r.start(t + 0.5); r.stop(t + 2.4); break; }
+
+    case 'petrif': { /* pétrification : broyage descendant, paliers, bloc final */
+      const g = bruit(); const lp = filtre('lowpass', 460, 3);
+      lp.frequency.exponentialRampToValueAtTime(85, t + 2.6);
+      chaine(g, dist(2.5), lp, ambEnv(ctx, t, {a:0.06, d:2.7, pic:0.65}), out); g.start(t); g.stop(t + 2.9);
+      for (const dt of [0.6, 1.2, 1.8, 2.4]) {
+        const c = bruit(); const f = filtre('bandpass', 620 - dt*120, 5);
+        chaine(c, f, ambEnv(ctx, t + dt, {a:0.002, d:0.08, pic:0.5}), out);
+        c.start(t + dt); c.stop(t + dt + 0.1);
+      }
+      const fin2 = osc('sine', 60, t + 2.75); fin2.frequency.exponentialRampToValueAtTime(34, t + 3.05);
+      chaine(fin2, ambEnv(ctx, t + 2.75, {a:0.004, d:0.4, pic:0.9}), out); fin2.start(t + 2.75); fin2.stop(t + 3.3); break; }
+
+    case 'porte2': { /* porte qui claque : grincement bref, claquement massif, loquet */
+      const gr = osc('sawtooth', 130); gr.frequency.linearRampToValueAtTime(210, t + 0.28);
+      const gf = filtre('bandpass', 900, 8);
+      chaine(gr, gf, ambEnv(ctx, t, {a:0.03, d:0.26, pic:0.14}), out); gr.start(t); gr.stop(t + 0.3);
+      const cl = osc('sine', 74, t + 0.34); cl.frequency.exponentialRampToValueAtTime(42, t + 0.46);
+      chaine(cl, ambEnv(ctx, t + 0.34, {a:0.002, d:0.3, pic:1}), out); cl.start(t + 0.34); cl.stop(t + 0.75);
+      for (const [f, g] of [[176, 0.35],[241, 0.22],[334, 0.12]]) {
+        const o = osc('sine', f, t + 0.34);
+        chaine(o, ambEnv(ctx, t + 0.345, {a:0.002, d:0.5, pic:g}), out); o.start(t + 0.34); o.stop(t + 0.95);
+      }
+      const b = bruit(); const bf = filtre('highpass', 3200);
+      chaine(b, bf, ambEnv(ctx, t + 0.52, {a:0.002, d:0.05, pic:0.3}), out); b.start(t + 0.52); b.stop(t + 0.6); break; }
+
+    case 'brume': { /* corne de brume : deux fondamentales battantes, enflée-tenue-relâchée */
+      for (const [f, g] of [[64, 0.7],[128.6, 0.4],[193, 0.14]]) {
+        const o = osc('sine', f);
+        const e = ctx.createGain();
+        e.gain.setValueAtTime(0.0001, t);
+        e.gain.exponentialRampToValueAtTime(g, t + 0.7);
+        e.gain.setValueAtTime(g, t + 2.6);
+        e.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
+        chaine(o, e, out); o.start(t); o.stop(t + 4);
+      }
+      const so = bruit(); const lp = filtre('lowpass', 340);
+      chaine(so, lp, ambEnv(ctx, t, {a:0.7, d:3, pic:0.1}), out); so.start(t); so.stop(t + 3.8); break; }
+
+    case 'brasier': { /* feu nourri : ronflement grave + crépitements granulaires, 7 s */
+      const r = bruit(); const lp = filtre('lowpass', 260, 0.8);
+      const mod = osc('sine', 0.9); const mg = ctx.createGain(); mg.gain.value = 60;
+      mod.connect(mg); mg.connect(lp.frequency);
+      chaine(r, lp, ambEnv(ctx, t, {a:0.4, d:6.6, pic:0.55}), out);
+      mod.start(t); r.start(t); r.stop(t + 7.2); mod.stop(t + 7.2);
+      for (let i2 = 0; i2 < 42; i2++) {
+        const dt = 0.15 + Math.random()*6.6;
+        const c = bruit(); const f = filtre('bandpass', 1600 + Math.random()*3200, 7);
+        chaine(c, f, ambEnv(ctx, t + dt, {a:0.001, d:0.03 + Math.random()*0.04, pic:0.16 + Math.random()*0.22}), out);
+        c.start(t + dt); c.stop(t + dt + 0.09);
+      } break; }
+
+    case 'torche': { /* embrasement : souffle d'ignition puis crépitement décroissant */
+      const w = bruit(); const bp = filtre('bandpass', 500, 0.8);
+      bp.frequency.exponentialRampToValueAtTime(1400, t + 0.25);
+      bp.frequency.exponentialRampToValueAtTime(600, t + 0.8);
+      chaine(w, bp, ambEnv(ctx, t, {a:0.02, d:0.85, pic:0.6}), out); w.start(t); w.stop(t + 1);
+      for (let i2 = 0; i2 < 14; i2++) {
+        const dt = 0.4 + Math.random()*2.2;
+        const c = bruit(); const f = filtre('bandpass', 2000 + Math.random()*2600, 7);
+        chaine(c, f, ambEnv(ctx, t + dt, {a:0.001, d:0.03, pic:0.2 * (1 - dt/3)}), out);
+        c.start(t + dt); c.stop(t + dt + 0.06);
+      } break; }
+
+    case 'epees': { for (const dt of [0, 0.3]) { const b = bruit(); const hp = filtre('highpass', 2500, 1.5);
+      chaine(b, hp, ambEnv(ctx, t + dt, {a:0.002, d:0.12, pic:0.8}), out); b.start(t + dt); b.stop(t + dt + 0.15); } break; }
+    case 'porte': { const o = osc('sine', 70); o.frequency.exponentialRampToValueAtTime(40, t + 0.18);
+      chaine(o, ambEnv(ctx, t, {a:0.003, d:0.3, pic:1}), out); o.start(t); o.stop(t + 0.5); break; }
+    case 'fleche': { const b = bruit(); const bp = filtre('bandpass', 2000, 2);
+      bp.frequency.exponentialRampToValueAtTime(600, t + 0.25);
+      chaine(b, bp, ambEnv(ctx, t, {a:0.005, d:0.25, pic:0.6}), out); b.start(t); b.stop(t + 0.3); break; }
+    case 'zap': { const o = osc('sawtooth', 800); o.frequency.exponentialRampToValueAtTime(120, t + 0.35);
+      chaine(o, filtre('lowpass', 2400), ambEnv(ctx, t, {a:0.005, d:0.35, pic:0.5}), out); o.start(t); o.stop(t + 0.45); break; }
+    case 'cloche': { for (const [r, g] of [[1, 0.5],[2.4, 0.2],[4.1, 0.08]]) {
+        const o = osc('sine', 660 * r); chaine(o, ambEnv(ctx, t, {a:0.003, d:1.8, pic:g}), out); o.start(t); o.stop(t + 2); } break; }
+    case 'coeur': { for (const dt of [0, 0.55, 1.1, 1.65]) for (const [d2, g] of [[0, 1],[0.16, 0.6]]) {
+        const o = osc('sine', 58, t + dt + d2); o.frequency.exponentialRampToValueAtTime(36, t + dt + d2 + 0.1);
+        chaine(o, ambEnv(ctx, t + dt + d2, {a:0.005, d:0.16, pic:g*0.9}), out);
+        o.start(t + dt + d2); o.stop(t + dt + d2 + 0.25); } break; }
+    case 'craquement': { for (let i2 = 0; i2 < 5; i2++) { const dt = i2 * 0.04;
+        const c = bruit(); const f = filtre('bandpass', 900 + Math.random()*1400, 6);
+        chaine(c, f, ambEnv(ctx, t + dt, {a:0.001, d:0.05, pic:0.5}), out); c.start(t + dt); c.stop(t + dt + 0.08); } break; }
+    case 'spectre': { const o = osc('sine', 520); o.frequency.exponentialRampToValueAtTime(180, t + 1.6);
+      const vib = osc('sine', 6); const vg = ctx.createGain(); vg.gain.value = 22;
+      vib.connect(vg); vg.connect(o.frequency);
+      chaine(o, ambEnv(ctx, t, {a:0.2, d:1.6, pic:0.5}), out); vib.start(t); o.start(t); o.stop(t + 1.9); vib.stop(t + 1.9); break; }
+    case 'cor': { const o = osc('sawtooth', 233); const o2 = osc('sawtooth', 233 * 1.5, t + 0.5);
+      chaine(o, filtre('lowpass', 900), ambEnv(ctx, t, {a:0.06, d:1.1, pic:0.6}), out);
+      chaine(o2, filtre('lowpass', 1100), ambEnv(ctx, t + 0.5, {a:0.06, d:1, pic:0.5}), out);
+      o.start(t); o.stop(t + 1.3); o2.start(t + 0.5); o2.stop(t + 1.7); break; }
+    default: { const o = osc('sine', 440); chaine(o, ambEnv(ctx, t, {a:0.01, d:0.3, pic:0.5}), out); o.start(t); o.stop(t + 0.4); }
   }
 }
 function ambVisibles(){ return amb.scenes.filter(s => amb.theme === 'tous' || (s.theme || 'perso') === amb.theme); }
@@ -10578,6 +10747,7 @@ const bm = {
   sel: null, projOn: false, showWalls: true, showRange: true,
   calib: { cm: 60, lock: false },
   projFollow: true, projCentre: null, alignP1: null,
+  selMulti: [],
   wallDraft: null,
   selGab: null, gabCouleurI: 0, pings: [], _pingRaf: null,
   imgs: new Map(), tokImgs: new Map(), fogCv: new Map(), fogDirty: new Set(),
@@ -10687,6 +10857,7 @@ window._bmGabTool = function(){
     ? 'Gabarits : choisis la forme et la taille (m), clique pour poser. Glisse pour déplacer, touche R pour pivoter (Maj+R en sens inverse), ✕ pour retirer. Visible des joueurs en projection.'
     : 'Outil déplacement standard.');
 };
+(function(){ const r0 = bmRender; bmRender = function(){ r0(); bmAnimKick(); }; })();
 window._bmGabRot = function(sens){
   const g = bmSelGabObj(); if (!g) return;
   g.angle = (g.angle + (sens || 1) * Math.PI / 12) % (Math.PI * 2);
@@ -10739,12 +10910,18 @@ function bmPing(x, y){
   bm.pings.push({ x, y, t0: performance.now() });
   if (!bm._pingRaf) bmPingLoop();
 }
-function bmPingLoop(){
-  const vivants = bm.pings.some(p => performance.now() - p.t0 < 2200);
+function bmAnimNecessaire(){
+  const m = bmMap();
+  return bm.pings.length > 0 || !!(m && (m.gabarits||[]).some(g => g.effet));
+}
+function bmPingLoop(ts){
   bm.pings = bm.pings.filter(p => performance.now() - p.t0 < 2200);
-  bmRender();
-  if (vivants) bm._pingRaf = requestAnimationFrame(bmPingLoop);
+  if (!bm._animT || !ts || (ts - bm._animT) > 32) { bm._animT = ts || 0; bmRender(); }
+  if (bmAnimNecessaire() && !document.hidden) bm._pingRaf = requestAnimationFrame(bmPingLoop);
   else bm._pingRaf = null;
+}
+function bmAnimKick(){
+  if (bmAnimNecessaire() && !bm._pingRaf && !document.hidden) bm._pingRaf = requestAnimationFrame(bmPingLoop);
 }
 window._bmTokHide = function(){
   const t = bmSelTok(); if (!t) return;
@@ -10895,6 +11072,11 @@ if (!window.__jnHooked) {
     try { jnEvt('🕊 Fin du combat (round ' + (window._combatState.round || '?') + ')'); }
     catch(_) { jnEvt('🕊 Fin du combat'); }
   });
+  jnHook('_combatNextTurn', () => { try { bmInitRender(); } catch(_){} });
+  if (typeof window._combatRender === 'function') {
+    const cr0 = window._combatRender;
+    window._combatRender = function(){ const r = cr0.apply(this, arguments); try { bmInitRender(); } catch(_){} return r; };
+  } else { setInterval(() => { try { bmInitRender(); } catch(_){} }, 1500); }
   jnHook('_bmProjToggle', () => {
     try {
       const m = bm.maps.find(x => x.id === bm.cur);
@@ -11115,7 +11297,8 @@ window._bmTokensFromCombat = function(){
     if (c.dead || m.tokens.some(t => t.nom === c.name)) continue;
     const mon = c.kind === 'monster';
     const gros = mon && /Géant|Dragon|TG|Gig/i.test(c.sub || '');
-    const img = mon && typeof spellSlug === 'function' ? 'assets/bestiaire/' + spellSlug(c.baseName || c.name) + '.jpg' : '';
+    const img = c.avatar ? c.avatar
+      : (typeof spellSlug === 'function' && (mon || c.baseName)) ? 'assets/bestiaire/' + spellSlug(c.baseName || c.name) + '.jpg' : '';
     m.tokens.push(bmNewToken(c.name, mon ? '#b03030' : '#4a90d9', img, gros ? 2 : 1)); n++;
   }
   bmSave(); bmRender();
@@ -11123,6 +11306,70 @@ window._bmTokensFromCombat = function(){
 };
 window._bmTokSize = function(d){ const t = bmSelTok(); if (!t) return; t.taille = Math.max(0.5, Math.min(4, t.taille + d * 0.5)); bmSave(); bmRender(); };
 window._bmTokColor = function(){ const t = bmSelTok(); if (!t) return; t.couleur = BM_COULEURS[(BM_COULEURS.indexOf(t.couleur) + 1) % BM_COULEURS.length]; bmSave(); bmRender(); };
+function bmInitRender(){
+  const bar = document.getElementById('bmInitBar'); if (!bar) return;
+  const st = window._combatState;
+  if (!st || !st.active || !st.combatants || !st.combatants.length) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = st.combatants.map((c, i) => {
+    const actif = i === (st.turnIndex || 0);
+    const img = c.avatar ? c.avatar
+      : (typeof spellSlug === 'function' && (c.kind === 'monster' || c.baseName)) ? 'assets/bestiaire/' + spellSlug(c.baseName || c.name) + '.jpg' : '';
+    const pct = c.hpMax ? Math.max(0, Math.min(100, Math.round(100 * c.hp / c.hpMax))) : 0;
+    const ini = (c.name || '?').replace(/^[^A-Za-zÀ-ÿ0-9]*/, '').slice(0, 2).toUpperCase();
+    return `<div class="bmi-chip ${c.kind === 'monster' ? 'bmi-m' : 'bmi-p'} ${actif ? 'bmi-actif' : ''} ${c.dead ? 'bmi-mort' : ''}"
+      title="${(c.name||'').replace(/"/g,'&quot;')} — PV ${c.hp}/${c.hpMax}${c.init !== '' ? ' · init ' + c.init : ''}"
+      data-nom="${(c.name||'').replace(/"/g,'&quot;')}">
+      ${img ? `<img src="${img}" onerror="this.remove()">` : ''}<span class="bmi-ini">${ini}</span>
+      <div class="bmi-pv"><div style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('') + `<div class="bmi-round">R${st.round || 1}</div>`;
+  bar.onclick = e => {
+    const chip = e.target.closest('.bmi-chip');
+    if (chip) window._bmInitFocus(chip.dataset.nom);
+  };
+}
+window._bmInitFocus = function(nom){
+  const m = bmMap(); if (!m) return;
+  const t = m.tokens.find(x => x.nom === nom); if (!t) return;
+  bm.sel = t.id; bm.selMulti = [t.id];
+  const cvel = document.getElementById('bmCanvas');
+  if (cvel) {
+    const W = cvel.width / bmDPR(), H = cvel.height / bmDPR();
+    bm.view.x = W / 2 - t.x * bm.view.k;
+    bm.view.y = H / 2 - t.y * bm.view.k;
+  }
+  bmRefreshUI(); bmRender();
+};
+window._bmTokJoin = function(){
+  const t = bmSelTok(); if (!t) return;
+  const st = window._combatState;
+  if (!st.active) { bmStatus('Aucun combat actif — lance d\'abord le tracker.'); return; }
+  if (st.combatants.some(c => c.name === t.nom)) { bmStatus('« ' + t.nom + ' » est déjà au combat.'); return; }
+  const base = t.nom.replace(/\s+\d+$/, '');
+  const mo = (COMPENDIUM_DATA.monster || []).find(x => x.name === base);
+  const pc = t.couleur === '#4a90d9';
+  const pv = mo ? _combatParseHp(mo.hp) : 10;
+  st.combatants.push({ kind: pc ? 'pc' : 'monster', baseName: base, name: t.nom,
+    sub: mo ? ('RC ' + (mo.cr || '?')) : 'Depuis la carte',
+    init: '', initBonus: mo ? _combatMod(_combatParseDexFromMonster(mo)) : 0,
+    hp: pv, hpMax: pv, ac: mo ? (parseInt(mo.ac) || 10) : 10, dead: false });
+  if (typeof window._combatRender === 'function') window._combatRender();
+  bmInitRender();
+  bmStatus('« ' + t.nom + ' » entre au combat' + (mo ? ' (fiche ' + base + ' du bestiaire).' : '.'));
+};
+window._bmTokFlee = function(){
+  const t = bmSelTok(); if (!t) return;
+  const st = window._combatState;
+  const ix = (st.combatants || []).findIndex(c => c.name === t.nom);
+  if (ix < 0) { bmStatus('« ' + t.nom + ' » n\'est pas au combat.'); return; }
+  st.combatants.splice(ix, 1);
+  if (st.turnIndex > ix) st.turnIndex--;
+  if (st.turnIndex >= st.combatants.length) st.turnIndex = 0;
+  if (typeof window._combatRender === 'function') window._combatRender();
+  bmInitRender();
+  bmStatus('« ' + t.nom + ' » quitte le combat (fuite).');
+};
 window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) return; m.tokens = m.tokens.filter(x => x.id !== t.id); bm.sel = null; bmSave(); bmRender(); };
 function bmSelTok(){ const m = bmMap(); return m ? m.tokens.find(t => t.id === bm.sel) : null; }
 
@@ -11353,6 +11600,116 @@ function bmProjCentre(m){
     y: base.length ? base.reduce((a, t) => a + t.y, 0) / base.length : (m.h||0) / 2,
   };
 }
+const BM_FX = {
+  feu:     { tpl: 'rgba(255,120,30,VAR)' },
+  glace:   { tpl: 'rgba(150,215,255,VAR)' },
+  eau:     { tpl: 'rgba(70,150,255,VAR)' },
+  foudre:  { tpl: 'rgba(255,235,120,VAR)' },
+  terrain: { tpl: 'rgba(165,125,70,VAR)' },
+  gaz:     { tpl: 'rgba(125,205,95,VAR)' },
+  lumiere: { tpl: 'rgba(255,240,190,VAR)' },
+  vent:    { tpl: 'rgba(185,220,235,VAR)' },
+  necro:   { tpl: 'rgba(155,95,205,VAR)' },
+};
+function bmHexTpl(hex){
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},VAR)`;
+}
+function bmRng(seed){ let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+function bmGabFxDraw(ctx, m, gb, now, vk){
+  if (!gb.effet || !BM_FX[gb.effet]) return;
+  const g = m.grid.px, port = (gb.taille / BM_CASE_M) * g;
+  ctx.save();
+  bmGabPath(ctx, m, gb);
+  ctx.clip();
+  const rng = bmRng(gb.seed || 1), T = now / 1000;
+  const base = gb.couleur.replace('VAR', '1').match(/\d+/g).slice(0,3).join(',');
+  const boxR = port * 1.1;
+  if (gb.effet === 'feu') {
+    for (let i = 0; i < 26; i++) {
+      const a0 = rng() * Math.PI * 2, r0 = Math.sqrt(rng()) * boxR * 0.9, ph = rng(), vx = (rng() - 0.5) * 14;
+      const cyc = (T * (0.5 + rng() * 0.6) + ph) % 1;
+      const x = gb.x + Math.cos(a0) * r0 + vx * cyc, y = gb.y + Math.sin(a0) * r0 - cyc * g * 1.1;
+      ctx.globalAlpha = (1 - cyc) * 0.7;
+      ctx.fillStyle = cyc < 0.4 ? 'rgba(255,220,120,1)' : `rgba(${base},1)`;
+      ctx.beginPath(); ctx.arc(x, y, (1 - cyc * 0.6) * 3.2 / vk, 0, 7); ctx.fill();
+    }
+  } else if (gb.effet === 'glace') {
+    for (let i = 0; i < 18; i++) {
+      const a0 = rng() * Math.PI * 2, r0 = Math.sqrt(rng()) * boxR * 0.92, ph = rng(), ang = rng() * Math.PI;
+      const tw = 0.4 + 0.6 * Math.abs(Math.sin(T * (0.8 + rng()) * 2 + ph * 6));
+      const x = gb.x + Math.cos(a0) * r0, y = gb.y + Math.sin(a0) * r0, L = (3 + rng() * 5) / vk;
+      ctx.globalAlpha = tw * 0.8; ctx.strokeStyle = 'rgba(220,245,255,1)'; ctx.lineWidth = 1.2 / vk;
+      ctx.beginPath(); ctx.moveTo(x - Math.cos(ang) * L, y - Math.sin(ang) * L); ctx.lineTo(x + Math.cos(ang) * L, y + Math.sin(ang) * L);
+      ctx.moveTo(x - Math.sin(ang) * L * 0.6, y + Math.cos(ang) * L * 0.6); ctx.lineTo(x + Math.sin(ang) * L * 0.6, y - Math.cos(ang) * L * 0.6);
+      ctx.stroke();
+    }
+  } else if (gb.effet === 'eau') {
+    for (let i = 0; i < 5; i++) {
+      const ph = i / 5, cyc = (T * 0.45 + ph) % 1;
+      ctx.globalAlpha = (1 - cyc) * 0.5;
+      ctx.strokeStyle = `rgba(${base},1)`; ctx.lineWidth = 2 / vk;
+      ctx.beginPath(); ctx.arc(gb.x, gb.y, cyc * boxR, 0, 7); ctx.stroke();
+    }
+  } else if (gb.effet === 'foudre') {
+    const flash = Math.sin(T * 9 + Math.floor(T * 2.1) * 7) > 0.55;
+    if (flash) for (let b = 0; b < 3; b++) {
+      let x = gb.x + (rng() - 0.5) * boxR * 0.5, y = gb.y - boxR * 0.6;
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = 'rgba(255,255,220,1)'; ctx.lineWidth = 1.6 / vk;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { x += (rng() - 0.5) * g * 0.8; y += rng() * g * 0.55; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = flash ? 0.2 : 0.05;
+    ctx.fillStyle = `rgba(${base},1)`; ctx.fillRect(gb.x - boxR, gb.y - boxR, boxR * 2, boxR * 2);
+  } else if (gb.effet === 'terrain') {
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = `rgba(${base},1)`; ctx.lineWidth = 1.4 / vk;
+    for (let i = 0; i < 22; i++) {
+      const a0 = rng() * Math.PI * 2, r0 = Math.sqrt(rng()) * boxR * 0.95, ang = rng() * Math.PI, L = (3 + rng() * 4) / vk;
+      const x = gb.x + Math.cos(a0) * r0, y = gb.y + Math.sin(a0) * r0;
+      ctx.beginPath(); ctx.moveTo(x - Math.cos(ang) * L, y - Math.sin(ang) * L); ctx.lineTo(x + Math.cos(ang) * L, y + Math.sin(ang) * L); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x + 3/vk, y + 2/vk, 1.6/vk, 0, 7); ctx.stroke();
+    }
+  } else if (gb.effet === 'gaz') {
+    for (let i = 0; i < 10; i++) {
+      const a0 = rng() * Math.PI * 2, r0 = Math.sqrt(rng()) * boxR * 0.8, ph = rng();
+      const x = gb.x + Math.cos(a0) * r0 + Math.sin(T * 0.7 + ph * 9) * g * 0.25;
+      const y = gb.y + Math.sin(a0) * r0 + Math.cos(T * 0.5 + ph * 7) * g * 0.2;
+      ctx.globalAlpha = 0.16 + 0.1 * Math.sin(T + ph * 6);
+      ctx.fillStyle = `rgba(${base},1)`;
+      ctx.beginPath(); ctx.arc(x, y, (g * 0.35) * (0.7 + 0.4 * ph), 0, 7); ctx.fill();
+    }
+  } else if (gb.effet === 'lumiere') {
+    const pulse = 0.55 + 0.45 * Math.sin(T * 2.2);
+    const gr = ctx.createRadialGradient(gb.x, gb.y, 0, gb.x, gb.y, boxR);
+    gr.addColorStop(0, `rgba(${base},${0.4 * pulse})`);
+    gr.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.globalAlpha = 1; ctx.fillStyle = gr;
+    ctx.fillRect(gb.x - boxR, gb.y - boxR, boxR * 2, boxR * 2);
+  } else if (gb.effet === 'vent') {
+    const dir = gb.angle || 0;
+    for (let i = 0; i < 14; i++) {
+      const ph = rng(), lat = (rng() - 0.5) * boxR * 1.6, cyc = (T * (0.8 + rng() * 0.5) + ph) % 1;
+      const d = (cyc - 0.5) * boxR * 2.2, L = g * 0.5;
+      const x = gb.x + Math.cos(dir) * d - Math.sin(dir) * lat, y = gb.y + Math.sin(dir) * d + Math.cos(dir) * lat;
+      ctx.globalAlpha = Math.sin(cyc * Math.PI) * 0.55;
+      ctx.strokeStyle = `rgba(${base},1)`; ctx.lineWidth = 1.4 / vk;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(dir) * L, y + Math.sin(dir) * L); ctx.stroke();
+    }
+  } else if (gb.effet === 'necro') {
+    for (let i = 0; i < 14; i++) {
+      const a0 = rng() * Math.PI * 2, r0 = Math.sqrt(rng()) * boxR * 0.85, ph = rng();
+      const cyc = (T * (0.3 + rng() * 0.3) + ph) % 1;
+      const x = gb.x + Math.cos(a0) * r0 + Math.sin(cyc * 6 + ph * 9) * g * 0.12;
+      const y = gb.y + Math.sin(a0) * r0 - cyc * g * 0.9;
+      ctx.globalAlpha = Math.sin(cyc * Math.PI) * 0.5;
+      ctx.strokeStyle = `rgba(${base},1)`; ctx.lineWidth = 2.2 / vk; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y + 5 / vk); ctx.quadraticCurveTo(x + 3 / vk, y, x, y - 5 / vk); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
 function bmCellCss(Wcss){
   const scrW = bm._projScrW || Wcss;
   if (!bm.calib.cm || !scrW) return 0;
@@ -11508,6 +11865,7 @@ function bmScene(ctx, W, H, mode){
     bmGabPath(ctx, m, gb);
     ctx.lineWidth = 1 / v.k;
     ctx.strokeStyle = 'rgba(255,248,225,0.5)';
+    bmGabFxDraw(ctx, m, gb, performance.now(), v.k);
     if (false) ctx.strokeStyle = gb.couleur.replace('VAR', mode === 'gm' && bm.selGab === gb.id ? '1' : '0.75');
     if (mode === 'gm' && bm.selGab === gb.id) ctx.setLineDash([8 / v.k, 5 / v.k]);
     ctx.stroke();
@@ -11544,6 +11902,10 @@ function bmScene(ctx, W, H, mode){
     ctx.restore();
     ctx.lineWidth = Math.max(2, r * 0.09);
     ctx.strokeStyle = (mode === 'gm' && bm.sel === t.id) ? '#ffe9a8' : t.couleur;
+    if (mode === 'gm' && bm.selMulti && bm.selMulti.length > 1 && bm.selMulti.includes(t.id)) {
+      ctx.save(); ctx.setLineDash([6 / v.k, 5 / v.k]); ctx.strokeStyle = '#ffd86e';
+      ctx.lineWidth = 2.5 / v.k; ctx.beginPath(); ctx.arc(t.x, t.y, r + 5 / v.k, 0, 7); ctx.stroke(); ctx.restore();
+    }
     ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, 7); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(10, r * 0.5)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -11732,7 +12094,11 @@ function bmInitCanvas(){
         const taille = Math.max(1.5, parseFloat(document.getElementById('bmGabTaille').value) || 4.5);
         const gb = { id: 'gb_' + Math.random().toString(36).slice(2, 8), forme, taille,
                      x: p.x, y: p.y, angle: 0,
-                     couleur: BM_GAB_COULEURS[bm.gabCouleurI++ % BM_GAB_COULEURS.length] };
+                     couleur: BM_GAB_COULEURS[bm.gabCouleurI++ % BM_GAB_COULEURS.length],
+        effet: (document.getElementById('bmGabFx')||{}).value || '', seed: Math.floor(Math.random()*1e6) };
+      const colEl = document.getElementById('bmGabCol');
+      if (colEl && colEl.dataset.touche) gb.couleur = bmHexTpl(colEl.value);
+      else if (gb.effet && BM_FX[gb.effet]) gb.couleur = BM_FX[gb.effet].tpl;
         m.gabarits.push(gb); bm.selGab = gb.id; bmSave();
       }
       bmRender(); return;
@@ -11760,7 +12126,18 @@ function bmInitCanvas(){
     }
     if (bm.tool === 'fog') { bm.drag = { kind: 'fog' }; bmFogPaint(p); return; }
     const t = [...m.tokens].reverse().find(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2 + 4 / bm.view.k);
-    if (t) { bm.sel = t.id; bm.drag = { kind: 'tok', id: t.id, dx: t.x - p.x, dy: t.y - p.y }; }
+    if (t) { if (e.ctrlKey) {
+          const ix = bm.selMulti.indexOf(t.id);
+          if (ix >= 0) bm.selMulti.splice(ix, 1); else bm.selMulti.push(t.id);
+          bm.sel = ix >= 0 ? (bm.selMulti[0] || null) : t.id;
+          bm.drag = null; bmRefreshUI(); bmRender(); return;
+        }
+        bm.sel = t.id;
+        if (!bm.selMulti.includes(t.id)) bm.selMulti = [t.id];
+        const p0g = toMap(pos(e));
+        bm.drag = { kind: 'tok', id: t.id,
+          groupe: bm.selMulti.map(gid => m.tokens.find(x => x.id === gid)).filter(Boolean)
+            .map(gt => ({ id: gt.id, dx: gt.x - p0g.x, dy: gt.y - p0g.y })) }; }
     else { bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
     bmRender();
   });
@@ -11794,8 +12171,11 @@ function bmInitCanvas(){
       bm.view.x = bm.drag.vx + (e.clientX - bm.drag.x0);
       bm.view.y = bm.drag.vy + (e.clientY - bm.drag.y0);
     } else if (bm.drag.kind === 'tok') {
-      const p = toMap(pos(e)), t = m.tokens.find(x => x.id === bm.drag.id);
-      if (t) { t.x = p.x + bm.drag.dx; t.y = p.y + bm.drag.dy; }
+      const p = toMap(pos(e));
+      for (const g of (bm.drag.groupe || [])) {
+        const t = m.tokens.find(x => x.id === g.id);
+        if (t) { t.x = p.x + g.dx; t.y = p.y + g.dy; }
+      }
     } else if (bm.drag.kind === 'cadr') {
       const p = toMap(pos(e));
       bm.projCentre = { x: p.x, y: p.y };
@@ -11812,8 +12192,9 @@ function bmInitCanvas(){
   const fin = () => {
     const m = bmMap();
     if (m && bm.drag && bm.drag.kind === 'tok' && m.grid.snap && m.grid.show) {
-      const t = m.tokens.find(x => x.id === bm.drag.id);
-      if (t) {
+      for (const gdrop of (bm.drag.groupe || [])) {
+        const t = m.tokens.find(x => x.id === gdrop.id);
+        if (!t) continue;
         const g = m.grid.px, demi = t.taille % 2 ? g / 2 : 0;
         t.x = (m.grid.ox||0) + Math.round((t.x - demi - (m.grid.ox||0)) / g) * g + demi;
         t.y = (m.grid.oy||0) + Math.round((t.y - demi - (m.grid.oy||0)) / g) * g + demi;
@@ -14384,6 +14765,30 @@ html .bm-tokctl button, html #bmGabCtl button {
   border:1px solid rgba(200,168,90,0.4); border-radius:4px; padding:4px 8px; cursor:pointer;
 }
 html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(240,210,140,0.9); color:#fff3d6; }
+
+/* barre d'initiative façon BG3 (écran MJ) */
+.bm-canvas-wrap { position:relative; }
+#bmInitBar { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:30;
+  display:none; align-items:flex-end; gap:6px; padding:6px 10px; border-radius:10px;
+  background:linear-gradient(180deg, rgba(10,7,3,0.85), rgba(24,16,7,0.75));
+  border:1px solid rgba(200,168,90,0.4); box-shadow:0 6px 20px rgba(0,0,0,0.5);
+  max-width:92%; overflow-x:auto; }
+.bmi-chip { position:relative; width:40px; height:40px; border-radius:50%; flex:0 0 auto;
+  border:2px solid; cursor:pointer; overflow:hidden; background:#241708;
+  transition:transform .15s ease, box-shadow .15s ease; }
+.bmi-chip img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
+.bmi-ini { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:#e8dcc2; font-size:0.7rem; font-weight:700; z-index:0; }
+.bmi-p { border-color:#4a90d9; }
+.bmi-m { border-color:#b03030; }
+.bmi-actif { transform:scale(1.28) translateY(-3px); border-color:#f0d89a;
+  box-shadow:0 0 14px rgba(216,178,100,0.7); z-index:2; }
+.bmi-mort { filter:grayscale(1) brightness(0.5); }
+.bmi-pv { position:absolute; left:3px; right:3px; bottom:2px; height:4px; border-radius:2px;
+  background:rgba(0,0,0,0.65); overflow:hidden; z-index:3; }
+.bmi-pv div { height:100%; background:linear-gradient(90deg,#7fc36a,#b8d84f); }
+.bmi-round { align-self:center; color:#c8a85c; font-size:0.66rem; letter-spacing:1px;
+  padding:0 4px; font-family:var(--font-title); }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
@@ -14531,6 +14936,13 @@ html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(24
         <option value="ligne">Ligne</option><option value="cube">Cube</option>
       </select>
       <input type="number" id="bmGabTaille" class="bm-num" min="1.5" max="36" step="1.5" value="4.5" title="Taille du gabarit (mètres)">
+      <select id="bmGabFx" class="bm-sel" style="min-width:96px" title="Effet visuel animé du gabarit">
+        <option value="">Sans effet</option><option value="feu">Feu</option><option value="glace">Glace</option>
+        <option value="eau">Eau</option><option value="foudre">Foudre</option><option value="terrain">Terrain difficile</option>
+        <option value="gaz">Gaz</option><option value="lumiere">Lumière</option><option value="vent">Vent</option>
+        <option value="necro">Nécrotique</option>
+      </select>
+      <input type="color" id="bmGabCol" value="#f0b43c" title="Couleur du gabarit" onchange="this.dataset.touche='1'" style="width:34px;height:30px;padding:2px;border-radius:4px;border:1px solid rgba(200,168,90,0.45);background:rgba(22,15,6,0.9);cursor:pointer">
       <button class="bm-btn" id="bmGabBtn" onclick="window._bmGabTool()" title="Poser des gabarits de sorts, visibles des joueurs">Gabarit</button>
     </div>
     <div class="bmc-grp"><span class="bmc-lab">Grille</span>
@@ -14555,7 +14967,7 @@ html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(24
       <button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">Guide</button>
     </div>
   </div>
-  <div class="bm-canvas-wrap" id="bmCanvasWrap">
+  <div class="bm-canvas-wrap" id="bmCanvasWrap"><div id="bmInitBar"></div>
     <canvas id="bmCanvas"></canvas>
     <div id="bmGabCtl">
       <button onclick="window._bmGabRot(-1)" title="Pivoter de 15° (Maj+R)">Rot −15°</button>
@@ -14569,6 +14981,8 @@ html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(24
       <button onclick="window._bmTokTorch()" id="bmTorchBtn" title="Halo de lumière dans le brouillard, arrêté par les murs">Torche</button>
       <button onclick="window._bmTokSpeed()" title="Vitesse de déplacement (mètres)">Vitesse</button>
       <button onclick="window._bmTokHide()" id="bmHideBtn" title="Invisible des joueurs en projection">Cacher</button>
+      <button onclick="window._bmTokJoin()" title="Faire entrer ce pion dans le combat (fiche du bestiaire si le nom correspond)">Au combat</button>
+      <button onclick="window._bmTokFlee()" title="Retirer ce combattant du combat">Fuite</button>
       <button onclick="window._bmTokDel()">Retirer</button>
     </div>
   </div>
