@@ -1300,7 +1300,7 @@ function computeMulticlassCasterLevel(classes, subclasses) {
 // Retourne les emplacements de sorts pour un personnage
 // ── Cartes de sorts illustrées (assets/sorts/{slug}.jpg = face, {slug}_txt.jpg = verso) ──
 const SPELL_ASSET_BASE = 'assets/sorts/';
-function spellSlug(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+function spellSlug(s){ return (s||'').replace(/œ/g,'oe').replace(/Œ/g,'oe').replace(/æ/g,'ae').replace(/Æ/g,'ae').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
 const SPELL_CARD_SET = new Set(['absorption-des-elements','agrandissement-rapetissement','aide','alarme','allie-planaire','amelioration-de-competences','amis','amitie-avec-les-animaux','animation-d-objets','animation-des-morts','antidetection','apaisement-des-emotions','apparence-trompeuse','appel-de-destrier','appel-de-destrier-superieur','appel-de-familier','appel-de-la-foudre','arme-elementaire','arme-magique','arme-sacree','arme-spirituelle','armure-d-agathys','armure-de-mage','arret-du-temps','aspersion-d-acide','assignation-infernale','assistance','attraction-terrestre','aube','augure','aura-de-purete','aura-de-vie','aura-de-vitalite','aura-du-croise','aura-magique-de-nystul','aura-sacree','aversion-attirance','bagou','baies-nourricieres','bannissement','barriere-de-lames','benediction','blessure','bosquet-des-druides','bouche-magique','bouclier','bouclier-de-feu','bouclier-de-la-foi','bouffee-de-poison','boule-de-feu','boule-de-feu-a-retardement','bourrasque','brume-mortelle','cage-de-force','cage-des-ames','carquois-magique','catapulte','cecite-surdite','cercle-de-mort','cercle-de-pouvoir','cercle-de-teleportation','cercle-magique','ceremonie','chaine-d-eclairs','champ-antimagie','changement-de-forme','changement-de-plan','charme-monstre','charme-personne','chatiment-aveuglant','chatiment-calcinant','chatiment-courrouce','chatiment-debilitant','chatiment-du-ban','chatiment-revelateur','chatiment-tonitruant','chien-de-garde-de-mordenkainen','clairvoyance','clignotement','clone','coffre-secret-de-leomund','collet','colonne-de-flamme','communication-a-distance','communication-avec-les-animaux','communication-avec-les-morts','communication-avec-les-plantes','communion','communion-avec-la-nature','comprehension-des-langues','compulsion','cone-de-froid','confusion','contact-avec-un-autre-plan','contact-glacial','contagion','contamination','contrat','contresort','controle-de-l-eau','controle-des-flammes','controle-des-vents','controle-du-climat','convocation-d-aberration','convocation-d-artificiel','convocation-d-elementaire','convocation-d-esprit-draconique','convocation-de-bete','convocation-de-celeste','convocation-de-demon-majeur','convocation-de-demons-mineurs','convocation-de-fee','convocation-de-fielon','convocation-de-mort-vivant','convocation-de-rejeton-d-ombre','convocations-instantanees-de-drawmij','coquille-antivie','corde-enchantee','cordon-de-fleches','costume-d-outremonde-de-tasha','couleurs-dansantes','coup-au-but','coup-de-tonnerre','couronne-d-etoiles','couronne-du-dement','couteau-de-glace','creation','creation-d-homoncule','creation-de-mort-vivant','creation-de-nourriture-et-d-eau','creation-ou-destruction-d-eau','croissance-d-epines','croissance-vegetale','danse-irresistible-d-otto','danse-macabre','deblocage','decharge-occulte','dedale','deguisement','delivrance-des-maledictions','deluge-d-energie-negative','demi-plan','desintegration','detection-de-la-magie','detection-des-pensees','detection-du-mal-et-du-bien','detection-du-poison-et-des-maladies','discours-captivant','dispersion','disque-flottant-de-tenser','dissimulation','dissipation-de-la-magie','dissipation-du-mal-et-du-bien','divination','doigt-de-mort','domination-de-bete','domination-de-monstre','domination-de-personne','don-des-langues','double-illusoire','dragon-illusoire','druidisme','duel-force','eclair','eclair-de-chaos','eclair-tracant','eclat-du-soleil','embrasement','emprisonnement','enchevetrement','enervation','ennemi-subconscient','ennemis-a-foison','epee-de-mordenkainen','epine-mentale','eruption-de-lames','eruption-de-terre','esprit-faible','esprit-guerisseur','esprit-impenetrable','esprits-gardiens','eveil','fabrication','faconnage-de-l-eau','faconnage-de-la-pierre','faconnage-de-la-terre','faveur-divine','ferrage-foudroyant','festin-des-heros','feu-gregeois','feuille-morte','flambee-d-aganazzar','flamme-eternelle','flamme-sacree','flammes','fleau','fleau-d-insectes','fleau-elementaire','fleche-acide-de-melf','fleche-de-foudre','fleches-enflammees','fletrissement','fletrissure-epouvantable-d-abi-dalzim','flou','force-fantasmagorique','forme-etheree','forme-gazeuse','formes-animales','forteresse-d-intellect','forteresse-majestueuse','fou-rire-de-tasha','fouet-epineux','fouet-mental-de-tasha','foulee-brumeuse','foulee-dimensionnelle','foulee-tonitruante','fracassement','frappe-du-vent-d-acier','frappe-du-zephyr','frappe-piegeuse','frayeur','fureur-de-la-nature','fusion-dans-la-pierre','gardien-de-la-foi','gardien-de-la-nature','gelure','glas','globe-d-invulnerabilite','glyphe-de-protection','gourdin-magique','graisse','grande-foulee','grele-d-epines','guerison','guerison-de-groupe','hate','heroisme','hurlement-psychique','identification','illusion-mineure','illusion-programmee','image-majeure','image-miroir','image-silencieuse','immobilisation-de-monstre','immobilisation-de-personne','immolation','infestation','injonction','insecte-geant','interdiction','inversion-de-la-gravite','invisibilite','invisibilite-superieure','invocation-d-animaux','invocation-d-elementaire','invocation-d-elementaires-mineurs','invocation-d-etres-sylvestres','invocation-de-celeste','invocation-de-fee','invocation-de-projectiles','invocation-de-volee','invulnerabilite','lame-aux-flammes-vertes','lame-d-ombres','lame-de-feu','lame-du-desastre','lame-retentissante','lenteur','levitation','liane-avide','libelle-aerien','liberte-de-mouvement','lien-avec-une-bete','lien-de-protection','lien-telepathique-de-rary','localisation-d-animaux-ou-de-plantes','localisation-d-objet','localisation-de-creature','lueur-d-espoir','lueurs-dansantes','lueurs-feeriques','lumiere','lumiere-du-jour','lumieres-dansantes','maelstrom','main-de-bigby','main-de-mage','mains-brulantes','malediction','malefice','manoir-somptueux-de-mordenkainen','marche-sur-l-eau','marche-sur-le-vent','marque-du-chasseur','mauvais-oeil','message','messager-animal','metal-brulant','metamorphose','metamorphose-de-groupe','metamorphose-supreme','minuscules-meteores-de-melf','mirage','mixture-caustique-de-tasha','modification-d-apparence','modification-de-memoire','monture-fantome','moquerie-cruelle','mort-simulee','mot-de-guerison','mot-de-guerison-de-groupe','mot-de-pouvoir-etourdissant','mot-de-pouvoir-guerisseur','mot-de-pouvoir-mortel','mot-de-radiance','mot-de-retour','motif-hypnotique','mur-d-eau','mur-d-epines','mur-de-feu','mur-de-force','mur-de-glace','mur-de-lumiere','mur-de-pierre','mur-de-sable','mur-de-vent','mur-prismatique','murmures-dissonants','mythes-et-legendes','nappe-de-brouillard','nuage-incendiaire','nuage-nauseabond','nuee-de-boules-de-neige-de-snilloc','nuee-de-dagues','nuee-de-meteores','oeil-magique','ombre-d-egarement','orbe-chromatique','ossements-de-la-terre','parole-divine','passage-par-les-arbres','passage-sans-trace','passe-muraille','pattes-d-araignee','peau-d-ecorce','peau-de-pierre','perturbations-synaptiques','petite-hutte-de-leomund','petrification','peur','pierre-magique','piqure-mentale','poigne-electrique','poigne-terreuse-de-maximilien','portail','portail-magique','porte-dimensionnelle','premonition','preservation-des-morts','prestidigitation','prevoyance','priere-de-guerison','prison-mentale','projectile-magique','projection-astrale','projection-d-image','protection-contre-la-mort','protection-contre-le-mal-et-le-bien','protection-contre-le-poison','protection-contre-les-armes','protection-contre-une-energie','protection-primordiale','protections-et-sceaux','purification-de-nourriture-et-d-eau','pyrotechnie','quete','rappel-a-la-vie','rayon-affaiblissant','rayon-ardent','rayon-de-givre','rayon-de-lune','rayon-de-soleil','rayon-empoisonne','rayonnement-ecoeurant','rayons-prismatiques','raz-de-maree','regeneration','reincarnation','reparation','repli-expeditif','represailles-infernales','resistance','respiration-aquatique','restauration-partielle','restauration-superieure','resurrection','resurrection-supreme','retour-a-la-vie','sacre-de-la-glace','sacre-de-la-pierre','sacre-des-flammes','sacre-du-vent','sanctification','sanctuaire','sanctuaire-prive-de-mordenkainen','saut','saute-de-vent','sauvagerie-primitive','scrutation','secousse-sismique','sens-animal','sens-de-l-orientation','sens-des-pieges','serviteur-invisible','serviteur-miniature','sieste','silence','simulacre','simulacre-de-vie','soins','soins-de-groupe','sommeil','songe','songe-du-voile-bleu','souffle-du-dragon','souhait','sphere-aqueuse','sphere-de-feu','sphere-de-tempete','sphere-de-vitriol','sphere-glaciale-d-otiluke','sphere-resiliente-d-otiluke','stabilisation','suggestion','suggestion-de-groupe','symbole','telekinesie','telepathie','teleportation','tempete-de-feu','tempete-de-grele','tempete-de-neige','tempete-vengeresse','temple-des-dieux','tenebres','tenebres-oppressantes','tentacules-de-hadar','tentacules-noirs-d-evard','terraformage','terrain-hallucinatoire','texte-illusoire','thaumaturgie','toile-d-araignee','toucher-du-vampire','tourbillon','tourbillon-de-poussiere','trait-de-feu','trait-ensorcele','transfert-de-vie','transformation-de-tenser','transmutation-de-la-pierre','tremblement-de-terre','tsunami','urne-magique','vague-destructrice','vague-tonnante','vent-protecteur','verrou-magique','vision-dans-le-noir','vision-supreme','voie-vegetale','voile-spirituel','voir-l-invisible','vol','voracite-de-hadar','zone-de-verite']);
 window._spellCardFace = (name) => { const s = spellSlug(name); return SPELL_CARD_SET.has(s) ? SPELL_ASSET_BASE + s + '.jpg' : ''; };
 window._spellCardText = (name) => { const s = spellSlug(name); return SPELL_CARD_SET.has(s) ? SPELL_ASSET_BASE + s + '_txt.jpg' : ''; };
@@ -5619,6 +5619,11 @@ function lvlStepHp(main, b) {
       ${LVL.hpMode==='roll' ? `
         <div class="lvl-die ${LVL.hpRoll?'rolled':''}" onclick="window._lvlRollHp()">${LVL.hpRoll||'d'+c.hd}</div>
         <p class="wiz-hint" style="text-align:center">${LVL.hpRoll?`Relance possible avant confirmation — clique sur le dé.`:`Clique sur le dé pour lancer 1d${c.hd}.`}</p>
+        <div class="lvl-hp-manuel">ou lance tes <strong>vrais dés</strong> à la table :
+          <input type="number" id="lvlHpManuel" min="1" max="${c.hd}" inputmode="numeric" placeholder="1–${c.hd}"
+            value="${LVL.hpRoll||''}" onkeydown="if(event.key==='Enter')window._lvlHpSaisie(${c.hd})">
+          <button class="wiz-btn-ghost" onclick="window._lvlHpSaisie(${c.hd})">Inscrire</button>
+        </div>
         ${LVL.hpRoll?`<div class="lvl-hp-sum">🎲 ${LVL.hpRoll} + ${b.conMod} (CON) = <strong>+${b.hpGain} PV</strong></div>`:''}
       ` : `
         <div class="lvl-hp-sum big">${b.hpText} = <strong>+${b.hpGain} PV</strong></div>
@@ -5630,6 +5635,12 @@ function lvlStepHp(main, b) {
     </div>`;
 }
 window._lvlHpMode = (m) => { LVL.hpMode = m; lvlRender(); };
+window._lvlHpSaisie = (max) => {
+  const el = document.getElementById('lvlHpManuel');
+  const v = parseInt(el && el.value, 10);
+  if (!v || v < 1 || v > max) { alert('Inscris un résultat entre 1 et ' + max + '.'); return; }
+  LVL.hpRoll = v; lvlRender();
+};
 window._lvlRollHp = () => {
   const c = lvlClassData(); if (!c) return;
   LVL.hpRoll = Math.floor(Math.random()*c.hd)+1;
@@ -9386,6 +9397,34 @@ const HIBOU_LS_KEY = 'kubbnd_ia_key', HIBOU_LS_MODEL = 'kubbnd_ia_model';
 let hibouHist = [];      // {role, content} — mémoire de session
 let hibouBusy = false;
 
+async function hibouCleGroupe(){
+  if (window.__hibouGK !== undefined) return window.__hibouGK;
+  window.__hibouGK = '';
+  try {
+    for (const g of (window._currentGroups || [])) {
+      const snap = await getDoc(doc(db, 'groups', g.id));
+      if (snap.exists() && snap.data().hibouKey) { window.__hibouGK = snap.data().hibouKey; break; }
+    }
+  } catch(_){}
+  return window.__hibouGK;
+}
+window._hibouPartagerCle = async function(){
+  const k = (document.getElementById('hibouKey')?.value || localStorage.getItem(HIBOU_LS_KEY) || '').trim();
+  if (!k) { alert('Saisis d\'abord ta clé.'); return; }
+  const grps = (window._currentGroups || []).filter(g => (window._grpGm||{})[g.id] !== false);
+  if (!grps.length) { alert('Aucun groupe trouvé.'); return; }
+  if (!confirm('Partager ta clé API avec ' + grps.length + ' groupe(s) ?\n\n⚠ Chaque membre du groupe pourra l\'utiliser via Hibouquin — et techniquement la lire. À réserver à une table de confiance ; les appels seront facturés sur TON compte Anthropic.')) return;
+  for (const g of grps) { try { await updateDoc(doc(db, 'groups', g.id), { hibouKey: k }); } catch(_){} }
+  window.__hibouGK = undefined;
+  alert('Clé partagée. « Révoquer » pour la retirer à tout moment.');
+};
+window._hibouRevoquerCle = async function(){
+  for (const g of (window._currentGroups || [])) {
+    try { await updateDoc(doc(db, 'groups', g.id), { hibouKey: deleteField() }); } catch(_){}
+  }
+  window.__hibouGK = undefined;
+  alert('Partage révoqué sur tous tes groupes.');
+};
 const HIBOU_PERSONA = `Tu es Hibouquin, un petit owlin mage érudit, mascotte de l'application KubbNd (compagnon de jeu D&D 5e en français). Tu es chaleureux, enthousiaste, un brin pédant mais attendrissant — tu ponctues parfois d'un discret "hou hou". Tu réponds en français, de façon CONCISE (2-6 phrases sauf si on te demande du contenu créatif). Règles importantes :
 - Pour les questions de règles ou de sorts, appuie-toi d'abord sur les EXTRAITS DU GRIMOIRE fournis (ce sont les données officielles de cette table, y compris ses variantes maison) ; si l'extrait contredit ta mémoire des règles D&D, l'extrait gagne.
 - Si tu n'es pas sûr, dis-le simplement et rappelle que le MJ tranche.
@@ -9610,7 +9649,8 @@ function hibouAddMsg(cls, html){
 }
 
 async function hibouSend(text){
-  const key = localStorage.getItem(HIBOU_LS_KEY);
+  let key = localStorage.getItem(HIBOU_LS_KEY) || '';
+  if (!key) key = await hibouCleGroupe();
   if (!key) { hibouToggleSettings(true); return; }
   if (hibouBusy || !text || !text.trim()) return;
   hibouBusy = true;
@@ -9801,56 +9841,58 @@ const amb = {
 };
 const AMB_THEMES = [['tous','✦','Tous'],['ville','🏘','Ville'],['nature','🌲','Nature'],['souterrain','🗝','Souterrains'],['mer','⛵','Mer'],['plans','🌌','Plans'],['situation','⚔','Situations'],['perso','★','Mes scènes']];
 const AMB_NAPPES_DEFAUT = [
-  ['Vent','🌬','https://sounds.tabletopaudio.com/138_Desert_Winds.mp3'],
-  ['Blizzard','🌨','https://sounds.tabletopaudio.com/130_Russian_Winter.mp3'],
-  ['Pluie','🌧','https://sounds.tabletopaudio.com/40_The_Long_Rain.mp3'],
-  ['Pluie au village','🏘','https://sounds.tabletopaudio.com/235_Rainy_Village.mp3'],
-  ['Orage lointain','⛈','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3'],
-  ['Feu de camp','🔥','https://sounds.tabletopaudio.com/51_Woodland_Campsite.mp3'],
-  ['Taverne (brouhaha)','🍺','https://sounds.tabletopaudio.com/255_The_Hearth_Inn.mp3'],
-  ['Foule','🗣','https://sounds.tabletopaudio.com/56_Medieval_Town.mp3'],
-  ['Nuit d\'été (criquets)','🦗','https://sounds.tabletopaudio.com/69_Forest_Night.mp3'],
-  ['Nuit de jungle','🌴','https://sounds.tabletopaudio.com/27_Xingu_Nights.mp3'],
-  ['Marais (grenouilles)','🐸','https://sounds.tabletopaudio.com/223_Salt_Marsh.mp3'],
-  ['Rivière','🛶','https://sounds.tabletopaudio.com/104_River_Town.mp3'],
-  ['Vagues','🌊','https://sounds.tabletopaudio.com/132_Open_Ocean.mp3'],
-  ['Mouettes du port','🕊','https://sounds.tabletopaudio.com/75_Docks_District.mp3'],
-  ['Craquements de navire','⛵','https://sounds.tabletopaudio.com/126_Endless_Voyage.mp3'],
-  ['Gouttes de caverne','💧','https://sounds.tabletopaudio.com/184_Underground_Lake.mp3'],
+  ['Vent','🌬','https://sounds.tabletopaudio.com/138_Desert_Winds.mp3','météo'],
+  ['Blizzard','🌨','https://sounds.tabletopaudio.com/130_Russian_Winter.mp3','météo'],
+  ['Pluie','🌧','https://sounds.tabletopaudio.com/40_The_Long_Rain.mp3','météo'],
+  ['Pluie au village','🏘','https://sounds.tabletopaudio.com/235_Rainy_Village.mp3','météo'],
+  ['Orage lointain','⛈','https://sounds.tabletopaudio.com/9_Before_The_Storm.mp3','météo'],
+  ['Tempête','🌩','https://sounds.tabletopaudio.com/60_Dark_and_Stormy.mp3','météo'],
+  ['Plaines ventées','🌾','https://sounds.tabletopaudio.com/96_Windswept_Plains_b.mp3','météo'],
+  ['Taverne (brouhaha)','🍺','https://sounds.tabletopaudio.com/255_The_Hearth_Inn.mp3','lieux'],
+  ['Foule','🗣','https://sounds.tabletopaudio.com/56_Medieval_Town.mp3','lieux'],
+  ['Marché','🧺','https://sounds.tabletopaudio.com/163_Medieval_Fair.mp3','lieux'],
+  ['Feu de camp','🔥','https://sounds.tabletopaudio.com/51_Woodland_Campsite.mp3','lieux'],
+  ['Nuit d\'été (criquets)','🦗','https://sounds.tabletopaudio.com/69_Forest_Night.mp3','nature'],
+  ['Forêt','🌲','https://sounds.tabletopaudio.com/161_Forest_Day.mp3','nature'],
+  ['Jungle','🌴','https://sounds.tabletopaudio.com/20_Dark_Continent_aa.mp3','nature'],
+  ['Col de montagne','⛰','https://sounds.tabletopaudio.com/64_Mountain_Pass.mp3','nature'],
+  ['Gouttes de caverne','💧','https://sounds.tabletopaudio.com/184_Underground_Lake.mp3','souterrain'],
+  ['Catacombes','🪦','https://sounds.tabletopaudio.com/37_Catacombs.mp3','souterrain'],
+  ['Profondeurs','🕳','https://sounds.tabletopaudio.com/170_The_Underdark.mp3','souterrain'],
 ];
 const AMB_SHOTS_URL = 'https://cdn.jsdelivr.net/gh/wesnoth/wesnoth@master/data/core/sounds/';
 const AMB_SHOTS_DEFAUT = [
-  ['Tonnerre','⚡','lightning.ogg','url','tonnerre'],
-  ['Choc d\'épées','⚔','clash','synth',null],
-  ['Hache','🪓','hache','synth',null],
-  ['Masse d\'armes','🔨','mace.ogg','url','porte'],
-  ['Flèche','🏹','bow.ogg','url','fleche'],
-  ['Dague furtive','🗡','throwing-knife.ogg','url','fleche'],
-  ['Explosion','💥','explosion.ogg','url','zap'],
-  ['Brasier','🔥','brasier','synth',null],
-  ['Torche','🔦','torche','synth',null],
-  ['Éclat magique','✨','eclat','synth',null],
-  ['Magie sombre','🌑','sombre','synth',null],
-  ['Soin','💚','heal.wav','url','cloche'],
-  ['Potion','🧪','potion.ogg','url','zap'],
-  ['Butin','💰','gold.ogg','url','cloche'],
-  ['Coffre','📦','open-chest.wav','url','porte'],
-  ['Éboulement','🪨','cave-in.ogg','url','tonnerre'],
-  ['Grondement','🌋','rumble.ogg','url','tonnerre'],
-  ['Craquement','🪵','craquement2','synth',null],
-  ['Hurlement spectral','👻','wail-sml.wav','url','spectre'],
-  ['Cri de rapace','🦅','gryphon-shriek-1.ogg','url','spectre'],
-  ['Hurlement de loup','🐺','loup','synth',null],
-  ['Rugissement de monstre','🐉','rugissement','synth',null],
-  ['Chauve-souris','🦇','chauves','synth',null],
-  ['Galop','🐴','galop','synth',null],
-  ['Jet d\'eau','🌊','eau','synth',null],
-  ['Pétrification','🗿','petrif','synth',null],
-  ['Porte qui claque','🚪','porte2','synth',null],
-  ['Cor de guerre','📯','cor','synth',null],
-  ['Corne de brume','🚢','brume','synth',null],
-  ['Cloche','🔔','cloche2','synth',null],
-  ['Battement de cœur','💓','coeur','synth',null],
+  ['Choc d\'épées','⚔','clash','synth',null,'armes'],
+  ['Hache','🪓','hache','synth',null,'armes'],
+  ['Masse d\'armes','🔨','mace.ogg','url','porte','armes'],
+  ['Flèche','🏹','bow.ogg','url','fleche','armes'],
+  ['Dague furtive','🗡','throwing-knife.ogg','url','fleche','armes'],
+  ['Éclat magique','✨','eclat','synth',null,'magie'],
+  ['Magie sombre','🌑','sombre','synth',null,'magie'],
+  ['Soin','💚','heal.wav','url','cloche','magie'],
+  ['Potion','🧪','potion.ogg','url','zap','magie'],
+  ['Explosion','💥','explosion.ogg','url','zap','magie'],
+  ['Pétrification','🗿','petrif','synth',null,'magie'],
+  ['Hurlement de loup','🐺','loup','synth',null,'créatures'],
+  ['Rugissement de monstre','🐉','rugissement','synth',null,'créatures'],
+  ['Chauve-souris','🦇','chauves','synth',null,'créatures'],
+  ['Cri de rapace','🦅','gryphon-shriek-1.ogg','url','spectre','créatures'],
+  ['Hurlement spectral','👻','wail-sml.wav','url','spectre','créatures'],
+  ['Galop','🐴','galop','synth',null,'créatures'],
+  ['Porte qui claque','🚪','porte2','synth',null,'matière'],
+  ['Coffre','📦','open-chest.wav','url','porte','matière'],
+  ['Butin','💰','gold.ogg','url','cloche','matière'],
+  ['Craquement','🪵','craquement2','synth',null,'matière'],
+  ['Éboulement','🪨','cave-in.ogg','url','tonnerre','matière'],
+  ['Grondement','🌋','rumble.ogg','url','tonnerre','matière'],
+  ['Jet d\'eau','🌊','eau','synth',null,'matière'],
+  ['Brasier','🔥','brasier','synth',null,'matière'],
+  ['Torche','🔦','torche','synth',null,'matière'],
+  ['Tonnerre','⚡','lightning.ogg','url','tonnerre','signaux'],
+  ['Cloche','🔔','cloche2','synth',null,'signaux'],
+  ['Cor de guerre','📯','cor','synth',null,'signaux'],
+  ['Corne de brume','🚢','brume','synth',null,'signaux'],
+  ['Battement de cœur','💓','coeur','synth',null,'signaux'],
 ];
 let ambCtx = null, ambNoiseBuf = null;
 function ambAudioCtx(){
@@ -10158,20 +10200,42 @@ function ambShot(id){
   });
 }
 window._ambNappeToggle = ambNappeToggle;
-window._ambShot = ambShot;
+window._ambShot = function(id){
+  const s = amb.shots.find(x => x.id === id); if (!s) return;
+  const slug2 = (typeof spellSlug === 'function') ? spellSlug(s.nom) : s.nom.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  let delegue = false;
+  const original = () => { if (!delegue) { delegue = true; ambShot(id); } };
+  const essaieLocal = (ext, sinon) => {
+    const a = ambSink(new Audio('assets/sons/' + slug2 + ext));
+    a.volume = Math.min(1, amb.vol * 1.15);
+    a.onerror = sinon;
+    a.play().catch(sinon);
+  };
+  essaieLocal('.ogg', () => essaieLocal('.mp3', original));
+};
 window._ambReseedDefaults = function(){
   let n = 0;
-  for (const [nom, emoji, url] of AMB_NAPPES_DEFAUT)
-    if (!amb.nappes.some(x => x.nom === nom)) { amb.nappes.push({ id:'nap_'+Math.random().toString(36).slice(2,8), nom, emoji, src:{mode:'url',ref:url} }); n++; }
-  for (const [nom, emoji, ref, mode, repli] of AMB_SHOTS_DEFAUT) {
+  for (const [nom, emoji, url, groupe] of AMB_NAPPES_DEFAUT) {
+    const ex = amb.nappes.find(x => x.nom === nom);
+    if (!ex) { amb.nappes.push({ id:'nap_'+Math.random().toString(36).slice(2,8), nom, emoji, groupe: groupe||'', src:{mode:'url',ref:url} }); n++; }
+    else if ((groupe||'') && ex.groupe !== groupe) { ex.groupe = groupe; n++; }
+  }
+  for (const [nom, emoji, ref, mode, repli, groupe] of AMB_SHOTS_DEFAUT) {
     const srcDef = mode === 'url'
       ? { mode:'url', ref: AMB_SHOTS_URL + ref, repli }
       : { mode:'synth', ref };
-    const existant = amb.shots.find(x => x.nom === nom);
-    if (!existant) { amb.shots.push({ id:'sh_'+Math.random().toString(36).slice(2,8), nom, emoji, src: srcDef }); n++; }
-    else if (mode === 'url' && existant.src && existant.src.mode === 'synth') { existant.src = srcDef; n++; }
+    const ex = amb.shots.find(x => x.nom === nom);
+    if (!ex) { amb.shots.push({ id:'sh_'+Math.random().toString(36).slice(2,8), nom, emoji, groupe: groupe||'', src: srcDef }); n++; }
+    else {
+      /* mise à niveau des entrées par défaut : nouvelles recettes de synthèse et nouveaux fichiers */
+      if (ex.src && ex.src.mode === 'synth' && mode === 'synth' && ex.src.ref !== ref) { ex.src = srcDef; n++; }
+      else if (ex.src && ex.src.mode === 'synth' && mode === 'url') { ex.src = srcDef; n++; }
+      else if (ex.src && ex.src.mode === 'url' && mode === 'url' && ex.src.ref !== srcDef.ref) { ex.src = srcDef; n++; }
+      if ((groupe||'') && ex.groupe !== groupe) { ex.groupe = groupe; n++; }
+    }
   }
-  if (n) { ambSaveBoards(); ambRenderBoards(); ambSetStatus(n + ' éléments par défaut (ré)installés.'); }
+  if (n) { ambSaveBoards(); ambRenderBoards(); ambSetStatus(n + ' éléments par défaut installés ou mis à niveau.'); }
+  else ambSetStatus('Planches déjà à jour.');
   return n;
 };
 window._ambBoardsEdit = function(){ amb.editBoards = !amb.editBoards; ambRenderBoards(); };
@@ -10209,10 +10273,36 @@ function ambRenderBoards(){
   if (!nb) return;
   const chip = (it, on, type) =>
     `<button class="amb-chip2${on?' on':''}" onclick="window._amb${type==='nappe'?'NappeToggle':'Shot'}('${it.id}')">${it.emoji||''} ${it.nom.replace(/</g,'&lt;')}${amb.editBoards?`<span class="amb-chip2-x" onclick="event.stopPropagation();window._ambDelBoardItem('${type}','${it.id}')">✕</span>`:''}</button>`;
-  nb.innerHTML = amb.nappes.map(n => { const a = amb.napAudio.get(n.id); return chip(n, a && !a.paused, 'nappe'); }).join('')
-    || '<span class="amb-board-vide">aucune nappe</span>';
-  sb.innerHTML = amb.shots.map(s => chip(s, false, 'shot')).join('')
-    || '<span class="amb-board-vide">aucun one-shot — ajoute des fichiers CC0 (voir guide)</span>';
+  const _grpN = {};
+  for (const n of amb.nappes) (_grpN[n.groupe || 'autres'] = _grpN[n.groupe || 'autres'] || []).push(n);
+  nb.innerHTML = Object.entries(_grpN).map(([g2, liste]) =>
+    `<div class="amb-grp-lab">${g2}</div>` +
+    liste.map(n => {
+      const sl = (typeof spellSlug === 'function') ? spellSlug(n.nom) : '';
+      const aN = amb.napAudio.get(n.id);
+      return `<button class="amb-nappe${aN && !aN.paused ? ' on' : ''}"
+        onclick="window._ambNappeToggle('${n.id}')" title="${n.nom}">
+        <img src="assets/ambiances/nappes/${sl}.jpg" onerror="this.remove()" alt="">
+        <span class="amb-b-ini">${n.nom.slice(0,2).toUpperCase()}</span>
+        <span class="amb-b-nom">${n.nom}</span>
+        ${amb.editBoards ? `<span class="amb-b-del" onclick="event.stopPropagation();window._ambDelBoardItem('nappe','${n.id}')" title="Supprimer">✕</span>` : ''}
+      </button>`;
+    }).join('')
+  ).join('') || '<span class="amb-board-vide">aucune nappe — ↺ pour installer les planches par défaut</span>';
+  const _grpS = {};
+  for (const o of amb.shots) (_grpS[o.groupe || 'autres'] = _grpS[o.groupe || 'autres'] || []).push(o);
+  sb.innerHTML = Object.entries(_grpS).map(([g2, liste]) =>
+    `<div class="amb-grp-lab">${g2}</div>` +
+    liste.map(o => {
+      const sl = (typeof spellSlug === 'function') ? spellSlug(o.nom) : '';
+      return `<button class="amb-shot" onclick="window._ambShot('${o.id}')" title="${o.nom}">
+        <img src="assets/ambiances/sons/${sl}.jpg" onerror="this.remove()" alt="">
+        <span class="amb-b-ini">${o.nom.slice(0,2).toUpperCase()}</span>
+        <span class="amb-b-nom">${o.nom}</span>
+        ${amb.editBoards ? `<span class="amb-b-del" onclick="event.stopPropagation();window._ambDelBoardItem('shot','${o.id}')" title="Supprimer">✕</span>` : ''}
+      </button>`;
+    }).join('')
+  ).join('') || '<span class="amb-board-vide">aucun one-shot — ↺ pour installer les planches par défaut</span>';
 }
 function ambYtId(u){
   const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
@@ -10477,7 +10567,7 @@ async function ambRender(){
     const visibles = ambVisibles();
     cont.innerHTML = visibles.map((s,i) =>
       `<button class="amb-scene${s.id===amb.cur?' on':''}" draggable="true" data-id="${s.id}" style="--amb-c:${s.couleur||'#caa258'}" onclick="window._ambActivate('${s.id}')">
-        <span class="amb-scene-vis" id="ambVis_${s.id}"><span class="amb-scene-emo">${s.emoji||'🎬'}</span></span>
+        <span class="amb-scene-vis" id="ambVis_${s.id}"><img class="amb-scene-img" src="assets/ambiances/${s.slug||'_'}.jpg" onerror="this.remove()" alt=""><span class="amb-scene-emo">${(s.nom||'?').slice(0,2).toUpperCase()}</span></span>
         <span class="amb-scene-name">${(s.nom||'?').replace(/</g,'&lt;')}</span>
         ${i<9?`<span class="amb-scene-key">${i+1}</span>`:''}
       </button>`).join('');
@@ -10506,7 +10596,7 @@ window._ambOpenEditor = function(id){
 window._ambCloseEditor = function(){ document.getElementById('ambOv').classList.remove('open'); };
 function ambRenderEditList(){
   const el = document.getElementById('ambListEdit');
-  el.innerHTML = amb.scenes.map(s => `<button class="${s.id===ambEditId?'sel':''}" onclick="window._ambOpenEditor('${s.id}')">${s.emoji||''} ${(s.nom||'?').replace(/</g,'&lt;')}</button>`).join('')
+  el.innerHTML = amb.scenes.map(s => `<button class="${s.id===ambEditId?'sel':''}" onclick="window._ambOpenEditor('${s.id}')"> ${(s.nom||'?').replace(/</g,'&lt;')}</button>`).join('')
     + `<button class="${!ambEditId?'sel':''}" onclick="window._ambOpenEditor()">＋ Nouvelle</button>`;
 }
 function ambFillForm(s){
@@ -10721,6 +10811,23 @@ window._ambInstallCatalogue = function(){
   document.body.appendChild(frame);
   const fx = document.createElement('div'); fx.id = 'fxParticles';
   document.body.appendChild(fx);
+  /* couche vidéo de thème : assets/fx/theme-{slug}.webm si présent, sinon particules procédurales */
+  const fv = document.createElement('video');
+  fv.id = 'fxVideo'; fv.muted = true; fv.loop = true; fv.playsInline = true; fv.autoplay = true;
+  document.body.appendChild(fv);
+  function fxVideoCharge(cle){
+    const slug = cle && cle !== 'materiel' ? cle : 'materiel';
+    document.documentElement.classList.remove('fxvid');
+    fv.onerror = () => { document.documentElement.classList.remove('fxvid'); fv.removeAttribute('src'); };
+    fv.oncanplay = () => { document.documentElement.classList.add('fxvid'); fv.play().catch(()=>{}); };
+    fv.src = 'assets/fx/theme-' + slug + '.webm';
+  }
+  if (typeof window._applyTheme === 'function' && !window.__fxVidHook) {
+    window.__fxVidHook = true;
+    const at0 = window._applyTheme;
+    window._applyTheme = function(k){ at0(k); fxVideoCharge(k); };
+  }
+  fxVideoCharge(document.documentElement.getAttribute('data-theme') || 'materiel');
   const pref = localStorage.getItem('kubbnd-fx');
   if (pref === '0') document.documentElement.classList.add('fx-off');
   const grid = document.getElementById('themeGrid');
@@ -11616,8 +11723,32 @@ function bmHexTpl(hex){
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},VAR)`;
 }
 function bmRng(seed){ let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+const bmFxVideos = new Map();
+function bmFxVideo(effet){
+  if (bmFxVideos.has(effet)) return bmFxVideos.get(effet);
+  const v = document.createElement('video');
+  v.muted = true; v.loop = true; v.playsInline = true; v.autoplay = true;
+  v.src = 'assets/fx/gab-' + effet + '.webm';
+  const rec = { v, ok: false };
+  v.oncanplay = () => { rec.ok = true; v.play().catch(() => {}); };
+  v.onerror = () => { rec.ok = false; };
+  bmFxVideos.set(effet, rec);
+  return rec;
+}
 function bmGabFxDraw(ctx, m, gb, now, vk){
   if (!gb.effet || !BM_FX[gb.effet]) return;
+  const vid = bmFxVideo(gb.effet);
+  if (vid.ok && vid.v.readyState >= 2) {
+    const g0 = m.grid.px, portV = (gb.taille / BM_CASE_M) * g0, bR = portV * 1.15;
+    ctx.save();
+    bmGabPath(ctx, m, gb);
+    ctx.clip();
+    ctx.globalAlpha = 0.85;
+    ctx.drawImage(vid.v, gb.x - bR, gb.y - bR, bR * 2, bR * 2);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
   const g = m.grid.px, port = (gb.taille / BM_CASE_M) * g;
   ctx.save();
   bmGabPath(ctx, m, gb);
@@ -12488,7 +12619,7 @@ function bmRefreshUI(){
 @keyframes bloodPulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
 @media (prefers-reduced-motion: reduce) { #tab-sheet.sheet-bloodied::after { animation:none; opacity:0.85; } }
 /* ════════ Le Grimoire (préparation de sorts) ════════ */
-.grim-overlay { position:fixed; inset:0; z-index:1200; display:none; align-items:center; justify-content:center; padding:16px; background:radial-gradient(ellipse at center, rgba(22,13,4,0.82), rgba(0,0,0,0.93)); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); }
+.grim-overlay { position:fixed; inset:0; z-index:1400; display:none; align-items:center; justify-content:center; padding:16px; background:radial-gradient(ellipse at center, rgba(22,13,4,0.82), rgba(0,0,0,0.93)); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); }
 .grim-book { position:relative; width:min(560px,96vw); max-height:92vh; display:flex; border-radius:7px 13px 13px 7px; border:1px solid #6b4f2a; overflow:hidden;
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(255,240,200,0.20), transparent 60%),
@@ -12565,7 +12696,7 @@ function bmRefreshUI(){
 .grim-detail-action { padding-top:12px; }
 .grim-granted-note { text-align:center; padding:11px; border-radius:8px; background:rgba(120,85,40,0.12); color:#6a4e2a; font-style:italic; }
 /* ════════ LE GRIMOIRE v2 — livre ouvert à deux pages ════════ */
-.grim-overlay { position:fixed; inset:0; z-index:1200; display:none; align-items:center; justify-content:center; padding:14px; background:radial-gradient(ellipse at center, rgba(22,13,4,0.85), rgba(0,0,0,0.94)); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); overscroll-behavior:contain; }
+.grim-overlay { position:fixed; inset:0; z-index:1400; display:none; align-items:center; justify-content:center; padding:14px; background:radial-gradient(ellipse at center, rgba(22,13,4,0.85), rgba(0,0,0,0.94)); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); overscroll-behavior:contain; }
 .grim-book { position:relative; width:min(920px,97vw); height:min(86vh,660px); display:flex; flex-direction:column; padding:16px 16px 14px; border-radius:12px; font-family:'Crimson Pro', Georgia, serif; color:#3a2a14;
   background:linear-gradient(160deg,#5e3d1d 0%,#48310f 55%,#3a2710 100%);
   box-shadow:0 40px 100px rgba(0,0,0,0.78), inset 0 0 0 2px rgba(160,120,65,0.28), inset 0 0 40px rgba(0,0,0,0.55); }
@@ -12654,7 +12785,7 @@ function bmRefreshUI(){
 }
 @media (prefers-reduced-motion: reduce){ .grim-spread.turn-next, .grim-spread.turn-prev { animation:none; } }
 /* ════════ LE GRIMOIRE v3 — sélection style Baldur's Gate ════════ */
-.grim-overlay { position:fixed; inset:0; z-index:1200; display:none; align-items:center; justify-content:center; padding:12px; background:rgba(8,5,2,0.88); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); overscroll-behavior:contain; }
+.grim-overlay { position:fixed; inset:0; z-index:1400; display:none; align-items:center; justify-content:center; padding:12px; background:rgba(8,5,2,0.88); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); overscroll-behavior:contain; }
 #grimBook { position:relative; width:min(960px,98vw); height:min(90vh,720px); display:flex; flex-direction:column; padding:0; background:none; border:none; box-shadow:none; border-radius:0; font-family:'Crimson Pro',Georgia,serif; }
 .grim-x { position:absolute; top:-4px; right:-2px; z-index:6; width:34px; height:34px; border-radius:50%; border:1px solid rgba(200,160,90,0.4); background:rgba(20,12,5,0.9); color:#e8cf9c; font-size:1rem; cursor:pointer; line-height:1; }
 .grim-bg3 { flex:1; min-height:0; display:flex; border-radius:12px; overflow:hidden; border:1px solid rgba(150,110,55,0.45); color:#e8dcc2;
@@ -14699,6 +14830,7 @@ html .wiz-side-block.ready h5 { color:#a8d494; }
   }
   #fxParticles::before, #fxParticles::after { display:none; }
   #fxParticles { display:none !important; }   /* l'animation background-position repeint à chaque frame sur mobile */
+  #fxVideo { display:none !important; }
   html .comp-card, html .comp-card:hover { transition:none; transform:none; }
   /* le navigateur ne rend que ce qui est visible au défilement */
   html .sheet-section, html .comp-card, html .jn-e, html .familiar-card {
@@ -14789,13 +14921,273 @@ html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(24
 .bmi-pv div { height:100%; background:linear-gradient(90deg,#7fc36a,#b8d84f); }
 .bmi-round { align-self:center; color:#c8a85c; font-size:0.66rem; letter-spacing:1px;
   padding:0 4px; font-family:var(--font-title); }
+
+/* bulles sonores : octogone (nappes), cercle (one-shots) — image par slug, initiales en repli */
+.amb-grp-lab { width:100%; flex-basis:100%; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase;
+  color:#a8905c; margin:8px 0 2px; border-bottom:1px dotted rgba(196,154,58,0.3); padding-bottom:2px; }
+.amb-nappe, .amb-shot { position:relative; width:64px; height:64px; padding:0; cursor:pointer; overflow:hidden;
+  border:2px solid rgba(200,168,90,0.5); background:linear-gradient(160deg, #2c1d0c, #150d05);
+  display:inline-flex; align-items:center; justify-content:center; vertical-align:top; margin:3px;
+  transition:border-color .15s ease, box-shadow .15s ease, transform .12s ease; }
+.amb-nappe { clip-path:polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%); border-radius:8px; }
+.amb-shot { border-radius:50%; }
+.amb-nappe img, .amb-shot img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
+.amb-b-ini { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-title); font-size:1rem; color:#c8a85c; z-index:0; }
+.amb-b-nom { position:absolute; left:2px; right:2px; bottom:2px; z-index:2; font-size:0.5rem; line-height:1.1;
+  color:#f0e2b8; text-align:center; background:rgba(10,6,2,0.72); border-radius:4px; padding:1px 2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.amb-nappe:hover, .amb-shot:hover { border-color:rgba(240,210,140,0.95); transform:translateY(-2px);
+  box-shadow:0 4px 14px rgba(200,160,70,0.3); }
+.amb-nappe.on { border-color:#f0d89a; box-shadow:0 0 14px rgba(216,178,100,0.65), inset 0 0 18px rgba(216,178,100,0.25); }
+.hibou-share { display:flex; gap:6px; margin-top:6px; }
+.hibou-share button { flex:1; font-size:0.68rem; padding:6px 8px; border-radius:8px; cursor:pointer;
+  border:1px solid rgba(200,168,90,0.45); background:rgba(28,19,8,0.9); color:#e2d2a8; }
+.hibou-share button:hover { border-color:rgba(240,210,140,0.9); }
+.hibou-share-note { font-size:0.62rem; color:#8a744c; font-style:italic; margin-top:4px; }
+
+.amb-b-del { position:absolute; top:2px; right:6px; z-index:3; color:#e08080; font-size:0.8rem;
+  cursor:pointer; text-shadow:0 1px 2px rgba(0,0,0,0.9); }
+.amb-b-del:hover { color:#ff9a9a; }
+
+.amb-scene-vis { position:relative; overflow:hidden; }
+.amb-scene-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; border-radius:inherit; }
+.amb-scene-emo { font-family:var(--font-title); font-size:0.9rem; color:#c8a85c; }
+
+/* ═══════════ Thèmes planaires v2 (les anciens sélecteurs restent inertes) ═══════════ */
+html[data-theme="neuf-enfers"] {
+  --parch:#f0e4dc; --parch2:#e6d6cc; --ink:#2a0e08;
+  --gold:#c8452a; --gold-light:#e06a48; --red:#7a1010; --red-light:#a02020;
+  --bg:#160404; --bg2:#240808; --border:rgba(200,69,42,0.34);
+  --surface:#ecdcd2; --surface-soft:#f3e8e0; --surface-alt:#dcc6ba; --surface-hi:#f8f0ea;
+  --line:#ccb0a4; --line-gold:#d8b09a; --muted-gold:#a87a5a; --brown:#401410; --brown-dark:#2c0c0a;
+}
+html[data-theme="feerie"] {
+  --parch:#eef0e4; --parch2:#e2e8d4; --ink:#1c2a16;
+  --gold:#7cc45a; --gold-light:#98da76; --red:#8a4ab0; --red-light:#a866cc;
+  --bg:#0e1a12; --bg2:#14261a; --border:rgba(124,196,90,0.32);
+  --surface:#e8eedd; --surface-soft:#f1f5ea; --surface-alt:#d6e0c6; --surface-hi:#f6f9f1;
+  --line:#c2cfb0; --line-gold:#bcd8a0; --muted-gold:#8aa470; --brown:#1e3c2a; --brown-dark:#142c1e;
+}
+html[data-theme="gisombre"] {
+  --parch:#e8e8ea; --parch2:#dcdce0; --ink:#1c1c22;
+  --gold:#8a94a0; --gold-light:#a8b2be; --red:#5a4a6a; --red-light:#74609a;
+  --bg:#0c0c10; --bg2:#121218; --border:rgba(138,148,160,0.30);
+  --surface:#e2e2e6; --surface-soft:#ededf0; --surface-alt:#d0d0d6; --surface-hi:#f2f2f5;
+  --line:#bcbcc4; --line-gold:#b8bcc8; --muted-gold:#8a8e9a; --brown:#262630; --brown-dark:#1a1a22;
+}
+html[data-theme="mecanus"] {
+  --parch:#f0ead8; --parch2:#e6dec8; --ink:#241c0c;
+  --gold:#c9963c; --gold-light:#e0b45c; --red:#3f8e7e; --red-light:#5aa896;
+  --bg:#141008; --bg2:#1e180c; --border:rgba(201,150,60,0.34);
+  --surface:#ece4d0; --surface-soft:#f3eddd; --surface-alt:#dcd2ba; --surface-hi:#f8f3e6;
+  --line:#ccc2a4; --line-gold:#d8c290; --muted-gold:#a8925a; --brown:#3a2c10; --brown-dark:#281e0a;
+}
+html[data-theme="plan-astral"] {
+  --parch:#e8ecf6; --parch2:#dce2f0; --ink:#181c2e;
+  --gold:#9aa8d8; --gold-light:#b8c4ea; --red:#7a5ab0; --red-light:#9678cc;
+  --bg:#0a0c1a; --bg2:#10142a; --border:rgba(154,168,216,0.32);
+  --surface:#e2e7f2; --surface-soft:#edf0f8; --surface-alt:#d0d7ea; --surface-hi:#f2f5fb;
+  --line:#bcc4da; --line-gold:#b8c4e0; --muted-gold:#8a94b8; --brown:#22284a; --brown-dark:#181c36;
+}
+html[data-theme="mont-celeste"] {
+  --parch:#faf4e2; --parch2:#f2e9d0; --ink:#2e2408;
+  --gold:#d8ae4c; --gold-light:#f0ca6e; --red:#b06a28; --red-light:#cc8440;
+  --bg:#181206; --bg2:#241c0a; --border:rgba(216,174,76,0.40);
+  --surface:#f4ecd8; --surface-soft:#f9f4e6; --surface-alt:#e8dcc0; --surface-hi:#fcf8ee;
+  --line:#d8cca8; --line-gold:#e4cc94; --muted-gold:#b09a5e; --brown:#4a3812; --brown-dark:#342808;
+}
+/* ── effets procéduraux par plan (bureau uniquement, remplacés par la vidéo si présente) ── */
+html[data-theme="neuf-enfers"] #fxParticles {
+  background:radial-gradient(ellipse at 50% 118%, rgba(200,60,20,0.22), transparent 55%);
+}
+html[data-theme="neuf-enfers"] #fxParticles::before, html[data-theme="neuf-enfers"] #fxParticles::after {
+  content:''; position:absolute; inset:-20%;
+  background-image:radial-gradient(2px 2px at 12% 88%, rgba(255,150,60,0.8), transparent 55%),
+    radial-gradient(1.6px 1.6px at 38% 94%, rgba(255,110,40,0.7), transparent 55%),
+    radial-gradient(2.4px 2.4px at 64% 90%, rgba(255,180,90,0.75), transparent 55%),
+    radial-gradient(1.4px 1.4px at 86% 96%, rgba(230,90,30,0.65), transparent 55%);
+  background-size:340px 420px;
+  animation:fxMonte 26s linear infinite;
+}
+html[data-theme="neuf-enfers"] #fxParticles::after {
+  background-size:520px 640px; opacity:0.6; animation-duration:44s; animation-delay:-12s;
+}
+html[data-theme="feerie"] #fxParticles::before, html[data-theme="feerie"] #fxParticles::after {
+  content:''; position:absolute; inset:-15%;
+  background-image:radial-gradient(2.2px 2.2px at 18% 30%, rgba(150,240,120,0.9), transparent 60%),
+    radial-gradient(1.8px 1.8px at 55% 68%, rgba(190,255,160,0.8), transparent 60%),
+    radial-gradient(2px 2px at 80% 40%, rgba(210,140,255,0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 35% 82%, rgba(150,240,120,0.75), transparent 60%);
+  background-size:460px 460px;
+  animation:fxDerive 34s linear infinite, fxScintille 3.4s ease-in-out infinite;
+}
+html[data-theme="feerie"] #fxParticles::after {
+  background-size:640px 640px; opacity:0.55;
+  animation:fxDeriveInv 52s linear infinite, fxScintille 4.6s ease-in-out infinite reverse;
+}
+html[data-theme="gisombre"] #fxParticles::before {
+  content:''; position:absolute; inset:-20%;
+  background-image:radial-gradient(1.8px 1.8px at 22% 10%, rgba(190,190,200,0.5), transparent 60%),
+    radial-gradient(1.4px 1.4px at 58% 24%, rgba(160,160,175,0.45), transparent 60%),
+    radial-gradient(2px 2px at 82% 6%, rgba(200,200,210,0.4), transparent 60%);
+  background-size:420px 520px;
+  animation:fxTombe 48s linear infinite;
+}
+html[data-theme="gisombre"] #fxParticles::after {
+  content:''; position:absolute; left:-30%; right:-30%; top:34%; height:26%;
+  background:linear-gradient(90deg, transparent, rgba(200,205,215,0.05) 30%, rgba(200,205,215,0.08) 50%, rgba(200,205,215,0.05) 70%, transparent);
+  animation:fxBrume 38s ease-in-out infinite alternate;
+}
+html[data-theme="mecanus"] #fxParticles::before, html[data-theme="mecanus"] #fxParticles::after {
+  content:''; position:absolute; width:46vmax; height:46vmax; opacity:0.10;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23c9963c' stroke-width='2'%3E%3Ccircle cx='50' cy='50' r='30'/%3E%3Ccircle cx='50' cy='50' r='12'/%3E%3Cg%3E%3Cpath d='M50 14v10M50 76v10M14 50h10M76 50h10M25 25l7 7M68 68l7 7M75 25l-7 7M32 68l-7 7'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-size:contain; background-repeat:no-repeat;
+  right:-14vmax; bottom:-14vmax;
+  animation:fxRouage 150s linear infinite;
+}
+html[data-theme="mecanus"] #fxParticles::after {
+  width:30vmax; height:30vmax; right:auto; bottom:auto; left:-10vmax; top:-10vmax;
+  opacity:0.07; animation:fxRouage 100s linear infinite reverse;
+}
+html[data-theme="plan-astral"] #fxParticles {
+  background-image:radial-gradient(1.4px 1.4px at 14% 22%, rgba(230,238,255,0.8), transparent 60%),
+    radial-gradient(1px 1px at 42% 60%, rgba(210,222,250,0.65), transparent 60%),
+    radial-gradient(1.8px 1.8px at 68% 30%, rgba(240,244,255,0.85), transparent 60%),
+    radial-gradient(1.1px 1.1px at 88% 74%, rgba(210,222,250,0.6), transparent 60%),
+    radial-gradient(1.3px 1.3px at 26% 84%, rgba(230,238,255,0.7), transparent 60%);
+  background-size:520px 520px;
+}
+html[data-theme="plan-astral"] #fxParticles::before {
+  content:''; position:absolute; inset:0;
+  background-image:radial-gradient(2px 2px at 33% 45%, rgba(255,255,255,0.9), transparent 60%),
+    radial-gradient(1.6px 1.6px at 74% 58%, rgba(240,244,255,0.8), transparent 60%);
+  background-size:700px 700px;
+  animation:fxScintille 5s ease-in-out infinite;
+}
+html[data-theme="plan-astral"] #fxParticles::after {
+  content:''; position:absolute; inset:-30%;
+  background:linear-gradient(115deg, transparent 42%, rgba(170,185,235,0.06) 50%, transparent 58%);
+  animation:fxDerive 60s linear infinite;
+}
+html[data-theme="mont-celeste"] #fxParticles::before {
+  content:''; position:absolute; inset:-20%;
+  background-image:radial-gradient(2px 2px at 20% 92%, rgba(255,235,180,0.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 52% 96%, rgba(255,245,210,0.7), transparent 60%),
+    radial-gradient(2.3px 2.3px at 78% 90%, rgba(250,220,150,0.75), transparent 60%);
+  background-size:420px 560px;
+  animation:fxMonte 38s linear infinite;
+}
+html[data-theme="mont-celeste"] #fxParticles::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(255,236,180,0.10), transparent 42%);
+  animation:fxScintille 7s ease-in-out infinite;
+}
+@keyframes fxMonte { from { background-position:0 0; } to { background-position:-30px -800px; } }
+@keyframes fxTombe { from { background-position:0 -600px; } to { background-position:40px 0; } }
+@keyframes fxDerive { from { background-position:0 0; } to { background-position:820px -240px; } }
+@keyframes fxDeriveInv { from { background-position:0 0; } to { background-position:-760px 200px; } }
+@keyframes fxScintille { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
+@keyframes fxBrume { from { transform:translateX(-6%); } to { transform:translateX(6%); } }
+@keyframes fxRouage { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+/* ── couche vidéo de thème ── */
+#fxVideo { position:fixed; inset:0; width:100%; height:100%; object-fit:cover;
+  z-index:0; pointer-events:none; opacity:0; transition:opacity 1.2s ease; }
+html.fxvid #fxVideo { opacity:0.5; }
+html.fxvid #fxParticles { display:none; }
+html.fx-off #fxVideo { display:none; }
+
+/* ═══════ Forge & Ascension : habillage du pied, des boutons et du volet ═══════ */
+.wiz-foot {
+  display:grid; grid-template-columns:auto auto 1fr auto; gap:8px; align-items:center;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(180deg, rgba(255,244,220,0.04), rgba(12,7,3,0.85));
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  border-top:1px solid rgba(196,154,58,0.4);
+}
+html .wiz-btn-ghost {
+  background:linear-gradient(160deg, rgba(255,244,220,0.07), rgba(18,11,4,0.65));
+  border:1px solid rgba(200,168,90,0.45); border-top-color:rgba(255,236,190,0.28);
+  color:#e8dcc2; border-radius:10px; padding:10px 16px; cursor:pointer;
+  font-size:0.8rem; white-space:nowrap;
+  transition:border-color .15s ease, background .15s ease;
+}
+html .wiz-btn-ghost:hover { border-color:rgba(240,210,140,0.9); background:rgba(196,154,58,0.2); }
+html .wiz-btn-gold {
+  background:linear-gradient(180deg, #d8b264, #a9812f);
+  border:1px solid #f0d89a; color:#1c1207; font-weight:700; letter-spacing:0.5px;
+  border-radius:10px; padding:10px 20px; cursor:pointer; font-size:0.82rem; white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.35);
+  transition:filter .15s ease, box-shadow .15s ease;
+}
+html .wiz-btn-gold:hover { filter:brightness(1.08); box-shadow:inset 0 1px 0 rgba(255,255,255,0.4), 0 0 14px rgba(216,178,100,0.4); }
+html .wiz-btn-gold.dim { opacity:0.5; filter:saturate(0.6); }
+#lvlFootHint, .wiz-foot > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  color:#e0b25c; font-size:0.78rem; text-align:right; padding-right:4px; }
+#lvlFootHint.flash { animation:footFlash .5s ease 2; }
+@keyframes footFlash { 50% { color:#ff9a6a; transform:translateX(-3px); } }
+@media (min-width:941px){ .wiz-side-toggle { display:none; } }
+@media (max-width:600px){
+  .wiz-foot { gap:6px; padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  html .wiz-btn-ghost { padding:9px 10px; font-size:0.68rem; }
+  html .wiz-btn-gold { padding:9px 12px; font-size:0.7rem; }
+  #lvlFootHint, .wiz-foot > span { font-size:0.62rem; }
+}
+#hibouBtn { z-index:1150 !important; }
+.wiz-side-hero { text-align:center; padding:4px 0 12px; border-bottom:1px solid rgba(196,154,58,0.25); margin-bottom:12px; }
+.wiz-side-img { width:76px; height:76px; border-radius:50%; margin:0 auto 8px; background-size:cover; background-position:center;
+  border:2px solid rgba(216,178,100,0.7); box-shadow:0 0 14px rgba(0,0,0,0.5); }
+.wiz-side-img.wiz-fallback { display:flex; align-items:center; justify-content:center; font-size:1.6rem; color:#c8a85c; }
+.wiz-side-name { font-family:var(--font-title); color:#f0e2b8; font-size:1.05rem; letter-spacing:1px; }
+.wiz-side-line { color:#c9b689; font-size:0.8rem; margin-top:2px; }
+.wiz-side-line.dim { color:#8a744c; font-size:0.72rem; }
+.wiz-side-combat { display:grid; gap:6px; margin-bottom:12px; }
+.wiz-side-combat > div { text-align:center; padding:8px 4px; border-radius:10px;
+  background:rgba(196,154,58,0.1); border:1px solid rgba(196,154,58,0.3); }
+.wiz-side-combat em { display:block; font-style:normal; font-size:0.95rem; }
+.wiz-side-combat strong { display:block; color:#f0e2b8; font-size:0.86rem; margin:2px 0; }
+.wiz-side-combat span { display:block; color:#8a744c; font-size:0.6rem; letter-spacing:1px; text-transform:uppercase; }
+.wiz-side-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-bottom:12px; }
+.wiz-side-stat { text-align:center; padding:6px 2px; border-radius:9px;
+  background:rgba(0,0,0,0.3); border:1px solid rgba(196,154,58,0.22); }
+.wiz-side-stat.boosted { background:rgba(120,200,110,0.13); border-color:rgba(140,220,120,0.45); }
+.wiz-side-stat span { display:block; font-size:0.58rem; letter-spacing:1px; color:#b9a67e; }
+.wiz-side-stat strong { display:block; color:#f0e2b8; font-size:0.88rem; }
+.wiz-side-stat em { display:block; font-style:normal; color:#8a744c; font-size:0.68rem; }
+.wiz-side-stat.boosted span { color:#a8d494; }
+.wiz-side-block { margin-bottom:12px; padding:10px 12px; border-radius:12px;
+  background:linear-gradient(155deg, rgba(255,244,220,0.05), rgba(12,7,3,0.5));
+  border:1px solid rgba(196,154,58,0.28); }
+.wiz-side-block h5 { margin:0 0 7px; font-family:var(--font-title); font-size:0.66rem; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--gold-light, #d8b264); }
+.wiz-side-block.pending { border-color:rgba(230,160,60,0.5); background:rgba(230,150,50,0.08); }
+.wiz-side-block.pending h5 { color:#e8a84c; }
+.wiz-side-block.ready { border-color:rgba(140,220,120,0.45); background:rgba(120,200,110,0.08); }
+.wiz-side-block.ready h5 { color:#a8d494; }
+.wiz-side-skill { display:flex; align-items:center; gap:7px; padding:3px 0; color:#d9c9a3; font-size:0.8rem; }
+.wiz-side-skill .tag-c { color:var(--gold); font-style:normal; }
+.wiz-side-text { color:#d9c9a3; font-size:0.8rem; line-height:1.4; }
+.wiz-recap-group h5 { margin:0 0 8px; font-family:var(--font-title); font-size:0.7rem; letter-spacing:1.5px;
+  text-transform:uppercase; color:var(--gold-light, #d8b264); }
+.wiz-trait { padding:7px 10px; margin-bottom:6px; border-radius:10px; font-size:0.82rem; line-height:1.45;
+  color:#d9c9a3; background:rgba(255,255,255,0.03); border:1px solid rgba(196,154,58,0.18); }
+.wiz-trait strong { color:#f0e2b8; }
+.lvl-hp-sum { text-align:center; color:#d9c9a3; font-size:0.9rem; margin-top:10px; }
+.lvl-hp-sum.big { font-size:1.05rem; padding:14px; }
+.lvl-hp-sum strong { color:var(--gold-light, #e0c47c); }
+.lvl-hp-manuel { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;
+  margin-top:14px; color:#b9a67e; font-size:0.8rem; }
+.lvl-hp-manuel input { width:72px; text-align:center; font-size:0.95rem; padding:8px 6px; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
   (function(){
     try {
       var t = localStorage.getItem('kubbnd-theme');
-      if (t && t !== 'parchemin') document.documentElement.setAttribute('data-theme', t);
+      var MIG = { parchemin:'materiel', sylvestre:'feerie', arcane:'plan-astral',
+                  saphir:'plan-astral', givre:'plan-astral', cendre:'gisombre' };
+      if (MIG[t]) { t = MIG[t]; localStorage.setItem('kubbnd-theme', t); }
+      if (t && t !== 'materiel') document.documentElement.setAttribute('data-theme', t);
     } catch(e) {}
   })();
 </script>
@@ -15479,20 +15871,21 @@ html .bm-tokctl button:hover, html #bmGabCtl button:hover { border-color:rgba(24
 <script>
 (function(){
   const THEMES = [
-    { key:'parchemin',   name:'Parchemin',     desc:'Le grimoire classique', dots:['#f4ece1','#b8860b','#8b0000','#1a0f05'] },
-    { key:'sylvestre',   name:'Sylvestre',     desc:'Forêt & émeraude',      dots:['#e9efe3','#5e8c3a','#7a3520','#0c1610'] },
-    { key:'arcane',      name:'Arcane',        desc:'Améthyste mystique',    dots:['#ece6f2','#8b5fc0','#8b2f6b','#120b1a'] },
-    { key:'saphir',      name:'Saphir',        desc:'Royal & argent',        dots:['#e7edf3','#3f7db0','#8b3a3a','#0a1018'] },
-    { key:'cendre',      name:'Sang & Cendre', desc:'Sombre fantasy',        dots:['#efe9e3','#a8743a','#a01828','#141210'] },
-    { key:'givre',       name:'Givre',         desc:'Glacial & cristal',     dots:['#e7eef2','#2f9bb0','#a83a4a','#08161a'] },
+    { key:'materiel',     name:'Plan Matériel',   desc:'Le grimoire des mortels',       dots:['#f4ece1','#b8860b','#8b0000','#1a0f05'] },
+    { key:'neuf-enfers',  name:'Les Neuf Enfers', desc:'Fer, braise et contrats',       dots:['#f0e4dc','#c8452a','#e08428','#160404'] },
+    { key:'feerie',       name:'Féerie',          desc:'Le Plan sauvage et rieur',      dots:['#eef0e4','#7cc45a','#8a4ab0','#0e1a12'] },
+    { key:'gisombre',     name:'Gisombre',        desc:'Cendre, deuil et pénombre',     dots:['#e8e8ea','#8a94a0','#5a4a6a','#0c0c10'] },
+    { key:'mecanus',      name:'Mécanus',         desc:'Laiton, rouages et loi',        dots:['#f0ead8','#c9963c','#3f8e7e','#141008'] },
+    { key:'plan-astral',  name:'Plan Astral',     desc:'La mer d\'argent des pensées', dots:['#e8ecf6','#9aa8d8','#7a5ab0','#0a0c1a'] },
+    { key:'mont-celeste', name:'Mont Céleste',    desc:'Les sept cieux radieux',        dots:['#faf4e2','#d8ae4c','#b06a28','#181206'] },
   ];
 
   function current(){
-    try { return localStorage.getItem('kubbnd-theme') || 'parchemin'; } catch(e){ return 'parchemin'; }
+    try { return localStorage.getItem('kubbnd-theme') || 'materiel'; } catch(e){ return 'materiel'; }
   }
 
   window._applyTheme = function(key){
-    if (!key || key === 'parchemin') document.documentElement.removeAttribute('data-theme');
+    if (!key || key === 'materiel') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', key);
     try { localStorage.setItem('kubbnd-theme', key); } catch(e){}
     renderGrid();
@@ -15588,7 +15981,7 @@ window._mainTourSteps = [
   { sel:"#navCompendium", title:"Le Compendium", body:"La bibliothèque complète : sorts, objets, dons, historiques… et près de 1 000 créatures avec fiches techniques. Filtres par catégorie, tri, recherche instantanée." },
   { sel:"#navGroups", title:"Les Groupes", body:"Rassemble les personnages de ta table : tout le monde voit les fiches du groupe, ton MJ suit la partie en temps réel." },
   { sel:"#navEditor", title:"L'Éditeur homebrew", body:"Crée tes propres sorts, objets, monstres ou dons — ils rejoignent le compendium et deviennent utilisables sur les fiches." },
-  { sel:'[onclick*="_openThemePicker"]', title:"Thèmes & ambiance visuelle", body:"Six univers visuels (parchemin, sylvestre, arcane, saphir, cendre, givre) avec effets animés — braises, lucioles, neige, aurores. L'interrupteur ✨ les coupe si tu préfères la sobriété." },
+  { sel:'[onclick*="_openThemePicker"]', title:"Thèmes & ambiance visuelle", body:"Sept plans d'existence en guise d'habillages : Matériel, Neuf Enfers, Féerie, Gisombre, Mécanus, Plan Astral, Mont Céleste — chacun avec ses effets (braises infernales, lucioles fées, cendre du Gisombre, rouages de Mécanus, étoiles astrales…). L'interrupteur ✨ coupe tout si tu préfères la sobriété." },
   { sel:"#navGM", title:"L'Écran du Maître", body:"Si tu mènes : tracker de combat, assistant Hibouquin, régisseur d'ambiances sonores, cartes de bataille projetables et journal de session. Son bouton ❓ Guide détaille tout." },
   { center:true, title:"À toi de jouer ! 🎲", body:"Tu connais les fonctionnalités phares. Le ❔ relance ce tour, et chaque écran a ses infobulles. Bonne aventure !" }
 ];
@@ -15769,6 +16162,11 @@ window.addEventListener('keydown', function(e){
   <div class="hibou-settings" id="hibouSettings">
     <label for="hibouKey">Clé API Anthropic</label>
     <input type="password" id="hibouKey" placeholder="sk-ant-…" autocomplete="off">
+    <div class="hibou-share">
+      <button type="button" onclick="window._hibouPartagerCle()" title="Écrit ta clé dans le document Firestore de tes groupes : tes joueurs pourront utiliser Hibouquin. Réservé aux tables de confiance — les appels sont facturés sur ton compte.">Partager avec mon groupe</button>
+      <button type="button" onclick="window._hibouRevoquerCle()" title="Retire la clé partagée de tous tes groupes">Révoquer</button>
+    </div>
+    <div class="hibou-share-note">Sans clé locale, Hibouquin utilise automatiquement la clé partagée par le MJ du groupe.</div>
     <label for="hibouModel">Modèle</label>
     <select id="hibouModel">
       <option value="claude-haiku-4-5-20251001">Haiku — rapide et économique</option>
