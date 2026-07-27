@@ -15324,13 +15324,14 @@ html .grim-tile.sel .grim-tile-name { color:#f0e2b8; }
 .grim-solo-prep .grim-grid-lvl:has(+ .grim-grid:not(:has(.grim-tile.sel, .grim-tile.locked))) { display:none; }
 
 /* ═══ Empilement de la couche vidéo ═══
-   Un élément fixed en z-index:0 ajouté en fin de document se peint AU-DESSUS de tout
-   le contenu non positionné : la vidéo passait par-dessus les menus. On la place en
-   z-index:-1 (vrai arrière-plan) et on rend le fond du body transparent pour ne pas
-   l'enterrer — la couleur de fond du thème remonte sur <html>. */
-html.fxvid { background:var(--bg); }
-html.fxvid body { background:transparent; }
-html.fxvid #fxVideo { z-index:-1; }
+   Le problème d'origine : #fxVideo est fixed, ajouté en fin de document, en z-index:0 —
+   il se peignait donc AU-DESSUS de tout le contenu non positionné (les menus).
+   Le z-index:-1 l'enterrait sous le fond du body. Solution déterministe : la vidéo reste
+   en z-index:0, et les deux écrans de l'application montent à z-index:1. Le fond du body
+   se peint avant la vidéo (étape « blocs en flux »), donc la vidéo reste visible dans les
+   marges et à travers le verre, mais passe sous tout le contenu. */
+#authScreen, #appScreen { position:relative; z-index:1; }
+.tour-spot, .tour-tip { z-index:1600; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
