@@ -10868,6 +10868,14 @@ window._ambInstallCatalogue = function(){
   fxVideoCharge(document.documentElement.getAttribute('data-theme') || 'materiel');
   const pref = localStorage.getItem('kubbnd-fx');
   if (pref === '0') document.documentElement.classList.add('fx-off');
+  /* intensité de la couche vidéo : 1 = discret (défaut), 2 = moyen, 3 = marqué */
+  function fxIntensite(n){
+    const html = document.documentElement;
+    html.classList.remove('fxv-1', 'fxv-2', 'fxv-3');
+    html.classList.add('fxv-' + n);
+    try { localStorage.setItem('kubbnd-fx-int', n); } catch(_){}
+  }
+  fxIntensite(parseInt(localStorage.getItem('kubbnd-fx-int'), 10) || 1);
   const grid = document.getElementById('themeGrid');
   if (grid && !document.getElementById('fxToggle')) {
     const row = document.createElement('label');
@@ -10880,6 +10888,17 @@ window._ambInstallCatalogue = function(){
       document.documentElement.classList.toggle('fx-off', !cb.checked);
       localStorage.setItem('kubbnd-fx', cb.checked ? '1' : '0');
     });
+    const row2 = document.createElement('label');
+    row2.style.cssText = row.style.cssText;
+    row2.innerHTML = '🎞 Fond animé <input type="range" id="fxInt" min="1" max="3" step="1" '
+      + 'style="accent-color:var(--gold);flex:1;max-width:130px"> '
+      + '<span id="fxIntLb" style="font-size:0.72rem;color:var(--muted-gold)"></span>';
+    grid.parentElement.insertBefore(row2, grid);
+    const sl = row2.querySelector('input'), lb = row2.querySelector('#fxIntLb');
+    const NOMS = { 1:'discret', 2:'moyen', 3:'marqué' };
+    sl.value = parseInt(localStorage.getItem('kubbnd-fx-int'), 10) || 1;
+    lb.textContent = NOMS[sl.value];
+    sl.addEventListener('input', () => { fxIntensite(sl.value); lb.textContent = NOMS[sl.value]; });
   }
 })();
 
@@ -15153,8 +15172,26 @@ html[data-theme="mont-celeste"] #fxParticles::after {
 /* ── couche vidéo de thème ── */
 #fxVideo { position:fixed; inset:0; width:100%; height:100%; object-fit:cover;
   z-index:0; pointer-events:none; opacity:0; transition:opacity 1.2s ease; }
-html.fxvid #fxVideo { opacity:0.8; mix-blend-mode:screen; }
-html.fxvid-opaque #fxVideo { opacity:0.3; mix-blend-mode:normal; }
+html.fxvid #fxVideo { mix-blend-mode:screen; filter:brightness(0.7) saturate(0.85); }
+html.fxvid-opaque #fxVideo { mix-blend-mode:normal; filter:brightness(0.8) saturate(0.9); }
+/* paliers d'intensité (curseur « Fond animé » du sélecteur de thèmes) */
+html.fxvid.fxv-1 #fxVideo { opacity:0.28; }
+html.fxvid.fxv-2 #fxVideo { opacity:0.5; }
+html.fxvid.fxv-3 #fxVideo { opacity:0.75; }
+html.fxvid-opaque.fxv-1 #fxVideo { opacity:0.14; }
+html.fxvid-opaque.fxv-2 #fxVideo { opacity:0.24; }
+html.fxvid-opaque.fxv-3 #fxVideo { opacity:0.36; }
+/* surfaces de lecture : la couleur de fond reprend le dessus sur la vidéo,
+   les dégradés de verre existants restent intacts (seule la couche couleur change) */
+html.fxvid .sheet-section, html.fxvid .rd-sheet, html.fxvid .wiz-card, html.fxvid .wiz-detail,
+html.fxvid #wizSide, html.fxvid #lvlSide, html.fxvid .gm-card, html.fxvid .combat-box,
+html.fxvid #editorPanel, html.fxvid .forge-window, html.fxvid .amb-wrap, html.fxvid .wiz-head {
+  background-color:rgba(13,8,3,0.88);
+}
+/* chrome interactif : on garde un soupçon de verre */
+html.fxvid .eqb, html.fxvid .bpc, html.fxvid .gm-insp-toggle {
+  background-color:rgba(13,8,3,0.55);
+}
 html.fxvid #fxParticles { display:none; }
 html.fx-off #fxVideo { display:none; }
 
