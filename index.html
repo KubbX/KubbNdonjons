@@ -15188,9 +15188,39 @@ html.fxvid #wizSide, html.fxvid #lvlSide, html.fxvid .gm-card, html.fxvid .comba
 html.fxvid #editorPanel, html.fxvid .forge-window, html.fxvid .amb-wrap, html.fxvid .wiz-head {
   background-color:rgba(13,8,3,0.88);
 }
-/* chrome interactif : on garde un soupçon de verre */
+/* ── Tout ce qui se clique, se sélectionne ou se saisit : opacité totale ──
+   (uniquement quand une vidéo de thème tourne ; sinon l'app garde son verre) */
+html.fxvid .bm-wrap, html.fxvid .bm-canvas-wrap, html.fxvid .bm-tokctl, html.fxvid #bmGabCtl,
+html.fxvid .bm-btn, html.fxvid .bm-sel, html.fxvid .bm-num, html.fxvid .bm-sep,
+html.fxvid .bm-tokctl button, html.fxvid #bmGabCtl button,
+html.fxvid .grim-tab, html.fxvid .grim-chip, html.fxvid .grim-open-btn, html.fxvid .grim-card-stats,
+html.fxvid .grim-tile-img,
+html.fxvid .cast-slot-btn, html.fxvid .eqb, html.fxvid .bpc, html.fxvid .bpc-add,
+html.fxvid .eqg-fig-btn, html.fxvid .gm-insp-toggle,
+html.fxvid .gm-card .gm-input, html.fxvid .gm-card .gm-notes-area, html.fxvid .gm-card .gm-slot,
+html.fxvid .gm-card .gm-charge, html.fxvid .gm-card .gm-conditions,
+html.fxvid .hibou-btn, html.fxvid .hibou-hbtn, html.fxvid .hibou-chip, html.fxvid .hibou-input,
+html.fxvid .hibou-settings input, html.fxvid .hibou-settings select, html.fxvid .hibou-share button,
+html.fxvid .amb-head-btn, html.fxvid .amb-chip2, html.fxvid .amb-file-btn,
+html.fxvid .amb-form input, html.fxvid .amb-form select, html.fxvid .amb-list-edit button,
+html.fxvid .amb-nappe .amb-b-forme, html.fxvid .amb-shot .amb-b-forme,
+html.fxvid .wiz-btn-ghost, html.fxvid .wiz-chip, html.fxvid .wiz-x-btn, html.fxvid .wiz-portrait-btn,
+html.fxvid .btn-prev, html.fxvid .btn-next, html.fxvid .forge-footer button,
+html.fxvid .section-add-btn, html.fxvid .proj-btn, html.fxvid .proj-btn-main,
+html.fxvid .spell-card-txtbtn, html.fxvid .ws-pv button, html.fxvid .fam-pv-btn,
+html.fxvid .sheet-hp-delta-input, html.fxvid .sheet-hp-delta-btn,
+html.fxvid .comp-cats button, html.fxvid .comp-toolbar input, html.fxvid .gm-search input,
+html.fxvid .skill-sort-select, html.fxvid .spell-filter-chip, html.fxvid .spell-filter-select,
+html.fxvid .comp-card, html.fxvid .grp-card, html.fxvid .familiar-card, html.fxvid .combat-box,
 html.fxvid .eqb, html.fxvid .bpc, html.fxvid .gm-insp-toggle {
-  background-color:rgba(13,8,3,0.55);
+  background-color:rgb(20,13,5);
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+/* les champs de saisie sur fond clair gardent leur propre couleur (fiches, grimoire) */
+html.fxvid .rd-sheet input, html.fxvid .rd-sheet select, html.fxvid .rd-sheet textarea,
+html.fxvid .sheet-section input:not(.sheet-hp-delta-input), html.fxvid .sheet-section select,
+html.fxvid .sheet-section textarea, html.fxvid input[type="checkbox"] {
+  background-color:revert;
 }
 html.fxvid #fxParticles { display:none; }
 html.fx-off #fxVideo { display:none; }
