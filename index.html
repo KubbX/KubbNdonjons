@@ -15361,6 +15361,15 @@ html .grim-tile.sel .grim-tile-name { color:#f0e2b8; }
 .grim-solo-prep .grim-tile:not(.sel):not(.locked) { display:none; }
 .grim-solo-prep .grim-grid:not(:has(.grim-tile.sel, .grim-tile.locked)) { display:none; }
 .grim-solo-prep .grim-grid-lvl:has(+ .grim-grid:not(:has(.grim-tile.sel, .grim-tile.locked))) { display:none; }
+
+/* ═══ Empilement de la couche vidéo ═══
+   Un élément fixed en z-index:0 ajouté en fin de document se peint AU-DESSUS de tout
+   le contenu non positionné : la vidéo passait par-dessus les menus. On la place en
+   z-index:-1 (vrai arrière-plan) et on rend le fond du body transparent pour ne pas
+   l'enterrer — la couleur de fond du thème remonte sur <html>. */
+html.fxvid { background:var(--bg); }
+html.fxvid body { background:transparent; }
+html.fxvid #fxVideo { z-index:-1; }
 </style>
 <script>
   // Applique le thème enregistré AVANT le rendu (évite le flash de couleur)
