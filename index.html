@@ -15331,6 +15331,42 @@ html .grim-tile.sel .grim-tile-name { color:#f0e2b8; }
    se peint avant la vidéo (étape « blocs en flux »), donc la vidéo reste visible dans les
    marges et à travers le verre, mais passe sous tout le contenu. */
 #authScreen, #appScreen { position:relative; z-index:1; }
+
+/* ═══ V2.11 — Démasquage de la couche vidéo de thème ═══
+   #fxVideo est correct depuis V2.10. Ce qui l'occultait : les vues sombres
+   pleine largeur peignaient un fond opaque par-dessus, à l'intérieur de
+   #appScreen (z-index:1). Seul #tab-list y échappait, non par transparence
+   mais parce qu'il est large de 700 px et centré.
+
+   On remplace ces aplats par un voile dont la densité suit le curseur
+   « Fond animé ». Sans vidéo chargée (.fxvid absent), le voile reste à
+   100 % : le rendu est alors identique au pixel près à celui de V2.10. */
+
+:root { --fx-voile: 100%; }
+html.fxvid.fxv-1, html.fxvid-opaque.fxv-1 { --fx-voile: 82%; }
+html.fxvid.fxv-2, html.fxvid-opaque.fxv-2 { --fx-voile: 70%; }
+html.fxvid.fxv-3, html.fxvid-opaque.fxv-3 { --fx-voile: 58%; }
+/* case « Effets visuels » décochée : on referme le voile */
+html.fx-off.fxv-1, html.fx-off.fxv-2, html.fx-off.fxv-3 { --fx-voile: 100%; }
+
+#tab-sheet {
+  background:
+    radial-gradient(55% 35% at 12% 4%, rgba(212,160,23,0.12), transparent 60%),
+    radial-gradient(50% 40% at 92% 98%, rgba(140,90,200,0.10), transparent 60%),
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--bg)    var(--fx-voile), transparent) 0%,
+      color-mix(in srgb, var(--brown) var(--fx-voile), transparent) 52%,
+      color-mix(in srgb, var(--bg2)   var(--fx-voile), transparent) 100%);
+}
+#tab-gm { background: color-mix(in srgb, var(--bg) var(--fx-voile), transparent); }
+
+/* Sous 800 px la vidéo est coupée : le voile doit rester plein.
+   Même spécificité que les règles ci-dessus, mais postérieur — donc prioritaire. */
+@media (max-width:800px){
+  html.fxvid.fxv-1, html.fxvid.fxv-2, html.fxvid.fxv-3,
+  html.fxvid-opaque.fxv-1, html.fxvid-opaque.fxv-2, html.fxvid-opaque.fxv-3 { --fx-voile: 100%; }
+}
+
 .tour-spot, .tour-tip { z-index:1600; }
 </style>
 <script>
