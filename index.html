@@ -15509,6 +15509,1092 @@ html {
 .spell-known-item:hover,
 .editor-list-item:hover { background-color: var(--card-hi); }
 
+/* ═══ V2.17 — les 27 plans de la Roue ═══
+   Chaque plan dérive d'une teinte et d'une MATIÈRE : parchemin, marbre,
+   laiton, fer noirci, ardoise, brume ou écorce. La teinte dit où l'on se
+   trouve dans la cosmologie, la matière dit de quoi le lieu est fait.
+   Généré par matieres.py — ne pas éditer à la main. */
+
+/* Plan Matériel — Le grimoire des mortels · Parchemin */
+:root, html {
+  --parch: #f9f4e9;
+  --parch2: #f9ecd0;
+  --ink: #322811;
+  --gold: #b2810d;
+  --gold-light: #dfc790;
+  --red: #423514;
+  --red-light: #7a5b10;
+  --bg: #151107;
+  --bg2: #423514;
+  --border: rgba(178,129,13,0.34);
+  --surface: #fbf8f3;
+  --surface-soft: #faf6ed;
+  --surface-alt: #f9ecd0;
+  --surface-hi: #fbf7ef;
+  --line: #cac2af;
+  --line-gold: #c2ab76;
+  --muted-gold: #78590f;
+  --brown: #423514;
+  --brown-dark: #151107;
+  --v-creme: 252,250,245;
+  --v-creme-hi: 253,252,248;
+  --v-noir: 21,17,7;
+  --v-noir-a: 21,17,7;
+  --v-noir-b: 15,12,5;
+  --v-noir-c: 18,14,6;
+  --v-or: 178,129,13;
+  --v-eclat: 223,199,144;
+  --v-txt: #4a402b;
+  --v-titre: #b2810d;
+  --v-txt-b: #6a614d;
+  --v-txt-c: #524934;
+  --v-txt-d: #c29a3d;
+  --v-saisie: #3e341e;
+  --card: #f9f4e9;
+  --card-hi: #f2e8d3;
+  --txt-muted: #7e7663;
+}
+
+/* Féerie — Le Plan sauvage et rieur · Écorce */
+html[data-theme="feerie"] {
+  --parch: #ddedd6;
+  --parch2: #ccecbe;
+  --ink: #243e19;
+  --gold: #55903c;
+  --gold-light: #aac99c;
+  --red: #2d4224;
+  --red-light: #416930;
+  --bg: #10170d;
+  --bg2: #2d4224;
+  --border: rgba(85,144,60,0.34);
+  --surface: #e4efdf;
+  --surface-soft: #e0eeda;
+  --surface-alt: #ccecbe;
+  --surface-hi: #e6f2e2;
+  --line: #a8baa1;
+  --line-gold: #8bab7e;
+  --muted-gold: #3f6b2c;
+  --brown: #2d4224;
+  --brown-dark: #10170d;
+  --v-creme: 240,247,237;
+  --v-creme-hi: 245,250,243;
+  --v-noir: 16,23,13;
+  --v-noir-a: 16,23,13;
+  --v-noir-b: 11,16,9;
+  --v-noir-c: 14,20,11;
+  --v-or: 85,144,60;
+  --v-eclat: 170,201,156;
+  --v-txt: #3a5330;
+  --v-titre: #55903c;
+  --v-txt-b: #586f4e;
+  --v-txt-c: #425a37;
+  --v-txt-d: #73a45e;
+  --v-saisie: #2f4824;
+  --card: #ddedd6;
+  --card-hi: #cfe4c7;
+  --txt-muted: #6a8061;
+}
+
+/* Gisombre — Cendre, deuil et pénombre · Ardoise */
+html[data-theme="gisombre"] {
+  --parch: #3b3f47;
+  --parch2: #444a58;
+  --ink: #ebeced;
+  --gold: #a6a7ab;
+  --gold-light: #5a5b5d;
+  --red: #303031;
+  --red-light: #6b6c6e;
+  --bg: #0e0e0e;
+  --bg2: #303031;
+  --border: rgba(166,167,171,0.34);
+  --surface: #373940;
+  --surface-soft: #393d44;
+  --surface-alt: #444a58;
+  --surface-hi: #585c62;
+  --line: #656567;
+  --line-gold: #7c7c7f;
+  --muted-gold: #c5c6c9;
+  --brown: #303031;
+  --brown-dark: #090909;
+  --v-creme: 118,121,126;
+  --v-creme-hi: 166,168,171;
+  --v-noir: 9,9,9;
+  --v-noir-a: 12,12,12;
+  --v-noir-b: 6,6,6;
+  --v-noir-c: 8,8,8;
+  --v-or: 166,167,171;
+  --v-eclat: 90,91,93;
+  --v-txt: #ebeced;
+  --v-titre: #5a5b5d;
+  --v-txt-b: #babcbf;
+  --v-txt-c: #cfd0d2;
+  --v-txt-d: #8e9095;
+  --v-saisie: #ebeced;
+  --card: #3b3f47;
+  --card-hi: #464951;
+  --txt-muted: #a8aaae;
+}
+
+/* Plan Éthéré — Le voile entre les mondes · Brume */
+html[data-theme="plan-ethere"] {
+  --parch: #e2ecec;
+  --parch2: #d0e4e5;
+  --ink: #3f5859;
+  --gold: #6c8c8e;
+  --gold-light: #c7d1d1;
+  --red: #333c3d;
+  --red-light: #506466;
+  --bg: #111515;
+  --bg2: #333c3d;
+  --border: rgba(108,140,142,0.34);
+  --surface: #e9eff0;
+  --surface-soft: #e5edee;
+  --surface-alt: #d0e4e5;
+  --surface-hi: #eaf1f1;
+  --line: #b5babb;
+  --line-gold: #9baaab;
+  --muted-gold: #587576;
+  --brown: #333c3d;
+  --brown-dark: #111515;
+  --v-creme: 242,246,246;
+  --v-creme-hi: 247,249,249;
+  --v-noir: 17,21,21;
+  --v-noir-a: 17,21,21;
+  --v-noir-b: 12,15,15;
+  --v-noir-c: 14,18,18;
+  --v-or: 108,140,142;
+  --v-eclat: 199,209,209;
+  --v-txt: #536a6b;
+  --v-titre: #6c8c8e;
+  --v-txt-b: #6d8182;
+  --v-txt-c: #597071;
+  --v-txt-d: #86a1a3;
+  --v-saisie: #496162;
+  --card: #e2ecec;
+  --card-hi: #d6e2e3;
+  --txt-muted: #7d9091;
+}
+
+/* Plan Astral — La mer d’argent des pensées · Brume */
+html[data-theme="plan-astral"] {
+  --parch: #dadfe9;
+  --parch2: #c6cfe4;
+  --ink: #3e4861;
+  --gold: #5c71a3;
+  --gold-light: #c2c8d6;
+  --red: #2f3442;
+  --red-light: #465272;
+  --bg: #101217;
+  --bg2: #2f3442;
+  --border: rgba(92,113,163,0.34);
+  --surface: #e2e5ed;
+  --surface-soft: #dde1eb;
+  --surface-alt: #c6cfe4;
+  --surface-hi: #e4e8ef;
+  --line: #b2b5be;
+  --line-gold: #949db5;
+  --muted-gold: #4e5f85;
+  --brown: #2f3442;
+  --brown-dark: #101217;
+  --v-creme: 238,241,245;
+  --v-creme-hi: 244,246,248;
+  --v-noir: 16,18,23;
+  --v-noir-a: 16,18,23;
+  --v-noir-b: 11,13,16;
+  --v-noir-c: 14,15,20;
+  --v-or: 92,113,163;
+  --v-eclat: 194,200,214;
+  --v-txt: #515a71;
+  --v-titre: #5c71a3;
+  --v-txt-b: #6a7287;
+  --v-txt-c: #576077;
+  --v-txt-d: #7889b2;
+  --v-saisie: #475169;
+  --card: #dadfe9;
+  --card-hi: #cdd4e2;
+  --txt-muted: #798195;
+}
+
+/* Plan du Feu — La fournaise éternelle · Fer noirci */
+html[data-theme="elem-feu"] {
+  --parch: #41220e;
+  --parch2: #622b06;
+  --ink: #ebe4e0;
+  --gold: #f28740;
+  --gold-light: #774422;
+  --red: #3b2517;
+  --red-light: #96562c;
+  --bg: #0e0906;
+  --bg2: #3b2517;
+  --border: rgba(242,135,64,0.34);
+  --surface: #351e0f;
+  --surface-soft: #3c200e;
+  --surface-alt: #622b06;
+  --surface-hi: #5e4332;
+  --line: #623c23;
+  --line-gold: #94562d;
+  --muted-gold: #efb188;
+  --brown: #3b2517;
+  --brown-dark: #090604;
+  --v-creme: 122,100,86;
+  --v-creme-hi: 169,154,145;
+  --v-noir: 9,6,4;
+  --v-noir-a: 12,8,5;
+  --v-noir-b: 6,4,3;
+  --v-noir-c: 8,5,3;
+  --v-or: 242,135,64;
+  --v-eclat: 119,68,34;
+  --v-txt: #ebe4e0;
+  --v-titre: #774422;
+  --v-txt-b: #bbaea5;
+  --v-txt-c: #d0c5be;
+  --v-txt-d: #cb7135;
+  --v-saisie: #ebe4e0;
+  --card: #41220e;
+  --card-hi: #532c13;
+  --txt-muted: #aa9a90;
+}
+
+/* Plan de l’Eau — L’abîme sans surface · Brume */
+html[data-theme="elem-eau"] {
+  --parch: #cee1e6;
+  --parch2: #b7dae3;
+  --ink: #32535b;
+  --gold: #38869a;
+  --gold-light: #bbd6dd;
+  --red: #284248;
+  --red-light: #306471;
+  --bg: #0d1719;
+  --bg2: #284248;
+  --border: rgba(56,134,154,0.34);
+  --surface: #d7e5e8;
+  --surface-soft: #d2e3e7;
+  --surface-alt: #b7dae3;
+  --surface-hi: #dceaed;
+  --line: #adbec2;
+  --line-gold: #84aab4;
+  --muted-gold: #356f7e;
+  --brown: #284248;
+  --brown-dark: #0d1719;
+  --v-creme: 233,242,244;
+  --v-creme-hi: 241,247,248;
+  --v-noir: 13,23,25;
+  --v-noir-a: 13,23,25;
+  --v-noir-b: 9,16,17;
+  --v-noir-c: 11,20,21;
+  --v-or: 56,134,154;
+  --v-eclat: 187,214,221;
+  --v-txt: #45646c;
+  --v-titre: #38869a;
+  --v-txt-b: #5e7b82;
+  --v-txt-c: #4b6a71;
+  --v-txt-d: #599aab;
+  --v-saisie: #3b5c63;
+  --card: #cee1e6;
+  --card-hi: #bfd8de;
+  --txt-muted: #6d8990;
+}
+
+/* Plan de l’Air — Le ciel sans terre · Marbre */
+html[data-theme="elem-air"] {
+  --parch: #ffffff;
+  --parch2: #f0f4f5;
+  --ink: #29383d;
+  --gold: #5f818c;
+  --gold-light: #bac6ca;
+  --red: #394042;
+  --red-light: #4c6067;
+  --bg: #151818;
+  --bg2: #394042;
+  --border: rgba(95,129,140,0.34);
+  --surface: #ffffff;
+  --surface-soft: #ffffff;
+  --surface-alt: #f0f4f5;
+  --surface-hi: #ffffff;
+  --line: #d5d7d8;
+  --line-gold: #acb9bd;
+  --muted-gold: #476068;
+  --brown: #394042;
+  --brown-dark: #151818;
+  --v-creme: 255,255,255;
+  --v-creme-hi: 255,255,255;
+  --v-noir: 21,24,24;
+  --v-noir-a: 21,24,24;
+  --v-noir-b: 15,17,17;
+  --v-noir-c: 18,20,20;
+  --v-or: 95,129,140;
+  --v-eclat: 186,198,202;
+  --v-txt: #435054;
+  --v-titre: #5f818c;
+  --v-txt-b: #657073;
+  --v-txt-c: #4b585c;
+  --v-txt-d: #829da5;
+  --v-saisie: #364449;
+  --card: #ffffff;
+  --card-hi: #eff2f4;
+  --txt-muted: #7a8487;
+}
+
+/* Plan de la Terre — La pierre sans ciel · Laiton */
+html[data-theme="elem-terre"] {
+  --parch: #6f4d1f;
+  --parch2: #945d15;
+  --ink: #f5f4f2;
+  --gold: #dad2c8;
+  --gold-light: #968773;
+  --red: #614f38;
+  --red-light: #9e9080;
+  --bg: #1b1610;
+  --bg2: #614f38;
+  --border: rgba(218,210,200,0.34);
+  --surface: #614623;
+  --surface-soft: #694a21;
+  --surface-alt: #945d15;
+  --surface-hi: #846840;
+  --line: #67543d;
+  --line-gold: #8f806e;
+  --muted-gold: #e6e1db;
+  --brown: #614f38;
+  --brown-dark: #120e0a;
+  --v-creme: 154,130,98;
+  --v-creme-hi: 189,174,153;
+  --v-noir: 18,14,10;
+  --v-noir-a: 22,18,13;
+  --v-noir-b: 13,10,7;
+  --v-noir-c: 15,12,8;
+  --v-or: 218,210,200;
+  --v-eclat: 150,135,115;
+  --v-txt: #f5f4f2;
+  --v-titre: #968773;
+  --v-txt-b: #cfc5b7;
+  --v-txt-c: #e0d9d0;
+  --v-txt-d: #c2b5a3;
+  --v-saisie: #f5f4f2;
+  --card: #6f4d1f;
+  --card-hi: #7a5a30;
+  --txt-muted: #c2b5a2;
+}
+
+/* Plan Positif — La source qui brûle de vie · Marbre */
+html[data-theme="energie-pos"] {
+  --parch: #f2f0e9;
+  --parch2: #ebe6d6;
+  --ink: #443b22;
+  --gold: #a68323;
+  --gold-light: #decfa6;
+  --red: #4d452d;
+  --red-light: #7a6428;
+  --bg: #1c1912;
+  --bg2: #4d452d;
+  --border: rgba(166,131,35,0.34);
+  --surface: #f6f4f1;
+  --surface-soft: #f4f2ec;
+  --surface-alt: #ebe6d6;
+  --surface-hi: #f5f4ef;
+  --line: #dbd9d1;
+  --line-gold: #c8bb94;
+  --muted-gold: #7a6323;
+  --brown: #4d452d;
+  --brown-dark: #1c1912;
+  --v-creme: 249,248,245;
+  --v-creme-hi: 251,250,248;
+  --v-noir: 28,25,18;
+  --v-noir-a: 28,25,18;
+  --v-noir-b: 20,17,13;
+  --v-noir-c: 24,21,15;
+  --v-or: 166,131,35;
+  --v-eclat: 222,207,166;
+  --v-txt: #59513a;
+  --v-titre: #a68323;
+  --v-txt-b: #756e5a;
+  --v-txt-c: #605842;
+  --v-txt-d: #b79b4f;
+  --v-saisie: #4e462e;
+  --card: #f2f0e9;
+  --card-hi: #eae5d5;
+  --txt-muted: #86806e;
+}
+
+/* Plan Négatif — La faim qui éteint tout · Fer noirci */
+html[data-theme="energie-neg"] {
+  --parch: #1c0e22;
+  --parch2: #2d103a;
+  --ink: #e7e2e9;
+  --gold: #a47db5;
+  --gold-light: #523e5b;
+  --red: #2b232e;
+  --red-light: #685072;
+  --bg: #0b090c;
+  --bg2: #2b232e;
+  --border: rgba(164,125,181,0.34);
+  --surface: #150c19;
+  --surface-soft: #190d1e;
+  --surface-alt: #2d103a;
+  --surface-hi: #3e3243;
+  --line: #46384c;
+  --line-gold: #675071;
+  --muted-gold: #c2aacc;
+  --brown: #2b232e;
+  --brown-dark: #070608;
+  --v-creme: 96,86,100;
+  --v-creme-hi: 152,145,154;
+  --v-noir: 7,6,8;
+  --v-noir-a: 9,8,10;
+  --v-noir-b: 5,4,6;
+  --v-noir-c: 6,5,7;
+  --v-or: 164,125,181;
+  --v-eclat: 82,62,91;
+  --v-txt: #e7e2e9;
+  --v-titre: #523e5b;
+  --v-txt-b: #aea7b1;
+  --v-txt-c: #c7c0c9;
+  --v-txt-d: #866595;
+  --v-saisie: #e7e2e9;
+  --card: #1c0e22;
+  --card-hi: #2a1931;
+  --txt-muted: #9a919d;
+}
+
+/* Mont Céleste — Les sept cieux radieux · Marbre */
+html[data-theme="mont-celeste"] {
+  --parch: #e4edeb;
+  --parch2: #d2e6e1;
+  --ink: #264039;
+  --gold: #3b947c;
+  --gold-light: #afd4ca;
+  --red: #334842;
+  --red-light: #376e5f;
+  --bg: #141a19;
+  --bg2: #334842;
+  --border: rgba(59,148,124,0.34);
+  --surface: #ebf1f0;
+  --surface-soft: #e7efed;
+  --surface-alt: #d2e6e1;
+  --surface-hi: #ecf2f0;
+  --line: #d3d9d8;
+  --line-gold: #9ec1b8;
+  --muted-gold: #326e5e;
+  --brown: #334842;
+  --brown-dark: #141a19;
+  --v-creme: 243,247,246;
+  --v-creme-hi: 247,250,249;
+  --v-noir: 20,26,25;
+  --v-noir-a: 20,26,25;
+  --v-noir-b: 14,18,17;
+  --v-noir-c: 17,22,21;
+  --v-or: 59,148,124;
+  --v-eclat: 175,212,202;
+  --v-txt: #3d554e;
+  --v-titre: #3b947c;
+  --v-txt-b: #5b706b;
+  --v-txt-c: #445c55;
+  --v-txt-d: #60a894;
+  --v-saisie: #314a44;
+  --card: #e4edeb;
+  --card-hi: #d3e4e0;
+  --txt-muted: #6e827d;
+}
+
+/* Bytopie — Le labeur juste et paisible · Parchemin */
+html[data-theme="bytopie"] {
+  --parch: #f7fbf6;
+  --parch2: #e3f5e3;
+  --ink: #182a18;
+  --gold: #568255;
+  --gold-light: #aec2ad;
+  --red: #263126;
+  --red-light: #3e5a3d;
+  --bg: #0c100c;
+  --bg2: #263126;
+  --border: rgba(86,130,85,0.34);
+  --surface: #fefefe;
+  --surface-soft: #fafcf9;
+  --surface-alt: #e3f5e3;
+  --surface-hi: #f9fcf8;
+  --line: #bac0b9;
+  --line-gold: #97aa96;
+  --muted-gold: #3a5a3a;
+  --brown: #263126;
+  --brown-dark: #0c100c;
+  --v-creme: 251,253,251;
+  --v-creme-hi: 252,254,252;
+  --v-noir: 12,16,12;
+  --v-noir-a: 12,16,12;
+  --v-noir-b: 8,11,8;
+  --v-noir-c: 10,14,10;
+  --v-or: 86,130,85;
+  --v-eclat: 174,194,173;
+  --v-txt: #334333;
+  --v-titre: #568255;
+  --v-txt-b: #566556;
+  --v-txt-c: #3c4b3c;
+  --v-txt-d: #799d78;
+  --v-saisie: #253725;
+  --card: #f7fbf6;
+  --card-hi: #e7efe6;
+  --txt-muted: #6d796c;
+}
+
+/* Élysée — Le repos des âmes bonnes · Marbre */
+html[data-theme="elysee"] {
+  --parch: #fafbfb;
+  --parch2: #eaf1ee;
+  --ink: #2a3c35;
+  --gold: #638879;
+  --gold-light: #bbc9c3;
+  --red: #39413e;
+  --red-light: #4e645c;
+  --bg: #161817;
+  --bg2: #39413e;
+  --border: rgba(99,136,121,0.34);
+  --surface: #ffffff;
+  --surface-soft: #fcfdfd;
+  --surface-alt: #eaf1ee;
+  --surface-hi: #fcfcfc;
+  --line: #d5d7d6;
+  --line-gold: #adbbb5;
+  --muted-gold: #49665a;
+  --brown: #39413e;
+  --brown-dark: #161817;
+  --v-creme: 253,253,253;
+  --v-creme-hi: 254,254,254;
+  --v-noir: 22,24,23;
+  --v-noir-a: 22,24,23;
+  --v-noir-b: 15,17,16;
+  --v-noir-c: 19,20,20;
+  --v-or: 99,136,121;
+  --v-eclat: 187,201,195;
+  --v-txt: #43534d;
+  --v-titre: #638879;
+  --v-txt-b: #64716c;
+  --v-txt-c: #4b5b55;
+  --v-txt-d: #84a196;
+  --v-saisie: #364741;
+  --card: #fafbfb;
+  --card-hi: #ebf0ee;
+  --txt-muted: #798580;
+}
+
+/* Terres des Bêtes — La nature sans maître · Écorce */
+html[data-theme="terres-betes"] {
+  --parch: #cae8c7;
+  --parch2: #b3e8ae;
+  --ink: #1c3e18;
+  --gold: #3d8d34;
+  --gold-light: #9fcb9a;
+  --red: #264323;
+  --red-light: #32682c;
+  --bg: #0e170d;
+  --bg2: #264323;
+  --border: rgba(61,141,52,0.34);
+  --surface: #d4e9d1;
+  --surface-soft: #cee8cb;
+  --surface-alt: #b3e8ae;
+  --surface-hi: #d8eed6;
+  --line: #a2bb9f;
+  --line-gold: #7fab7a;
+  --muted-gold: #2e6927;
+  --brown: #264323;
+  --brown-dark: #0e170d;
+  --v-creme: 231,245,230;
+  --v-creme-hi: 239,248,239;
+  --v-noir: 14,23,13;
+  --v-noir-a: 14,23,13;
+  --v-noir-b: 10,16,9;
+  --v-noir-c: 12,20,11;
+  --v-or: 61,141,52;
+  --v-eclat: 159,203,154;
+  --v-txt: #31522d;
+  --v-titre: #3d8d34;
+  --v-txt-b: #4d6e49;
+  --v-txt-c: #385934;
+  --v-txt-d: #5ca154;
+  --v-saisie: #264822;
+  --card: #cae8c7;
+  --card-hi: #bcdfb8;
+  --txt-muted: #5e7f5a;
+}
+
+/* Arborée — La beauté déchaînée · Écorce */
+html[data-theme="arboree"] {
+  --parch: #f2f7e6;
+  --parch2: #eaf6cd;
+  --ink: #354413;
+  --gold: #729818;
+  --gold-light: #c2d98c;
+  --red: #3d4d19;
+  --red-light: #587218;
+  --bg: #151a09;
+  --bg2: #3d4d19;
+  --border: rgba(114,152,24,0.34);
+  --surface: #f6f9ef;
+  --surface-soft: #f4f8ea;
+  --surface-alt: #eaf6cd;
+  --surface-hi: #f5f9ed;
+  --line: #b6c497;
+  --line-gold: #9eb56b;
+  --muted-gold: #577216;
+  --brown: #3d4d19;
+  --brown-dark: #151a09;
+  --v-creme: 249,251,244;
+  --v-creme-hi: 251,252,248;
+  --v-noir: 21,26,9;
+  --v-noir-a: 21,26,9;
+  --v-noir-b: 15,18,6;
+  --v-noir-c: 18,22,8;
+  --v-or: 114,152,24;
+  --v-eclat: 194,217,140;
+  --v-txt: #4c592c;
+  --v-titre: #729818;
+  --v-txt-b: #6a764e;
+  --v-txt-c: #536135;
+  --v-txt-d: #8ead45;
+  --v-saisie: #404f20;
+  --card: #f2f7e6;
+  --card-hi: #e5eed1;
+  --txt-muted: #7d8863;
+}
+
+/* Ysgard — La gloire et la mêlée sans fin · Laiton */
+html[data-theme="ysgard"] {
+  --parch: #a75e16;
+  --parch2: #d66b00;
+  --ink: #fbfaf9;
+  --gold: #e6d1bc;
+  --gold-light: #ab855e;
+  --red: #7b4c1e;
+  --red-light: #b08e6d;
+  --bg: #221609;
+  --bg2: #7b4c1e;
+  --border: rgba(230,209,188,0.34);
+  --surface: #93591f;
+  --surface-soft: #9f5c1a;
+  --surface-alt: #d66b00;
+  --surface-hi: #b47639;
+  --line: #805223;
+  --line-gold: #a47e59;
+  --muted-gold: #efe3d7;
+  --brown: #7b4c1e;
+  --brown-dark: #160e06;
+  --v-creme: 193,142,92;
+  --v-creme-hi: 215,182,149;
+  --v-noir: 22,14,6;
+  --v-noir-a: 28,18,8;
+  --v-noir-b: 15,10,4;
+  --v-noir-c: 19,12,5;
+  --v-or: 230,209,188;
+  --v-eclat: 171,133,94;
+  --v-txt: #fbfaf9;
+  --v-titre: #ab855e;
+  --v-txt-b: #e3ceb9;
+  --v-txt-c: #eee1d5;
+  --v-txt-d: #d8b897;
+  --v-saisie: #fbfaf9;
+  --card: #a75e16;
+  --card-hi: #ad6a27;
+  --txt-muted: #dbbfa3;
+}
+
+/* Limbes — La matière qui ne se fixe pas · Brume */
+html[data-theme="limbes"] {
+  --parch: #f4edf5;
+  --parch2: #eddbee;
+  --ink: #5f3d61;
+  --gold: #a05aa5;
+  --gold-light: #d5c1d7;
+  --red: #412e42;
+  --red-light: #704474;
+  --bg: #160f17;
+  --bg2: #412e42;
+  --border: rgba(160,90,165,0.34);
+  --surface: #f8f5f9;
+  --surface-soft: #f6f0f7;
+  --surface-alt: #eddbee;
+  --surface-hi: #f7f2f8;
+  --line: #bdb1be;
+  --line-gold: #b393b5;
+  --muted-gold: #834d86;
+  --brown: #412e42;
+  --brown-dark: #160f17;
+  --v-creme: 250,247,251;
+  --v-creme-hi: 252,250,252;
+  --v-noir: 22,15,23;
+  --v-noir-a: 22,15,23;
+  --v-noir-b: 15,10,16;
+  --v-noir-c: 19,13,20;
+  --v-or: 160,90,165;
+  --v-eclat: 213,193,215;
+  --v-txt: #715273;
+  --v-titre: #a05aa5;
+  --v-txt-b: #896e8a;
+  --v-txt-c: #775979;
+  --v-txt-d: #b27ab7;
+  --v-saisie: #68486a;
+  --card: #f4edf5;
+  --card-hi: #ecdeed;
+  --txt-muted: #988099;
+}
+
+/* Pandémonium — Le vent qui rend fou · Ardoise */
+html[data-theme="pandemonium"] {
+  --parch: #504a5c;
+  --parch2: #5b516e;
+  --ink: #ecebed;
+  --gold: #a6a3ae;
+  --gold-light: #5a5860;
+  --red: #302f32;
+  --red-light: #6b6970;
+  --bg: #0e0e0e;
+  --bg2: #302f32;
+  --border: rgba(166,163,174,0.34);
+  --surface: #4b4655;
+  --surface-soft: #4e4859;
+  --surface-alt: #5b516e;
+  --surface-hi: #6a6575;
+  --line: #65626a;
+  --line-gold: #7c7982;
+  --muted-gold: #c6c3ca;
+  --brown: #302f32;
+  --brown-dark: #090909;
+  --v-creme: 132,128,141;
+  --v-creme-hi: 175,172,181;
+  --v-noir: 9,9,9;
+  --v-noir-a: 12,12,12;
+  --v-noir-b: 6,6,6;
+  --v-noir-c: 8,8,8;
+  --v-or: 166,163,174;
+  --v-eclat: 90,88,96;
+  --v-txt: #ecebed;
+  --v-titre: #5a5860;
+  --v-txt-b: #c0bec4;
+  --v-txt-c: #d3d1d6;
+  --v-txt-d: #938f9c;
+  --v-saisie: #ecebed;
+  --card: #504a5c;
+  --card-hi: #595364;
+  --txt-muted: #b1aeb6;
+}
+
+/* Abysses — La corruption sans fond · Fer noirci */
+html[data-theme="abysses"] {
+  --parch: #16070d;
+  --parch2: #2e0717;
+  --ink: #eae1e5;
+  --gold: #d35f8d;
+  --gold-light: #6b2e46;
+  --red: #341d26;
+  --red-light: #843e5a;
+  --bg: #0d070a;
+  --bg2: #341d26;
+  --border: rgba(211,95,141,0.34);
+  --surface: #0c0508;
+  --surface-soft: #12060b;
+  --surface-alt: #2e0717;
+  --surface-hi: #392c32;
+  --line: #572e3e;
+  --line-gold: #823f5a;
+  --muted-gold: #dd9ab5;
+  --brown: #341d26;
+  --brown-dark: #080506;
+  --v-creme: 92,81,86;
+  --v-creme-hi: 149,142,145;
+  --v-noir: 8,5,6;
+  --v-noir-a: 10,6,8;
+  --v-noir-b: 6,3,4;
+  --v-noir-c: 7,4,5;
+  --v-or: 211,95,141;
+  --v-eclat: 107,46,70;
+  --v-txt: #eae1e5;
+  --v-titre: #6b2e46;
+  --v-txt-b: #afa4a9;
+  --v-txt-c: #c8bec2;
+  --v-txt-d: #a94c71;
+  --v-saisie: #eae1e5;
+  --card: #16070d;
+  --card-hi: #29101a;
+  --txt-muted: #998e93;
+}
+
+/* Carcéri — La prison des traîtres · Fer noirci */
+html[data-theme="carceri"] {
+  --parch: #341d16;
+  --parch2: #4d2317;
+  --ink: #e8e4e3;
+  --gold: #b18c81;
+  --gold-light: #594640;
+  --red: #2e2624;
+  --red-light: #705952;
+  --bg: #0b0a09;
+  --bg2: #2e2624;
+  --border: rgba(177,140,129,0.34);
+  --surface: #2a1a15;
+  --surface-soft: #301c16;
+  --surface-alt: #4d2317;
+  --surface-hi: #523f39;
+  --line: #4b3e3a;
+  --line-gold: #6f5953;
+  --muted-gold: #cab4ad;
+  --brown: #2e2624;
+  --brown-dark: #070606;
+  --v-creme: 113,97,92;
+  --v-creme-hi: 163,152,149;
+  --v-noir: 7,6,6;
+  --v-noir-a: 9,8,8;
+  --v-noir-b: 5,4,4;
+  --v-noir-c: 6,5,5;
+  --v-or: 177,140,129;
+  --v-eclat: 89,70,64;
+  --v-txt: #e8e4e3;
+  --v-titre: #594640;
+  --v-txt-b: #b6acaa;
+  --v-txt-c: #cbc4c2;
+  --v-txt-d: #967469;
+  --v-saisie: #e8e4e3;
+  --card: #341d16;
+  --card-hi: #402821;
+  --txt-muted: #a49895;
+}
+
+/* Hadès — Le gris où tout s’éteint · Ardoise */
+html[data-theme="hades"] {
+  --parch: #2c2e26;
+  --parch2: #3b3d30;
+  --ink: #ecedeb;
+  --gold: #a9a9a8;
+  --gold-light: #5c5c5b;
+  --red: #313130;
+  --red-light: #6d6d6c;
+  --bg: #0e0e0e;
+  --bg2: #313130;
+  --border: rgba(169,169,168,0.34);
+  --surface: #262722;
+  --surface-soft: #2a2b24;
+  --surface-alt: #3b3d30;
+  --surface-hi: #4c4e46;
+  --line: #666666;
+  --line-gold: #7d7d7d;
+  --muted-gold: #c7c8c6;
+  --brown: #313130;
+  --brown-dark: #090909;
+  --v-creme: 107,109,103;
+  --v-creme-hi: 159,160,156;
+  --v-noir: 9,9,9;
+  --v-noir-a: 12,12,12;
+  --v-noir-b: 6,6,6;
+  --v-noir-c: 8,8,8;
+  --v-or: 169,169,168;
+  --v-eclat: 92,92,91;
+  --v-txt: #ecedeb;
+  --v-titre: #5c5c5b;
+  --v-txt-b: #b6b8b4;
+  --v-txt-c: #cdcecb;
+  --v-txt-d: #8e8e8b;
+  --v-saisie: #ecedeb;
+  --card: #2c2e26;
+  --card-hi: #383a33;
+  --txt-muted: #a3a4a0;
+}
+
+/* Géhenne — La pente de cendre et de feu · Fer noirci */
+html[data-theme="gehenne"] {
+  --parch: #1d0b09;
+  --parch2: #370d09;
+  --ink: #eae2e1;
+  --gold: #d46a5e;
+  --gold-light: #6b342e;
+  --red: #351f1d;
+  --red-light: #84443e;
+  --bg: #0d0807;
+  --bg2: #351f1d;
+  --border: rgba(212,106,94,0.34);
+  --surface: #140907;
+  --surface-soft: #190a08;
+  --surface-alt: #370d09;
+  --surface-hi: #3f302e;
+  --line: #57322e;
+  --line-gold: #83463f;
+  --muted-gold: #dea099;
+  --brown: #351f1d;
+  --brown-dark: #080505;
+  --v-creme: 97,84,83;
+  --v-creme-hi: 152,144,143;
+  --v-noir: 8,5,5;
+  --v-noir-a: 10,6,6;
+  --v-noir-b: 6,3,3;
+  --v-noir-c: 7,4,4;
+  --v-or: 212,106,94;
+  --v-eclat: 107,52,46;
+  --v-txt: #eae2e1;
+  --v-titre: #6b342e;
+  --v-txt-b: #b1a6a5;
+  --v-txt-c: #c9c0be;
+  --v-txt-d: #ac554b;
+  --v-saisie: #eae2e1;
+  --card: #1d0b09;
+  --card-hi: #2f1412;
+  --txt-muted: #9c908f;
+}
+
+/* Les Neuf Enfers — Fer, braise et contrats · Fer noirci */
+html[data-theme="neuf-enfers"] {
+  --parch: #35120b;
+  --parch2: #541205;
+  --ink: #ebe2e0;
+  --gold: #f25e40;
+  --gold-light: #773022;
+  --red: #3b1d17;
+  --red-light: #963e2c;
+  --bg: #0e0706;
+  --bg2: #3b1d17;
+  --border: rgba(242,94,64,0.34);
+  --surface: #29110c;
+  --surface-soft: #30120b;
+  --surface-alt: #541205;
+  --surface-hi: #543530;
+  --line: #622d23;
+  --line-gold: #943e2d;
+  --muted-gold: #ef9988;
+  --brown: #3b1d17;
+  --brown-dark: #090504;
+  --v-creme: 114,89,84;
+  --v-creme-hi: 163,147,144;
+  --v-noir: 9,5,4;
+  --v-noir-a: 12,6,5;
+  --v-noir-b: 6,3,3;
+  --v-noir-c: 8,4,3;
+  --v-or: 242,94,64;
+  --v-eclat: 119,48,34;
+  --v-txt: #ebe2e0;
+  --v-titre: #773022;
+  --v-txt-b: #b8a8a4;
+  --v-txt-c: #cec1be;
+  --v-txt-d: #c84d34;
+  --v-saisie: #ebe2e0;
+  --card: #35120b;
+  --card-hi: #481a10;
+  --txt-muted: #a6938f;
+}
+
+/* Achéron — Les cubes de fer et la guerre · Laiton */
+html[data-theme="acheron"] {
+  --parch: #64262e;
+  --parch2: #83202d;
+  --ink: #f5f3f3;
+  --gold: #d4cecf;
+  --gold-light: #8b7e80;
+  --red: #544547;
+  --red-light: #948a8b;
+  --bg: #181414;
+  --bg2: #544547;
+  --border: rgba(212,206,207,0.34);
+  --surface: #57272e;
+  --surface-soft: #5f262e;
+  --surface-alt: #83202d;
+  --surface-hi: #7b464e;
+  --line: #594a4c;
+  --line-gold: #84787a;
+  --muted-gold: #e3dfdf;
+  --brown: #544547;
+  --brown-dark: #100d0d;
+  --v-creme: 146,103,109;
+  --v-creme-hi: 184,156,160;
+  --v-noir: 16,13,13;
+  --v-noir-a: 20,16,16;
+  --v-noir-b: 11,9,9;
+  --v-noir-c: 14,11,11;
+  --v-or: 212,206,207;
+  --v-eclat: 139,126,128;
+  --v-txt: #f5f3f3;
+  --v-titre: #8b7e80;
+  --v-txt-b: #ccbabc;
+  --v-txt-c: #ded2d3;
+  --v-txt-d: #bba9ac;
+  --v-saisie: #f5f3f3;
+  --card: #64262e;
+  --card-hi: #6f373e;
+  --txt-muted: #bea5a8;
+}
+
+/* Mécanus — Laiton, rouages et loi · Laiton */
+html[data-theme="mecanus"] {
+  --parch: #887320;
+  --parch2: #b29110;
+  --ink: #fbfaf9;
+  --gold: #ded9c5;
+  --gold-light: #9c936d;
+  --red: #685d31;
+  --red-light: #a39b7b;
+  --bg: #1d1a0e;
+  --bg2: #685d31;
+  --border: rgba(222,217,197,0.34);
+  --surface: #786725;
+  --surface-soft: #826e22;
+  --surface-alt: #b29110;
+  --surface-hi: #9a8842;
+  --line: #6e6236;
+  --line-gold: #958c68;
+  --muted-gold: #ebe8dc;
+  --brown: #685d31;
+  --brown-dark: #131109;
+  --v-creme: 172,157,99;
+  --v-creme-hi: 201,191,154;
+  --v-noir: 19,17,9;
+  --v-noir-a: 24,22,12;
+  --v-noir-b: 13,12,6;
+  --v-noir-c: 16,14,8;
+  --v-or: 222,217,197;
+  --v-eclat: 156,147,109;
+  --v-txt: #fbfaf9;
+  --v-titre: #9c936d;
+  --v-txt-b: #dbd4bc;
+  --v-txt-c: #e9e4d6;
+  --v-txt-d: #cbc3a1;
+  --v-saisie: #fbfaf9;
+  --card: #887320;
+  --card-hi: #917d31;
+  --txt-muted: #cfc7a7;
+}
+
+/* Arcadie — Le jardin taillé au cordeau · Parchemin */
+html[data-theme="arcadie"] {
+  --parch: #e1f2e7;
+  --parch2: #caefd8;
+  --ink: #172c1e;
+  --gold: #488e62;
+  --gold-light: #a7c8b3;
+  --red: #223429;
+  --red-light: #356146;
+  --bg: #0b110d;
+  --bg2: #223429;
+  --border: rgba(72,142,98,0.34);
+  --surface: #eaf4ed;
+  --surface-soft: #e5f3e9;
+  --surface-alt: #caefd8;
+  --surface-hi: #eaf5ee;
+  --line: #b7c2bb;
+  --line-gold: #90b09c;
+  --muted-gold: #326243;
+  --brown: #223429;
+  --brown-dark: #0b110d;
+  --v-creme: 242,249,244;
+  --v-creme-hi: 247,251,248;
+  --v-noir: 11,17,13;
+  --v-noir-a: 11,17,13;
+  --v-noir-b: 8,12,9;
+  --v-noir-c: 9,14,11;
+  --v-or: 72,142,98;
+  --v-eclat: 167,200,179;
+  --v-txt: #2f4436;
+  --v-titre: #488e62;
+  --v-txt-b: #506356;
+  --v-txt-c: #374c3e;
+  --v-txt-d: #6aa47f;
+  --v-saisie: #23382a;
+  --card: #e1f2e7;
+  --card-hi: #d2e8da;
+  --txt-muted: #64776a;
+}
+
 
 
 .tour-spot, .tour-tip { z-index:1600; }
@@ -16205,14 +17291,36 @@ html {
 
 <script>
 (function(){
+  /* V2.17 : les 27 plans. Alimente la grille de repli sous 640 px ;
+     au-dessus, c'est la Roue qui sert de sélecteur. */
   const THEMES = [
-    { key:'materiel',     name:'Plan Matériel',   desc:'Le grimoire des mortels',       dots:['#f4ece1','#b8860b','#8b0000','#1a0f05'] },
-    { key:'neuf-enfers',  name:'Les Neuf Enfers', desc:'Fer, braise et contrats',       dots:['#f0e4dc','#c8452a','#e08428','#160404'] },
-    { key:'feerie',       name:'Féerie',          desc:'Le Plan sauvage et rieur',      dots:['#eef0e4','#7cc45a','#8a4ab0','#0e1a12'] },
-    { key:'gisombre',     name:'Gisombre',        desc:'Cendre, deuil et pénombre',     dots:['#e8e8ea','#8a94a0','#5a4a6a','#0c0c10'] },
-    { key:'mecanus',      name:'Mécanus',         desc:'Laiton, rouages et loi',        dots:['#f0ead8','#c9963c','#3f8e7e','#141008'] },
-    { key:'plan-astral',  name:'Plan Astral',     desc:'La mer d\'argent des pensées', dots:['#e8ecf6','#9aa8d8','#7a5ab0','#0a0c1a'] },
-    { key:'mont-celeste', name:'Mont Céleste',    desc:'Les sept cieux radieux',        dots:['#faf4e2','#d8ae4c','#b06a28','#181206'] },
+    { key:'materiel', name:'Plan Matériel', desc:'Le grimoire des mortels', dots:['#f9f4e9', '#b2810d', '#dfc790', '#151107'] },
+    { key:'feerie', name:'Féerie', desc:'Le Plan sauvage et rieur', dots:['#ddedd6', '#55903c', '#aac99c', '#10170d'] },
+    { key:'gisombre', name:'Gisombre', desc:'Cendre, deuil et pénombre', dots:['#3b3f47', '#a6a7ab', '#5a5b5d', '#0e0e0e'] },
+    { key:'plan-ethere', name:'Plan Éthéré', desc:'Le voile entre les mondes', dots:['#e2ecec', '#6c8c8e', '#c7d1d1', '#111515'] },
+    { key:'plan-astral', name:'Plan Astral', desc:'La mer d’argent des pensées', dots:['#dadfe9', '#5c71a3', '#c2c8d6', '#101217'] },
+    { key:'elem-feu', name:'Plan du Feu', desc:'La fournaise éternelle', dots:['#41220e', '#f28740', '#774422', '#0e0906'] },
+    { key:'elem-eau', name:'Plan de l’Eau', desc:'L’abîme sans surface', dots:['#cee1e6', '#38869a', '#bbd6dd', '#0d1719'] },
+    { key:'elem-air', name:'Plan de l’Air', desc:'Le ciel sans terre', dots:['#ffffff', '#5f818c', '#bac6ca', '#151818'] },
+    { key:'elem-terre', name:'Plan de la Terre', desc:'La pierre sans ciel', dots:['#6f4d1f', '#dad2c8', '#968773', '#1b1610'] },
+    { key:'energie-pos', name:'Plan Positif', desc:'La source qui brûle de vie', dots:['#f2f0e9', '#a68323', '#decfa6', '#1c1912'] },
+    { key:'energie-neg', name:'Plan Négatif', desc:'La faim qui éteint tout', dots:['#1c0e22', '#a47db5', '#523e5b', '#0b090c'] },
+    { key:'mont-celeste', name:'Mont Céleste', desc:'Les sept cieux radieux', dots:['#e4edeb', '#3b947c', '#afd4ca', '#141a19'] },
+    { key:'bytopie', name:'Bytopie', desc:'Le labeur juste et paisible', dots:['#f7fbf6', '#568255', '#aec2ad', '#0c100c'] },
+    { key:'elysee', name:'Élysée', desc:'Le repos des âmes bonnes', dots:['#fafbfb', '#638879', '#bbc9c3', '#161817'] },
+    { key:'terres-betes', name:'Terres des Bêtes', desc:'La nature sans maître', dots:['#cae8c7', '#3d8d34', '#9fcb9a', '#0e170d'] },
+    { key:'arboree', name:'Arborée', desc:'La beauté déchaînée', dots:['#f2f7e6', '#729818', '#c2d98c', '#151a09'] },
+    { key:'ysgard', name:'Ysgard', desc:'La gloire et la mêlée sans fin', dots:['#a75e16', '#e6d1bc', '#ab855e', '#221609'] },
+    { key:'limbes', name:'Limbes', desc:'La matière qui ne se fixe pas', dots:['#f4edf5', '#a05aa5', '#d5c1d7', '#160f17'] },
+    { key:'pandemonium', name:'Pandémonium', desc:'Le vent qui rend fou', dots:['#504a5c', '#a6a3ae', '#5a5860', '#0e0e0e'] },
+    { key:'abysses', name:'Abysses', desc:'La corruption sans fond', dots:['#16070d', '#d35f8d', '#6b2e46', '#0d070a'] },
+    { key:'carceri', name:'Carcéri', desc:'La prison des traîtres', dots:['#341d16', '#b18c81', '#594640', '#0b0a09'] },
+    { key:'hades', name:'Hadès', desc:'Le gris où tout s’éteint', dots:['#2c2e26', '#a9a9a8', '#5c5c5b', '#0e0e0e'] },
+    { key:'gehenne', name:'Géhenne', desc:'La pente de cendre et de feu', dots:['#1d0b09', '#d46a5e', '#6b342e', '#0d0807'] },
+    { key:'neuf-enfers', name:'Les Neuf Enfers', desc:'Fer, braise et contrats', dots:['#35120b', '#f25e40', '#773022', '#0e0706'] },
+    { key:'acheron', name:'Achéron', desc:'Les cubes de fer et la guerre', dots:['#64262e', '#d4cecf', '#8b7e80', '#181414'] },
+    { key:'mecanus', name:'Mécanus', desc:'Laiton, rouages et loi', dots:['#887320', '#ded9c5', '#9c936d', '#1d1a0e'] },
+    { key:'arcadie', name:'Arcadie', desc:'Le jardin taillé au cordeau', dots:['#e1f2e7', '#488e62', '#a7c8b3', '#0b110d'] },
   ];
 
   function current(){
@@ -16268,20 +17376,59 @@ html {
 
   /* les 16 Plans Extérieurs, ordre canonique de la Roue — index 0 = Élysée au
      sommet, puis sens horaire. Seuls trois portent un thème. */
+  /* les 16 Plans Extérieurs, ordre canonique — index 0 = Élysée au sommet,
+     puis sens horaire. Tous jouables depuis la V2.17. */
   const EXT = [
-    ['Élysée',0], ['Terres des Bêtes',0], ['Arborée',0], ['Ysgard',0],
-    ['Limbes',0], ['Pandémonium',0], ['Abysses',0], ['Carcéri',0],
-    ['Hadès',0], ['Géhenne',0], ['Neuf Enfers','neuf-enfers'], ['Achéron',0],
-    ['Mécanus','mecanus'], ['Arcadie',0], ['Mont Céleste','mont-celeste'], ['Bytopie',0]
+    ['Élysée','elysee'],
+    ['Terres des Bêtes','terres-betes'],
+    ['Arborée','arboree'],
+    ['Ysgard','ysgard'],
+    ['Limbes','limbes'],
+    ['Pandémonium','pandemonium'],
+    ['Abysses','abysses'],
+    ['Carcéri','carceri'],
+    ['Hadès','hades'],
+    ['Géhenne','gehenne'],
+    ['Les Neuf Enfers','neuf-enfers'],
+    ['Achéron','acheron'],
+    ['Mécanus','mecanus'],
+    ['Arcadie','arcadie'],
+    ['Mont Céleste','mont-celeste'],
+    ['Bytopie','bytopie']
+  ];
+  /* les quatre plans élémentaires, sur les diagonales autour du Matériel */
+  const ELEM = [
+    ['Feu','elem-feu',315], ['Air','elem-air',45],
+    ['Eau','elem-eau',135], ['Terre','elem-terre',225]
   ];
   const DESC = {
     'materiel':['Plan Matériel','Le grimoire des mortels'],
     'feerie':['Féerie','Le Plan sauvage et rieur'],
     'gisombre':['Gisombre','Cendre, deuil et pénombre'],
-    'neuf-enfers':['Les Neuf Enfers','Fer, braise et contrats'],
-    'mecanus':['Mécanus','Laiton, rouages et loi'],
+    'plan-ethere':['Plan Éthéré','Le voile entre les mondes'],
+    'plan-astral':['Plan Astral','La mer d’argent des pensées'],
+    'elem-feu':['Plan du Feu','La fournaise éternelle'],
+    'elem-eau':['Plan de l’Eau','L’abîme sans surface'],
+    'elem-air':['Plan de l’Air','Le ciel sans terre'],
+    'elem-terre':['Plan de la Terre','La pierre sans ciel'],
+    'energie-pos':['Plan Positif','La source qui brûle de vie'],
+    'energie-neg':['Plan Négatif','La faim qui éteint tout'],
     'mont-celeste':['Mont Céleste','Les sept cieux radieux'],
-    'plan-astral':['Plan Astral','La mer d’argent des pensées']
+    'bytopie':['Bytopie','Le labeur juste et paisible'],
+    'elysee':['Élysée','Le repos des âmes bonnes'],
+    'terres-betes':['Terres des Bêtes','La nature sans maître'],
+    'arboree':['Arborée','La beauté déchaînée'],
+    'ysgard':['Ysgard','La gloire et la mêlée sans fin'],
+    'limbes':['Limbes','La matière qui ne se fixe pas'],
+    'pandemonium':['Pandémonium','Le vent qui rend fou'],
+    'abysses':['Abysses','La corruption sans fond'],
+    'carceri':['Carcéri','La prison des traîtres'],
+    'hades':['Hadès','Le gris où tout s’éteint'],
+    'gehenne':['Géhenne','La pente de cendre et de feu'],
+    'neuf-enfers':['Les Neuf Enfers','Fer, braise et contrats'],
+    'acheron':['Achéron','Les cubes de fer et la guerre'],
+    'mecanus':['Mécanus','Laiton, rouages et loi'],
+    'arcadie':['Arcadie','Le jardin taillé au cordeau'],
   };
   /* sceaux planaires — tracés originaux, dessinés dans un carré de 24 */
   const RUNES = {
@@ -16294,6 +17441,15 @@ html {
     'plan-astral':'M0 -11 L2.8 -3.2 L11 -3.2 L4.4 1.8 L7 10 L0 5 L-7 10 L-4.4 1.8 L-11 -3.2 L-2.8 -3.2 Z'
   };
 
+  /* V2.17 : chaque plan hérite du sceau de sa matière s'il n'a pas le sien */
+  const MAT = {"materiel": "parchemin", "feerie": "ecorce", "gisombre": "ardoise", "plan-ethere": "brume", "plan-astral": "brume", "elem-feu": "fer-noirci", "elem-eau": "brume", "elem-air": "marbre", "elem-terre": "laiton", "energie-pos": "marbre", "energie-neg": "fer-noirci", "mont-celeste": "marbre", "bytopie": "parchemin", "elysee": "marbre", "terres-betes": "ecorce", "arboree": "ecorce", "ysgard": "laiton", "limbes": "brume", "pandemonium": "ardoise", "abysses": "fer-noirci", "carceri": "fer-noirci", "hades": "ardoise", "gehenne": "fer-noirci", "neuf-enfers": "fer-noirci", "acheron": "laiton", "mecanus": "laiton", "arcadie": "parchemin"};
+  const RUNE_MAT = {
+    parchemin:RUNES['materiel'], ecorce:RUNES['feerie'],
+    ardoise:RUNES['gisombre'], 'fer-noirci':RUNES['neuf-enfers'],
+    laiton:RUNES['mecanus'], marbre:RUNES['mont-celeste'],
+    brume:RUNES['plan-astral']
+  };
+  const rune = s => RUNES[s] || RUNE_MAT[MAT[s]] || RUNES['materiel'];
   const NS = 'http://www.w3.org/2000/svg', CX = 410, CY = 410, R_EXT = 305;
   hote.innerHTML =
     '<svg class="rp-svg" viewBox="0 0 820 820" role="group" aria-label="Roue des Plans">'
@@ -16312,6 +17468,8 @@ html {
   + ' d="M410 4 A406 406 0 1 0 410 816 A406 406 0 1 0 410 4 Z'
   + '    M410 38 A372 372 0 1 1 410 782 A372 372 0 1 1 410 38 Z"/></g>'
   + '<text class="rp-libelle" x="410" y="27">Plan Astral</text>'
+  + '<g id="rpEthere" class="rp-plan"><circle class="rp-zone" cx="410" cy="410"'
+  + ' r="176" fill="none" stroke-width="72" stroke="transparent"/></g>'
   + '<text class="rp-libelle rp-libelle-it" x="291" y="295"'
   + ' transform="rotate(-45 291 295)">Plan Éthéré</text>'
   + '<g id="rpPlans"></g></svg>'
@@ -16332,8 +17490,8 @@ html {
                          transform:'translate(' + x + ' ' + y + ')'});
     if (slug) grp.appendChild(el('circle', {class:'rp-halo', r:r+6}));
     grp.appendChild(el('circle', {class:'rp-disque', r:r}));
-    if (slug && RUNES[slug]) grp.appendChild(el('path',
-      {class:'rp-rune', d:RUNES[slug], transform:'scale(' + (r/34).toFixed(3) + ')'}));
+    if (slug) grp.appendChild(el('path',
+      {class:'rp-rune', d:rune(slug), transform:'scale(' + (r/34).toFixed(3) + ')'}));
     const t = el('text', {class:'rp-nom', y:r + 13});
     coupe(nom).forEach((L,i) => {
       const sp = el('tspan', {x:0}); if (i) sp.setAttribute('dy','1.08em');
@@ -16357,11 +17515,17 @@ html {
   });
   pastille(CX, CY - 172, 42, 'Féerie', 'feerie');
   pastille(CX, CY + 172, 42, 'Gisombre', 'gisombre');
+  /* V2.17 : les quatre élémentaires, sur les diagonales, entre le Matériel
+     et l'anneau éthéré */
+  ELEM.forEach(function(e){
+    const a = e[2] * Math.PI / 180;
+    pastille(CX + 128 * Math.sin(a), CY - 128 * Math.cos(a), 27, e[0], e[1]);
+  });
 
   const coeur = el('g', {class:'rp-plan rp-actif', transform:'translate(410 410)'});
   coeur.appendChild(el('circle', {class:'rp-halo', r:86}));
   coeur.appendChild(el('circle', {class:'rp-disque', r:78, fill:'url(#rpCoeur)'}));
-  coeur.appendChild(el('path', {class:'rp-rune', d:RUNES['materiel'],
+  coeur.appendChild(el('path', {class:'rp-rune', d:rune('materiel'),
                                 transform:'translate(0 -8) scale(2.1)'}));
   const tc = el('text', {class:'rp-nom', y:46, style:'font-size:12.5px'});
   tc.textContent = 'Plan Matériel';
@@ -16372,11 +17536,21 @@ html {
   coeur.addEventListener('mouseleave', () => survol(null));
   g.appendChild(coeur);
 
+  pastille(CX, CY - 237, 19, 'Positif', 'energie-pos');
+  pastille(CX, CY + 237, 19, 'Négatif', 'energie-neg');
+
   const zA = hote.querySelector('#rpAstral');
   zA.dataset.slug = 'plan-astral';
   zA.addEventListener('click', () => window._applyTheme('plan-astral'));
   zA.addEventListener('mouseenter', () => survol('plan-astral'));
   zA.addEventListener('mouseleave', () => survol(null));
+
+  const zE = hote.querySelector('#rpEthere');
+  zE.dataset.slug = 'plan-ethere';
+  zE.style.pointerEvents = 'stroke';
+  zE.addEventListener('click', () => window._applyTheme('plan-ethere'));
+  zE.addEventListener('mouseenter', () => survol('plan-ethere'));
+  zE.addEventListener('mouseleave', () => survol(null));
 
   const rpT = hote.querySelector('#rpT'), rpD = hote.querySelector('#rpD'),
         rpN = hote.querySelector('#rpN');
