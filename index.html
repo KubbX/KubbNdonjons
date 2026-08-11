@@ -2781,13 +2781,1940 @@ const WIZ_STAT_KEYS = ['str','dex','con','int','wis','cha'];
 const WIZ_STAT_FR = {str:'FOR',dex:'DEX',con:'CON',int:'INT',wis:'SAG',cha:'CHA'};
 const WIZ_STAT_LONG = {str:'Force',dex:'Dextérité',con:'Constitution',int:'Intelligence',wis:'Sagesse',cha:'Charisme'};
 const WIZ_LANGUAGES = ["Commun","Nain","Elfique","Géant","Gnome","Gobelin","Halfelin","Orc","Abyssal","Céleste","Commun des profondeurs","Draconique","Infernal","Primordial","Profond","Sylvestre"];
+/* ═══════════ CRÉATEUR D'AVATAR — L'ATELIER DU PORTRAIT (V2.19) ═══════════ */
+/* ══════════════════════════════════════════════════════════════════
+   CRÉATEUR D'AVATAR (avc) — TABLES DE DONNÉES
+   Tout est déclaratif : le moteur ne contient aucun ordre de couche,
+   aucune morphologie, aucune pièce écrits en dur.
+   ══════════════════════════════════════════════════════════════════ */
+
+const AVC_SCHEMA_VERSION = 1;
+const AVC_W = 832, AVC_H = 1216;
+
+/* ── Pile de couches (le z est l'index du tableau, jamais en dur) ── */
+const AVC_LAYERS = [
+  { id:'fond',            type:'fond' },
+  { id:'capeArriere',     type:'equip', slot:'cape',            partie:'arriere' },
+  { id:'queue',           type:'trait', trait:'queue' },
+  { id:'corps',           type:'corps' },
+  { id:'sousVetements',   type:'corps', partie:'sousVetements' },
+  { id:'jambieres',       type:'equip', slot:'jambes' },
+  { id:'torse',           type:'equip', slot:'torse',           categories:['vetement'] },
+  { id:'cuirasse',        type:'equip', slot:'torse',           categories:['armure-legere','armure-inter','armure-lourde'] },
+  { id:'bottes',          type:'equip', slot:'pieds' },
+  { id:'ceinture',        type:'equip', slot:'ceinture' },
+  { id:'gants',           type:'equip', slot:'mains' },
+  { id:'brassards',       type:'equip', slot:'bras' },
+  { id:'epaulieres',      type:'equip', slot:'epaules' },
+  { id:'tete',            type:'visage' },
+  { id:'oreilles',        type:'trait', trait:'oreilles' },
+  { id:'cheveuxArriere',  type:'pilosite', partie:'arriere' },
+  { id:'barbe',           type:'pilosite', partie:'barbe' },
+  { id:'cheveuxAvant',    type:'pilosite', partie:'avant' },
+  { id:'cornes',          type:'trait', trait:'cornes' },
+  { id:'casque',          type:'equip', slot:'tete' },
+  { id:'bijoux',          type:'equip', slot:'bijou1', slots:['bijou1','bijou2'] },
+  { id:'armeDos',         type:'equip', slot:'mainPrincipale',  partie:'dos' },
+  { id:'capeAvant',       type:'equip', slot:'cape',            partie:'avant' },
+  { id:'armeMain',        type:'equip', slot:'mainPrincipale' },
+  { id:'armeSecondaire',  type:'equip', slot:'mainSecondaire' },
+  { id:'effets',          type:'effet' }
+];
+
+/* ── Règles de visibilité déclaratives ─────────────────────────── */
+const AVC_REGLES = [
+  /* casque intégral : masque coiffure et oreilles */
+  { si:{ piece:{ slot:'tete', prop:'integral' } }, masque:['cheveuxAvant','cheveuxArriere','oreilles'] },
+  /* casque (tout type) : la coiffure passe en variante écrasée */
+  { si:{ piece:{ slot:'tete' } }, coiffure:'ecrasee' },
+  /* armure lourde : masque la chemise (couche torse-vêtement) */
+  { si:{ piece:{ slot:'torse', categorie:'armure-lourde' } }, masque:['torse'] },
+  /* cornes portées : le casque doit avoir une variante à cornes, sinon il est désactivé */
+  { si:{ trait:'cornes' }, casque:'varianteOuRetrait' },
+  /* robe longue : masque jambières et bottes hautes (zones déclarées par pièce) */
+];
+
+/* ── Squelette de référence (gabarit M humain), coordonnées 0–1 ── */
+const AVC_SQUELETTE_BASE = {
+  tete:     [0.500, 0.130],
+  cou:      [0.500, 0.232],
+  epauleL:  [0.400, 0.272],  epauleR: [0.600, 0.272],
+  coudeL:   [0.362, 0.402],  coudeR:  [0.638, 0.402],
+  poignetL: [0.342, 0.522],  poignetR:[0.658, 0.522],
+  taille:   [0.500, 0.470],
+  hancheL:  [0.444, 0.548],  hancheR: [0.556, 0.548],
+  genouL:   [0.452, 0.722],  genouR:  [0.548, 0.722],
+  piedL:    [0.456, 0.930],  piedR:   [0.544, 0.930]
+};
+
+/* ── Ascendances draconiques SRD : couleur d'écailles corrélée ── */
+const AVC_ASCENDANCES = {
+  'noir':   { nom:'Dragon noir',   souffle:'Acide (ligne)',        ecailles:'#3a3d42', reflet:'#6b7280' },
+  'bleu':   { nom:'Dragon bleu',   souffle:'Foudre (ligne)',       ecailles:'#2d4d8f', reflet:'#5b7fc7' },
+  'airain': { nom:"Dragon d'airain", souffle:'Feu (ligne)',        ecailles:'#a97142', reflet:'#d9a066' },
+  'bronze': { nom:'Dragon de bronze', souffle:'Foudre (ligne)',    ecailles:'#8a6d3b', reflet:'#c9a96a' },
+  'cuivre': { nom:'Dragon de cuivre', souffle:'Acide (ligne)',     ecailles:'#9c5a3c', reflet:'#d98b5f' },
+  'or':     { nom:"Dragon d'or",   souffle:'Feu (cône)',           ecailles:'#b8860b', reflet:'#ecc94b' },
+  'vert':   { nom:'Dragon vert',   souffle:'Poison (cône)',        ecailles:'#3f6b3f', reflet:'#6f9f6f' },
+  'rouge':  { nom:'Dragon rouge',  souffle:'Feu (cône)',           ecailles:'#8f2d2d', reflet:'#c75b5b' },
+  'argent': { nom:"Dragon d'argent", souffle:'Froid (cône)',       ecailles:'#9aa2ad', reflet:'#d5dae2' },
+  'blanc':  { nom:'Dragon blanc',  souffle:'Froid (cône)',         ecailles:'#cfd6dd', reflet:'#f2f6fa' }
+};
+
+/* ── Palettes communes ─────────────────────────────────────────── */
+const AVC_PAL = {
+  peauHumaine: ['#f5d7b8','#ecc49a','#dcab7e','#c68f60','#a9714a','#8a5a3a','#6e462e','#54382a'],
+  peauPale:    ['#f8e3cd','#f0d2b2','#e3bd97','#d3a87e'],
+  peauVerte:   ['#8fa065','#79905a','#647c4c','#50663e','#a9b478'],
+  peauInfernale:['#c46a5a','#a5453c','#8a3030','#6e2a3c','#7d4a8f','#5c3a6e','#b98a7a'],
+  chevBase:    ['#1c1310','#3a2617','#5a3a20','#7a512c','#a06a35','#c8933f','#8a8378','#d9d2c4','#f0ece2','#b3402e'],
+  chevFantaisie:['#3a5a8f','#5c3a6e','#3f6b52','#8f2d2d','#d4a520'],
+  yeuxBase:    ['#3a2a1c','#5a3a20','#2d4d3a','#2d4d8f','#6e7b8a','#8a6d3b'],
+  yeuxVifs:    ['#c8452a','#d4a520','#7cc45a','#9aa8d8','#f0f0f0','#1c1c22']
+};
+
+/* ── Fiches morphologiques : SRD 5.1 uniquement ────────────────
+   echelle    : hauteur du personnage / hauteur du cadre
+   epaules    : facteur de largeur d'épaules
+   membres    : facteur de longueur bras/jambes
+   corpulence : [min, max] (1 = référence)
+   tete       : facteur de taille de tête
+   Chaque champ non listé hérite du gabarit générique.            */
+const AVC_RACES = {
+  'humain': {
+    nom:'Humain', taille:'M', echelle:1.00, epaules:1.00, membres:1.00, tete:1.00,
+    corpulence:[0.85,1.30],
+    peau:AVC_PAL.peauHumaine, cheveux:AVC_PAL.chevBase, yeux:AVC_PAL.yeuxBase,
+    oreilles:{ longueur:0.0, angle:0 }
+  },
+  'nain': {
+    nom:'Nain des collines', taille:'M', echelle:0.76, epaules:1.18, membres:0.82, tete:1.08,
+    corpulence:[1.00,1.50],
+    peau:AVC_PAL.peauHumaine, cheveux:AVC_PAL.chevBase, yeux:AVC_PAL.yeuxBase,
+    oreilles:{ longueur:0.08, angle:0 },
+    barbeNaturelle:true, barbeDefaut:'fournie'
+  },
+  'elfe': {
+    nom:'Haut-elfe', taille:'M', echelle:1.02, epaules:0.90, membres:1.06, tete:0.97,
+    corpulence:[0.72,1.05],
+    peau:AVC_PAL.peauPale.concat(AVC_PAL.peauHumaine.slice(2,6)), cheveux:AVC_PAL.chevBase.concat(['#d9d2c4','#3a5a8f']), yeux:AVC_PAL.yeuxBase.concat(['#d4a520','#9aa8d8']),
+    oreilles:{ longueur:1.00, angle:-22 }
+  },
+  'halfelin': {
+    nom:'Halfelin pied-léger', taille:'P', echelle:0.55, epaules:0.86, membres:0.94, tete:1.15,
+    corpulence:[0.90,1.35],
+    peau:AVC_PAL.peauHumaine, cheveux:AVC_PAL.chevBase, yeux:AVC_PAL.yeuxBase,
+    oreilles:{ longueur:0.30, angle:-8 }
+  },
+  'gnome': {
+    nom:'Gnome des roches', taille:'P', echelle:0.50, epaules:0.90, membres:0.90, tete:1.28,
+    corpulence:[0.85,1.30],
+    peau:AVC_PAL.peauHumaine.concat(['#d9c49a']), cheveux:AVC_PAL.chevBase.concat(AVC_PAL.chevFantaisie), yeux:AVC_PAL.yeuxBase.concat(['#7cc45a']),
+    oreilles:{ longueur:0.55, angle:-15 }
+  },
+  'demi-elfe': {
+    nom:'Demi-elfe', taille:'M', echelle:1.00, epaules:0.95, membres:1.02, tete:0.99,
+    corpulence:[0.80,1.20],
+    peau:AVC_PAL.peauHumaine, cheveux:AVC_PAL.chevBase, yeux:AVC_PAL.yeuxBase.concat(['#d4a520']),
+    oreilles:{ longueur:0.45, angle:-12 }
+  },
+  'demi-orc': {
+    nom:'Demi-orc', taille:'M', echelle:1.08, epaules:1.22, membres:1.04, tete:1.02,
+    corpulence:[1.00,1.55],
+    peau:AVC_PAL.peauVerte.concat(AVC_PAL.peauHumaine.slice(4)), cheveux:['#1c1310','#3a2617','#54382a','#8a8378'], yeux:AVC_PAL.yeuxBase.concat(['#c8452a']),
+    oreilles:{ longueur:0.35, angle:-6 },
+    crocs:true
+  },
+  'drakeide': {
+    nom:'Drakéide', taille:'M', echelle:1.10, epaules:1.18, membres:1.03, tete:1.05,
+    corpulence:[0.95,1.45],
+    peau:null /* dérivée de l'ascendance */, cheveux:[], yeux:AVC_PAL.yeuxVifs,
+    oreilles:{ longueur:0.0, angle:0 },
+    museau:true, ecailles:true, ascendances:Object.keys(AVC_ASCENDANCES), ascendanceDefaut:'airain',
+    sansCheveux:true
+  },
+  'tieffelin': {
+    nom:'Tieffelin', taille:'M', echelle:1.00, epaules:1.00, membres:1.02, tete:1.00,
+    corpulence:[0.80,1.25],
+    peau:AVC_PAL.peauInfernale.concat(AVC_PAL.peauHumaine.slice(2)), cheveux:AVC_PAL.chevBase.concat(['#5c3a6e','#8f2d2d']), yeux:AVC_PAL.yeuxVifs,
+    oreilles:{ longueur:0.40, angle:-14 },
+    cornesNaturelles:true, cornesDefaut:'arriere', queueNaturelle:true
+  }
+};
+
+/* Gabarits génériques pour toute espèce hors SRD (par taille) */
+const AVC_GENERIQUES = {
+  'P': { nom:'Gabarit petit',  taille:'P', echelle:0.55, epaules:0.90, membres:0.94, tete:1.15,
+         corpulence:[0.85,1.35], peau:AVC_PAL.peauHumaine, cheveux:AVC_PAL.chevBase, yeux:AVC_PAL.yeuxBase,
+         oreilles:{ longueur:0.2, angle:-6 }, generique:true },
+  'M': { nom:'Gabarit moyen',  taille:'M', echelle:1.00, epaules:1.00, membres:1.00, tete:1.00,
+         corpulence:[0.85,1.30], peau:AVC_PAL.peauHumaine, cheveux:AVC_PAL.chevBase, yeux:AVC_PAL.yeuxBase,
+         oreilles:{ longueur:0.0, angle:0 }, generique:true }
+};
+
+/* Correspondance RACES (table KubbNd) → fiche avc.
+   Toute clé absente bascule sur le gabarit générique de sa taille. */
+const AVC_RACE_MAP = {
+  'Humain':'humain', 'Nain':'nain', 'Elfe':'elfe', 'Halfelin':'halfelin',
+  'Gnome':'gnome', 'Demi-elfe':'demi-elfe', 'Demi-orc':'demi-orc',
+  'Drakéide':'drakeide', 'Tieffelin':'tieffelin'
+};
+/* Sous-races SRD reconnues (les autres gardent la fiche de la race) */
+const AVC_SOUSRACES = {
+  'nain':      { srd:'Nain des collines' },
+  'elfe':      { srd:'Haut-Elfe' },
+  'halfelin':  { srd:'Halfelin pied-léger' },
+  'gnome':     { srd:'Gnome des roches' }
+};
+/* Taille des espèces hors SRD (défaut M) — pour choisir le gabarit générique */
+const AVC_TAILLES_HORS_SRD = { 'Gnome des profondeurs':'P', 'Kobold':'P', 'Goblin':'P', 'Gobelin':'P', 'Fée':'P', 'Harengon':'P' };
+
+/* ── Options de visage / pilosité / traits ─────────────────────── */
+const AVC_VISAGES = {
+  presets:  [ {id:'ovale',nom:'Ovale'}, {id:'carre',nom:'Carré'}, {id:'fin',nom:'Fin'}, {id:'rond',nom:'Rond'}, {id:'anguleux',nom:'Anguleux'} ],
+  yeuxFormes:[ {id:'amande',nom:'En amande'}, {id:'rond',nom:'Ronds'}, {id:'tombant',nom:'Tombants'}, {id:'percant',nom:'Perçants'} ],
+  sourcils: [ {id:'fins',nom:'Fins'}, {id:'epais',nom:'Épais'}, {id:'arques',nom:'Arqués'}, {id:'droits',nom:'Droits'} ],
+  bouches:  [ {id:'neutre',nom:'Neutre'}, {id:'souriante',nom:'Souriante'}, {id:'severe',nom:'Sévère'}, {id:'fine',nom:'Fine'} ],
+  nez:      [ {id:'droit',nom:'Droit'}, {id:'aquilin',nom:'Aquilin'}, {id:'epate',nom:'Épaté'}, {id:'retrousse',nom:'Retroussé'} ],
+  maquillages:[ {id:'aucun',nom:'Aucun'}, {id:'lignes',nom:'Lignes rituelles'}, {id:'masque',nom:'Masque sombre'} ],
+  cicatrices:[ {id:'aucune',nom:'Aucune'}, {id:'joue',nom:'Balafre à la joue'}, {id:'oeil',nom:"Marque à l'œil"}, {id:'lèvre',nom:'Lèvre fendue'} ],
+  tatouages:[ {id:'aucun',nom:'Aucun'}, {id:'runes',nom:'Runes au front'}, {id:'spirale',nom:'Spirale de clan'} ]
+};
+
+const AVC_COIFFURES = [
+  { id:'rase',       nom:'Crâne rasé',      avant:false, arriere:false, ecrasable:false },
+  { id:'courte',     nom:'Coupe courte',    avant:true,  arriere:false, ecrasable:true  },
+  { id:'mi-longue',  nom:'Mi-longue',       avant:true,  arriere:true,  ecrasable:true  },
+  { id:'longue',     nom:'Longue',          avant:true,  arriere:true,  ecrasable:true  },
+  { id:'tresse',     nom:'Tresse épaisse',  avant:true,  arriere:true,  ecrasable:true  },
+  { id:'chignon',    nom:'Chignon haut',    avant:true,  arriere:false, ecrasable:false },
+  { id:'queue',      nom:'Queue de cheval', avant:true,  arriere:true,  ecrasable:true  },
+  { id:'crete',      nom:'Crête',           avant:true,  arriere:false, ecrasable:false },
+  { id:'boucles',    nom:'Boucles amples',  avant:true,  arriere:true,  ecrasable:true  },
+  { id:'nattes',     nom:'Nattes de guerre',avant:true,  arriere:true,  ecrasable:true  }
+];
+
+const AVC_BARBES = [
+  { id:'aucune',   nom:'Imberbe' },
+  { id:'bouc',     nom:'Bouc' },
+  { id:'courte',   nom:'Barbe courte' },
+  { id:'fournie',  nom:'Barbe fournie' },
+  { id:'tressee',  nom:'Barbe tressée (naine)' },
+  { id:'moustache',nom:'Moustache' }
+];
+
+/* Cornes tieffelines : 6 formes + aucune. La queue est un choix séparé. */
+const AVC_CORNES = [
+  { id:'aucunes',  nom:'Sans cornes' },
+  { id:'droites',  nom:'Droites' },
+  { id:'spirales', nom:'Spiralées' },
+  { id:'belier',   nom:'De bélier' },
+  { id:'arriere',  nom:'Couchées en arrière' },
+  { id:'couronne', nom:'En couronne' },
+  { id:'lyre',     nom:'En lyre' }
+];
+
+const AVC_GABARITS = [
+  { id:'mince',   nom:'Mince',   t:0.0 },
+  { id:'moyen',   nom:'Moyen',   t:0.45 },
+  { id:'athletique', nom:'Athlétique', t:0.65 },
+  { id:'costaud', nom:'Costaud', t:1.0 }
+];
+
+const AVC_POSES = [
+  { id:'neutre', nom:'Posture neutre' },
+  { id:'fiere',  nom:'Posture fière' }
+];
+
+const AVC_FONDS = [
+  { id:'transparent', nom:'Transparent' },
+  { id:'socle',       nom:'Socle sombre' },
+  { id:'materiel',    nom:'Plan Matériel',  haut:'#3d2712', bas:'#120a04' },
+  { id:'feerie',      nom:'Féerie',         haut:'#1e3c2a', bas:'#0a140e' },
+  { id:'gisombre',    nom:'Gisombre',       haut:'#262630', bas:'#0a0a0e' },
+  { id:'neuf-enfers', nom:'Neuf Enfers',    haut:'#401410', bas:'#120404' },
+  { id:'mecanus',     nom:'Mécanus',        haut:'#3a2c10', bas:'#100c04' },
+  { id:'astral',      nom:'Plan Astral',    haut:'#22284a', bas:'#080a14' },
+  { id:'mont-celeste',nom:'Mont Céleste',   haut:'#4a3812', bas:'#161006' }
+];
+
+/* ── Matériaux et teintes d'équipement ─────────────────────────── */
+const AVC_MATERIAUX = {
+  tissu:   { nom:'Tissu',   motif:'plat' },
+  cuir:    { nom:'Cuir',    motif:'couture' },
+  mailles: { nom:'Mailles', motif:'anneaux' },
+  plaques: { nom:'Plaques', motif:'bandes' },
+  bois:    { nom:'Bois',    motif:'veines' }
+};
+const AVC_TEINTES = ['#7a512c','#54382a','#8a3030','#3d5a3d','#2d4d8f','#5c3a6e','#8a8e9a','#b8860b','#2c2c30','#e8e0d0','#6e4a2e','#3a5a5a'];
+
+/* ── Catalogue d'équipement ────────────────────────────────────────
+   slot ∈ tete, epaules, cape, torse, bras, mains, ceinture, jambes,
+          pieds, mainPrincipale, mainSecondaire, bijou1, bijou2
+   categorie ∈ vetement, armure-legere, armure-inter, armure-lourde,
+               bouclier, arme
+   ancrage : { a:'pointA', b:'pointB' } — paire du squelette qui fixe
+             échelle et position (les PNG sont peints plein cadre sur
+             le gabarit M humain ; voir formule dans le moteur).
+   masque : couches éteintes quand la pièce est portée.
+   Les 14 ids sans préfixe correspondent aux clés (slugifiées) de
+   COMPENDIUM_DATA.armor.                                            */
+const AVC_ANCRE_TORSE = { a:'epauleL', b:'hancheR' };
+const AVC_ANCRE_TETE  = { a:'tete',    b:'cou' };
+const AVC_ANCRE_JAMBE = { a:'hancheL', b:'piedR' };
+const AVC_ANCRE_PIED  = { a:'genouL',  b:'piedR' };
+const AVC_ANCRE_BRAS  = { a:'epauleL', b:'poignetL' };
+const AVC_ANCRE_MAIN  = { a:'coudeL',  b:'poignetL' };
+const AVC_ANCRE_CEINT = { a:'taille',  b:'hancheR' };
+
+const AVC_CATALOGUE = [
+  /* — Armures du compendium (COMPENDIUM_DATA.armor) — */
+  { id:'matelassee', nom:'Matelassée', slot:'torse', categorie:'armure-legere', materiau:'tissu',   ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 11 + DEX · Discrétion : désavantage' },
+  { id:'cuir', nom:'Cuir', slot:'torse', categorie:'armure-legere', materiau:'cuir',    ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 11 + DEX' },
+  { id:'cuir-cloute', nom:'Cuir clouté', slot:'torse', categorie:'armure-legere', materiau:'cuir', ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 12 + DEX' },
+  { id:'peaux', nom:'Peaux', slot:'torse', categorie:'armure-inter', materiau:'cuir',   ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 12 + DEX (max 2)' },
+  { id:'broigne', nom:'Broigne', slot:'torse', categorie:'armure-inter', materiau:'cuir', ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 13 + DEX (max 2)' },
+  { id:'chemise-de-mailles', nom:'Chemise de mailles', slot:'torse', categorie:'armure-inter', materiau:'mailles', ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 13 + DEX (max 2)' },
+  { id:'ecailles', nom:'Écailles', slot:'torse', categorie:'armure-inter', materiau:'plaques', ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 14 + DEX (max 2) · Discrétion : désavantage' },
+  { id:'cuirasse', nom:'Cuirasse', slot:'torse', categorie:'armure-inter', materiau:'plaques', ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 14 + DEX (max 2)' },
+  { id:'demi-plate', nom:'Demi-plate', slot:'torse', categorie:'armure-inter', materiau:'plaques', ancrage:AVC_ANCRE_TORSE, masque:[], regle:'CA 15 + DEX (max 2) · Discrétion : désavantage' },
+  { id:'anneau', nom:'Anneau', slot:'torse', categorie:'armure-lourde', materiau:'mailles', ancrage:AVC_ANCRE_TORSE, masque:['torse'], regle:'CA 14 · Discrétion : désavantage' },
+  { id:'cotte-de-mailles', nom:'Cotte de mailles', slot:'torse', categorie:'armure-lourde', materiau:'mailles', ancrage:AVC_ANCRE_TORSE, masque:['torse'], regle:'CA 16 · FOR 13 · Discrétion : désavantage' },
+  { id:'eclisses', nom:'Éclisses', slot:'torse', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_TORSE, masque:['torse'], regle:'CA 17 · FOR 15 · Discrétion : désavantage' },
+  { id:'harnois', nom:'Harnois', slot:'torse', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_TORSE, masque:['torse'], regle:'CA 18 · FOR 15 · Discrétion : désavantage' },
+  { id:'bouclier', nom:'Bouclier', slot:'mainSecondaire', categorie:'bouclier', materiau:'bois', ancrage:{ a:'coudeL', b:'poignetL' }, masque:[], regle:'+2 CA' },
+
+  /* — Tenue civile — */
+  { id:'civ-chemise', nom:'Chemise simple', slot:'torse', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TORSE, masque:[] },
+  { id:'civ-pantalon', nom:'Pantalon de toile', slot:'jambes', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_JAMBE, masque:[] },
+  { id:'civ-bottes', nom:'Bottes simples', slot:'pieds', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_PIED, masque:[] },
+  { id:'civ-ceinture', nom:'Ceinture simple', slot:'ceinture', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_CEINT, masque:[] },
+
+  /* — Tenue de voyage — */
+  { id:'voy-tunique', nom:'Tunique de voyage', slot:'torse', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TORSE, masque:[] },
+  { id:'voy-cape', nom:'Cape de voyage', slot:'cape', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TORSE, masque:[] },
+  { id:'voy-capuche', nom:'Capuche de voyage', slot:'tete', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TETE, masque:[] },
+  { id:'voy-gants', nom:'Gants de voyage', slot:'mains', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_MAIN, masque:[] },
+  { id:'voy-bottes', nom:'Bottes de voyage', slot:'pieds', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_PIED, masque:[] },
+  { id:'voy-ceinture', nom:'Ceinture à bourses', slot:'ceinture', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_CEINT, masque:[] },
+
+  /* — Robe de mage — */
+  { id:'robe-de-mage', nom:'Robe de mage', slot:'torse', categorie:'vetement', materiau:'tissu', ancrage:{ a:'epauleL', b:'piedR' }, masque:['jambieres','bottes'], longue:true },
+  { id:'robe-capuchon', nom:'Capuchon arcanique', slot:'tete', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TETE, masque:[] },
+  { id:'robe-echarpe', nom:'Écharpe arcanique', slot:'epaules', categorie:'vetement', materiau:'tissu', ancrage:{ a:'epauleL', b:'epauleR' }, masque:[] },
+
+  /* — Tenue noble — */
+  { id:'noble-pourpoint', nom:'Pourpoint noble', slot:'torse', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TORSE, masque:[] },
+  { id:'noble-cape', nom:'Cape de cour', slot:'cape', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_TORSE, masque:[] },
+  { id:'noble-bottes', nom:'Bottes fines', slot:'pieds', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_PIED, masque:[] },
+  { id:'noble-ceinture', nom:'Ceinture dorée', slot:'ceinture', categorie:'vetement', materiau:'cuir', ancrage:AVC_ANCRE_CEINT, masque:[] },
+  { id:'noble-gants', nom:'Gants de soie', slot:'mains', categorie:'vetement', materiau:'tissu', ancrage:AVC_ANCRE_MAIN, masque:[] },
+
+  /* — Casques — */
+  { id:'casq-cerveliere', nom:'Cervelière', slot:'tete', categorie:'armure-legere', materiau:'plaques', ancrage:AVC_ANCRE_TETE, masque:[] },
+  { id:'casq-nasal', nom:'Casque à nasal', slot:'tete', categorie:'armure-inter', materiau:'plaques', ancrage:AVC_ANCRE_TETE, masque:[] },
+  { id:'casq-heaume', nom:'Heaume intégral', slot:'tete', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_TETE, masque:[], integral:true, varianteCornes:true },
+
+  /* — Épaulières, bras, mains — */
+  { id:'epau-cuir', nom:'Épaulières de cuir', slot:'epaules', categorie:'armure-legere', materiau:'cuir', ancrage:{ a:'epauleL', b:'epauleR' }, masque:[] },
+  { id:'epau-acier', nom:"Épaulières d'acier", slot:'epaules', categorie:'armure-lourde', materiau:'plaques', ancrage:{ a:'epauleL', b:'epauleR' }, masque:[] },
+  { id:'bras-cuir', nom:'Brassards de cuir', slot:'bras', categorie:'armure-legere', materiau:'cuir', ancrage:AVC_ANCRE_BRAS, masque:[] },
+  { id:'bras-acier', nom:"Brassards d'acier", slot:'bras', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_BRAS, masque:[] },
+  { id:'mains-gantelets', nom:'Gantelets', slot:'mains', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_MAIN, masque:[] },
+
+  /* — Jambes et pieds (armure) — */
+  { id:'jamb-cuir', nom:'Jambières de cuir', slot:'jambes', categorie:'armure-legere', materiau:'cuir', ancrage:AVC_ANCRE_JAMBE, masque:[] },
+  { id:'jamb-acier', nom:"Jambières d'acier", slot:'jambes', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_JAMBE, masque:[] },
+  { id:'pieds-solerets', nom:'Solerets', slot:'pieds', categorie:'armure-lourde', materiau:'plaques', ancrage:AVC_ANCRE_PIED, masque:[] },
+
+  /* — Armes (rendu visuel seul) — */
+  { id:'arme-epee-longue', nom:'Épée longue', slot:'mainPrincipale', categorie:'arme', materiau:'plaques', ancrage:{ a:'poignetR', b:'coudeR' }, masque:[] },
+  { id:'arme-hache', nom:'Hache de bataille', slot:'mainPrincipale', categorie:'arme', materiau:'plaques', ancrage:{ a:'poignetR', b:'coudeR' }, masque:[] },
+  { id:'arme-masse', nom:"Masse d'armes", slot:'mainPrincipale', categorie:'arme', materiau:'plaques', ancrage:{ a:'poignetR', b:'coudeR' }, masque:[] },
+  { id:'arme-baton', nom:'Bâton de mage', slot:'mainPrincipale', categorie:'arme', materiau:'bois', ancrage:{ a:'poignetR', b:'piedR' }, masque:[] },
+  { id:'arme-dague', nom:'Dague', slot:'mainSecondaire', categorie:'arme', materiau:'plaques', ancrage:{ a:'poignetL', b:'coudeL' }, masque:[] },
+  { id:'arme-arc', nom:'Arc long (au dos)', slot:'mainPrincipale', categorie:'arme', materiau:'bois', ancrage:AVC_ANCRE_TORSE, masque:[], auDos:true },
+
+  /* — Bijoux — */
+  { id:'bij-amulette', nom:'Amulette', slot:'bijou1', categorie:'vetement', materiau:'plaques', ancrage:{ a:'cou', b:'taille' }, masque:[] },
+  { id:'bij-anneau', nom:'Anneau serti', slot:'bijou2', categorie:'vetement', materiau:'plaques', ancrage:AVC_ANCRE_MAIN, masque:[] }
+];
+
+/* Emplacements affichés à l'étape Équipement */
+const AVC_SLOTS = [
+  { id:'tete', nom:'Tête' }, { id:'epaules', nom:'Épaules' }, { id:'cape', nom:'Cape' },
+  { id:'torse', nom:'Torse' }, { id:'bras', nom:'Bras' }, { id:'mains', nom:'Mains' },
+  { id:'ceinture', nom:'Ceinture' }, { id:'jambes', nom:'Jambes' }, { id:'pieds', nom:'Pieds' },
+  { id:'mainPrincipale', nom:'Main principale' }, { id:'mainSecondaire', nom:'Main secondaire' },
+  { id:'bijou1', nom:'Bijou 1' }, { id:'bijou2', nom:'Bijou 2' }
+];
+
+/* Étapes de la colonne gauche du créateur */
+const AVC_ETAPES = [
+  { id:'espece',    nom:'Espèce' },
+  { id:'sousEspece',nom:'Sous-espèce' },
+  { id:'corps',     nom:'Corps' },
+  { id:'visage',    nom:'Visage' },
+  { id:'pilosite',  nom:'Pilosité' },
+  { id:'traits',    nom:'Traits' },
+  { id:'equipement',nom:'Équipement' },
+  { id:'identite',  nom:'Identité & rendu' }
+];
+
+/* ══════════════════════════════════════════════════════════════════
+   CRÉATEUR D'AVATAR (avc) — MOTEUR DE COMPOSITION
+   Composition 2D par couches sur canvas 832×1216.
+   - La recomposition n'exécute que du vectoriel + drawImage de
+     bitmaps déjà préparés (budget < 16 ms).
+   - Les PNG assets/avatar/{cat}/{slug}.png sont chargés à la demande,
+     recolorés hors chemin critique, mis en cache ; s'ils manquent,
+     le repli procédural dessine la pièce (aucun asset supposé présent).
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── Utilitaires couleur ─── */
+function avcHex(h){ const n=parseInt((h||'#888').slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function avcRgbHsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,s=0; const l=(mx+mn)/2;
+  if(mx!==mn){ const d=mx-mn; s=l>0.5? d/(2-mx-mn) : d/(mx+mn);
+    h = mx===r ? (g-b)/d+(g<b?6:0) : mx===g ? (b-r)/d+2 : (r-g)/d+4; h/=6; }
+  return [h,s,l]; }
+function avcHslRgb(h,s,l){ if(s===0){ const v=Math.round(l*255); return [v,v,v]; }
+  const q=l<0.5? l*(1+s) : l+s-l*s, p=2*l-q;
+  const f=t=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; };
+  return [Math.round(f(h+1/3)*255),Math.round(f(h)*255),Math.round(f(h-1/3)*255)]; }
+function avcAssombrir(hex,f){ const [r,g,b]=avcHex(hex); return `rgb(${Math.round(r*f)},${Math.round(g*f)},${Math.round(b*f)})`; }
+function avcEclaircir(hex,f){ const [r,g,b]=avcHex(hex); return `rgb(${Math.min(255,Math.round(r+(255-r)*f))},${Math.min(255,Math.round(g+(255-g)*f))},${Math.min(255,Math.round(b+(255-b)*f))})`; }
+
+/* ─── Résolution race → fiche morphologique ─── */
+function avcFiche(raceName, subraceName){
+  const cle = AVC_RACE_MAP[raceName];
+  if (cle){
+    const f = AVC_RACES[cle];
+    /* seule la sous-race SRD est illustrée ; une autre sous-race de la
+       même race garde la fiche de base (silhouette commune) */
+    return { cle, fiche:f, dispo:true };
+  }
+  const taille = AVC_TAILLES_HORS_SRD[raceName] || 'M';
+  return { cle:'generique-'+taille.toLowerCase(), fiche:AVC_GENERIQUES[taille], dispo:false };
+}
+
+/* ─── Avatar par défaut : toujours composable sans erreur ─── */
+function avcDefaut(raceName, subraceName){
+  const { fiche } = avcFiche(raceName, subraceName);
+  const peau = (fiche.peau && fiche.peau.length) ? fiche.peau[2] || fiche.peau[0] : '#c68f60';
+  return {
+    schemaVersion: AVC_SCHEMA_VERSION,
+    race: raceName || 'Humain',
+    sousRace: subraceName || '',
+    ascendance: fiche.museau ? (fiche.ascendanceDefaut || 'airain') : '',
+    corps: { gabarit:'moyen', corpulence:0.45, taille:0.5, teint:peau, cicatrices:[], tatouages:[] },
+    visage: { preset:'ovale', yeux:{ forme:'amande', couleur:(fiche.yeux&&fiche.yeux[0])||'#3a2a1c' },
+              sourcils:'epais', bouche:'neutre', nez:'droit', maquillage:[] },
+    pilosite: { coiffure: fiche.sansCheveux ? 'rase' : 'courte',
+                couleurCheveux:(fiche.cheveux&&fiche.cheveux[1])||'#3a2617',
+                barbe: fiche.barbeNaturelle ? (fiche.barbeDefaut||'fournie') : 'aucune',
+                couleurBarbe:(fiche.cheveux&&fiche.cheveux[1])||'#3a2617' },
+    traits: { cornes: fiche.cornesNaturelles ? (fiche.cornesDefaut||'arriere') : 'aucunes',
+              queue: !!fiche.queueNaturelle, ecailles: !!fiche.ecailles,
+              oreilles: (fiche.oreilles&&fiche.oreilles.longueur)||0 },
+    equipement: { refleter:true,
+      torse:{ itemId:'civ-chemise', teintePrimaire:'#e8e0d0', teinteSecondaire:'#7a512c', materiau:'tissu', visible:true },
+      jambes:{ itemId:'civ-pantalon', teintePrimaire:'#54382a', teinteSecondaire:'#3a2617', materiau:'tissu', visible:true },
+      pieds:{ itemId:'civ-bottes', teintePrimaire:'#6e4a2e', teinteSecondaire:'#54382a', materiau:'cuir', visible:true },
+      ceinture:{ itemId:'civ-ceinture', teintePrimaire:'#54382a', teinteSecondaire:'#b8860b', materiau:'cuir', visible:true } },
+    pose:'neutre', fond:'socle'
+  };
+}
+
+/* Migration paresseuse : jamais d'écriture Firestore ici. */
+function avcDeFiche(d){
+  if (d && d.avatar && d.avatar.schemaVersion >= 1){
+    const a = JSON.parse(JSON.stringify(d.avatar));
+    const def = avcDefaut(a.race, a.sousRace);
+    /* complète les champs manquants d'anciennes versions */
+    for (const k of Object.keys(def)) if (a[k] === undefined) a[k] = def[k];
+    return a;
+  }
+  const a = avcDefaut(d?.race, d?.subrace);
+  if (d) avcRefleterEquipement(a, d);
+  return a;
+}
+
+/* ─── Reflet de l'équipement réel de la fiche ─── */
+function avcRefleterEquipement(a, d){
+  if (!a.equipement.refleter || !d) return;
+  const armors = (d.inventory_armors||[]).filter(x=>x.equipped);
+  const weapons = (d.inventory_weapons||[]).filter(x=>x.equipped);
+  const slugOf = (typeof spellSlug==='function') ? spellSlug : (s=>String(s||'').toLowerCase());
+  const body = armors.find(x=>!/bouclier|shield/i.test(x.name||''));
+  const shield = armors.find(x=>/bouclier|shield/i.test(x.name||''));
+  if (body){
+    const id = slugOf(body.name);
+    const p = AVC_CATALOGUE.find(c=>c.id===id && c.slot==='torse');
+    if (p) a.equipement.torse = { itemId:p.id, teintePrimaire:a.equipement.torse?.teintePrimaire||'#8a8e9a',
+      teinteSecondaire:a.equipement.torse?.teinteSecondaire||'#54382a', materiau:p.materiau, visible:true };
+  }
+  a.equipement.mainSecondaire = shield
+    ? { itemId:'bouclier', teintePrimaire:'#6e4a2e', teinteSecondaire:'#b8860b', materiau:'bois', visible:true }
+    : (a.equipement.mainSecondaire?.itemId==='bouclier' ? undefined : a.equipement.mainSecondaire);
+  const w = weapons[0];
+  if (w){
+    const n=(w.name||'').toLowerCase();
+    const id = /hache/.test(n)?'arme-hache':/masse|marteau/.test(n)?'arme-masse':/b[âa]ton/.test(n)?'arme-baton':/arc/.test(n)?'arme-arc':/dague/.test(n)?'arme-dague':'arme-epee-longue';
+    const p = AVC_CATALOGUE.find(c=>c.id===id);
+    if (p) a.equipement[p.slot==='mainSecondaire'?'mainSecondaire':'mainPrincipale'] =
+      { itemId:id, teintePrimaire:'#8a8e9a', teinteSecondaire:'#6e4a2e', materiau:p.materiau, visible:true };
+  }
+}
+
+/* ─── Squelette adapté : coordonnées px pour une fiche + corpulence ───
+   Formule d'adaptation :
+   - échelle verticale `echelle` appliquée autour de la ligne de sol y=0.94 ;
+   - facteur `epaules` sur l'écart horizontal des points de bras ;
+   - facteur `membres` sur la longueur des segments bras et jambes.   */
+function avcSquelette(fiche, corpulence){
+  const S = {}; const sol = 0.94, e = fiche.echelle, wf = fiche.epaules;
+  const c = 1 + 0.30 * ((corpulence!=null?corpulence:0.45) - 0.45);
+  for (const k of Object.keys(AVC_SQUELETTE_BASE)){
+    let [x,y] = AVC_SQUELETTE_BASE[k];
+    y = sol - (sol - y) * e;
+    let fx = 1;
+    if (/epaule|coude|poignet/.test(k)) fx = wf * c;
+    else if (/hanche|genou|pied/.test(k)) fx = (0.6 + 0.4*wf) * c;
+    x = 0.5 + (x - 0.5) * fx;
+    S[k] = [x * AVC_W, y * AVC_H];
+  }
+  /* longueur de membres : étire coudes/poignets et genoux le long du segment */
+  const m = fiche.membres || 1;
+  for (const cote of ['L','R']){
+    const ep=S['epaule'+cote], co=S['coude'+cote], po=S['poignet'+cote];
+    co[0]=ep[0]+(co[0]-ep[0])*m; co[1]=ep[1]+(co[1]-ep[1])*m;
+    po[0]=ep[0]+(po[0]-ep[0])*m; po[1]=ep[1]+(po[1]-ep[1])*m;
+    const ha=S['hanche'+cote], ge=S['genou'+cote], pi=S['pied'+cote];
+    ge[1]=pi[1]-(pi[1]-ge[1])*Math.min(m,1.05); /* le pied reste au sol */
+    ge[0]=ha[0]+(ge[0]-ha[0])*m;
+  }
+  return S;
+}
+
+/* ─── Cache de sprites PNG recolorés ───
+   Clé : cat/slug|teinte1|teinte2. status : pending | ok | absent.
+   Convention de teinture des PNG : la zone primaire est encodée en
+   dominante ROUGE, la secondaire en dominante VERTE, le reste (gris,
+   contours) n'est pas reteinté. Teinte + saturation imposées,
+   luminance du pixel préservée → les ombres survivent.              */
+const avcSpriteCache = new Map();
+let avcRecomposeCb = null;
+function avcSprite(cat, slug, t1, t2){
+  const key = cat+'/'+slug+'|'+(t1||'')+'|'+(t2||'');
+  const hit = avcSpriteCache.get(key);
+  if (hit) return hit.status==='ok' ? hit.bmp : null;
+  const ent = { status:'pending', bmp:null };
+  avcSpriteCache.set(key, ent);
+  if (avcSpriteCache.size > 96){ const k0 = avcSpriteCache.keys().next().value; avcSpriteCache.delete(k0); }
+  const im = new Image();
+  im.onload = () => {
+    try { ent.bmp = avcRecolore(im, t1, t2); ent.status='ok'; }
+    catch(e){ ent.status='absent'; }
+    if (avcRecomposeCb) avcRecomposeCb();
+  };
+  im.onerror = () => { ent.status='absent'; };
+  im.src = 'assets/avatar/'+cat+'/'+slug+'.png';
+  return null;
+}
+function avcRecolore(im, t1, t2){
+  const cv = document.createElement('canvas'); cv.width=im.naturalWidth; cv.height=im.naturalHeight;
+  const cx = cv.getContext('2d', { willReadFrequently:true });
+  cx.drawImage(im,0,0);
+  if (!t1 && !t2) return cv;
+  const d = cx.getImageData(0,0,cv.width,cv.height), p = d.data;
+  const h1 = t1 ? avcRgbHsl(...avcHex(t1)) : null;
+  const h2 = t2 ? avcRgbHsl(...avcHex(t2)) : null;
+  for (let i=0;i<p.length;i+=4){
+    if (p[i+3]===0) continue;
+    const r=p[i],g=p[i+1],b=p[i+2];
+    const dom = (r>g+24 && r>b+24) ? h1 : (g>r+24 && g>b+24) ? h2 : null;
+    if (!dom) continue;
+    const l = avcRgbHsl(r,g,b)[2];
+    const [nr,ng,nb] = avcHslRgb(dom[0], dom[1], l);
+    p[i]=nr; p[i+1]=ng; p[i+2]=nb;
+  }
+  cx.putImageData(d,0,0);
+  return cv;
+}
+
+/* ─── Transformation d'ancrage pour un PNG plein cadre ───
+   Les assets sont peints plein cadre (832×1216) portés par le gabarit
+   M humain. Pour une pièce d'ancrage {a,b} :
+     s  = |B'−A'| / |B−A|      (B,A : squelette de base ; B',A' : cible)
+     sx = s · cx               (cx : élargissement de corpulence, pièces du buste)
+     position : A' − A·s       (le point A de l'asset se pose sur A' )
+   → la même paire de bottes se pose sur un nain et un drakéide.      */
+function avcTransforme(ctx, piece, S, corpFacteur){
+  const A0=[AVC_SQUELETTE_BASE[piece.ancrage.a][0]*AVC_W, AVC_SQUELETTE_BASE[piece.ancrage.a][1]*AVC_H];
+  const B0=[AVC_SQUELETTE_BASE[piece.ancrage.b][0]*AVC_W, AVC_SQUELETTE_BASE[piece.ancrage.b][1]*AVC_H];
+  const A1=S[piece.ancrage.a], B1=S[piece.ancrage.b];
+  const d0=Math.hypot(B0[0]-A0[0],B0[1]-A0[1]) || 1;
+  const d1=Math.hypot(B1[0]-A1[0],B1[1]-A1[1]);
+  const s=d1/d0;
+  const large = (piece.slot==='torse'||piece.slot==='epaules'||piece.slot==='cape');
+  const sx = s * (large ? corpFacteur : 1);
+  /* transformation RELATIVE : elle compose avec le miroir éventuel */
+  ctx.transform(sx,0,0,s, A1[0]-A0[0]*sx, A1[1]-A0[1]*s);
+}
+
+/* ─── Visibilité des couches (règles déclaratives) ─── */
+function avcVisibilite(a){
+  const off = new Set(); const infos = { casqueRetire:false, coiffureEcrasee:false };
+  const eq = a.equipement || {};
+  const pieceDe = slot => { const e=eq[slot]; if(!e||!e.itemId||e.visible===false) return null;
+    return AVC_CATALOGUE.find(c=>c.id===e.itemId) || null; };
+  const casque = pieceDe('tete');
+  const cornes = a.traits && a.traits.cornes && a.traits.cornes!=='aucunes';
+  for (const r of AVC_REGLES){
+    if (r.si.piece){
+      const p = pieceDe(r.si.piece.slot);
+      if (!p) continue;
+      if (r.si.piece.prop && !p[r.si.piece.prop]) continue;
+      if (r.si.piece.categorie && p.categorie!==r.si.piece.categorie) continue;
+      if (r.masque) r.masque.forEach(id=>off.add(id));
+      if (r.coiffure==='ecrasee') infos.coiffureEcrasee = true;
+    } else if (r.si.trait==='cornes' && cornes && casque){
+      if (!casque.varianteCornes){ off.add('casque'); infos.casqueRetire = true; }
+      else infos.casqueVarianteCornes = true;
+    }
+  }
+  /* masques déclarés par pièce portée */
+  for (const s of Object.keys(eq)){
+    const p = pieceDe(s); if (p && p.masque) p.masque.forEach(id=>off.add(id));
+  }
+  return { off, infos };
+}
+
+/* ══════════════ REPLI PROCÉDURAL (aucun asset requis) ══════════════
+   Toutes les formes sont accumulées dans des Path2D : un même tracé
+   sert au remplissage, au motif de matériau (clip) et au liseré.   */
+function avcPathCapsule(P,x1,y1,x2,y2,w1,w2){
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy)||1, nx=-dy/L, ny=dx/L;
+  P.moveTo(x1+nx*w1, y1+ny*w1);
+  P.lineTo(x2+nx*w2, y2+ny*w2);
+  P.arc(x2,y2,w2, Math.atan2(ny,nx), Math.atan2(-ny,-nx));
+  P.lineTo(x1-nx*w1, y1-ny*w1);
+  P.arc(x1,y1,w1, Math.atan2(-ny,-nx), Math.atan2(ny,nx));
+  P.closePath();
+}
+function avcMotif(ctx, P, mat, teinte, zone){
+  /* texture légère par matériau, confinée à la forme */
+  ctx.save(); ctx.clip(P);
+  ctx.globalAlpha = 0.28;
+  ctx.strokeStyle = avcAssombrir(teinte, 0.55); ctx.lineWidth = 2;
+  const [x,y,w,h] = zone;
+  if (mat==='mailles'){
+    ctx.fillStyle = avcAssombrir(teinte,0.6);
+    for(let yy=y; yy<y+h; yy+=14) for(let xx=x+((yy/14)%2?7:0); xx<x+w; xx+=14){
+      ctx.beginPath(); ctx.arc(xx,yy,3.4,0,6.283); ctx.stroke(); }
+  } else if (mat==='plaques'){
+    for(let yy=y+18; yy<y+h; yy+=34){ ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy+8); ctx.stroke(); }
+    ctx.globalAlpha=0.18; ctx.strokeStyle=avcEclaircir(teinte,0.5);
+    for(let yy=y+10; yy<y+h; yy+=34){ ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy+8); ctx.stroke(); }
+  } else if (mat==='cuir'){
+    ctx.setLineDash([6,7]);
+    for(let yy=y+22; yy<y+h; yy+=44){ ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy+4); ctx.stroke(); }
+    ctx.setLineDash([]);
+  } else if (mat==='bois'){
+    for(let xx=x+8; xx<x+w; xx+=16){ ctx.beginPath(); ctx.moveTo(xx,y); ctx.quadraticCurveTo(xx+5,y+h/2, xx,y+h); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+function avcDessineCorps(ctx, a, F, S){
+  const teint = a.corps.teint, c = 1 + 0.55*((a.corps.corpulence??0.45)-0.45);
+  const rTete = 58 * F.tete * F.echelle;
+  const [hx,hy] = S.tete;
+  const ombre = avcAssombrir(teint,0.78), clair = avcEclaircir(teint,0.18);
+  const P = new Path2D();
+  /* jambes + pieds */
+  for (const cote of ['L','R']){
+    avcPathCapsule(P, S['hanche'+cote][0],S['hanche'+cote][1], S['genou'+cote][0],S['genou'+cote][1], 26*c*F.echelle,18*c*F.echelle);
+    avcPathCapsule(P, S['genou'+cote][0],S['genou'+cote][1], S['pied'+cote][0],S['pied'+cote][1], 18*c*F.echelle,12*c*F.echelle);
+    P.moveTo(S['pied'+cote][0]+34*F.echelle, S['pied'+cote][1]+6);
+    P.ellipse(S['pied'+cote][0]+8, S['pied'+cote][1]+6, 26*F.echelle, 11*F.echelle, 0, 0, 6.283);
+  }
+  /* bras + mains */
+  for (const cote of ['L','R']){
+    avcPathCapsule(P, S['epaule'+cote][0],S['epaule'+cote][1], S['coude'+cote][0],S['coude'+cote][1], 20*c*F.echelle,15*c*F.echelle);
+    avcPathCapsule(P, S['coude'+cote][0],S['coude'+cote][1], S['poignet'+cote][0],S['poignet'+cote][1], 15*c*F.echelle,11*c*F.echelle);
+    P.moveTo(S['poignet'+cote][0]+13*c*F.echelle, S['poignet'+cote][1]+10*F.echelle);
+    P.arc(S['poignet'+cote][0], S['poignet'+cote][1]+10*F.echelle, 13*c*F.echelle, 0, 6.283);
+  }
+  /* torse : trapèze épaules→hanches */
+  const eL=S.epauleL,eR=S.epauleR,hL=S.hancheL,hR=S.hancheR,ta=S.taille;
+  P.moveTo(eL[0]-14*c, eL[1]);
+  P.quadraticCurveTo(ta[0]-(ta[0]-hL[0])*1.9, ta[1], hL[0]-8*c, hL[1]+16);
+  P.lineTo(hR[0]+8*c, hR[1]+16);
+  P.quadraticCurveTo(ta[0]+(hR[0]-ta[0])*1.9, ta[1], eR[0]+14*c, eR[1]);
+  P.quadraticCurveTo(S.cou[0], S.cou[1]+6, eL[0]-14*c, eL[1]);
+  P.closePath();
+  /* cou : descend jusqu'à la ligne d'épaules pour ne laisser aucun jour */
+  avcPathCapsule(P, S.cou[0], (S.cou[1]+eL[1])/2+6, S.cou[0], hy+rTete*0.5, 15*F.tete*F.echelle, 17*F.tete*F.echelle);
+  /* tête */
+  P.moveTo(hx+rTete*0.82, hy);
+  P.ellipse(hx, hy, rTete*0.82, rTete, 0, 0, 6.283);
+  ctx.fillStyle = teint;
+  ctx.fill(P);
+  /* modelé simple confiné au corps */
+  ctx.save(); ctx.clip(P);
+  const gr = ctx.createRadialGradient(hx-rTete*0.4, hy-rTete*0.5, rTete*0.2, hx, hy, rTete*3.2);
+  gr.addColorStop(0, 'rgba(255,255,255,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0.12)');
+  ctx.fillStyle = gr; ctx.fillRect(0,0,AVC_W,AVC_H);
+  /* écailles confinées au corps */
+  if (F.ecailles || (a.traits&&a.traits.ecailles)){
+    ctx.globalAlpha=0.22; ctx.strokeStyle=avcEclaircir(teint,0.35); ctx.lineWidth=1.6;
+    for(let yy=hy-rTete; yy<S.piedL[1]; yy+=13)
+      for(let xx=hx-190; xx<hx+190; xx+=13){
+        ctx.beginPath(); ctx.arc(xx+((yy/13)%2?6:0), yy, 6, 3.5, 5.9); ctx.stroke();
+      }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  /* museau drakéide */
+  if (F.museau){
+    ctx.fillStyle = avcAssombrir(teint,0.9);
+    ctx.beginPath(); ctx.ellipse(hx, hy+rTete*0.42, rTete*0.52, rTete*0.34, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = avcAssombrir(teint,0.5);
+    ctx.beginPath(); ctx.ellipse(hx-rTete*0.16, hy+rTete*0.34, 4,7,0,0,6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx+rTete*0.16, hy+rTete*0.34, 4,7,0,0,6.283); ctx.fill();
+  }
+  return { rTete, c, ombre, clair, corpsPath:P };
+}
+
+function avcDessineVisage(ctx, a, F, S, M){
+  const [hx,hy]=S.tete, r=M.rTete, v=a.visage;
+  const enc = avcAssombrir('#3a2a20', 0.9);
+  /* yeux */
+  const ey = hy - r*0.10, ex = r*0.34;
+  for (const s of [-1,1]){
+    ctx.fillStyle='#f4efe6';
+    ctx.beginPath();
+    if (v.yeux.forme==='rond') ctx.ellipse(hx+s*ex, ey, r*0.15, r*0.11, 0, 0, 6.283);
+    else if (v.yeux.forme==='tombant') ctx.ellipse(hx+s*ex, ey, r*0.16, r*0.085, s*0.25, 0, 6.283);
+    else if (v.yeux.forme==='percant') ctx.ellipse(hx+s*ex, ey, r*0.17, r*0.07, -s*0.18, 0, 6.283);
+    else ctx.ellipse(hx+s*ex, ey, r*0.16, r*0.09, -s*0.1, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle=v.yeux.couleur||'#3a2a1c';
+    ctx.beginPath(); ctx.arc(hx+s*ex, ey, r*0.055, 0, 6.283); ctx.fill();
+    ctx.fillStyle='#14100c'; ctx.beginPath(); ctx.arc(hx+s*ex, ey, r*0.024, 0, 6.283); ctx.fill();
+    /* sourcils */
+    ctx.strokeStyle=a.pilosite.couleurCheveux||enc; ctx.lineCap='round';
+    ctx.lineWidth = v.sourcils==='epais'? r*0.055 : v.sourcils==='fins'? r*0.025 : r*0.04;
+    ctx.beginPath();
+    const sy = ey - r*0.17;
+    if (v.sourcils==='arques'){ ctx.moveTo(hx+s*(ex-r*0.14), sy+r*0.03); ctx.quadraticCurveTo(hx+s*ex, sy-r*0.06, hx+s*(ex+r*0.14), sy+r*0.02); }
+    else if (v.sourcils==='droits'){ ctx.moveTo(hx+s*(ex-r*0.14), sy); ctx.lineTo(hx+s*(ex+r*0.14), sy); }
+    else { ctx.moveTo(hx+s*(ex-r*0.13), sy+r*0.02); ctx.quadraticCurveTo(hx+s*ex, sy-r*0.03, hx+s*(ex+r*0.13), sy); }
+    ctx.stroke();
+  }
+  /* nez (sauf museau) */
+  if (!F.museau){
+    ctx.strokeStyle = avcAssombrir(a.corps.teint,0.7); ctx.lineWidth=r*0.035; ctx.lineCap='round';
+    ctx.beginPath();
+    const ny = hy + r*0.18;
+    if (v.nez==='aquilin'){ ctx.moveTo(hx-r*0.02, hy-r*0.02); ctx.quadraticCurveTo(hx+r*0.09, ny-r*0.12, hx-r*0.02, ny); }
+    else if (v.nez==='epate'){ ctx.moveTo(hx-r*0.09, ny); ctx.quadraticCurveTo(hx, ny+r*0.05, hx+r*0.09, ny); }
+    else if (v.nez==='retrousse'){ ctx.moveTo(hx, hy+r*0.02); ctx.quadraticCurveTo(hx-r*0.05, ny, hx+r*0.05, ny-r*0.03); }
+    else { ctx.moveTo(hx, hy); ctx.lineTo(hx, ny); ctx.moveTo(hx-r*0.06, ny); ctx.quadraticCurveTo(hx, ny+r*0.04, hx+r*0.06, ny); }
+    ctx.stroke();
+  }
+  /* bouche */
+  const by = hy + r*(F.museau?0.62:0.42);
+  ctx.strokeStyle = avcAssombrir(a.corps.teint,0.55); ctx.lineWidth=r*0.045;
+  ctx.beginPath();
+  if (v.bouche==='souriante'){ ctx.moveTo(hx-r*0.22, by-r*0.02); ctx.quadraticCurveTo(hx, by+r*0.09, hx+r*0.22, by-r*0.02); }
+  else if (v.bouche==='severe'){ ctx.moveTo(hx-r*0.2, by+r*0.02); ctx.quadraticCurveTo(hx, by-r*0.05, hx+r*0.2, by+r*0.02); }
+  else if (v.bouche==='fine'){ ctx.moveTo(hx-r*0.14, by); ctx.lineTo(hx+r*0.14, by); }
+  else { ctx.moveTo(hx-r*0.19, by); ctx.quadraticCurveTo(hx, by+r*0.02, hx+r*0.19, by); }
+  ctx.stroke();
+  /* crocs demi-orcs */
+  if (F.crocs){
+    ctx.fillStyle='#f2ede0';
+    for (const s of [-1,1]){
+      ctx.beginPath();
+      ctx.moveTo(hx+s*r*0.14, by+r*0.01);
+      ctx.lineTo(hx+s*r*0.10, by-r*0.14);
+      ctx.lineTo(hx+s*r*0.05, by+r*0.01);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  /* maquillage, cicatrices, tatouages */
+  for (const mq of (v.maquillage||[])){
+    ctx.save(); ctx.globalAlpha=0.5; ctx.strokeStyle='#2a1a30'; ctx.lineWidth=r*0.03;
+    if (mq==='lignes'){ for(const s of [-1,1]){ ctx.beginPath(); ctx.moveTo(hx+s*ex, ey+r*0.14); ctx.lineTo(hx+s*ex, ey+r*0.34); ctx.stroke(); } }
+    if (mq==='masque'){ ctx.globalAlpha=0.3; ctx.fillStyle='#1c1022'; ctx.fillRect(hx-r*0.62, ey-r*0.14, r*1.24, r*0.30); }
+    ctx.restore();
+  }
+  for (const ci of (a.corps.cicatrices||[])){
+    ctx.save(); ctx.strokeStyle=avcAssombrir(a.corps.teint,0.6); ctx.lineWidth=r*0.028; ctx.globalAlpha=0.8;
+    if (ci==='joue'){ ctx.beginPath(); ctx.moveTo(hx+r*0.34, ey+r*0.18); ctx.lineTo(hx+r*0.5, ey+r*0.5); ctx.stroke(); }
+    if (ci==='oeil'){ ctx.beginPath(); ctx.moveTo(hx-ex-r*0.06, ey-r*0.2); ctx.lineTo(hx-ex+r*0.06, ey+r*0.22); ctx.stroke(); }
+    if (ci==='lèvre'){ ctx.beginPath(); ctx.moveTo(hx+r*0.08, by-r*0.08); ctx.lineTo(hx+r*0.1, by+r*0.08); ctx.stroke(); }
+    ctx.restore();
+  }
+  for (const tt of (a.corps.tatouages||[])){
+    ctx.save(); ctx.globalAlpha=0.55; ctx.strokeStyle='#27404f'; ctx.lineWidth=r*0.03;
+    if (tt==='runes'){ for(let i=-1;i<2;i++){ ctx.beginPath(); ctx.moveTo(hx+i*r*0.16-r*0.04, hy-r*0.62); ctx.lineTo(hx+i*r*0.16+r*0.04, hy-r*0.46); ctx.stroke(); } }
+    if (tt==='spirale'){ ctx.beginPath(); ctx.arc(hx+r*0.5, ey+r*0.42, r*0.14, 0, 4.5); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+function avcDessineOreilles(ctx, a, F, S, M){
+  const L = (a.traits&&a.traits.oreilles!=null)? a.traits.oreilles : (F.oreilles?F.oreilles.longueur:0);
+  const [hx,hy]=S.tete, r=M.rTete;
+  const ang = ((F.oreilles&&F.oreilles.angle)||0) * Math.PI/180;
+  ctx.fillStyle = a.corps.teint; ctx.strokeStyle = M.ombre; ctx.lineWidth=2;
+  for (const s of [-1,1]){
+    const bx = hx + s*r*0.80, by = hy + r*0.05;
+    ctx.save(); ctx.translate(bx,by); ctx.rotate(s*(-0.12+ang));
+    ctx.beginPath();
+    ctx.moveTo(0, r*0.14);
+    ctx.quadraticCurveTo(s*r*0.16, r*0.05, s*(r*0.12 + r*0.55*L), -r*(0.10+0.42*L));
+    ctx.quadraticCurveTo(s*r*0.05, -r*0.12, 0, -r*0.10);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function avcDessineCheveux(ctx, a, F, S, M, partie, ecrasee){
+  if (F.sansCheveux) return;
+  const cf = AVC_COIFFURES.find(c=>c.id===a.pilosite.coiffure) || AVC_COIFFURES[1];
+  if (cf.id==='rase' && partie!=='barbe') return;
+  const [hx,hy]=S.tete, r=M.rTete, col=a.pilosite.couleurCheveux;
+  ctx.fillStyle=col; ctx.strokeStyle=avcAssombrir(col,0.7); ctx.lineWidth=2;
+  if (partie==='arriere' && cf.arriere && !ecrasee){
+    /* la masse arrière est trouée à la forme de la tête (evenodd) :
+       elle dépasse sur les côtés et en bas sans jamais couvrir le visage */
+    const long = cf.id==='longue'?2.4 : cf.id==='tresse'||cf.id==='nattes'?2.2 : cf.id==='queue'?1.9 : 1.5;
+    const P = new Path2D();
+    P.moveTo(hx-r*0.85, hy-r*0.2);
+    P.quadraticCurveTo(hx-r*1.0, hy+r*long*0.6, hx-r*0.55, hy+r*long);
+    P.lineTo(hx+r*0.55, hy+r*long);
+    P.quadraticCurveTo(hx+r*1.0, hy+r*long*0.6, hx+r*0.85, hy-r*0.2);
+    P.quadraticCurveTo(hx, hy-r*1.05, hx-r*0.85, hy-r*0.2);
+    P.closePath();
+    P.moveTo(hx+r*0.84, hy);
+    P.ellipse(hx, hy, r*0.84, r*1.02, 0, 0, 6.283);
+    ctx.fill(P, 'evenodd');
+  }
+  if (partie==='avant' && cf.avant){
+    ctx.beginPath();
+    if (ecrasee && cf.ecrasable){
+      ctx.moveTo(hx-r*0.8, hy-r*0.35);
+      ctx.quadraticCurveTo(hx, hy-r*0.95, hx+r*0.8, hy-r*0.35);
+      ctx.quadraticCurveTo(hx, hy-r*0.55, hx-r*0.8, hy-r*0.35);
+    } else if (cf.id==='crete'){
+      ctx.moveTo(hx-r*0.14, hy-r*0.8);
+      ctx.quadraticCurveTo(hx, hy-r*1.7, hx+r*0.14, hy-r*0.8);
+      ctx.closePath();
+    } else if (cf.id==='chignon'){
+      ctx.moveTo(hx-r*0.85, hy-r*0.3);
+      ctx.quadraticCurveTo(hx, hy-r*1.15, hx+r*0.85, hy-r*0.3);
+      ctx.quadraticCurveTo(hx, hy-r*0.5, hx-r*0.85, hy-r*0.3);
+      ctx.moveTo(hx, hy-r*1.15);
+      ctx.arc(hx, hy-r*1.18, r*0.3, 0, 6.283);
+    } else {
+      ctx.moveTo(hx-r*0.85, hy-r*0.25);
+      ctx.quadraticCurveTo(hx-r*0.5, hy-r*1.12, hx+r*0.25, hy-r*0.95);
+      ctx.quadraticCurveTo(hx+r*0.85, hy-r*0.8, hx+r*0.85, hy-r*0.22);
+      ctx.quadraticCurveTo(hx+r*0.4, hy-r*0.65, hx-r*0.2, hy-r*0.6);
+      ctx.quadraticCurveTo(hx-r*0.7, hy-r*0.55, hx-r*0.85, hy-r*0.25);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+  if (partie==='barbe'){
+    const bb = a.pilosite.barbe;
+    if (!bb || bb==='aucune') return;
+    const cb = a.pilosite.couleurBarbe || col;
+    ctx.fillStyle=cb;
+    const by = hy + r*0.45;
+    ctx.beginPath();
+    if (bb==='moustache'){
+      ctx.ellipse(hx, by-r*0.06, r*0.26, r*0.07, 0, 0, 6.283);
+    } else if (bb==='bouc'){
+      ctx.moveTo(hx-r*0.14, by); ctx.quadraticCurveTo(hx, by+r*0.55, hx+r*0.14, by); ctx.closePath();
+    } else {
+      const long = bb==='fournie'?1.0 : bb==='tressee'?1.5 : 0.45;
+      ctx.moveTo(hx-r*0.62, hy+r*0.1);
+      ctx.quadraticCurveTo(hx-r*0.55, by+r*long, hx, by+r*long*1.1);
+      ctx.quadraticCurveTo(hx+r*0.55, by+r*long, hx+r*0.62, hy+r*0.1);
+      ctx.quadraticCurveTo(hx, hy+r*0.75, hx-r*0.62, hy+r*0.1);
+      ctx.closePath();
+    }
+    ctx.fill();
+    if (bb==='tressee'){
+      ctx.strokeStyle=avcAssombrir(cb,0.6); ctx.lineWidth=3;
+      for(let i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(hx-r*0.2+i*r*0.2, by+r*0.3); ctx.lineTo(hx-r*0.24+i*r*0.2, by+r*1.35); ctx.stroke(); }
+    }
+  }
+}
+
+function avcDessineCornes(ctx, a, F, S, M){
+  const forme = a.traits && a.traits.cornes;
+  if (!forme || forme==='aucunes') return;
+  const [hx,hy]=S.tete, r=M.rTete;
+  const col='#2c2126';
+  ctx.fillStyle=col; ctx.strokeStyle='#4a3a40'; ctx.lineWidth=2;
+  for (const s of [-1,1]){
+    const bx=hx+s*r*0.45, by=hy-r*0.78;
+    ctx.beginPath();
+    if (forme==='droites'){
+      ctx.moveTo(bx-s*r*0.1, by+r*0.1); ctx.quadraticCurveTo(bx+s*r*0.05, by-r*0.7, bx+s*r*0.12, by-r*0.95);
+      ctx.quadraticCurveTo(bx+s*r*0.16, by-r*0.5, bx+s*r*0.16, by+r*0.12);
+    } else if (forme==='spirales'){
+      ctx.moveTo(bx, by+r*0.1);
+      ctx.quadraticCurveTo(bx+s*r*0.55, by-r*0.35, bx+s*r*0.3, by-r*0.7);
+      ctx.quadraticCurveTo(bx+s*r*0.05, by-r*0.95, bx+s*r*0.02, by-r*0.6);
+      ctx.quadraticCurveTo(bx+s*r*0.3, by-r*0.45, bx+s*r*0.18, by-r*0.12);
+    } else if (forme==='belier'){
+      ctx.moveTo(bx, by+r*0.05);
+      ctx.arc(bx+s*r*0.3, by+r*0.25, r*0.42, Math.PI*(s>0?1.2:1.8), Math.PI*(s>0?0.4:2.6), s<0);
+      ctx.lineTo(bx+s*r*0.2, by+r*0.35);
+    } else if (forme==='arriere'){
+      ctx.moveTo(bx-s*r*0.05, by+r*0.05);
+      ctx.quadraticCurveTo(bx+s*r*0.5, by-r*0.15, bx+s*r*0.85, by+r*0.35);
+      ctx.quadraticCurveTo(bx+s*r*0.4, by+r*0.12, bx+s*r*0.1, by+r*0.22);
+    } else if (forme==='couronne'){
+      for(let i=0;i<2;i++){
+        ctx.moveTo(bx+s*i*r*0.25, by+r*0.12);
+        ctx.lineTo(bx+s*(i*r*0.25+r*0.05), by-r*0.32);
+        ctx.lineTo(bx+s*(i*r*0.25+r*0.12), by+r*0.12);
+      }
+    } else { /* lyre */
+      ctx.moveTo(bx, by+r*0.1);
+      ctx.quadraticCurveTo(bx+s*r*0.65, by-r*0.1, bx+s*r*0.5, by-r*0.75);
+      ctx.quadraticCurveTo(bx+s*r*0.35, by-r*0.35, bx+s*r*0.12, by-r*0.05);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+}
+
+function avcDessineQueue(ctx, a, F, S, M){
+  if (!(a.traits && a.traits.queue)) return;
+  const h=S.hancheR, col = F.museau ? (AVC_ASCENDANCES[a.ascendance]?.ecailles || a.corps.teint) : avcAssombrir(a.corps.teint,0.85);
+  ctx.strokeStyle=col; ctx.lineCap='round';
+  ctx.lineWidth=16*F.echelle;
+  ctx.beginPath();
+  ctx.moveTo(h[0]+6, h[1]+10);
+  ctx.quadraticCurveTo(h[0]+150*F.echelle, h[1]+120*F.echelle, h[0]+120*F.echelle, S.genouR[1]+80*F.echelle);
+  ctx.stroke();
+  ctx.lineWidth=8*F.echelle;
+  ctx.beginPath();
+  ctx.moveTo(h[0]+120*F.echelle, S.genouR[1]+80*F.echelle);
+  ctx.quadraticCurveTo(h[0]+105*F.echelle, S.genouR[1]+150*F.echelle, h[0]+55*F.echelle, S.genouR[1]+135*F.echelle);
+  ctx.stroke();
+  /* pointe */
+  ctx.fillStyle=col;
+  ctx.beginPath();
+  const px=h[0]+55*F.echelle, py=S.genouR[1]+135*F.echelle;
+  ctx.moveTo(px, py-12); ctx.lineTo(px-26, py+4); ctx.lineTo(px+4, py+14); ctx.closePath(); ctx.fill();
+}
+
+/* Zones procédurales d'équipement, par slot (formes en Path2D) */
+function avcDessinePiece(ctx, piece, e, a, F, S, M, infos){
+  const t1 = e.teintePrimaire || '#8a8e9a', t2 = e.teinteSecondaire || '#54382a';
+  const mat = e.materiau || piece.materiau;
+  const c = M.c, r = M.rTete;
+  const ombre = avcAssombrir(t1,0.62);
+  const eL=S.epauleL,eR=S.epauleR,hL=S.hancheL,hR=S.hancheR,ta=S.taille;
+  const ech=F.echelle;
+  const P = new Path2D();
+  let zone = null;
+
+  /* armes : dessin direct orienté, sans motif */
+  if (piece.categorie==='arme' && !piece.auDos){
+    const droite = piece.slot==='mainPrincipale';
+    const p = droite ? S.poignetR : S.poignetL;
+    ctx.save();
+    ctx.translate(p[0], p[1]+8*ech);
+    ctx.rotate(droite ? 0.30 : -0.30);
+    ctx.fillStyle=t1; ctx.strokeStyle=ombre; ctx.lineWidth=2.5;
+    ctx.beginPath();
+    if (piece.id==='arme-baton'){
+      ctx.rect(-5, -(S.piedR[1]-S.tete[1])*0.62, 10, (S.piedR[1]-S.tete[1])*0.78);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle=t2; ctx.beginPath(); ctx.arc(0, -(S.piedR[1]-S.tete[1])*0.62, 14, 0, 6.283); ctx.fill();
+    } else if (piece.id==='arme-hache'){
+      ctx.rect(-4, -170*ech, 8, 190*ech); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=t2; ctx.beginPath();
+      ctx.moveTo(4, -168*ech);
+      ctx.quadraticCurveTo(66*ech, -150*ech, 8, -100*ech);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (piece.id==='arme-masse'){
+      ctx.rect(-4, -140*ech, 8, 160*ech); ctx.fill(); ctx.stroke();
+      ctx.fillStyle=t2; ctx.beginPath(); ctx.arc(0, -150*ech, 24*ech, 0, 6.283); ctx.fill(); ctx.stroke();
+    } else if (piece.id==='arme-dague'){
+      ctx.moveTo(-6, -14); ctx.lineTo(0, -90*ech); ctx.lineTo(6, -14); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle=t2; ctx.fillRect(-16, -16, 32, 7);
+    } else { /* épée longue */
+      ctx.moveTo(-7, -20); ctx.lineTo(0, -230*ech); ctx.lineTo(7, -20); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle=t2; ctx.fillRect(-26, -22, 52, 9);
+      ctx.beginPath(); ctx.arc(0, 2, 8, 0, 6.283); ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  switch (piece.slot){
+    case 'torse': {
+      const bas = piece.longue ? S.genouL[1] + (S.piedL[1]-S.genouL[1])*0.75 : hL[1]+22;
+      P.moveTo(eL[0]-8*c, eL[1]-6);
+      P.quadraticCurveTo(ta[0]-(ta[0]-hL[0])*(piece.longue?2.6:1.9), ta[1], (piece.longue?hL[0]-46*c:hL[0]-12*c), bas);
+      P.lineTo((piece.longue?hR[0]+46*c:hR[0]+12*c), bas);
+      P.quadraticCurveTo(ta[0]+(hR[0]-ta[0])*(piece.longue?2.6:1.9), ta[1], eR[0]+8*c, eR[1]-6);
+      P.quadraticCurveTo(S.cou[0], S.cou[1]+14, eL[0]-8*c, eL[1]-6);
+      P.closePath();
+      zone = [eL[0]-60, eL[1]-10, (eR[0]-eL[0])+120, bas-eL[1]+16];
+      break;
+    }
+    case 'jambes': {
+      for (const ct of ['L','R']){
+        avcPathCapsule(P, S['hanche'+ct][0],S['hanche'+ct][1], S['genou'+ct][0],S['genou'+ct][1], 29*c*ech,20*c*ech);
+        avcPathCapsule(P, S['genou'+ct][0],S['genou'+ct][1], (S['genou'+ct][0]+S['pied'+ct][0])/2,(S['genou'+ct][1]+S['pied'+ct][1])/2, 20*c*ech,15*c*ech);
+      }
+      zone = [S.hancheL[0]-40, S.hancheL[1], (S.hancheR[0]-S.hancheL[0])+80, S.piedL[1]-S.hancheL[1]];
+      break;
+    }
+    case 'pieds': {
+      for (const ct of ['L','R']){
+        const g=S['genou'+ct], p=S['pied'+ct];
+        const mx=(g[0]+p[0])/2, my=(g[1]+p[1])/2;
+        avcPathCapsule(P, mx,my, p[0],p[1], 17*c*ech,13*c*ech);
+        P.moveTo(p[0]+36*ech, p[1]+5);
+        P.ellipse(p[0]+8, p[1]+5, 28*ech, 12*ech, 0, 0, 6.283);
+      }
+      zone = [S.piedL[0]-40, S.genouL[1], (S.piedR[0]-S.piedL[0])+80, S.piedL[1]-S.genouL[1]+18];
+      break;
+    }
+    case 'ceinture': {
+      P.rect(S.hancheL[0]-20*c, S.taille[1]+18, (S.hancheR[0]-S.hancheL[0])+40*c, 26*ech);
+      zone = [S.hancheL[0]-20*c, S.taille[1]+18, (S.hancheR[0]-S.hancheL[0])+40*c, 26*ech];
+      break;
+    }
+    case 'mains': {
+      for (const ct of ['L','R']){
+        const p=S['poignet'+ct];
+        P.moveTo(p[0]+16*c*ech, p[1]+10*ech);
+        P.arc(p[0], p[1]+10*ech, 16*c*ech, 0, 6.283);
+      }
+      zone = [S.poignetL[0]-20, S.poignetL[1]-10, (S.poignetR[0]-S.poignetL[0])+40, 44];
+      break;
+    }
+    case 'bras': {
+      for (const ct of ['L','R']){
+        avcPathCapsule(P, S['coude'+ct][0],S['coude'+ct][1], S['poignet'+ct][0],S['poignet'+ct][1], 17*c*ech,13*c*ech);
+      }
+      zone = [S.coudeL[0]-24, S.coudeL[1], (S.coudeR[0]-S.coudeL[0])+48, S.poignetL[1]-S.coudeL[1]+16];
+      break;
+    }
+    case 'epaules': {
+      for (const ct of ['L','R']){
+        const p=S['epaule'+ct];
+        P.moveTo(p[0]+30*c,p[1]-4);
+        P.ellipse(p[0], p[1]-4, 30*c*ech, 20*ech, 0, 0, 6.283);
+      }
+      zone = [S.epauleL[0]-36, S.epauleL[1]-26, (S.epauleR[0]-S.epauleL[0])+72, 52];
+      break;
+    }
+    case 'cape': {
+      const bas = S.genouL[1]+40;
+      P.moveTo(eL[0]-26*c, eL[1]-8);
+      P.quadraticCurveTo(eL[0]-70*c, (ta[1]+bas)/2, eL[0]-30, bas);
+      P.lineTo(eR[0]+30, bas);
+      P.quadraticCurveTo(eR[0]+70*c, (ta[1]+bas)/2, eR[0]+26*c, eR[1]-8);
+      P.closePath();
+      zone = [eL[0]-80, eL[1]-12, (eR[0]-eL[0])+160, bas-eL[1]+12];
+      break;
+    }
+    case 'tete': {
+      const [hx,hy]=S.tete;
+      if (piece.integral){
+        P.moveTo(hx+r*0.95, hy-2);
+        P.ellipse(hx, hy-2, r*0.95, r*1.12, 0, 0, 6.283);
+      } else if (piece.id==='casq-nasal'){
+        P.ellipse(hx, hy-r*0.34, r*0.92, r*0.66, 0, Math.PI, 0);
+        P.closePath();
+        P.rect(hx-r*0.05, hy-r*0.3, r*0.1, r*0.55);
+      } else if (piece.categorie==='vetement'){ /* capuches */
+        P.moveTo(hx-r*1.0, hy+r*0.5);
+        P.quadraticCurveTo(hx-r*1.15, hy-r*1.0, hx, hy-r*1.25);
+        P.quadraticCurveTo(hx+r*1.15, hy-r*1.0, hx+r*1.0, hy+r*0.5);
+        P.quadraticCurveTo(hx, hy+r*0.15, hx-r*1.0, hy+r*0.5);
+        P.closePath();
+      } else { /* cervelière */
+        P.ellipse(hx, hy-r*0.38, r*0.9, r*0.62, 0, Math.PI, 0);
+        P.closePath();
+      }
+      zone = [S.tete[0]-r, S.tete[1]-r*1.3, r*2, r*1.7];
+      break;
+    }
+    case 'mainSecondaire': { /* bouclier */
+      const p = S.poignetL;
+      P.ellipse(p[0]-6, p[1]+6, 64*ech, 82*ech, 0, 0, 6.283);
+      zone = [p[0]-72, p[1]-80, 144, 170];
+      break;
+    }
+    case 'mainPrincipale': { /* arc au dos */
+      P.moveTo(eL[0]-10, hR[1]);
+      P.quadraticCurveTo(S.cou[0], eL[1]-90*ech, eR[0]+30, eR[1]-60*ech);
+      P.lineTo(eR[0]+38, eR[1]-50*ech);
+      P.quadraticCurveTo(S.cou[0]+10, eL[1]-70*ech, eL[0]-2, hR[1]+8);
+      P.closePath();
+      zone = [eL[0]-14, eL[1]-96*ech, (eR[0]-eL[0])+60, hR[1]-eL[1]+110*ech];
+      break;
+    }
+    case 'bijou1': {
+      ctx.save();
+      ctx.strokeStyle=t2; ctx.lineWidth=4;
+      ctx.beginPath();
+      ctx.moveTo(S.cou[0]-24, S.cou[1]+8);
+      ctx.quadraticCurveTo(S.cou[0], S.cou[1]+52, S.cou[0]+24, S.cou[1]+8);
+      ctx.stroke();
+      ctx.fillStyle=t1; ctx.beginPath(); ctx.arc(S.cou[0], S.cou[1]+48, 9, 0, 6.283); ctx.fill(); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    case 'bijou2': {
+      ctx.save();
+      ctx.fillStyle=t1; ctx.strokeStyle=t2; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(S.poignetL[0]-4, S.poignetL[1]+16, 6, 0, 6.283); ctx.fill(); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    default: return;
+  }
+
+  ctx.save();
+  ctx.fillStyle=t1; ctx.fill(P);
+  if (zone) avcMotif(ctx, P, mat, t1, zone);
+  ctx.strokeStyle=ombre; ctx.lineWidth=3; ctx.stroke(P);
+  /* liseré secondaire */
+  ctx.strokeStyle=t2; ctx.lineWidth=1.8; ctx.globalAlpha=0.9;
+  ctx.stroke(P);
+  ctx.restore();
+}
+
+function avcDessineFond(ctx, a, override){
+  const id = override!==undefined ? override : a.fond;
+  const f = AVC_FONDS.find(x=>x.id===id) || AVC_FONDS[1];
+  if (f.id==='transparent') return;
+  if (f.haut){
+    const g = ctx.createLinearGradient(0,0,0,AVC_H);
+    g.addColorStop(0,f.haut); g.addColorStop(1,f.bas);
+    ctx.fillStyle=g; ctx.fillRect(0,0,AVC_W,AVC_H);
+  }
+  /* socle */
+  ctx.save();
+  const g2 = ctx.createRadialGradient(AVC_W/2, AVC_H*0.95, 40, AVC_W/2, AVC_H*0.95, 320);
+  g2.addColorStop(0,'rgba(212,160,23,0.30)'); g2.addColorStop(0.6,'rgba(20,12,4,0.55)'); g2.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g2;
+  ctx.beginPath(); ctx.ellipse(AVC_W/2, AVC_H*0.945, 300, 70, 0, 0, 6.283); ctx.fill();
+  ctx.strokeStyle='rgba(212,160,23,0.5)'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.ellipse(AVC_W/2, AVC_H*0.945, 250, 52, 0, 0, 6.283); ctx.stroke();
+  ctx.restore();
+}
+
+/* ═══════════════ COMPOSITION PRINCIPALE ═══════════════ */
+let avcDerniereMs = 0;
+function avcCompose(ctx, a, opts){
+  const t0 = performance.now();
+  opts = opts || {};
+  const { fiche:F0 } = avcFiche(a.race, a.sousRace);
+  const F = Object.assign({}, F0);
+  /* teint drakéide corrélé à l'ascendance */
+  if (F.museau && a.ascendance && AVC_ASCENDANCES[a.ascendance] && !opts.teintLibre){
+    a = Object.assign({}, a, { corps: Object.assign({}, a.corps, { teint: a.corps.teint || AVC_ASCENDANCES[a.ascendance].ecailles }) });
+  }
+  const S = avcSquelette(F, a.corps.corpulence);
+  const { off, infos } = avcVisibilite(a);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,AVC_W,AVC_H);
+  if (opts.miroir){ ctx.translate(AVC_W,0); ctx.scale(-1,1); }
+  let M = null;
+  const eq = a.equipement || {};
+  const corpFacteur = 1 + 0.30*((a.corps.corpulence??0.45)-0.45);
+  const dessinePieceSlot = (slot, layerId) => {
+    const e = eq[slot];
+    if (!e || !e.itemId || e.visible===false) return;
+    const piece = AVC_CATALOGUE.find(c=>c.id===e.itemId);
+    if (!piece) return;
+    const layer = AVC_LAYERS.find(l=>l.id===layerId);
+    if (layer && layer.categories && !layer.categories.includes(piece.categorie)) return;
+    /* PNG si présent, sinon procédural */
+    const bmp = avcSprite(piece.slot, piece.id, e.teintePrimaire, e.teinteSecondaire);
+    if (bmp){
+      ctx.save();
+      avcTransforme(ctx, piece, S, corpFacteur);
+      ctx.drawImage(bmp, 0, 0, AVC_W, AVC_H);
+      ctx.restore();
+    } else {
+      avcDessinePiece(ctx, piece, e, a, F, S, M||{rTete:58*F.tete*F.echelle,c:corpFacteur,ombre:'#333'}, infos);
+    }
+  };
+  for (const layer of AVC_LAYERS){
+    if (off.has(layer.id)) continue;
+    switch (layer.type){
+      case 'fond':
+        if (!opts.sansFond) avcDessineFond(ctx, a, opts.fond); break;
+      case 'corps':
+        if (layer.partie==='sousVetements'){
+          /* maillot neutre si aucun torse porté */
+          if (!eq.torse || !eq.torse.itemId || eq.torse.visible===false){
+            if (M){ ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='#6e5c48';
+              ctx.fillRect(S.hancheL[0]-18, S.taille[1]+8, (S.hancheR[0]-S.hancheL[0])+36, 60); ctx.restore(); }
+          }
+        } else {
+          const corpsB = avcSprite('corps', (avcFiche(a.race,a.sousRace).cle)+'-'+(a.corps.gabarit||'moyen'), a.corps.teint, null);
+          if (corpsB){ ctx.drawImage(corpsB, 0, 0, AVC_W, AVC_H); M = { rTete:58*F.tete*F.echelle, c:corpFacteur, ombre:avcAssombrir(a.corps.teint,0.78), clair:'#fff' }; }
+          else M = avcDessineCorps(ctx, a, F, S);
+        }
+        break;
+      case 'visage': avcDessineVisage(ctx, a, F, S, M); break;
+      case 'trait':
+        if (layer.trait==='oreilles') avcDessineOreilles(ctx, a, F, S, M||{rTete:58*F.tete*F.echelle,ombre:'#333'});
+        else if (layer.trait==='cornes') avcDessineCornes(ctx, a, F, S, M||{rTete:58*F.tete*F.echelle});
+        else if (layer.trait==='queue') avcDessineQueue(ctx, a, F, S, M||{rTete:58*F.tete*F.echelle});
+        break;
+      case 'pilosite':
+        avcDessineCheveux(ctx, a, F, S, M||{rTete:58*F.tete*F.echelle}, layer.partie, infos.coiffureEcrasee);
+        break;
+      case 'equip':
+        if (layer.slots){ for (const s of layer.slots) dessinePieceSlot(s, layer.id); }
+        else if (layer.partie==='arriere' && layer.slot==='cape'){
+          dessinePieceSlot('cape', layer.id);
+        } else if (layer.partie==='avant' && layer.slot==='cape'){
+          /* pans avant : fine bande d'épaules */
+          const e = eq.cape;
+          if (e && e.itemId && e.visible!==false && M){
+            ctx.save(); ctx.fillStyle=e.teinteSecondaire||'#54382a';
+            ctx.fillRect(S.epauleL[0]-14, S.epauleL[1]-10, 20, 14);
+            ctx.fillRect(S.epauleR[0]-6, S.epauleR[1]-10, 20, 14); ctx.restore();
+          }
+        } else if (layer.partie==='dos'){
+          const e = eq[layer.slot];
+          const p = e && e.itemId ? AVC_CATALOGUE.find(c=>c.id===e.itemId) : null;
+          if (p && p.auDos) dessinePieceSlot(layer.slot, layer.id);
+        } else if (layer.slot==='mainPrincipale'){
+          const e = eq.mainPrincipale;
+          const p = e && e.itemId ? AVC_CATALOGUE.find(c=>c.id===e.itemId) : null;
+          if (p && !p.auDos) dessinePieceSlot('mainPrincipale', layer.id);
+        } else {
+          dessinePieceSlot(layer.slot, layer.id);
+        }
+        break;
+      case 'effet': break; /* réservé */
+    }
+  }
+  /* libellé espèce hors SRD */
+  if (!avcFiche(a.race, a.sousRace).dispo && !opts.sansLibelle){
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.save();
+    ctx.fillStyle='rgba(20,12,4,0.72)';
+    ctx.fillRect(0, AVC_H-72, AVC_W, 44);
+    ctx.fillStyle='#e0b25c'; ctx.font='24px "Crimson Pro", serif'; ctx.textAlign='center';
+    ctx.fillText('Portrait non disponible pour cette espèce — gabarit générique', AVC_W/2, AVC_H-42);
+    ctx.restore();
+  }
+  avcDerniereMs = performance.now() - t0;
+  return avcDerniereMs;
+}
+
+/* ─── Historique annuler/refaire : anneau de 20 pas ─── */
+function avcHistoInit(st){ st.histo=[JSON.stringify(st.avatar)]; st.histoIdx=0; }
+function avcHistoPush(st){
+  const s = JSON.stringify(st.avatar);
+  if (st.histo[st.histoIdx]===s) return;
+  st.histo = st.histo.slice(0, st.histoIdx+1);
+  st.histo.push(s);
+  if (st.histo.length>21) st.histo.shift();
+  st.histoIdx = st.histo.length-1;
+}
+function avcHistoUndo(st){ if (st.histoIdx>0){ st.histoIdx--; st.avatar=JSON.parse(st.histo[st.histoIdx]); return true; } return false; }
+function avcHistoRedo(st){ if (st.histoIdx<st.histo.length-1){ st.histoIdx++; st.avatar=JSON.parse(st.histo[st.histoIdx]); return true; } return false; }
+
+/* ─── Aléatoire cohérent avec la race ─── */
+function avcAleatoire(a){
+  const { fiche:F } = avcFiche(a.race, a.sousRace);
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+  const n = avcDefaut(a.race, a.sousRace);
+  n.equipement = a.equipement; /* l'aléatoire ne touche pas l'équipement */
+  if (F.museau){ n.ascendance = pick(F.ascendances); n.corps.teint = AVC_ASCENDANCES[n.ascendance].ecailles; }
+  else n.corps.teint = pick(F.peau||['#c68f60']);
+  n.corps.gabarit = pick(AVC_GABARITS).id;
+  n.corps.corpulence = Math.random();
+  n.corps.taille = Math.random();
+  n.visage.preset = pick(AVC_VISAGES.presets).id;
+  n.visage.yeux = { forme:pick(AVC_VISAGES.yeuxFormes).id, couleur:pick(F.yeux||['#3a2a1c']) };
+  n.visage.sourcils = pick(AVC_VISAGES.sourcils).id;
+  n.visage.bouche = pick(AVC_VISAGES.bouches).id;
+  n.visage.nez = pick(AVC_VISAGES.nez).id;
+  if (!F.sansCheveux){
+    n.pilosite.coiffure = pick(AVC_COIFFURES).id;
+    n.pilosite.couleurCheveux = pick(F.cheveux||['#3a2617']);
+    n.pilosite.couleurBarbe = n.pilosite.couleurCheveux;
+    n.pilosite.barbe = F.barbeNaturelle ? pick(AVC_BARBES.filter(b=>b.id!=='aucune')).id
+                    : (Math.random()<0.3 ? pick(AVC_BARBES).id : 'aucune');
+  }
+  if (F.cornesNaturelles) n.traits.cornes = pick(AVC_CORNES.filter(c=>c.id!=='aucunes')).id;
+  n.traits.queue = !!F.queueNaturelle;
+  n.traits.oreilles = (F.oreilles&&F.oreilles.longueur)||0;
+  n.pose = a.pose; n.fond = a.fond;
+  return n;
+}
+
+/* ─── Changement de race : reporte les choix compatibles ─── */
+function avcChangeRace(a, raceName, subraceName){
+  const n = avcDefaut(raceName, subraceName);
+  const { fiche:F } = avcFiche(raceName, subraceName);
+  n.equipement = a.equipement;
+  n.pose = a.pose; n.fond = a.fond;
+  n.corps.gabarit = a.corps.gabarit; n.corps.corpulence = a.corps.corpulence; n.corps.taille = a.corps.taille;
+  n.corps.cicatrices = a.corps.cicatrices; n.corps.tatouages = a.corps.tatouages;
+  if (F.peau && F.peau.includes(a.corps.teint)) n.corps.teint = a.corps.teint;
+  n.visage = JSON.parse(JSON.stringify(a.visage));
+  if (!(F.yeux||[]).includes(a.visage.yeux.couleur)) n.visage.yeux.couleur = (F.yeux&&F.yeux[0])||'#3a2a1c';
+  if (!F.sansCheveux){
+    n.pilosite.coiffure = a.pilosite.coiffure;
+    if ((F.cheveux||[]).includes(a.pilosite.couleurCheveux)) n.pilosite.couleurCheveux = a.pilosite.couleurCheveux;
+    if (F.barbeNaturelle && a.pilosite.barbe==='aucune') n.pilosite.barbe = F.barbeDefaut||'fournie';
+    else if (!F.barbeNaturelle) n.pilosite.barbe = a.pilosite.barbe;
+  }
+  if (F.cornesNaturelles && a.traits.cornes!=='aucunes') n.traits.cornes = a.traits.cornes;
+  return n;
+}
+
+/* ─── Exports PNG ─── */
+function avcCanvasExport(a, avecFond){
+  const cv = document.createElement('canvas'); cv.width=AVC_W; cv.height=AVC_H;
+  const cx = cv.getContext('2d');
+  avcCompose(cx, a, avecFond ? {} : { fond:'transparent', sansLibelle:true });
+  return cv;
+}
+function avcPortraitDataURL(a){
+  /* recadrage tête/épaules 320×320 pour avatarUrl (fiche + jeton) */
+  const src = avcCanvasExport(a, true);
+  const { fiche:F } = avcFiche(a.race, a.sousRace);
+  const S = avcSquelette(F, a.corps.corpulence);
+  const cy = S.tete[1], r = 260*F.echelle + 90;
+  const cv = document.createElement('canvas'); cv.width=320; cv.height=320;
+  const cx = cv.getContext('2d');
+  cx.drawImage(src, AVC_W/2-r, cy-r*0.9, r*2, r*2, 0, 0, 320, 320);
+  let url = cv.toDataURL('image/jpeg', 0.86);
+  if (url.length>110000) url = cv.toDataURL('image/jpeg', 0.7);
+  return url;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CRÉATEUR D'AVATAR (avc) — INTERFACE
+   Deux modes, un seul code :
+   - 'wiz'  : étape 6 de la Forge (rendu dans #wizMain, pied wiz-foot)
+   - 'solo' : overlay #avcOverlay (z-index 1250) ouvert depuis la
+              poupée de papier ; l'espèce y est verrouillée.
+   ══════════════════════════════════════════════════════════════════ */
+
+const AVC = {
+  mode:null, charId:null, docData:null,
+  avatar:null, baseline:null, histo:[], histoIdx:0,
+  etape:'espece', visites:null, slotSel:'torse',
+  zoom:1, cy:0, miroir:false, comparer:false,
+  off:null, offCtx:null, portraitAuto:false
+};
+avcRecomposeCb = () => { try { avcRecompose(); } catch(_){} };
+
+/* ─── Recomposition et affichage ─── */
+function avcOff(){
+  if (!AVC.off){ AVC.off=document.createElement('canvas'); AVC.off.width=AVC_W; AVC.off.height=AVC_H;
+    AVC.offCtx=AVC.off.getContext('2d'); }
+  return AVC.off;
+}
+function avcRecompose(){
+  if (!AVC.avatar) return;
+  const a = AVC.comparer && AVC.baseline ? AVC.baseline : AVC.avatar;
+  avcCompose(avcOffCtxGet(), a, { miroir:AVC.miroir });
+  const cv = document.getElementById('avcCanvas');
+  if (cv){
+    const cx = cv.getContext('2d');
+    cx.setTransform(1,0,0,1,0,0);
+    cx.clearRect(0,0,cv.width,cv.height);
+    const z = AVC.zoom;
+    const tx = (1-z)*AVC_W/2, ty = -AVC.cy*z;
+    cx.setTransform(z,0,0,z,tx,ty);
+    cx.drawImage(avcOff(),0,0);
+    cx.setTransform(1,0,0,1,0,0);
+  }
+  const perf = document.getElementById('avcPerf');
+  if (perf) perf.textContent = avcDerniereMs.toFixed(1)+' ms';
+  const res = document.querySelector('#wizFootHint .avc-resume, #avcFootHint .avc-resume');
+  if (res) res.textContent = avcResumeCompact();
+}
+function avcOffCtxGet(){ avcOff(); return AVC.offCtx; }
+
+/* ─── Mutations d'état ─── */
+function avcMaj(fn){
+  fn(AVC.avatar);
+  avcHistoPush(AVC);
+  if (AVC.mode==='wiz' && typeof WIZ!=='undefined' && WIZ) WIZ.avatar = AVC.avatar;
+  avcRecompose();
+}
+window._avcSet = (chemin, valeur) => {
+  avcMaj(a => {
+    const p = chemin.split('.'); let o = a;
+    for (let i=0;i<p.length-1;i++){ if (o[p[i]]==null) o[p[i]]={}; o=o[p[i]]; }
+    o[p[p.length-1]] = valeur;
+  });
+  avcRenderOptions(); avcRenderEtapes();
+};
+window._avcBascule = (chemin, valeur) => {
+  avcMaj(a => {
+    const p = chemin.split('.'); let o = a;
+    for (let i=0;i<p.length-1;i++) o=o[p[i]];
+    const arr = o[p[p.length-1]] || [];
+    const ix = arr.indexOf(valeur);
+    if (ix>=0) arr.splice(ix,1); else arr.push(valeur);
+    o[p[p.length-1]] = arr;
+  });
+  avcRenderOptions();
+};
+window._avcUndo = () => { if (avcHistoUndo(AVC)){ if (AVC.mode==='wiz'&&typeof WIZ!=='undefined'&&WIZ){WIZ.avatar=AVC.avatar;} avcRecompose(); avcRenderOptions(); } };
+window._avcRedo = () => { if (avcHistoRedo(AVC)){ if (AVC.mode==='wiz'&&typeof WIZ!=='undefined'&&WIZ){WIZ.avatar=AVC.avatar;} avcRecompose(); avcRenderOptions(); } };
+window._avcAleatoireBtn = () => {
+  AVC.avatar = avcAleatoire(AVC.avatar);
+  avcHistoPush(AVC);
+  if (AVC.mode==='wiz' && typeof WIZ!=='undefined' && WIZ) WIZ.avatar = AVC.avatar;
+  avcRecompose(); avcRenderOptions();
+};
+
+/* ─── Vue : zoom, recadrage, miroir, comparaison ─── */
+window._avcZoom = (dir) => {
+  AVC.zoom = Math.min(4, Math.max(1, AVC.zoom * (dir>0?1.25:0.8)));
+  if (AVC.zoom===1) AVC.cy=0;
+  avcRecompose();
+};
+window._avcCadre = (quoi) => {
+  if (quoi==='tete'){ AVC.zoom=2.6; AVC.cy=0; }
+  else if (quoi==='buste'){ AVC.zoom=1.7; AVC.cy=AVC_H*0.05; }
+  else { AVC.zoom=1; AVC.cy=0; }
+  avcRecompose();
+};
+window._avcMiroir = () => { AVC.miroir=!AVC.miroir; avcRecompose(); };
+window._avcComparer = (on) => { AVC.comparer=!!on; avcRecompose();
+  const b=document.getElementById('avcCompBtn'); if(b) b.setAttribute('aria-pressed', String(AVC.comparer)); };
+function avcMolette(ev){ ev.preventDefault(); window._avcZoom(ev.deltaY<0?1:-1); }
+
+/* ─── Détail au survol / focus ─── */
+window._avcDetail = (nom, desc, regle) => {
+  const el = document.getElementById('avcDetail'); if(!el) return;
+  if (!nom){ el.innerHTML=''; el.classList.remove('avc-detail-on'); return; }
+  el.classList.add('avc-detail-on');
+  el.innerHTML = `<b>${nom}</b>${desc?`<span>${desc}</span>`:''}${regle?`<em>◆ ${regle}</em>`:''}`;
+};
+
+/* ─── Espèce / sous-espèce ─── */
+window._avcRace = (raceName) => {
+  if (AVC.mode==='wiz' && typeof WIZ!=='undefined' && WIZ){
+    if (WIZ.race!==raceName){ WIZ.race=raceName; WIZ.subrace=null; WIZ.bonusStatPicks=[]; }
+    AVC.avatar = avcChangeRace(AVC.avatar, raceName, null);
+    WIZ.avatar = AVC.avatar;
+    avcHistoPush(AVC);
+    avcRecompose(); avcRenderOptions(); avcRenderEtapes();
+    if (typeof wizRender==='function') wizRender();
+  }
+};
+window._avcSousRace = (s) => {
+  if (AVC.mode==='wiz' && typeof WIZ!=='undefined' && WIZ){
+    WIZ.subrace = s;
+    AVC.avatar = avcChangeRace(AVC.avatar, WIZ.race, s);
+    WIZ.avatar = AVC.avatar;
+    avcHistoPush(AVC);
+    avcRecompose(); avcRenderOptions();
+    if (typeof wizRender==='function') wizRender();
+  } else {
+    window._avcSet('sousRace', s);
+  }
+};
+window._avcAscendance = (id) => {
+  avcMaj(a => { a.ascendance=id; a.corps.teint = AVC_ASCENDANCES[id] ? AVC_ASCENDANCES[id].ecailles : a.corps.teint; });
+  avcRenderOptions();
+};
+
+/* ─── Navigation d'étapes du créateur ─── */
+window._avcEtape = (id) => {
+  AVC.etape = id; AVC.visites.add(id);
+  avcRenderEtapes(); avcRenderOptions();
+};
+function avcEtapeSuiv(dir){
+  const ids = AVC_ETAPES.map(e=>e.id);
+  const i = ids.indexOf(AVC.etape) + dir;
+  if (i>=0 && i<ids.length){ window._avcEtape(ids[i]); return true; }
+  return false;
+}
+
+/* ─── Rendus HTML ─── */
+function avcEsc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+function avcRenderEtapes(){
+  const el = document.getElementById('avcEtapes'); if(!el) return;
+  el.innerHTML = AVC_ETAPES.map(e=>{
+    const st = e.id===AVC.etape ? 'encours' : AVC.visites.has(e.id) ? 'fait' : 'afaire';
+    const lbl = st==='encours' ? 'en cours' : st==='fait' ? 'complété' : 'à faire';
+    return `<button class="avc-etape avc-${st}" onclick="window._avcEtape('${e.id}')" aria-current="${e.id===AVC.etape?'step':'false'}">
+      <span class="avc-etape-nom">${e.nom}</span><span class="avc-etape-etat">${lbl}</span></button>`;
+  }).join('');
+}
+
+function avcSwatches(chemin, couleurs, courante){
+  return `<div class="avc-grille avc-grille-couleurs" role="listbox" aria-label="Couleurs">` +
+    couleurs.map(c=>`<button class="avc-swatch ${c===courante?'sel':''}" style="background:${c}"
+      onclick="window._avcSet('${chemin}','${c}')" aria-label="Couleur ${c}" title="${c}"></button>`).join('') + `</div>`;
+}
+function avcChips(chemin, options, courante){
+  return `<div class="avc-chips">` + options.map(o=>{
+    const id = o.id!==undefined?o.id:o, nom = o.nom||o;
+    return `<button class="avc-chip ${id===courante?'sel':''}" onclick="window._avcSet('${chemin}','${id}')"
+      onmouseenter="window._avcDetail('${avcEsc(nom)}','','')" onfocus="window._avcDetail('${avcEsc(nom)}','','')">${nom}</button>`;
+  }).join('') + `</div>`;
+}
+function avcChipsMulti(chemin, options, tableau){
+  return `<div class="avc-chips">` + options.map(o=>{
+    const on = (tableau||[]).includes(o.id);
+    return `<button class="avc-chip ${on?'sel':''}" onclick="window._avcBascule('${chemin}','${o.id}')" aria-pressed="${on}">${o.nom}</button>`;
+  }).join('') + `</div>`;
+}
+
+/* Vignette : mini-composition de l'avatar avec une option appliquée */
+function avcVignettes(options, applique, courante, detailFn){
+  const id = 'avcVig'+Math.floor(Math.random()*1e9);
+  setTimeout(()=>{
+    const cont = document.getElementById(id); if(!cont) return;
+    cont.querySelectorAll('canvas[data-opt]').forEach(cv=>{
+      try {
+        const a = JSON.parse(JSON.stringify(AVC.avatar));
+        applique(a, cv.dataset.opt);
+        const cx = cv.getContext('2d');
+        const tmp = document.createElement('canvas'); tmp.width=AVC_W; tmp.height=AVC_H;
+        avcCompose(tmp.getContext('2d'), a, { fond:'transparent', sansLibelle:true });
+        cx.clearRect(0,0,cv.width,cv.height);
+        /* cadrage adapté à la stature : la vignette vise tête→cuisses */
+        const infoV = avcFiche(a.race, a.sousRace);
+        const SV = avcSquelette(infoV.fiche, a.corps.corpulence);
+        const sw = AVC_W*0.72, sh = sw*cv.height/cv.width;
+        const sy = Math.max(0, Math.min(AVC_H-sh, SV.tete[1]-140*infoV.fiche.echelle-50));
+        cx.drawImage(tmp, AVC_W*0.14, sy, sw, sh, 0,0,cv.width,cv.height);
+      } catch(_){}
+    });
+  }, 0);
+  return `<div class="avc-grille" id="${id}" role="listbox">` + options.map(o=>{
+    const d = detailFn ? detailFn(o) : {};
+    return `<button class="avc-vig ${o.id===courante?'sel':''}" onclick="${o.onclick}"
+      onmouseenter="window._avcDetail('${avcEsc(o.nom)}','${avcEsc(d.desc||'')}','${avcEsc(d.regle||'')}')"
+      onfocus="window._avcDetail('${avcEsc(o.nom)}','${avcEsc(d.desc||'')}','${avcEsc(d.regle||'')}')">
+      <canvas width="86" height="104" data-opt="${o.id}" aria-hidden="true"></canvas>
+      <span>${o.nom}</span></button>`;
+  }).join('') + `</div>`;
+}
+
+function avcRenderOptions(){
+  const el = document.getElementById('avcOptions'); if(!el || !AVC.avatar) return;
+  const a = AVC.avatar;
+  const info = avcFiche(a.race, a.sousRace);
+  const F = info.fiche;
+  let h = `<div id="avcDetail" class="avc-detail" aria-live="polite"></div>`;
+  switch (AVC.etape){
+    case 'espece': {
+      if (AVC.mode==='solo'){
+        h += `<p class="avc-note">L'espèce (<b>${avcEsc(a.race)}</b>) est celle de la fiche : elle se change dans la Forge, pas ici. Tu peux modifier librement tout le reste.</p>`;
+        if (!info.dispo) h += `<p class="avc-note avc-note-warn">Portrait non disponible pour cette espèce — gabarit générique de taille ${F.taille}.</p>`;
+        break;
+      }
+      const cles = (typeof RACES!=='undefined') ? Object.keys(RACES) : Object.keys(AVC_RACE_MAP);
+      h += `<h4 class="avc-h">Espèce <small>(répercutée sur la fiche)</small></h4><div class="avc-grille">` + cles.map(k=>{
+        const srd = !!AVC_RACE_MAP[k];
+        return `<button class="avc-vig avc-vig-txt ${a.race===k?'sel':''}" onclick="window._avcRace('${avcEsc(k)}')"
+          onmouseenter="window._avcDetail('${avcEsc(k)}','${srd?'Portrait complet':'Gabarit générique — portrait non disponible'}','')"
+          onfocus="window._avcDetail('${avcEsc(k)}','${srd?'Portrait complet':'Gabarit générique'}','')">
+          <span>${k}</span><small>${srd?'✦ portrait':'gabarit'}</small></button>`;
+      }).join('') + `</div>`;
+      break;
+    }
+    case 'sousEspece': {
+      const r = (typeof RACES!=='undefined') ? RACES[a.race] : null;
+      const subs = r && r.subraces ? Object.keys(r.subraces) : [];
+      if (F.museau){
+        h += `<h4 class="avc-h">Ascendance draconique</h4><div class="avc-chips">` +
+          Object.entries(AVC_ASCENDANCES).map(([id,x])=>
+            `<button class="avc-chip avc-chip-asc ${a.ascendance===id?'sel':''}" onclick="window._avcAscendance('${id}')"
+              onmouseenter="window._avcDetail('${avcEsc(x.nom)}','Écailles assorties à l\\'ascendance','${avcEsc(x.souffle)}')"
+              onfocus="window._avcDetail('${avcEsc(x.nom)}','','${avcEsc(x.souffle)}')">
+              <i style="background:${x.ecailles}"></i>${x.nom.replace('Dragon ','').replace("Dragon d'",'')}</button>`).join('') + `</div>`;
+      } else if (subs.length && AVC.mode==='wiz'){
+        h += `<h4 class="avc-h">Sous-espèce <small>(répercutée sur la fiche)</small></h4>` +
+          avcChipsSous(subs, (typeof WIZ!=='undefined'&&WIZ)?WIZ.subrace:a.sousRace);
+      } else if (subs.length){
+        h += `<p class="avc-note">Sous-espèce de la fiche : <b>${avcEsc(a.sousRace||'—')}</b>.</p>`;
+      } else {
+        h += `<p class="avc-note">Cette espèce n'a pas de sous-espèce.</p>`;
+      }
+      break;
+    }
+    case 'corps': {
+      h += `<h4 class="avc-h">Gabarit</h4>` + avcChips('corps.gabarit', AVC_GABARITS, a.corps.gabarit);
+      h += `<h4 class="avc-h">Corpulence</h4><input class="avc-slider" type="range" min="0" max="1" step="0.01" value="${a.corps.corpulence}"
+        aria-label="Corpulence" oninput="window._avcSet('corps.corpulence', parseFloat(this.value))">`;
+      h += `<h4 class="avc-h">Stature</h4><input class="avc-slider" type="range" min="0" max="1" step="0.01" value="${a.corps.taille}"
+        aria-label="Stature" oninput="window._avcSet('corps.taille', parseFloat(this.value))">`;
+      if (F.museau){
+        h += `<h4 class="avc-h">Écailles</h4><p class="avc-note">Couleur corrélée à l'ascendance (${avcEsc(AVC_ASCENDANCES[a.ascendance]?.nom||'—')}). Nuance :</p>`
+          + avcSwatches('corps.teint', [AVC_ASCENDANCES[a.ascendance]?.ecailles||'#888', AVC_ASCENDANCES[a.ascendance]?.reflet||'#aaa'], a.corps.teint);
+      } else {
+        h += `<h4 class="avc-h">Teint</h4>` + avcSwatches('corps.teint', F.peau||[], a.corps.teint);
+      }
+      h += `<h4 class="avc-h">Cicatrices</h4>` + avcChipsMulti('corps.cicatrices', AVC_VISAGES.cicatrices.filter(c=>c.id!=='aucune'), a.corps.cicatrices);
+      h += `<h4 class="avc-h">Tatouages</h4>` + avcChipsMulti('corps.tatouages', AVC_VISAGES.tatouages.filter(c=>c.id!=='aucun'), a.corps.tatouages);
+      break;
+    }
+    case 'visage': {
+      h += `<h4 class="avc-h">Forme du visage</h4>` + avcChips('visage.preset', AVC_VISAGES.presets, a.visage.preset);
+      h += `<h4 class="avc-h">Yeux</h4>` + avcChips('visage.yeux.forme', AVC_VISAGES.yeuxFormes, a.visage.yeux.forme)
+         + avcSwatches('visage.yeux.couleur', F.yeux||[], a.visage.yeux.couleur);
+      h += `<h4 class="avc-h">Sourcils</h4>` + avcChips('visage.sourcils', AVC_VISAGES.sourcils, a.visage.sourcils);
+      h += `<h4 class="avc-h">Nez</h4>` + avcChips('visage.nez', AVC_VISAGES.nez, a.visage.nez);
+      h += `<h4 class="avc-h">Bouche</h4>` + avcChips('visage.bouche', AVC_VISAGES.bouches, a.visage.bouche);
+      h += `<h4 class="avc-h">Maquillage</h4>` + avcChipsMulti('visage.maquillage', AVC_VISAGES.maquillages.filter(m=>m.id!=='aucun'), a.visage.maquillage);
+      break;
+    }
+    case 'pilosite': {
+      if (F.sansCheveux){ h += `<p class="avc-note">Les drakéides n'ont ni cheveux ni barbe : leur crâne est écailleux.</p>`; break; }
+      h += `<h4 class="avc-h">Coiffure</h4>` + avcVignettes(
+        AVC_COIFFURES.map(c=>({ id:c.id, nom:c.nom, onclick:`window._avcSet('pilosite.coiffure','${c.id}')` })),
+        (av,opt)=>{ av.pilosite.coiffure=opt; }, a.pilosite.coiffure,
+        o=>({ desc: AVC_COIFFURES.find(c=>c.id===o.id)?.ecrasable ? 'Variante écrasée sous casque' : '' }));
+      h += `<h4 class="avc-h">Couleur de cheveux</h4>` + avcSwatches('pilosite.couleurCheveux', F.cheveux||[], a.pilosite.couleurCheveux);
+      h += `<h4 class="avc-h">Barbe${F.barbeNaturelle?' <small>(pilosité naine naturelle)</small>':''}</h4>`
+         + avcChips('pilosite.barbe', AVC_BARBES, a.pilosite.barbe);
+      h += `<h4 class="avc-h">Couleur de barbe</h4>` + avcSwatches('pilosite.couleurBarbe', F.cheveux||[], a.pilosite.couleurBarbe);
+      break;
+    }
+    case 'traits': {
+      let quelquechose = false;
+      if (F.cornesNaturelles || a.traits.cornes!=='aucunes'){
+        quelquechose = true;
+        h += `<h4 class="avc-h">Cornes</h4>` + avcVignettes(
+          AVC_CORNES.map(c=>({ id:c.id, nom:c.nom, onclick:`window._avcSet('traits.cornes','${c.id}')` })),
+          (av,opt)=>{ av.traits.cornes=opt; }, a.traits.cornes,
+          o=>({ desc:o.id==='aucunes'?'':'Un casque sans variante à cornes sera retiré' }));
+      }
+      if (F.queueNaturelle || a.traits.queue){
+        quelquechose = true;
+        h += `<h4 class="avc-h">Queue</h4><div class="avc-chips">
+          <button class="avc-chip ${a.traits.queue?'sel':''}" onclick="window._avcSet('traits.queue',true)">Avec queue</button>
+          <button class="avc-chip ${!a.traits.queue?'sel':''}" onclick="window._avcSet('traits.queue',false)">Sans queue</button></div>`;
+      }
+      if ((F.oreilles&&F.oreilles.longueur>0)){
+        quelquechose = true;
+        h += `<h4 class="avc-h">Longueur d'oreilles</h4><input class="avc-slider" type="range" min="0" max="1.2" step="0.05"
+          value="${a.traits.oreilles}" aria-label="Longueur des oreilles" oninput="window._avcSet('traits.oreilles', parseFloat(this.value))">`;
+      }
+      if (F.ecailles){
+        quelquechose = true;
+        h += `<h4 class="avc-h">Écailles apparentes</h4><div class="avc-chips">
+          <button class="avc-chip ${a.traits.ecailles?'sel':''}" onclick="window._avcSet('traits.ecailles',true)">Marquées</button>
+          <button class="avc-chip ${!a.traits.ecailles?'sel':''}" onclick="window._avcSet('traits.ecailles',false)">Discrètes</button></div>`;
+      }
+      if (F.crocs){ quelquechose = true; h += `<p class="avc-note">Les crocs demi-orcs sont toujours visibles — c'est un trait racial.</p>`; }
+      if (!quelquechose) h += `<p class="avc-note">Aucun trait particulier pour cette espèce.</p>`;
+      break;
+    }
+    case 'equipement': {
+      const eq = a.equipement;
+      h += `<div class="avc-chips avc-chips-serre">
+        <button class="avc-chip ${eq.refleter?'sel':''}" onclick="window._avcRefleter(true)"
+          onmouseenter="window._avcDetail('Refléter l\\'équipement porté','L\\'avatar suit l\\'inventaire réel de la fiche','')">⟲ Refléter l'équipement porté</button>
+        <button class="avc-chip ${!eq.refleter?'sel':''}" onclick="window._avcRefleter(false)">✎ Tenue libre</button></div>`;
+      h += `<h4 class="avc-h">Emplacement</h4><div class="avc-chips avc-chips-serre">` +
+        AVC_SLOTS.map(s=>{
+          const porte = eq[s.id] && eq[s.id].itemId;
+          return `<button class="avc-chip ${AVC.slotSel===s.id?'sel':''} ${porte?'avc-porte':''}"
+            onclick="AVC.slotSel='${s.id}'; avcRenderOptions()">${s.nom}</button>`;
+        }).join('') + `</div>`;
+      const pieces = AVC_CATALOGUE.filter(p=>p.slot===AVC.slotSel);
+      const cour = eq[AVC.slotSel];
+      h += `<h4 class="avc-h">Pièce</h4>` + avcVignettes(
+        [{ id:'', nom:'— Aucune —', onclick:`window._avcPiece('${AVC.slotSel}', '')` }]
+          .concat(pieces.map(p=>({ id:p.id, nom:p.nom, onclick:`window._avcPiece('${AVC.slotSel}','${p.id}')` }))),
+        (av,opt)=>{ if(!opt){ delete av.equipement[AVC.slotSel]; } else { const p=AVC_CATALOGUE.find(x=>x.id===opt);
+            av.equipement[AVC.slotSel]={ itemId:opt, teintePrimaire:cour?.teintePrimaire||'#8a8e9a', teinteSecondaire:cour?.teinteSecondaire||'#54382a', materiau:p?p.materiau:'cuir', visible:true }; } },
+        cour?.itemId||'',
+        o=>{ const p=AVC_CATALOGUE.find(x=>x.id===o.id);
+             return p?{ desc:`${AVC_MATERIAUX[p.materiau]?.nom||''} · ${p.categorie}`, regle:p.regle||'' }:{}; });
+      if (cour && cour.itemId){
+        h += `<h4 class="avc-h">Teinte primaire</h4>` + avcSwatches(`equipement.${AVC.slotSel}.teintePrimaire`, AVC_TEINTES, cour.teintePrimaire);
+        h += `<h4 class="avc-h">Teinte secondaire</h4>` + avcSwatches(`equipement.${AVC.slotSel}.teinteSecondaire`, AVC_TEINTES, cour.teinteSecondaire);
+        h += `<div class="avc-chips"><button class="avc-chip ${cour.visible!==false?'sel':''}"
+          onclick="window._avcSet('equipement.${AVC.slotSel}.visible', ${cour.visible===false})">${cour.visible===false?'Masquée':'Visible'}</button></div>`;
+      }
+      break;
+    }
+    case 'identite': {
+      h += `<h4 class="avc-h">Pose</h4>` + avcChips('pose', AVC_POSES, a.pose);
+      h += `<h4 class="avc-h">Fond</h4><div class="avc-chips">` + AVC_FONDS.map(f=>
+        `<button class="avc-chip ${a.fond===f.id?'sel':''}" onclick="window._avcSet('fond','${f.id}')"
+          ${f.haut?`style="border-color:${f.haut}"`:''}>${f.nom}</button>`).join('') + `</div>`;
+      h += `<h4 class="avc-h">Rendu</h4><div class="avc-chips">
+        <button class="avc-chip" onclick="window._avcTelecharger(false)">⬇ PNG transparent</button>
+        <button class="avc-chip" onclick="window._avcTelecharger(true)">⬇ PNG avec fond</button></div>`;
+      h += `<div class="avc-chips"><button class="avc-chip ${AVC.portraitAuto?'sel':''}" role="checkbox" aria-checked="${AVC.portraitAuto}"
+        onclick="AVC.portraitAuto=!AVC.portraitAuto; avcRenderOptions()"
+        onmouseenter="window._avcDetail('Utiliser comme portrait','Recadrage tête/épaules écrit dans le portrait de la fiche — il alimente aussi les jetons de la carte','')">
+        ${AVC.portraitAuto?'☑':'☐'} Utiliser comme portrait (fiche + jeton)</button></div>`;
+      if (AVC.mode==='solo') h += `<p class="avc-note">« Enregistrer » écrit l'avatar dans la fiche.</p>`;
+      break;
+    }
+  }
+  el.innerHTML = h;
+  avcGrilleClavier(el);
+}
+function avcChipsSous(subs, courante){
+  return `<div class="avc-chips">` + subs.map(s=>{
+    const srd = Object.values(AVC_SOUSRACES).some(x=>x.srd===s);
+    return `<button class="avc-chip big ${courante===s?'sel':''}" onclick="window._avcSousRace('${avcEsc(s)}')"
+      onmouseenter="window._avcDetail('${avcEsc(s)}','${srd?'Sous-espèce illustrée (SRD)':'Silhouette de la race de base'}','')">${s}</button>`;
+  }).join('') + `</div>`;
+}
+window._avcPiece = (slot, id) => {
+  avcMaj(a => {
+    a.equipement.refleter = false;
+    if (!id){ delete a.equipement[slot]; return; }
+    const p = AVC_CATALOGUE.find(x=>x.id===id);
+    const prev = a.equipement[slot];
+    a.equipement[slot] = { itemId:id, teintePrimaire:prev?.teintePrimaire||'#8a8e9a',
+      teinteSecondaire:prev?.teinteSecondaire||'#54382a', materiau:p?p.materiau:'cuir', visible:true };
+  });
+  avcRenderOptions();
+};
+window._avcRefleter = (on) => {
+  avcMaj(a => { a.equipement.refleter = on; if (on && AVC.docData) avcRefleterEquipement(a, AVC.docData); });
+  avcRenderOptions();
+};
+window._avcTelecharger = (avecFond) => {
+  try {
+    const url = avcCanvasExport(AVC.avatar, avecFond).toDataURL('image/png');
+    const l = document.createElement('a');
+    l.href = url; l.download = 'avatar-'+(AVC.avatar.race||'heros').toLowerCase()+(avecFond?'-fond':'')+'.png';
+    document.body.appendChild(l); l.click(); l.remove();
+  } catch(e){ alert("Export impossible : "+(e.message||e)); }
+};
+
+/* ─── Navigation clavier dans les grilles ─── */
+function avcGrilleClavier(cont){
+  cont.querySelectorAll('.avc-grille, .avc-chips').forEach(g=>{
+    g.addEventListener('keydown', ev=>{
+      if (!['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(ev.key)) return;
+      const btns = [...g.querySelectorAll('button')];
+      const i = btns.indexOf(document.activeElement);
+      if (i<0) return;
+      ev.preventDefault();
+      const cols = Math.max(1, Math.round(g.clientWidth / (btns[0]?.offsetWidth+8 || 90)));
+      let j = i + (ev.key==='ArrowRight'?1:ev.key==='ArrowLeft'?-1:ev.key==='ArrowDown'?cols:-cols);
+      if (j>=0 && j<btns.length) btns[j].focus();
+    });
+  });
+}
+function avcClavierGlobal(ev){
+  const solo = document.getElementById('avcOverlay')?.classList.contains('open');
+  const wiz = AVC.mode==='wiz' && typeof WIZ!=='undefined' && WIZ && WIZ.step===6;
+  if (!solo && !wiz) return;
+  if ((ev.ctrlKey||ev.metaKey) && ev.key.toLowerCase()==='z' && !ev.shiftKey){ ev.preventDefault(); window._avcUndo(); }
+  else if ((ev.ctrlKey||ev.metaKey) && (ev.key.toLowerCase()==='y' || (ev.shiftKey && ev.key.toLowerCase()==='z'))){ ev.preventDefault(); window._avcRedo(); }
+  else if (ev.key==='Escape' && solo){ window._avcFermer(); }
+}
+document.addEventListener('keydown', avcClavierGlobal);
+
+/* ─── Zone centrale (partagée wiz/solo) ─── */
+function avcSceneHTML(){
+  return `
+  <div class="avc-scene-outils" role="toolbar" aria-label="Vue de l'avatar">
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcCadre('tete')">Tête</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcCadre('buste')">Buste</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcCadre('pied')">En pied</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcZoom(1)" aria-label="Zoomer">＋</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcZoom(-1)" aria-label="Dézoomer">－</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcMiroir()">Retourner</button>
+    <button class="wiz-btn-ghost avc-mini" id="avcCompBtn" aria-pressed="false"
+      onpointerdown="window._avcComparer(true)" onpointerup="window._avcComparer(false)" onpointerleave="window._avcComparer(false)"
+      onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();window._avcComparer(true)}"
+      onkeyup="if(event.key===' '||event.key==='Enter')window._avcComparer(false)">Avant / après</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcUndo()" aria-label="Annuler">↺ Annuler</button>
+    <button class="wiz-btn-ghost avc-mini" onclick="window._avcRedo()" aria-label="Refaire">↻ Refaire</button>
+  </div>
+  <div class="avc-scene" id="avcSceneBox">
+    <canvas id="avcCanvas" width="${AVC_W}" height="${AVC_H}" aria-label="Aperçu de l'avatar"></canvas>
+    <span id="avcPerf" class="avc-perf" aria-hidden="true"></span>
+  </div>`;
+}
+function avcMonteScene(){
+  const box = document.getElementById('avcSceneBox');
+  if (box && !box.dataset.avcWheel){
+    box.dataset.avcWheel='1';
+    box.addEventListener('wheel', avcMolette, { passive:false });
+  }
+  avcRecompose();
+}
+function avcResumeCompact(){
+  const a = AVC.avatar; if(!a) return '';
+  const arm = a.equipement?.torse?.itemId ? (AVC_CATALOGUE.find(p=>p.id===a.equipement.torse.itemId)?.nom||'') : 'torse nu';
+  return `${a.race}${a.sousRace?' ('+a.sousRace+')':''} · ${arm}`;
+}
+function avcFootHintHTML(){
+  return `<button class="wiz-btn-ghost avc-mini" onclick="window._avcAleatoireBtn()">🎲 Aléatoire</button>
+    <span class="avc-resume">${avcEsc(avcResumeCompact())}</span>`;
+}
+
+/* ─── Mode Forge : étape 6 ─── */
+function avcStepForge(main, b){
+  AVC.mode = 'wiz';
+  if (!WIZ.avatar || WIZ.avatar.race !== WIZ.race || (WIZ.subrace||'') !== (WIZ.avatar.sousRace||'')){
+    WIZ.avatar = WIZ.avatar
+      ? avcChangeRace(WIZ.avatar, WIZ.race||'Humain', WIZ.subrace)
+      : avcDefaut(WIZ.race||'Humain', WIZ.subrace);
+    WIZ.avatar.sousRace = WIZ.subrace||'';
+  }
+  if (AVC.avatar !== WIZ.avatar){
+    AVC.avatar = WIZ.avatar;
+    AVC.baseline = JSON.parse(JSON.stringify(WIZ.avatar));
+    avcHistoInit(AVC);
+    AVC.visites = new Set(['espece']);
+    AVC.etape = 'espece'; AVC.zoom=1; AVC.cy=0; AVC.miroir=false; AVC.portraitAuto = !WIZ.avatarUrl;
+  }
+  AVC.docData = null; AVC.charId = null;
+  main.innerHTML = `
+    <div class="avc-corps">
+      <nav class="avc-col-etapes" aria-label="Étapes de l'avatar"><div id="avcEtapes"></div></nav>
+      <section class="avc-col-scene">${avcSceneHTML()}</section>
+      <section class="avc-col-options"><div id="avcOptions"></div></section>
+    </div>`;
+  avcRenderEtapes(); avcRenderOptions(); avcMonteScene();
+}
+
+/* À l'enregistrement de la Forge : le portrait auto alimente avatarUrl */
+function avcAvantWizSave(){
+  try {
+    if (WIZ && WIZ.avatar && AVC.portraitAuto && !WIZ.avatarUrl){
+      WIZ.avatarUrl = avcPortraitDataURL(WIZ.avatar);
+    }
+  } catch(_){}
+}
+
+/* ─── Mode autonome (poupée de papier) ─── */
+window._avcOuvrir = (charId) => {
+  const id = charId || window._currentSheetId;
+  const d = window._currentSheetData;
+  if (!id || !d){ alert("Ouvre d'abord une fiche de personnage."); return; }
+  AVC.mode='solo'; AVC.charId=id; AVC.docData=d;
+  AVC.avatar = avcDeFiche(d);
+  AVC.baseline = JSON.parse(JSON.stringify(AVC.avatar));
+  avcHistoInit(AVC);
+  AVC.visites = new Set(['espece']); AVC.etape='espece';
+  AVC.zoom=1; AVC.cy=0; AVC.miroir=false; AVC.comparer=false;
+  AVC.portraitAuto = false;
+  const ov = document.getElementById('avcOverlay');
+  document.getElementById('avcMain').innerHTML = `
+    <div class="avc-corps">
+      <nav class="avc-col-etapes" aria-label="Étapes de l'avatar"><div id="avcEtapes"></div></nav>
+      <section class="avc-col-scene">${avcSceneHTML()}</section>
+      <section class="avc-col-options"><div id="avcOptions"></div></section>
+    </div>`;
+  ov.classList.add('open');
+  document.body.style.overflow='hidden';
+  avcRenderEtapes(); avcRenderOptions(); avcMonteScene(); avcSoloFoot();
+};
+function avcSoloFoot(){
+  const ids = AVC_ETAPES.map(e=>e.id);
+  const dern = AVC.etape === ids[ids.length-1];
+  const prem = AVC.etape === ids[0];
+  document.getElementById('avcPrev').style.visibility = prem ? 'hidden' : 'visible';
+  document.getElementById('avcNext').textContent = dern ? '✓ ENREGISTRER' : 'SUIVANT →';
+  const hint = document.getElementById('avcFootHint');
+  if (hint) hint.innerHTML = `<span class="avc-resume">${avcEsc(avcResumeCompact())}</span>`;
+}
+window._avcPrev = () => { if (avcEtapeSuiv(-1)) avcSoloFoot(); };
+window._avcNext = async () => {
+  const ids = AVC_ETAPES.map(e=>e.id);
+  if (AVC.etape !== ids[ids.length-1]){ avcEtapeSuiv(1); avcSoloFoot(); return; }
+  await window._avcEnregistrer();
+};
+window._avcEnregistrer = async () => {
+  const btn = document.getElementById('avcNext');
+  try {
+    if (btn){ btn.disabled=true; btn.textContent='Enregistrement…'; }
+    const maj = { avatar: AVC.avatar };
+    if (AVC.portraitAuto) maj.avatarUrl = avcPortraitDataURL(AVC.avatar);
+    await updateDoc(doc(db,'characters',AVC.charId), maj);
+    window._avcFermer(true);
+  } catch(e){
+    console.error('[avatar] enregistrement', e);
+    if (btn){ btn.disabled=false; btn.textContent='✓ ENREGISTRER'; }
+    alert("Impossible d'enregistrer l'avatar (connexion ?). Tes réglages restent affichés — réessaie.");
+  }
+};
+window._avcFermer = (sansConfirmer) => {
+  if (!sansConfirmer){
+    const modifie = JSON.stringify(AVC.avatar) !== JSON.stringify(AVC.baseline);
+    if (modifie && !confirm("Fermer sans enregistrer les changements de l'avatar ?")) return;
+  }
+  document.getElementById('avcOverlay').classList.remove('open');
+  document.body.style.overflow='';
+  AVC.mode=null;
+};
+window._avcToggleSide = () => { /* le résumé est déjà permanent (scène centrale) ; rien à ouvrir */ };
+
+/* ─── Poupée de papier : rendu composé dans .eqg-fig ─── */
+window._avcFigTick = () => {
+  const d = window._currentSheetData;
+  for (const fig of document.querySelectorAll('.eqg-fig')){
+    let cv = fig.querySelector('canvas.avc-fig-cv');
+    if (!d || !d.avatar || !d.avatar.schemaVersion){
+      if (cv) cv.remove();
+      continue;
+    }
+    const a = avcDeFiche(d);
+    if (a.equipement.refleter) avcRefleterEquipement(a, d);
+    const hash = JSON.stringify(a);
+    if (fig.dataset.avcHash === hash) continue;
+    fig.dataset.avcHash = hash;
+    if (!cv){
+      cv = document.createElement('canvas');
+      cv.className='avc-fig-cv'; cv.width=AVC_W/2; cv.height=AVC_H/2;
+      fig.appendChild(cv);
+    }
+    try {
+      const tmp = document.createElement('canvas'); tmp.width=AVC_W; tmp.height=AVC_H;
+      avcCompose(tmp.getContext('2d'), a, { fond:'transparent', sansLibelle:true });
+      const cx = cv.getContext('2d');
+      cx.clearRect(0,0,cv.width,cv.height);
+      cx.drawImage(tmp,0,0,cv.width,cv.height);
+    } catch(e){ /* jamais bloquant pour la fiche */ }
+  }
+};
+
+/* ═══════════ CRÉATEUR D'AVATAR — fin ═══════════ */
+
 const WIZ_STEPS_DEF = [
   {id:1, icon:'🧝', label:'Peuple'},
   {id:2, icon:'⚔️', label:'Vocation'},
   {id:3, icon:'🎲', label:'Caractéristiques'},
   {id:4, icon:'📜', label:'Historique'},
   {id:5, icon:'🪶', label:'Identité'},
-  {id:6, icon:'🔥', label:'La Forge'}
+  {id:6, icon:'🎭', label:'Avatar'},
+  {id:7, icon:'🔥', label:'La Forge'}
 ];
 
 let WIZ = null;
@@ -2813,7 +4740,8 @@ function wizFresh() {
     personality:'', ideals:'', bonds:'', flaws:'', appearance:'', backstory:'',
     feat: null, featStatPick: null, featSearch:'',
     // ui
-    sideOpen: false
+    sideOpen: false,
+    avatar: null
   };
 }
 
@@ -3145,12 +5073,13 @@ window._wizGo = (s) => { WIZ.step = s; WIZ.sideOpen = false; wizRender(); };
 window._wizPrev = () => { if (WIZ.step > 1) { WIZ.step--; wizRender(); } };
 window._wizNext = async () => {
   const b = wizBuild();
-  if (WIZ.step < 6) {
+  if (WIZ.step < WIZ_STEPS_DEF.length) {
     const blockers = b.pending.filter(p => p.step === WIZ.step);
     if (blockers.length) { wizFlashPending(); return; }
     WIZ.step++; wizRender();
   } else {
     if (b.pending.length) { wizFlashPending(); return; }
+    avcAvantWizSave();
     await wizSave(b);
   }
 };
@@ -3185,6 +5114,7 @@ function wizRender() {
   else if (WIZ.step===3) wizStepStats(main, b);
   else if (WIZ.step===4) wizStepBg(main, b);
   else if (WIZ.step===5) wizStepIdentity(main, b);
+  else if (WIZ.step===6) avcStepForge(main, b);
   else wizStepRecap(main, b);
   main.scrollTop = sc;
 
@@ -3194,7 +5124,7 @@ function wizRender() {
   document.getElementById('wizPrev').style.visibility = WIZ.step>1 ? 'visible' : 'hidden';
   const next = document.getElementById('wizNext');
   const stepPend = b.pending.filter(p => p.step === WIZ.step);
-  if (WIZ.step === 6) {
+  if (WIZ.step === 7) {
     next.innerHTML = '🔥 DONNER VIE AU HÉROS';
     next.classList.toggle('dim', b.pending.length>0);
   } else {
@@ -3202,8 +5132,9 @@ function wizRender() {
     next.classList.toggle('dim', stepPend.length>0);
   }
   const hint = document.getElementById('wizFootHint');
-  const relevant = WIZ.step===6 ? b.pending : stepPend;
-  hint.innerHTML = relevant.length ? `⚠ ${relevant.map(p=>p.label).join(' · ')}` : '';
+  const relevant = WIZ.step===7 ? b.pending : stepPend;
+  hint.innerHTML = relevant.length ? `⚠ ${relevant.map(p=>p.label).join(' · ')}`
+                 : (WIZ.step===6 ? avcFootHintHTML() : '');
   document.getElementById('wizSide').classList.toggle('mobile-open', !!WIZ.sideOpen);
 }
 
@@ -3718,6 +5649,7 @@ async function wizSave(b) {
       ideals: WIZ.ideals||'', bonds: WIZ.bonds||'', flaws: WIZ.flaws||'',
       personality: WIZ.personality||'', appearance: WIZ.appearance||'', backstory: WIZ.backstory||'',
       race: WIZ.race, subrace: WIZ.subrace||'',
+      avatar: WIZ.avatar || null,
       class: WIZ.cls, classes: [{ name: WIZ.cls, level: 1 }],
       subclasses: WIZ.subclass ? { [WIZ.cls]: WIZ.subclass } : {},
       level: 1, xp: 0,
@@ -4493,7 +6425,7 @@ function renderCharSheet(id, d) {
               ${fItem('bottes','Pieds',IC.pieds)}
               ${fItem('anneau1','Anneau',IC.ring)}
             </div>
-            <div class="eqg-fig"></div>
+            <div class="eqg-fig"><div class="eqg-fig-tools"><button type="button" class="eqg-fig-btn" title="Modifier l'avatar" aria-label="Modifier l'avatar" onclick="window._avcOuvrir('${id}')">🎭</button></div></div>
             <div class="eqg-col">
               ${fItem('cape','Dos',IC.dos,true)}
               ${fAuto('Torse',bodyName,bodyClick,IC.body,true)}
@@ -8980,7 +10912,10 @@ window._setSpellView = (v) => {
 
 // ── Paper doll : emplacements d'accessoires (objets de l'inventaire) ──
 window._eqSilRace = function(){
+  const _dAv = window._currentSheetData;
+  const _avOk = _dAv && _dAv.avatar && _dAv.avatar.schemaVersion;
   for (const el of document.querySelectorAll('.eqg-sil[data-race]')) {
+    if (_avOk){ el.style.backgroundImage = 'none'; el.dataset.silDone = ''; continue; }
     const r = el.dataset.race || '';
     if (!r || el.dataset.silDone === r) continue;
     el.dataset.silDone = r;
@@ -8991,7 +10926,7 @@ window._eqSilRace = function(){
     im.src = 'assets/silhouettes/' + slug + '.jpg';
   }
 };
-setInterval(() => { try { window._eqSilRace(); } catch(_){} }, 1200);
+setInterval(() => { try { window._eqSilRace(); } catch(_){} try { window._avcFigTick && window._avcFigTick(); } catch(_){} }, 1200);
 window._eqPulse = (el) => { if(!el) return; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); setTimeout(()=>{ try{ el.classList.remove('pulse'); }catch(e){} }, 540); };
 // Pulse au clic sur les éléments interactifs de la fiche
 (function(){
@@ -10842,7 +12777,12 @@ window._ambInstallCatalogue = function(){
   document.body.appendChild(fv);
   /* 'opaque' pour un rush plein cadre (engrenages) : fond assombri au lieu d'additif */
   const FX_VER = '214';   /* V2.14 : bump a chaque remplacement de clip fx */
-  const FX_THEME_MODE = { mecanus:'opaque', 'mont-celeste':'opaque' };  /* V2.12 : vista plein cadre */
+  /* V2.18 : les matières claires — parchemin, marbre, brume, écorce — composent
+     en mode opaque. Le mode screen ajoute de la lumière et exige un fond noir ;
+     il ne convient qu'aux matières sombres : laiton, fer noirci, ardoise. */
+  const FX_THEME_MODE = {
+    'arboree':'opaque', 'arcadie':'opaque', 'bytopie':'opaque', 'elem-air':'opaque', 'elem-eau':'opaque', 'elysee':'opaque', 'energie-pos':'opaque', 'feerie':'opaque', 'limbes':'opaque', 'materiel':'opaque', 'mecanus':'opaque', 'mont-celeste':'opaque', 'plan-astral':'opaque', 'plan-ethere':'opaque', 'terres-betes':'opaque'
+  };
   function fxVideoCharge(cle){
     const slug = cle && cle !== 'materiel' ? cle : 'materiel';
     const html = document.documentElement;
@@ -15250,6 +17190,119 @@ html .wiz-btn-gold.dim { opacity:0.5; filter:saturate(0.6); }
   #lvlFootHint, .wiz-foot > span { font-size:0.62rem; }
 }
 #hibouBtn { z-index:1150 !important; }
+
+/* ══════════ CRÉATEUR D'AVATAR (avc) ══════════
+   Règles nouvelles uniquement — aucune règle existante modifiée.
+   z-index 1250 : au-dessus du hibou (1150), sous Forge/Ascension (1300),
+   grimoire (1400) et bulles de didacticiel (1600). */
+#avcOverlay { display:none; position:fixed; inset:0; z-index:1250;
+  background:radial-gradient(1200px 600px at 50% -10%, #3a2a14 0%, #1b1309 45%, #0d0905 100%);
+  color:#efe6d6; flex-direction:column; font-family:'Crimson Pro',serif; }
+#avcOverlay.open { display:flex; }
+#avcOverlay .avc-main { flex:1; min-height:0; overflow-y:auto; padding:14px 18px; }
+
+.avc-corps { display:grid; grid-template-columns:224px minmax(0,1fr) 340px; gap:14px; align-items:start; }
+.avc-col-etapes { position:sticky; top:0; }
+.avc-col-options { max-height:calc(100vh - 220px); overflow-y:auto; padding-right:4px;
+  background:linear-gradient(160deg, rgba(var(--v-creme),0.05), rgba(var(--v-noir),0.4));
+  border:1px solid rgba(var(--v-or),0.3); border-radius:12px; padding:12px; }
+
+/* ── colonne d'étapes ── */
+.avc-etape { display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%;
+  background:linear-gradient(160deg, rgba(var(--v-creme),0.05), rgba(var(--v-noir),0.5));
+  border:1px solid rgba(var(--v-or),0.3); color:#d8ccb4; border-radius:10px;
+  padding:9px 12px; margin-bottom:6px; cursor:pointer; font-family:'Crimson Pro',serif; font-size:0.86rem;
+  transition:border-color .15s ease, background .15s ease; text-align:left; }
+.avc-etape:hover { border-color:rgba(var(--v-or),0.8); }
+.avc-etape-nom { font-family:var(--font-title); font-size:0.68rem; letter-spacing:1px; }
+.avc-etape-etat { font-size:0.66rem; font-style:italic; opacity:0.75; white-space:nowrap; }
+.avc-etape.avc-encours { border-color:var(--gold); background:rgba(var(--v-or),0.18); color:#f0dfae; }
+.avc-etape.avc-encours .avc-etape-etat { color:var(--gold); opacity:1; }
+.avc-etape.avc-fait .avc-etape-etat { color:#9fc48a; opacity:1; }
+.avc-etape.avc-afaire { opacity:0.72; }
+
+/* ── scène centrale ── */
+.avc-scene-outils { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; justify-content:center; }
+.avc-mini { padding:6px 10px !important; font-size:0.68rem !important; }
+.avc-scene { position:relative; display:flex; justify-content:center;
+  background:radial-gradient(ellipse at 50% 20%, #241a10 0%, #0c0805 75%);
+  border:1px solid rgba(var(--v-or),0.35); border-radius:14px; overflow:hidden; padding:8px; }
+#avcCanvas { max-width:100%; max-height:min(62vh, 680px); height:auto; aspect-ratio:832/1216; touch-action:pan-y; }
+.avc-perf { position:absolute; right:8px; bottom:6px; font-size:0.6rem; color:rgba(224,178,92,0.5); font-family:monospace; }
+
+/* ── colonne d'options ── */
+.avc-h { font-family:var(--font-title); color:var(--gold); font-size:0.66rem; letter-spacing:1.5px;
+  text-transform:uppercase; margin:14px 0 6px; }
+.avc-h:first-of-type { margin-top:2px; }
+.avc-h small { color:#a8925a; text-transform:none; letter-spacing:0.4px; }
+.avc-note { font-size:0.82rem; color:#cbbfa8; font-style:italic; line-height:1.45; }
+.avc-note-warn { color:#e0b25c; }
+.avc-detail { min-height:52px; border:1px dashed rgba(var(--v-or),0.35); border-radius:10px;
+  padding:7px 10px; margin-bottom:10px; font-size:0.78rem; line-height:1.35; color:#d8ccb4;
+  display:flex; flex-direction:column; gap:2px; }
+.avc-detail b { color:#f0dfae; font-family:var(--font-title); font-size:0.7rem; letter-spacing:1px; }
+.avc-detail em { color:var(--gold); font-style:normal; font-size:0.72rem; }
+.avc-detail:not(.avc-detail-on)::before { content:'Survole une option pour le détail'; opacity:0.45; font-style:italic; }
+
+.avc-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.avc-chips-serre { gap:4px; }
+.avc-chip { background:linear-gradient(160deg, rgba(var(--v-creme),0.06), rgba(var(--v-noir),0.55));
+  border:1px solid rgba(200,168,90,0.4); color:#d8ccb4; border-radius:9px; padding:6px 11px;
+  cursor:pointer; font-family:'Crimson Pro',serif; font-size:0.8rem;
+  transition:border-color .15s ease, background .15s ease; }
+.avc-chip:hover { border-color:rgba(240,210,140,0.9); }
+.avc-chip.sel { border-color:var(--gold); background:rgba(var(--v-or),0.25); color:#f0dfae; }
+.avc-chip.avc-porte::after { content:' ●'; color:var(--gold); font-size:0.6rem; }
+.avc-chip-asc i { display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:6px;
+  vertical-align:-1px; border:1px solid rgba(255,255,255,0.4); }
+
+.avc-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(88px,1fr)); gap:7px; }
+.avc-grille-couleurs { display:flex; flex-wrap:wrap; gap:7px; }
+.avc-swatch { width:30px; height:30px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); cursor:pointer;
+  transition:transform .12s ease, border-color .12s ease; }
+.avc-swatch:hover { transform:scale(1.12); }
+.avc-swatch.sel { border-color:var(--gold); box-shadow:0 0 0 2px rgba(212,160,23,0.45); }
+.avc-vig { display:flex; flex-direction:column; align-items:center; gap:4px;
+  background:linear-gradient(160deg, rgba(var(--v-creme),0.05), rgba(var(--v-noir),0.6));
+  border:1px solid rgba(200,168,90,0.35); border-radius:10px; padding:6px 4px; cursor:pointer;
+  color:#d8ccb4; font-family:'Crimson Pro',serif; font-size:0.7rem; line-height:1.15; text-align:center;
+  transition:border-color .15s ease; }
+.avc-vig canvas { background:radial-gradient(ellipse at 50% 30%, #2a1e12, #100a06); border-radius:7px; }
+.avc-vig:hover { border-color:rgba(240,210,140,0.9); }
+.avc-vig.sel { border-color:var(--gold); background:rgba(var(--v-or),0.2); color:#f0dfae; }
+.avc-vig-txt { min-height:56px; justify-content:center; }
+.avc-vig-txt small { color:#a8925a; font-size:0.6rem; }
+
+.avc-slider { width:100%; accent-color:var(--gold); }
+.avc-resume { font-size:0.74rem; color:#e0b25c; font-style:italic; }
+
+/* focus clavier visible partout dans le créateur */
+.avc-corps button:focus-visible, #avcOverlay button:focus-visible {
+  outline:2px solid var(--gold); outline-offset:2px; }
+
+/* rendu composé dans la poupée de papier */
+.avc-fig-cv { position:relative; z-index:1; height:100%; width:auto; max-width:100%; object-fit:contain;
+  filter:drop-shadow(0 8px 20px rgba(0,0,0,0.5)); }
+.eqg-fig-tools { position:absolute; top:4px; right:4px; display:flex; gap:4px; z-index:3; }
+
+/* ── mobile : colonnes empilées, la scène reste visible ── */
+@media (max-width:900px){
+  .avc-corps { display:flex; flex-direction:column; gap:10px; }
+  .avc-col-scene { position:sticky; top:0; z-index:3;
+    background:linear-gradient(180deg, #17100a 82%, transparent); padding-bottom:6px; }
+  #avcCanvas { max-height:40vh; }
+  .avc-col-etapes { position:static; }
+  #avcEtapes { display:flex; flex-wrap:wrap; gap:5px; }
+  .avc-etape { width:auto; padding:6px 9px; margin-bottom:0; }
+  .avc-etape-etat { display:none; }
+  .avc-col-options { max-height:none; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .avc-etape, .avc-chip, .avc-vig, .avc-swatch, .avc-mini { transition:none !important; }
+  .avc-swatch:hover { transform:none; }
+}
+
 .wiz-side-hero { text-align:center; padding:4px 0 12px; border-bottom:1px solid rgba(var(--v-or),0.25); margin-bottom:12px; }
 .wiz-side-img { width:76px; height:76px; border-radius:50%; margin:0 auto 8px; background-size:cover; background-position:center;
   border:2px solid rgba(216,178,100,0.7); box-shadow:0 0 14px rgba(0,0,0,0.5); }
@@ -17252,6 +19305,21 @@ html[data-theme="arcadie"] {
     <button class="wiz-btn-ghost wiz-side-toggle" onclick="window._wizToggleSide()">📜 Résumé</button>
     <span id="wizFootHint"></span>
     <button id="wizNext" class="wiz-btn-gold" onclick="window._wizNext()">SUIVANT →</button>
+  </div>
+</div>
+
+<!-- CRÉATEUR D'AVATAR (mode autonome, ouvert depuis la poupée de papier) -->
+<div id="avcOverlay" role="dialog" aria-modal="true" aria-label="Créateur d'avatar">
+  <div class="wiz-head">
+    <h2>🎭 L'ATELIER DU PORTRAIT</h2>
+    <button class="wiz-x-btn" onclick="window._avcFermer()" title="Fermer">✕</button>
+  </div>
+  <div id="avcMain" class="avc-main"></div>
+  <div class="wiz-foot">
+    <button id="avcPrev" class="wiz-btn-ghost" onclick="window._avcPrev()">← Précédent</button>
+    <button class="wiz-btn-ghost" onclick="window._avcAleatoireBtn()">🎲 Aléatoire</button>
+    <span id="avcFootHint"></span>
+    <button id="avcNext" class="wiz-btn-gold" onclick="window._avcNext()">SUIVANT →</button>
   </div>
 </div>
 
