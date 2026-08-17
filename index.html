@@ -12146,8 +12146,9 @@ window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) 
 function bmSelTok(){ const m = bmMap(); return m ? m.tokens.find(t => t.id === bm.sel) : null; }
 
 /* ── géométrie partagée : murs -> segments (cache), intersections, visibilité, chemins ── */
-const bmGeo = { segs: new Map(), vis: new Map(), reach: new Map() };
-function bmGeoDirty(mapId){ bmGeo.segs.delete(mapId); bmGeo.vis.clear(); bmGeo.reach.clear(); }
+const bmGeo = { segs: new Map(), vis: new Map(), reach: new Map(), ver: 0 };
+function bmGeoDirty(mapId){ bmGeo.segs.delete(mapId); bmGeo.vis.clear(); bmGeo.reach.clear();
+  bmGeo.ver = (bmGeo.ver || 0) + 1; }   /* V2.35 : les murs ont changé */
 function bmSegs(m){
   let s = bmGeo.segs.get(m.id);
   if (s) return s;
@@ -12575,6 +12576,7 @@ function bmFogCanvas(m){
       c.beginPath(); c.arc(op.x, op.y, op.r, 0, 7); c.fill();
     }
     bm.fogDirty.delete(m.id);
+    bm._fogVer = (bm._fogVer || 0) + 1;      /* V2.35 : invalide le cache des torches */
   }
   return cv;
 }
@@ -12582,6 +12584,14 @@ function bmFogAvecLumieres(m){
   const base = bmFogCanvas(m);
   const torches = m.tokens.filter(t => t.torche);
   if (!torches.length) return base;
+  /* V2.35 — cache : recomposer un canvas de la taille de la carte à chaque
+     image coûtait cher pour rien. Signature = version du brouillard, version
+     de la géométrie, position et portée de chaque torche. */
+  const sig = (bm._fogVer || 0) + '|' + (bmGeo.ver || 0) + '|' + m.id + '|'
+    + torches.map(t => t.id + ',' + Math.round(t.x) + ',' + Math.round(t.y) + ',' + (t.lum || 6)).join(';');
+  if (bm.fogMix && bm._fogMixSig === sig
+      && bm.fogMix.width === base.width && bm.fogMix.height === base.height) return bm.fogMix;
+  bm._fogMixSig = sig;
   if (!bm.fogMix || bm.fogMix.width !== base.width || bm.fogMix.height !== base.height) {
     bm.fogMix = document.createElement('canvas');
     bm.fogMix.width = base.width; bm.fogMix.height = base.height;
@@ -12866,7 +12876,11 @@ function bmRender(){
   }
   bmTokCtlPos();
   bmGabCtlPos();
-  bmProjRender();
+  /* V2.35 : on SIGNALE le changement, la fenêtre projetée se redessine
+     d'elle-même à sa cadence. Sécurité : si sa pompe ne bat pas (fenêtre
+     ouverte par une version antérieure), on dessine directement. */
+  bm._projDirty = true;
+  if (bm.projOn && performance.now() - (bm._projPouls || 0) > 500) bmProjRender();
 }
 function bmGabCtlPos(){
   const el = document.getElementById('bmGabCtl'); if (!el) return;
@@ -13447,6 +13461,10 @@ function bmInitCanvas(){
         if (!bm.projOn || !bmMap()) { mini.style.display = 'none'; return; }
         const now = performance.now();
         if (now - derniere < 140) return;
+        /* V2.35 : inutile de recomposer la miniature si rien n'a changé */
+        const anime2 = (typeof bmAnimNecessaire === 'function') && bmAnimNecessaire();
+        if (!anime2 && bm._miniSig === (bm._projT || 0) + ':' + (bm._fogMixSig || '')) return;
+        bm._miniSig = (bm._projT || 0) + ':' + (bm._fogMixSig || '');
         derniere = now;
         mini.style.display = 'block';
         const W2 = prev.clientWidth || 276, H2 = prev.clientHeight || 155;
@@ -13620,7 +13638,14 @@ function bmBulleMesure(ctx, sx, sy, txt, loin){
 }
 /* V2.24 : point d'entrée appelé par la boucle rAF de la fenêtre projetée */
 window.bmProjPump = function(){
+  bm._projPouls = performance.now();
   if (!bm.projOn) return;
+  /* V2.35 — rendu à la demande : rien ne bouge, rien n'est redessiné. */
+  const anime = (typeof bmAnimNecessaire === 'function') && bmAnimNecessaire();
+  if (!bm._projDirty && !anime) return;
+  if (bm._projPouls - (bm._projT || 0) < 33) return;     /* 30 im/s au plus */
+  bm._projT = bm._projPouls;
+  bm._projDirty = false;
   try { bmProjRender(); } catch(e) {}
 };
 document.addEventListener('visibilitychange', () => {
