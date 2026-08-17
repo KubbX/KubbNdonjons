@@ -6154,11 +6154,14 @@ window._combatSyncPcs = (silent) => {
       if (!snap.exists()) return;
       const d = snap.data();
       const stats = d.stats || {};
+      window._tkAvatars = window._tkAvatars || {};
+      if (d.avatarUrl) window._tkAvatars[d.name || 'PJ'] = d.avatarUrl;
       window._combatState.combatants.push({
         kind:'pc', refId:id, name:d.name||'PJ',
         sub:`${d.race||''} ${classesDisplayFull(d)} (Niv.${totalLevel(d)})`.trim(),
         init:'', initBonus:_combatMod(stats.dex||10),
         avatar: d.avatarUrl || '',
+        /* V2.33 : gardé sous la main pour la galerie d'images de pion */
         hp:d.hp||0, hpMax:d.hpMax||0, ac:d.ac||10, dead:false
       });
       /* le familier et l'invocation active suivent leur maître dans le combat (et sur la carte) */
@@ -11961,13 +11964,118 @@ window._bmTokensFromCombat = function(){
     if (c.dead || m.tokens.some(t => t.nom === c.name)) continue;
     const mon = c.kind === 'monster';
     const gros = mon && /Géant|Dragon|TG|Gig/i.test(c.sub || '');
-    const img = c.avatar ? c.avatar
-      : (typeof spellSlug === 'function' && (mon || c.baseName)) ? 'assets/bestiaire/' + spellSlug(c.baseName || c.name) + '.jpg' : '';
+    /* V2.33 : un PJ sans avatar prend l'image de sa classe (lue dans le
+       sous-titre « Race Classe (Niv.X) ») plutôt que ses seules initiales */
+    let img = c.avatar || '';
+    if (!img && mon && typeof spellSlug === 'function')
+      img = 'assets/bestiaire/' + spellSlug(c.baseName || c.name) + '.jpg';
+    if (!img && !mon) {
+      const cl = Object.keys(CLASS_IMAGES).find(k => (c.sub || '').includes(k));
+      if (cl) img = 'assets/classes/' + CLASS_IMAGES[cl];
+      if (!img) { window._tkAvatars = window._tkAvatars || {}; }
+    }
+    if (!img && c.baseName && typeof spellSlug === 'function')
+      img = 'assets/bestiaire/' + spellSlug(c.baseName) + '.jpg';
     m.tokens.push(bmNewToken(c.name, mon ? '#b03030' : '#4a90d9', img, gros ? 2 : 1)); n++;
   }
   bmSave(); bmRender();
   bmStatus(n ? n + ' pions créés depuis le combat (portraits du bestiaire quand disponibles).' : 'Tous les combattants ont déjà leur pion.');
 };
+/* ═══════════ V2.33 — choix de l'image d'un pion ═══════════ */
+window._tkImgSrc = function(cat, cle){
+  if (cat === 'classe')     return 'assets/classes/' + CLASS_IMAGES[cle];
+  if (cat === 'historique') return 'assets/backgrounds/' + BACKGROUND_IMAGES[cle];
+  if (cat === 'espece')     return 'assets/silhouettes/' + spellSlug(cle) + '.jpg';
+  if (cat === 'bestiaire')  return 'assets/bestiaire/' + spellSlug(cle) + '.jpg';
+  return '';
+};
+window._tkOnglet = function(cat){
+  window._tkCat = cat;
+  document.querySelectorAll('#tkImgOnglets button').forEach(b =>
+    b.classList.toggle('on', b.dataset.cat === cat));
+  const g = document.getElementById('tkImgGrille');
+  const rech = document.getElementById('tkImgRech');
+  rech.style.display = (cat === 'bestiaire' || cat === 'espece') ? '' : 'none';
+  const t = bmSelTok();
+
+  if (cat === 'autre') {
+    rech.style.display = 'none';
+    const av = (window._tkAvatars || {})[t && t.nom] || '';
+    g.innerHTML =
+        '<div class="tk-autre">'
+      + (av ? '<button class="tk-b" onclick="window._tkChoisir(\'' + av.replace(/'/g, "\\'") + '\')">'
+              + '🧑 Avatar de ' + (t ? t.nom : '') + '</button>' : '')
+      + '<button class="tk-b" onclick="window._tkUrl()">🔗 Adresse d\'image…</button>'
+      + '<button class="tk-b" onclick="window._tkChoisir(\'\')">✖ Aucune image (initiales)</button>'
+      + '</div>';
+    return;
+  }
+
+  let entrees = [];
+  if (cat === 'classe')     entrees = Object.keys(CLASS_IMAGES);
+  if (cat === 'historique') entrees = Object.keys(BACKGROUND_IMAGES);
+  if (cat === 'espece')     entrees = Object.keys(RACES || {});
+  if (cat === 'bestiaire') {
+    const q = (document.getElementById('tkImgRech').value || '').toLowerCase().trim();
+    const src = (typeof COMPENDIUM_DATA !== 'undefined' && COMPENDIUM_DATA.monster) || [];
+    entrees = src.map(m => m.name);
+    if (q) entrees = entrees.filter(n => n.toLowerCase().includes(q));
+    else if (t) {                     /* sans recherche : on propose le nom du pion */
+      const n0 = (t.nom || '').toLowerCase();
+      entrees = entrees.filter(n => n.toLowerCase().includes(n0.split(' ')[0]));
+    }
+    entrees = entrees.slice(0, 60);
+  }
+  if (cat === 'espece') {
+    const q = (document.getElementById('tkImgRech').value || '').toLowerCase().trim();
+    if (q) entrees = entrees.filter(n => n.toLowerCase().includes(q));
+  }
+  g.innerHTML = entrees.length
+    ? entrees.map(cle => {
+        const url = window._tkImgSrc(cat, cle);
+        return '<button class="tk-vign" onclick="window._tkChoisir(\'' + url.replace(/'/g, "\\'") + '\')" title="' + cle + '">'
+             + '<img src="' + url + '" alt="" loading="lazy" '
+             + 'onerror="this.closest(\'.tk-vign\').remove(); window._tkVide()">'
+             + '<span>' + cle + '</span></button>';
+      }).join('')
+    : '<p class="tk-rien">Rien à proposer ici. Essaie la recherche, ou l\'onglet « Autre ».</p>';
+  window._tkVide();
+};
+/* si toutes les vignettes ont disparu (images pas encore poussées) : le dire */
+window._tkVide = function(){
+  const g = document.getElementById('tkImgGrille');
+  if (g && !g.querySelector('.tk-vign') && !g.querySelector('.tk-autre') && !g.querySelector('.tk-rien'))
+    g.innerHTML = '<p class="tk-rien">Aucune image de cette catégorie n\'est présente dans '
+      + 'le dépôt pour l\'instant.</p>';
+};
+window._tkOuvrir = function(){
+  const t = bmSelTok();
+  if (!t) { bmStatus('Choisis d\'abord un pion sur la carte.'); return; }
+  document.getElementById('tkImgNom').textContent = t.nom || '';
+  const apercu = document.getElementById('tkImgActuelle');
+  apercu.innerHTML = t.img
+    ? '<img src="' + t.img + '" alt="" onerror="this.remove()">'
+    : '<span>' + (typeof bmInitiales === 'function' ? bmInitiales(t.nom) : '?') + '</span>';
+  document.getElementById('tkImgOv').style.display = 'flex';
+  window._tkOnglet(window._tkCat || 'classe');
+};
+window._tkFermer = function(){ document.getElementById('tkImgOv').style.display = 'none'; };
+window._tkChoisir = function(url){
+  const t = bmSelTok(); if (!t) return;
+  t.img = url || '';
+  if (typeof bm !== 'undefined' && bm.tokImgs) bm.tokImgs.delete(t.id);   /* vide le cache d'image */
+  bmSave(); bmRender();
+  window._tkFermer();
+  bmStatus(url ? 'Image du pion « ' + t.nom + ' » mise à jour.'
+                : 'Pion « ' + t.nom + ' » : retour aux initiales.');
+};
+window._tkUrl = function(){
+  const t = bmSelTok(); if (!t) return;
+  const u = prompt('Adresse de l\'image (assets/… ou https://…)', t.img || 'assets/');
+  if (u === null) return;
+  window._tkChoisir(u.trim());
+};
+
 window._bmTokSize = function(d){ const t = bmSelTok(); if (!t) return; t.taille = Math.max(0.5, Math.min(4, t.taille + d * 0.5)); bmSave(); bmRender(); };
 window._bmTokColor = function(){ const t = bmSelTok(); if (!t) return; t.couleur = BM_COULEURS[(BM_COULEURS.indexOf(t.couleur) + 1) % BM_COULEURS.length]; bmSave(); bmRender(); };
 function bmInitRender(){
@@ -13694,6 +13802,37 @@ html .cc-pastille { color:var(--v-txt); background:rgba(var(--v-or),0.16); borde
 .cc-btn { margin-left:6px; padding:0 5px; font-size:0.7rem; cursor:pointer; border-radius:5px;
   border:1px solid rgba(var(--v-or),0.4); background:rgba(var(--v-noir),0.5); color:var(--v-titre); opacity:0.55; }
 .cc-btn:hover { opacity:1; background:rgba(var(--v-or),0.28); }
+
+/* ═══ V2.33 — galerie d'images de pion ═══ */
+.tk-boite { width:min(720px,96vw); }
+.tk-tete { display:flex; gap:14px; align-items:flex-start; margin-bottom:10px; }
+.tk-actuelle { flex:0 0 auto; width:66px; height:66px; border-radius:50%; overflow:hidden;
+  display:grid; place-items:center; background:rgba(var(--v-noir),0.6);
+  border:2px solid rgba(var(--v-or),0.6); font-family:var(--font-title); color:var(--v-titre); }
+.tk-actuelle img { width:100%; height:100%; object-fit:cover; }
+.tk-onglets { display:flex; flex-wrap:wrap; gap:6px; }
+.tk-onglets button { padding:6px 12px; border-radius:8px; cursor:pointer; font-family:var(--font-title);
+  font-size:0.76rem; border:1px solid rgba(var(--v-or),0.4);
+  background:rgba(var(--v-noir),0.5); color:var(--v-txt); }
+.tk-onglets button.on { background:var(--gold-fond); color:#fff; border-color:var(--gold-fond); }
+.tk-rech { width:100%; margin-bottom:10px; padding:7px 10px; border-radius:8px;
+  border:1px solid rgba(var(--v-or),0.35); background:rgba(var(--v-noir),0.55); color:var(--v-txt); }
+.tk-grille { display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:9px;
+  max-height:52vh; overflow:auto; padding:2px; }
+.tk-vign { padding:0; border:none; background:none; cursor:pointer; display:flex;
+  flex-direction:column; align-items:center; gap:3px; }
+.tk-vign img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px;
+  border:2px solid rgba(var(--v-or),0.35); transition:border-color .15s, transform .15s; }
+.tk-vign:hover img { border-color:var(--v-titre); transform:translateY(-2px); }
+.tk-vign span { font-size:0.66rem; color:var(--v-txt-b); text-align:center; line-height:1.1;
+  max-width:88px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.tk-autre { grid-column:1/-1; display:flex; flex-direction:column; gap:8px; }
+.tk-b { padding:11px 14px; border-radius:10px; cursor:pointer; font-family:var(--font-title);
+  font-size:0.85rem; border:1px solid rgba(var(--v-or),0.45);
+  background:rgba(var(--v-noir),0.55); color:var(--v-txt); text-align:left; }
+.tk-b:hover { background:rgba(var(--v-or),0.24); }
+.tk-rien { grid-column:1/-1; font-style:italic; color:var(--v-txt-c); font-size:0.88rem;
+  text-align:center; padding:18px 6px; }
 .spell-known-item.not-prepared { opacity:0.55; }
 .spell-known-item.not-prepared .spell-known-main strong::after { content:' · non préparé'; font-size:0.68rem; font-style:italic; color:#a8967e; }
 .grim-open-btn { background:rgba(150,110,40,0.18); border-color:rgba(150,110,40,0.4); }
@@ -17867,6 +18006,7 @@ html[data-theme="arcadie"] {
       <button onclick="window._bmTokHide()" id="bmHideBtn" title="Invisible des joueurs en projection">Cacher</button>
       <button onclick="window._bmTokJoin()" title="Faire entrer ce pion dans le combat (fiche du bestiaire si le nom correspond)">Au combat</button>
       <button onclick="window._bmTokFlee()" title="Retirer ce combattant du combat">Fuite</button>
+      <button onclick="window._tkOuvrir()" title="Choisir l'image du pion : classes, historiques, espèces, bestiaire">🖼 Image</button>
       <button onclick="window._bmTokDel()">Retirer</button>
     </div>
   </div>
@@ -18023,6 +18163,25 @@ html[data-theme="arcadie"] {
         <button class="sc-b sc-b-neutre" onclick="window._scFermerEnvoi()">Fermer</button>
         <button id="scEnvoyer" class="sc-b sc-b-go" onclick="window._scEnvoyer()">Envoyer</button>
       </div>
+    </div></div>
+    <!-- ═══ V2.33 — galerie d'images de pion ═══ -->
+    <div id="tkImgOv" class="sc-ov"><div class="sc-boite tk-boite">
+      <div class="sc-titre">🖼 Image du pion — <span id="tkImgNom"></span></div>
+      <div class="tk-tete">
+        <div id="tkImgActuelle" class="tk-actuelle"></div>
+        <div id="tkImgOnglets" class="tk-onglets">
+          <button data-cat="classe" class="on" onclick="window._tkOnglet('classe')">Classes</button>
+          <button data-cat="historique" onclick="window._tkOnglet('historique')">Historiques</button>
+          <button data-cat="espece" onclick="window._tkOnglet('espece')">Espèces</button>
+          <button data-cat="bestiaire" onclick="window._tkOnglet('bestiaire')">Bestiaire</button>
+          <button data-cat="autre" onclick="window._tkOnglet('autre')">Autre</button>
+        </div>
+      </div>
+      <input id="tkImgRech" class="tk-rech" type="search" placeholder="Rechercher…"
+             oninput="window._tkOnglet(window._tkCat)" style="display:none">
+      <div id="tkImgGrille" class="tk-grille"></div>
+      <div class="sc-pied"><button class="sc-b sc-b-neutre" style="flex:1"
+        onclick="window._tkFermer()">Fermer</button></div>
     </div></div>
     <div id="ccFin" class="sc-ov"><div class="sc-boite sc-boite-recu">
       <div id="ccFinCorps"></div>
