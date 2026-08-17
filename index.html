@@ -12434,11 +12434,18 @@ function bmTokCtlPos(){
 /* ── interactions ── */
 function bmInitCanvas(){
   const cv = document.getElementById('bmCanvas'); if (!cv) return;
+  /* V2.27 — correction du décalage souris, calibrée par appareil */
+  bm.sourisCal = (() => {
+    try { const c = JSON.parse(localStorage.getItem('kubbnd-souriscal'));
+      if (c && isFinite(c.dx) && isFinite(c.dy)) return c; } catch(_){}
+    return { dx: 0, dy: 0 };
+  })();
   const pos = e => {
     const b = cv.getBoundingClientRect();
     const lw = cv.width / bmDPR(), lh = cv.height / bmDPR();
     const fx = b.width ? lw / b.width : 1, fy = b.height ? lh / b.height : 1;
-    return { sx: (e.clientX - b.left) * fx, sy: (e.clientY - b.top) * fy };
+    return { sx: (e.clientX + bm.sourisCal.dx - b.left) * fx,
+             sy: (e.clientY + bm.sourisCal.dy - b.top) * fy };
   };
   const toMap = p => ({ x: (p.sx - bm.view.x) / bm.view.k, y: (p.sy - bm.view.y) / bm.view.k });
   cv.addEventListener('pointerdown', e => {
@@ -12645,6 +12652,210 @@ function bmInitCanvas(){
     const split = document.createElement('div'); split.id = 'gmSplit';
     carte.parentNode.insertBefore(split, carte);
     split.appendChild(carte); split.appendChild(combat);
+  })();
+
+  /* ═══ V2.27 — calibration du décalage souris ═══ */
+  window._bmCalibSouris = function(){
+    const anciens = { dx: bm.sourisCal.dx, dy: bm.sourisCal.dy };
+    bm.sourisCal = { dx: 0, dy: 0 };                    /* mesurer à nu */
+    const ov = document.createElement('div');
+    ov.id = 'bmCalOv';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(8,5,2,0.93);cursor:crosshair';
+    ov.innerHTML = '<div style="position:fixed;top:26px;left:50%;transform:translateX(-50%);'
+      + 'color:#f4dfa4;font-family:\'Crimson Pro\',serif;font-size:1.05rem;text-align:center;max-width:520px">'
+      + 'Clique très précisément sur le centre de chaque croix,<br><b>avec le curseur tel que tu le vois à l\'écran</b>.'
+      + '<br><span style="opacity:0.75">Échap pour annuler.</span></div>';
+    const croix = document.createElement('div');
+    croix.style.cssText = 'position:fixed;width:46px;height:46px;pointer-events:none';
+    croix.innerHTML = '<svg width="46" height="46">'
+      + '<line x1="23" y1="0" x2="23" y2="46" stroke="#ffd66e" stroke-width="1.6"/>'
+      + '<line x1="0" y1="23" x2="46" y2="23" stroke="#ffd66e" stroke-width="1.6"/>'
+      + '<circle cx="23" cy="23" r="10" fill="none" stroke="#ffd66e" stroke-width="1.4"/></svg>';
+    ov.appendChild(croix);
+    const cibles = [[0.30, 0.35], [0.70, 0.65]];
+    const ecarts = [];
+    let i = 0;
+    const place = () => {
+      croix.style.left = (innerWidth  * cibles[i][0] - 23) + 'px';
+      croix.style.top  = (innerHeight * cibles[i][1] - 23) + 'px';
+    };
+    place();
+    const finir = (garde) => { document.removeEventListener('keydown', esc); ov.remove();
+      if (!garde) bm.sourisCal = anciens; };
+    const esc = (e) => { if (e.key === 'Escape') finir(false); };
+    document.addEventListener('keydown', esc);
+    ov.addEventListener('pointerdown', (e) => {
+      ecarts.push({ dx: innerWidth * cibles[i][0] - e.clientX,
+                    dy: innerHeight * cibles[i][1] - e.clientY });
+      i++;
+      if (i < cibles.length) { place(); return; }
+      const dx = ecarts.reduce((a, c) => a + c.dx, 0) / ecarts.length;
+      const dy = ecarts.reduce((a, c) => a + c.dy, 0) / ecarts.length;
+      if (Math.hypot(dx, dy) < 1.5) {
+        bm.sourisCal = { dx: 0, dy: 0 };
+        try { localStorage.removeItem('kubbnd-souriscal'); } catch(_){}
+        bmStatus('Souris : aucun décalage mesurable — correction remise à zéro.');
+      } else {
+        bm.sourisCal = { dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10 };
+        try { localStorage.setItem('kubbnd-souriscal', JSON.stringify(bm.sourisCal)); } catch(_){}
+        bmStatus('Souris calibrée pour cet appareil : ' + bm.sourisCal.dx + ' px / '
+          + bm.sourisCal.dy + ' px appliqués aux clics sur la carte.');
+      }
+      finir(true);
+    });
+    document.body.appendChild(ov);
+  };
+
+  /* ═══ V2.27 — largeur de la colonne combat réglable ═══ */
+  (function(){
+    const split = document.getElementById('gmSplit');
+    if (!split || document.getElementById('gmSplitPoignee')) return;
+    const setCols = (w) => { split.style.gridTemplateColumns = 'minmax(0,1fr) 8px ' + w + 'px'; };
+    let w0 = parseInt(localStorage.getItem('kubbnd-gm-col'), 10);
+    if (!(w0 >= 280 && w0 <= 640)) w0 = 380;
+    const pg = document.createElement('div');
+    pg.id = 'gmSplitPoignee';
+    pg.title = 'Glisser pour régler la largeur de la colonne combat';
+    split.insertBefore(pg, split.lastElementChild);
+    setCols(w0);
+    let d0 = null;
+    pg.addEventListener('pointerdown', e => {
+      pg.setPointerCapture(e.pointerId);
+      d0 = { x: e.clientX, w: split.lastElementChild.getBoundingClientRect().width };
+    });
+    pg.addEventListener('pointermove', e => {
+      if (!d0) return;
+      setCols(Math.max(280, Math.min(640, d0.w - (e.clientX - d0.x))));
+    });
+    const lache = () => {
+      if (!d0) return; d0 = null;
+      const w = Math.round(split.lastElementChild.getBoundingClientRect().width);
+      try { localStorage.setItem('kubbnd-gm-col', w); } catch(_){}
+    };
+    pg.addEventListener('pointerup', lache);
+    pg.addEventListener('pointercancel', lache);
+  })();
+
+  /* ═══ V2.27 — hauteur de la carte réglable ═══ */
+  (function(){
+    const wrap = document.getElementById('bmCanvasWrap');
+    if (!wrap || document.getElementById('bmHPoignee')) return;
+    const h0 = parseInt(localStorage.getItem('kubbnd-gm-carteh'), 10);
+    if (h0 >= 300 && h0 <= 1200) wrap.style.height = h0 + 'px';
+    const pg = document.createElement('div');
+    pg.id = 'bmHPoignee';
+    pg.title = 'Glisser pour régler la hauteur de la carte';
+    wrap.insertAdjacentElement('afterend', pg);
+    let d0 = null;
+    pg.addEventListener('pointerdown', e => {
+      pg.setPointerCapture(e.pointerId);
+      d0 = { y: e.clientY, h: wrap.getBoundingClientRect().height };
+    });
+    pg.addEventListener('pointermove', e => {
+      if (!d0) return;
+      wrap.style.height = Math.max(300, Math.min(1200, d0.h + (e.clientY - d0.y))) + 'px';
+    });
+    const lache = () => {
+      if (!d0) return; d0 = null;
+      try { localStorage.setItem('kubbnd-gm-carteh', parseInt(wrap.style.height, 10)); } catch(_){}
+    };
+    pg.addEventListener('pointerup', lache);
+    pg.addEventListener('pointercancel', lache);
+  })();
+
+  /* ═══ V2.27 — réagencement des sections de l'écran MJ ═══ */
+  (function(){
+    const tab = document.getElementById('tab-gm');
+    if (!tab || document.getElementById('gmAgence')) return;
+    const CLES = [
+      ['ambiances', '.amb-wrap',  "🎵 Régisseur d'ambiances"],
+      ['carte',     '#gmSplit',   '🗺 Carte & combat'],
+      ['journal',   '.jn-wrap',   '📖 Journal de session'],
+      ['moniteur',  '#gmMonitor', '🧿 Moniteur de groupe'],
+    ];
+    const el = k => { const d = CLES.find(c => c[0] === k); return d && tab.querySelector(d[1]); };
+    let ordre = (() => {
+      try { const o = JSON.parse(localStorage.getItem('kubbnd-gm-ordre'));
+        if (Array.isArray(o)) {
+          const connus = o.filter(k => CLES.some(c => c[0] === k));
+          CLES.forEach(c => { if (!connus.includes(c[0])) connus.push(c[0]); });
+          return connus;
+        } } catch(_){}
+      return CLES.map(c => c[0]);
+    })();
+    const plis = (() => {
+      try { const p = JSON.parse(localStorage.getItem('kubbnd-gm-plis'));
+        if (Array.isArray(p)) return new Set(p); } catch(_){}
+      return new Set();
+    })();
+    const garde = () => {
+      try {
+        localStorage.setItem('kubbnd-gm-ordre', JSON.stringify(ordre));
+        localStorage.setItem('kubbnd-gm-plis', JSON.stringify(Array.from(plis)));
+      } catch(_){}
+    };
+    /* pivot : la position d'origine de la première section gérée */
+    const premier = el(CLES[0][0]) || el('carte');
+    if (!premier) return;
+    const pivot = document.createComment('gm-ordre');
+    premier.parentNode.insertBefore(pivot, premier);
+    const barre = document.createElement('div');
+    barre.id = 'gmAgence';
+    barre.innerHTML = '<button class="bm-btn" id="gmAgenceBtn">🧩 Réagencer l\'écran</button>'
+      + '<button class="bm-btn" id="gmAgenceReset" style="display:none">↺ Disposition par défaut</button>';
+    pivot.parentNode.insertBefore(barre, pivot);
+    const applique = () => {
+      let prev = pivot;
+      for (const k of ordre) {
+        const e2 = el(k);
+        if (!e2) continue;
+        prev.after(e2);
+        prev = e2;
+        e2.classList.toggle('gm-plie', plis.has(k));
+        let pg = e2.querySelector(':scope > .gm-poignee');
+        if (!pg) {
+          pg = document.createElement('div');
+          pg.className = 'gm-poignee';
+          e2.insertBefore(pg, e2.firstChild);
+        }
+        const lib = CLES.find(c => c[0] === k)[2];
+        pg.innerHTML = '<span class="gm-pg-nom">' + lib + (plis.has(k) ? ' <i>(replié — cliquer pour rouvrir)</i>' : '') + '</span>'
+          + '<span class="gm-pg-btns">'
+          + '<button data-k="' + k + '" data-a="haut" title="Monter">▲</button>'
+          + '<button data-k="' + k + '" data-a="bas" title="Descendre">▼</button>'
+          + '<button data-k="' + k + '" data-a="pli" title="Replier / déplier">' + (plis.has(k) ? '🗖' : '🗕') + '</button>'
+          + '</span>';
+        pg.querySelectorAll('button').forEach(b => b.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const kk = b.dataset.k, a = b.dataset.a, ix = ordre.indexOf(kk);
+          if (a === 'haut' && ix > 0) { ordre.splice(ix, 1); ordre.splice(ix - 1, 0, kk); }
+          else if (a === 'bas' && ix < ordre.length - 1) { ordre.splice(ix, 1); ordre.splice(ix + 1, 0, kk); }
+          else if (a === 'pli') { if (plis.has(kk)) plis.delete(kk); else plis.add(kk); }
+          garde(); applique();
+        }));
+        pg.addEventListener('click', () => {          /* barre repliée = rouvrir */
+          if (plis.has(k)) { plis.delete(k); garde(); applique(); }
+        });
+      }
+      try { if (typeof bmRender === 'function') bmRender(); } catch(_){}
+    };
+    document.getElementById('gmAgenceBtn').addEventListener('click', () => {
+      const actif = tab.classList.toggle('gm-edition');
+      document.getElementById('gmAgenceReset').style.display = actif ? '' : 'none';
+    });
+    document.getElementById('gmAgenceReset').addEventListener('click', () => {
+      try {
+        ['kubbnd-gm-ordre', 'kubbnd-gm-plis', 'kubbnd-gm-col', 'kubbnd-gm-carteh']
+          .forEach(k => localStorage.removeItem(k));
+      } catch(_){}
+      ordre = CLES.map(c => c[0]); plis.clear();
+      const split = document.getElementById('gmSplit');
+      if (split) split.style.gridTemplateColumns = 'minmax(0,1fr) 8px 380px';
+      const wrapC = document.getElementById('bmCanvasWrap');
+      if (wrapC) wrapC.style.height = '';
+      applique();
+    });
+    applique();
   })();
 
   /* ═══ V2.25 — barre d'actions de la carte, personnalisable ═══ */
@@ -14920,6 +15131,31 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
   border:1px solid rgba(var(--v-or),0.45); background:rgba(var(--v-noir),0.35); color:var(--v-txt); }
 .sous-nav-btn:hover { background:rgba(var(--v-or),0.22); }
 .sous-nav-btn.sn-actif { background:var(--gold-fond); color:#fff; border-color:var(--gold-fond); }
+
+/* ═══ V2.27 — calibration souris & réagencement de l'écran MJ ═══ */
+#gmSplitPoignee { cursor:col-resize; border-radius:4px; align-self:stretch;
+  background:rgba(var(--v-or),0.22); transition:background .15s; touch-action:none; }
+#gmSplitPoignee:hover { background:rgba(var(--v-or),0.5); }
+#bmHPoignee { height:8px; width:130px; margin:6px auto 0; border-radius:4px;
+  background:rgba(var(--v-or),0.22); cursor:row-resize; transition:background .15s; touch-action:none; }
+#bmHPoignee:hover { background:rgba(var(--v-or),0.5); }
+@media (max-width:1180px){ #gmSplitPoignee { display:none; } }
+#gmAgence { display:flex; gap:8px; margin:14px 0 0; }
+.gm-poignee { display:none; align-items:center; justify-content:space-between; gap:10px;
+  margin:0 0 8px; padding:6px 10px; border-radius:8px; cursor:default;
+  background:rgba(var(--v-or),0.14); border:1px dashed rgba(var(--v-or),0.55);
+  font-family:var(--font-title); font-size:0.78rem; letter-spacing:0.05em; color:var(--v-titre); }
+#tab-gm.gm-edition .gm-poignee { display:flex; }
+.gm-plie > .gm-poignee { display:flex; cursor:pointer; }
+.gm-plie > *:not(.gm-poignee) { display:none !important; }
+.gm-poignee .gm-pg-btns button { margin-left:4px; padding:2px 8px; border-radius:6px; cursor:pointer;
+  border:1px solid rgba(var(--v-or),0.5); background:rgba(var(--v-noir),0.5); color:var(--v-titre); }
+.gm-poignee .gm-pg-btns button:hover { background:rgba(var(--v-or),0.35); }
+.gm-poignee i { opacity:0.7; font-style:italic; }
+#gmSplit > .gm-poignee { grid-column:1 / -1; }
+#tab-gm.gm-edition .amb-wrap, #tab-gm.gm-edition #gmSplit,
+#tab-gm.gm-edition .jn-wrap, #tab-gm.gm-edition #gmMonitor
+  { outline:1px dashed rgba(var(--v-or),0.45); outline-offset:4px; border-radius:12px; }
 #bmCanvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
 #bmCanvas.fog { cursor:crosshair; }
 #bmCanvas.dragging { cursor:grabbing; }
@@ -17160,7 +17396,7 @@ html[data-theme="arcadie"] {
       <button class="bm-btn" onclick="window._ambSinkPick()" title="Choisir la sortie audio (télé HDMI) pour musiques, nappes et bruitages">Sortie audio</button>
       <select id="ambSinkSel" class="bm-sel" style="display:none;min-width:120px;max-width:170px"
         onchange="localStorage.setItem('kubbnd_sink', this.value); (window._ambAllAudio||[]).forEach(a=>a.setSinkId&&a.setSinkId(this.value||'').catch(()=>{}));"></select>
-      <button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">Guide</button>
+      <button class="bm-btn" onclick="window._bmCalibSouris()" title="Corriger un décalage entre le curseur affiché et le point de clic (mémorisé pour cet appareil)">🖱 Calibrer</button><button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">Guide</button>
     </div>
   </div>
   <div class="bm-canvas-wrap" id="bmCanvasWrap"><div id="bmInitBar"></div>
