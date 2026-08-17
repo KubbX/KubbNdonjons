@@ -2271,12 +2271,38 @@ onAuthStateChanged(auth, user => {
 // ============================================================
 // NAVIGATION
 // ============================================================
+/* ═══ V2.26 — trois familles, sous-menus, accès MJ réservé ═══ */
+const SOUS_NAV = {
+  'tab-list':       [['🦸 Mes héros','tab-list'], ['📜 Fiche','tab-sheet']],
+  'tab-sheet':      'tab-list',
+  'tab-compendium': [['📖 Consulter','tab-compendium'], ['✎ Éditer','tab-editor']],
+  'tab-editor':     'tab-compendium',
+  'tab-groups':     [['🫂 Groupes','tab-groups'], ['🗺 Maître du jeu','tab-gm']],
+  'tab-gm':         'tab-groups',
+};
+window._sousNavMaj = (tabId) => {
+  let def = SOUS_NAV[tabId];
+  if (typeof def === 'string') def = SOUS_NAV[def];
+  const tab = document.getElementById(tabId);
+  if (!def || !tab) return;
+  let bar = tab.querySelector(':scope > .sous-nav');
+  if (!bar) { bar = document.createElement('div'); bar.className = 'sous-nav'; tab.insertBefore(bar, tab.firstChild); }
+  bar.innerHTML = def
+    .filter(p => p[1] !== 'tab-gm' || !window._estMJ || window._estMJ())
+    .map(p => '<button class="sous-nav-btn' + (p[1] === tabId ? ' sn-actif' : '')
+            + '" onclick="_showTab(\'' + p[1] + '\')">' + p[0] + '</button>').join('');
+};
 window._showTab = (tabId) => {
+  if (tabId === 'tab-gm' && window._estMJ && !window._estMJ()) tabId = 'tab-groups';
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('nav-active'));
-  const map = {'tab-list':'navList','tab-sheet':'navSheet','tab-gm':'navGM','tab-compendium':'navCompendium','tab-editor':'navEditor','tab-groups':'navGroups'};
-  if(map[tabId]) document.getElementById(map[tabId]).classList.add('nav-active');
+  const map = {'tab-list':'navFiches','tab-sheet':'navFiches',
+               'tab-compendium':'navCompendium','tab-editor':'navCompendium',
+               'tab-gm':'navCampagne','tab-groups':'navCampagne'};
+  const nb = map[tabId] && document.getElementById(map[tabId]);
+  if (nb) nb.classList.add('nav-active');
+  window._sousNavMaj(tabId);
   if(tabId === 'tab-compendium') {
     const catsEl = document.getElementById('compCats');
     if (catsEl && !catsEl.children.length) {
@@ -5915,8 +5941,16 @@ function loadGroups(){
       e=>console.warn('[groups mem]',e)));
   }
 }
+/* V2.26 : légitime sur l'écran MJ = créateur d'un groupe, ou aucun groupe
+   (solo). Membre des groupes des autres seulement -> pas d'écran MJ. */
+window._estMJ = () => {
+  const g = window._currentGroups || [];
+  return g.length === 0 || g.some(x => x.gmUid === currentUid);
+};
 function mergeGroups(){
   const m=Object.assign({}, _grpMem, _grpGm);
+  setTimeout(() => { const a = document.querySelector('.tab-content.active');
+    if (a && window._sousNavMaj) window._sousNavMaj(a.id); }, 0);
   window._currentGroups = Object.values(m).sort((a,b)=>(a.name||'').localeCompare(b.name||'','fr'));
   renderGroups();
 }
@@ -7252,22 +7286,30 @@ async function seedCompendiumIfNeeded() {
   }
   if (snap && snap.exists()) { compendiumSeeded = true; return; }
 
-  // Seed toutes les catégories avec des documents nommés
-  const promises = [];
+  /* V2.24 : seed incrémental — on lit les IDs déjà présents et on ne pousse
+     que les manquants, par vagues de 250 écritures. Un seed interrompu se
+     termine au chargement suivant au lieu de tout réécrire (et d'échouer). */
   for (const [catId, items] of Object.entries(COMPENDIUM_DATA)) {
-    for (const item of items) {
-      const docId = makeDocId(item.name, true);
-      const ref = doc(db, colName(catId), docId);
-      promises.push(setDoc(ref, {
-        ...item,
-        type: catId,
-        owner: "system",
-        source: item.source || "PHB",
-        createdAt: new Date().toISOString()
-      }, { merge: false }));
+    if (!items || !items.length) continue;
+    const dejaLa = new Set();
+    try {
+      (await getDocs(collection(db, colName(catId)))).forEach(d => dejaLa.add(d.id));
+    } catch (e) { console.warn('[comp] lecture ' + catId + ':', e); }
+    const manquants = items.filter(it => !dejaLa.has(makeDocId(it.name, true)));
+    if (!manquants.length) { console.info('[comp] ' + catId + ' : complet (' + items.length + ')'); continue; }
+    console.info('[comp] ' + catId + ' : ' + manquants.length + ' entrées à pousser');
+    for (let i = 0; i < manquants.length; i += 250) {
+      await Promise.all(manquants.slice(i, i + 250).map(item =>
+        setDoc(doc(db, colName(catId), makeDocId(item.name, true)), {
+          ...item,
+          type: catId,
+          owner: "system",
+          source: item.source || "PHB",
+          createdAt: new Date().toISOString()
+        }, { merge: false })));
+      console.info('[comp] ' + catId + ' : ' + Math.min(i + 250, manquants.length) + '/' + manquants.length);
     }
   }
-  await Promise.all(promises);
   await setDoc(doc(db, "meta", "compendium_seeded_v3"), { seeded: true, date: new Date().toISOString() });
   compendiumSeeded = true;
 }
@@ -7278,7 +7320,9 @@ function loadCompendium() {
   compendiumUnsubscribes = [];
   compendiumResources = [];
 
-  seedCompendiumIfNeeded().then(() => {
+  /* V2.24 : les abonnements ne dépendent plus du succès du seed —
+     l'onglet affiche ce qui existe, le seed complète en tâche de fond. */
+  const _compAttache = () => {
     // Un onSnapshot par collection/catégorie
     for (const cat of COMPENDIUM_CATEGORIES) {
       const colRef = collection(db, colName(cat.id));
@@ -7300,14 +7344,25 @@ function loadCompendium() {
       });
       compendiumUnsubscribes.push(unsub);
     }
+  };
+  _compAttache();
+  seedCompendiumIfNeeded().then(() => {
+    console.info('[comp] seed vérifié/complété');
+    const e = document.getElementById('compErr'); if (e) e.remove();
   }).catch((err) => {
-    console.error('[Firestore] compendium indisponible:', err);
+    console.error('[comp] seed en échec:', err);
     const catsEl = document.getElementById('compCats');
-    if (catsEl && err.code === 'permission-denied' && !document.getElementById('compErr')) {
+    if (catsEl && !document.getElementById('compErr')) {
+      const msg = err && err.code === 'permission-denied'
+        ? 'Firestore refuse l\'écriture pour ce compte — vérifie les règles de sécurité.'
+        : 'La synchronisation des données de base a échoué (' + ((err && err.code) || 'réseau') + ').';
       catsEl.insertAdjacentHTML('afterend',
-        '<p id="compErr" style="color:#e07070;margin:14px 0">Compendium inaccessible : Firestore refuse la lecture pour ce compte. Vérifie les règles de sécurité.</p>');
+        '<p id="compErr" style="color:#e07070;margin:14px 0">' + msg
+        + ' <button class="btn-gold" style="margin-left:8px;padding:4px 10px" '
+        + 'onclick="window._compRetrySeed()">Réessayer</button></p>');
     }
   });
+  window._compRetrySeed = () => { const e = document.getElementById('compErr'); if (e) e.remove(); loadCompendium(); };
 }
 
 async function addCustomResource(category, data) {
@@ -10925,6 +10980,8 @@ const bm = {
   selMulti: [],
   wallDraft: null,
   selGab: null, gabCouleurI: 0, pings: [], _pingRaf: null,
+  annots: [],
+  projZoom: Math.max(0.3, Math.min(4, parseFloat(localStorage.getItem('kubbnd-projzoom')) || 1)),
   imgs: new Map(), tokImgs: new Map(), fogCv: new Map(), fogDirty: new Set(),
   fogMix: null, drag: null, saveT: null, _projScrW: 0,
 };
@@ -11087,10 +11144,11 @@ function bmPing(x, y){
 }
 function bmAnimNecessaire(){
   const m = bmMap();
-  return bm.pings.length > 0 || !!(m && (m.gabarits||[]).some(g => g.effet));
+  return bm.pings.length > 0 || bm.annots.length > 0 || !!(m && (m.gabarits||[]).some(g => g.effet));
 }
 function bmPingLoop(ts){
   bm.pings = bm.pings.filter(p => performance.now() - p.t0 < 2200);
+  bm.annots = bm.annots.filter(a => performance.now() - a.t0 < 5200);
   if (!bm._animT || !ts || (ts - bm._animT) > 32) { bm._animT = ts || 0; bmRender(); }
   if (bmAnimNecessaire() && !document.hidden) bm._pingRaf = requestAnimationFrame(bmPingLoop);
   else bm._pingRaf = null;
@@ -12130,7 +12188,7 @@ function bmScene(ctx, W, H, mode){
   let v = bm.view;
   if (mode === 'player') {
     if (bm.calib.lock && bmCellCss(W)) {
-      const k = bmCellCss(W) / (m.grid.px || 70);
+      const k = (bm.projZoom || 1) * bmCellCss(W) / (m.grid.px || 70);
       const c = bmProjCentre(m);
       const cx = c.x, cy = c.y;
       v = { k, x: W / 2 - cx * k, y: H / 2 - cy * k };
@@ -12256,8 +12314,22 @@ function bmScene(ctx, W, H, mode){
     }
     if (age < 0.9) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 / v.k, 0, 7); ctx.fillStyle = 'rgba(255,224,140,0.95)'; ctx.fill(); }
   }
+  /* V2.25 — annotations éphémères (Maj+glisser), fondu sur 5 s */
+  const _annTous = (bm.drag && bm.drag.kind === 'annot')
+    ? bm.annots.concat([{ pts: bm.drag.pts, t0: null }]) : bm.annots;
+  for (const a of _annTous) {
+    if (!a.pts || a.pts.length < 2) continue;
+    const ageA = a.t0 == null ? 0 : (performance.now() - a.t0) / 5200;
+    if (ageA >= 1) continue;
+    ctx.beginPath();
+    ctx.moveTo(a.pts[0].x, a.pts[0].y);
+    for (let i2 = 1; i2 < a.pts.length; i2++) ctx.lineTo(a.pts[i2].x, a.pts[i2].y);
+    ctx.strokeStyle = 'rgba(255,214,110,' + (0.95 * (1 - ageA)).toFixed(3) + ')';
+    ctx.lineWidth = 3.5 / v.k; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
   if (mode === 'gm' && bm.projOn && bm.calib.lock && bm._projWH && bm._projWH.w) {
-    const kp = bmCellCss(bm._projWH.w) / (m.grid.px || 70);
+    const kp = (bm.projZoom || 1) * bmCellCss(bm._projWH.w) / (m.grid.px || 70);
     if (kp > 0) {
       const rw = bm._projWH.w / kp, rh = bm._projWH.h / kp;
       const c = bmProjCentre(m);
@@ -12373,6 +12445,12 @@ function bmInitCanvas(){
     const m = bmMap(); if (!m) return;
     cv.setPointerCapture(e.pointerId);
     const p = toMap(pos(e));
+    /* V2.25 — souris façon 3D : clic droit = pan, Maj+glisser = annotation */
+    if (e.button === 2) {
+      bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y };
+      cv.classList.add('dragging'); return;
+    }
+    if (e.shiftKey && e.button === 0) { bm.drag = { kind: 'annot', pts: [{ x: p.x, y: p.y }] }; return; }
     if (e.altKey) { bmPing(p.x, p.y); return; }
     if (bm.tool === 'aligner') {
       if (!bm.alignP1) { bm.alignP1 = { x: p.x, y: p.y }; bmStatus('Coin 1 posé — clique maintenant le coin inférieur droit de la même case.'); bmRender(); return; }
@@ -12445,7 +12523,9 @@ function bmInitCanvas(){
         bm.drag = { kind: 'tok', id: t.id,
           groupe: bm.selMulti.map(gid => m.tokens.find(x => x.id === gid)).filter(Boolean)
             .map(gt => ({ id: gt.id, dx: gt.x - p0g.x, dy: gt.y - p0g.y })) }; }
-    else { bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
+    else {
+      if (e.ctrlKey) { bmPing(p.x, p.y); return; }   /* V2.25 : marqueur d'attention */
+      bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
     bmRender();
   });
   let bmHoverT = 0;
@@ -12490,6 +12570,10 @@ function bmInitCanvas(){
       const p = toMap(pos(e));
       const gb = (m.gabarits || []).find(g => g.id === bm.drag.id);
       if (gb) { gb.x = p.x + bm.drag.dx; gb.y = p.y + bm.drag.dy; }
+    } else if (bm.drag.kind === 'annot') {
+      const p = toMap(pos(e));
+      const d = bm.drag.pts[bm.drag.pts.length - 1];
+      if (Math.hypot(p.x - d.x, p.y - d.y) > 3 / bm.view.k) bm.drag.pts.push({ x: p.x, y: p.y });
     } else if (bm.drag.kind === 'fog') {
       bmFogPaint(toMap(pos(e)));
       return; /* bmFogPaint rend déjà */
@@ -12506,6 +12590,10 @@ function bmInitCanvas(){
         t.x = (m.grid.ox||0) + Math.round((t.x - demi - (m.grid.ox||0)) / g) * g + demi;
         t.y = (m.grid.oy||0) + Math.round((t.y - demi - (m.grid.oy||0)) / g) * g + demi;
       }
+    }
+    if (bm.drag && bm.drag.kind === 'annot' && bm.drag.pts.length > 1) {
+      bm.annots.push({ pts: bm.drag.pts, t0: performance.now() });
+      bmAnimKick();
     }
     if (bm.drag && (bm.drag.kind === 'tok' || bm.drag.kind === 'gab' || bm.drag.kind === 'pan')) bmSave();
     if (bm.drag && bm.drag.kind === 'fog') { const mm = bmMap(); if (mm && mm.fog.length > 4000) mm.fog = mm.fog.slice(-4000); bmSave(); }
@@ -12532,6 +12620,13 @@ function bmInitCanvas(){
   cv.addEventListener('wheel', e => {
     const m = bmMap(); if (!m) return;
     e.preventDefault();
+    /* V2.25 : en outil Cadrage, la molette règle la TAILLE de la zone projetée */
+    if (bm.tool === 'cadrage' && bm.calib.lock) {
+      bm.projZoom = Math.max(0.3, Math.min(4, (bm.projZoom || 1) * (e.deltaY < 0 ? 1.08 : 0.926)));
+      try { localStorage.setItem('kubbnd-projzoom', bm.projZoom.toFixed(3)); } catch(_){}
+      bmStatus('Zone projetée : ' + Math.round(bm.projZoom * 100) + ' % du calibrage (molette en outil Cadrage)');
+      bmRender(); return;
+    }
     const p = pos(e);
     const k2 = Math.max(0.12, Math.min(5, bm.view.k * (e.deltaY < 0 ? 1.13 : 0.885)));
     bm.view.x = p.sx - (p.sx - bm.view.x) * (k2 / bm.view.k);
@@ -12540,6 +12635,100 @@ function bmInitCanvas(){
     bmRender();
   }, { passive: false });
   new ResizeObserver(() => bmRender()).observe(cv.parentElement);
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* ═══ V2.25 — écran scindé : le combat en colonne à droite de la carte ═══ */
+  (function(){
+    const carte = document.querySelector('.bm-wrap');
+    const combat = document.getElementById('combatPanel');
+    if (!carte || !combat || document.getElementById('gmSplit')) return;
+    const split = document.createElement('div'); split.id = 'gmSplit';
+    carte.parentNode.insertBefore(split, carte);
+    split.appendChild(carte); split.appendChild(combat);
+  })();
+
+  /* ═══ V2.25 — barre d'actions de la carte, personnalisable ═══ */
+  (function(){
+    const wrap = document.getElementById('bmCanvasWrap');
+    if (!wrap || document.getElementById('bmBar')) return;
+    const ACTES = [
+      ['projeter', '📽', 'Projeter / arrêter', () => { const b = document.getElementById('bmProjBtn'); if (b) b.click(); }],
+      ['rideau',   '🌑', 'Rideau noir (écran joueurs)', () => { if (window._ambBlack) window._ambBlack(); }],
+      ['cadrage',  '🎯', 'Cadrer la zone projetée (glisser · molette = taille)', () => { const b = document.getElementById('bmCadrBtn'); if (b) b.click(); }],
+      ['brouillard','🌫', 'Brouillard : révéler / masquer', () => { const b = document.getElementById('bmFogBtn'); if (b) b.click(); }],
+      ['gabarit',  '✨', 'Poser un gabarit de sort', () => { const b = document.getElementById('bmGabBtn'); if (b) b.click(); }],
+      ['mesure',   '📏', 'Mesure & déplacement', () => { const b = document.getElementById('bmRangeBtn'); if (b) b.click(); }],
+      ['murs',     '🧱', 'Tracer des murs', () => { const b = document.getElementById('bmWallBtn'); if (b) b.click(); }],
+      ['grille',   '▦', 'Grille visible', () => { const b = document.getElementById('bmGridBtn'); if (b) b.click(); }],
+      ['torche',   '🔥', 'Torche sur le pion choisi', () => { const b = document.getElementById('bmTorchBtn'); if (b) b.click(); }],
+      ['cacher',   '🙈', 'Cacher / montrer le pion choisi', () => { const b = document.getElementById('bmHideBtn'); if (b) b.click(); }],
+    ];
+    const lireCfg = () => {
+      try { const c = JSON.parse(localStorage.getItem('kubbnd-bmbar')); if (Array.isArray(c)) return c; } catch(_){}
+      return ACTES.map(a => a[0]);
+    };
+    const bar = document.createElement('div'); bar.id = 'bmBar'; bar.className = 'bm-bar';
+    wrap.appendChild(bar);
+    const cfgP = document.createElement('div'); cfgP.id = 'bmBarCfg'; cfgP.className = 'bm-barcfg';
+    wrap.appendChild(cfgP);
+    function bati(){
+      const actifs = lireCfg();
+      bar.innerHTML = '';
+      for (const [id, emo, titre, fn] of ACTES) {
+        if (!actifs.includes(id)) continue;
+        const b = document.createElement('button');
+        b.title = titre; b.dataset.acte = id;
+        b.innerHTML = '<img src="assets/ui/carte/' + id + '.jpg" alt="" onerror="this.remove()"><span>' + emo + '</span>';
+        b.addEventListener('click', fn);
+        bar.appendChild(b);
+      }
+      const cfgB = document.createElement('button');
+      cfgB.title = 'Personnaliser la barre'; cfgB.innerHTML = '<span>⚙</span>';
+      cfgB.addEventListener('click', () => {
+        if (cfgP.style.display === 'block') { cfgP.style.display = 'none'; return; }
+        const actifs2 = lireCfg();
+        cfgP.innerHTML = '<b>Barre d\'actions</b><br>' + ACTES.map(a =>
+          '<label style="display:block;margin:3px 0"><input type="checkbox" data-id="' + a[0] + '"'
+          + (actifs2.includes(a[0]) ? ' checked' : '') + '> ' + a[1] + ' ' + a[2].split('(')[0] + '</label>').join('');
+        cfgP.style.display = 'block';
+        cfgP.querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+          const sel = Array.from(cfgP.querySelectorAll('input:checked')).map(x => x.dataset.id);
+          try { localStorage.setItem('kubbnd-bmbar', JSON.stringify(sel)); } catch(_){}
+          bati(); cfgP.style.display = 'block';
+        }));
+      });
+      bar.appendChild(cfgB);
+    }
+    bati();
+  })();
+
+  /* ═══ V2.25 — aperçu joueur en direct dans le dock (bas gauche) ═══ */
+  (function(){
+    const prev = document.querySelector('#projDock .proj-preview');
+    if (!prev || document.getElementById('projMini')) return;
+    const mini = document.createElement('canvas');
+    mini.id = 'projMini';
+    mini.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:none;background:#000';
+    prev.appendChild(mini);
+    let derniere = 0;
+    const _rendu0 = bmRender;
+    bmRender = function(){
+      _rendu0.apply(this, arguments);
+      try {
+        const dock = document.getElementById('projDock');
+        if (!dock || dock.classList.contains('proj-collapsed')) return;
+        if (!bm.projOn || !bmMap()) { mini.style.display = 'none'; return; }
+        const now = performance.now();
+        if (now - derniere < 140) return;
+        derniere = now;
+        mini.style.display = 'block';
+        const W2 = prev.clientWidth || 276, H2 = prev.clientHeight || 155;
+        if (mini.width !== W2 || mini.height !== H2) { mini.width = W2; mini.height = H2; }
+        const c2 = mini.getContext('2d');
+        c2.save(); bmScene(c2, W2, H2, 'player'); c2.restore();
+      } catch(e) {}
+    };
+  })();
 }
 let bmLastFog = 0;
 function bmFogPaint(p){
@@ -12576,6 +12765,16 @@ window._bmProjToggle = function(){
     cvs = w.document.createElement('canvas'); cvs.id = 'bmproj';
     cvs.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:55;background:#000;opacity:0;transition:opacity .8s ease;';
     w.document.body.appendChild(cvs);
+    /* V2.24 : la fenêtre projetée anime elle-même son rendu. Elle est
+       visible sur l'écran des joueurs par définition : son rAF ne s'endort
+       jamais, même si la fenêtre MJ est recouverte ou minimisée. */
+    if (!w.document.getElementById('bmpompe')) {
+      const sc = w.document.createElement('script'); sc.id = 'bmpompe';
+      sc.textContent = '(function boucle(){'
+        + 'try { if (window.opener && !window.opener.closed && window.opener.bmProjPump) window.opener.bmProjPump(); } catch(e) {}'
+        + 'requestAnimationFrame(boucle); })();';
+      w.document.body.appendChild(sc);
+    }
     if (!w.document.getElementById('bmfshint')) {
       const goFs = () => { try { const el = w.document.documentElement;
         if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
@@ -12678,6 +12877,14 @@ async function bmRestoreKubbmap(d){
   bmFit(); bmSave(); bmRefreshUI(); bmRender();
   bmStatus('Préparation « ' + map.nom + ' » restaurée : ' + map.tokens.length + ' pions, ' + map.walls.length + ' murs, brouillard et gabarits inclus. Prêt à projeter.');
 }
+/* V2.24 : point d'entrée appelé par la boucle rAF de la fenêtre projetée */
+window.bmProjPump = function(){
+  if (!bm.projOn) return;
+  try { bmProjRender(); } catch(e) {}
+};
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && typeof bmAnimKick === 'function') bmAnimKick();
+});
 function bmProjRender(){
   if (!bm.projOn) return;
   const w = bm._projWin;
@@ -14226,7 +14433,7 @@ em.ok { color:#7fc06a; font-style:normal; }
 .sc-banner { font-family:var(--font-title); font-size:0.7rem; color:var(--gold); letter-spacing:1.5px; text-transform:uppercase; text-align:center; padding:7px 6px 9px; margin:-12px -12px 2px; border-bottom:1px solid rgba(212,180,120,0.3); background:linear-gradient(180deg,rgba(212,180,120,0.10),transparent); }
 
 /* ══ Dock de projection (style OBS) — page MJ ══ */
-.proj-dock { position:fixed; bottom:16px; right:16px; z-index:9000; width:300px; max-width:calc(100vw - 32px); background:linear-gradient(160deg,#1c1c22,#101013); border:1px solid rgba(255,255,255,0.12); border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,0.55); color:#e8e8ec; font-family:'Crimson Pro',serif; overflow:hidden; }
+.proj-dock { position:fixed; bottom:16px; left:16px; right:auto; z-index:9000; width:300px; max-width:calc(100vw - 32px); background:linear-gradient(160deg,#1c1c22,#101013); border:1px solid rgba(255,255,255,0.12); border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,0.55); color:#e8e8ec; font-family:'Crimson Pro',serif; overflow:hidden; }
 .proj-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 12px; cursor:pointer; background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.08); }
 .proj-title { font-family:var(--font-title); font-size:0.76rem; letter-spacing:1px; color:var(--gold); white-space:nowrap; }
 .proj-chevron { color:var(--gold); font-size:0.8rem; transition:transform .2s; }
@@ -14686,6 +14893,33 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 .bm-sep { width:1px; height:22px; background:rgba(185,140,72,0.3); margin:0 2px; }
 .bm-canvas-wrap { position:relative; border-radius:10px; overflow:hidden; border:1px solid rgba(120,90,50,0.5);
   background:#0a0703; height:min(62vh, 640px); }
+
+/* ═══ V2.25 — écran scindé, barre d'actions, dock à gauche ═══ */
+#gmSplit { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:14px; align-items:start; margin-top:18px; }
+#gmSplit > .bm-wrap { margin-top:0; }
+#gmSplit > .combat-panel { position:sticky; top:8px; max-height:calc(100vh - 24px); overflow:auto; margin-bottom:0; }
+@media (max-width:1180px){
+  #gmSplit { display:block; }
+  #gmSplit > .combat-panel { position:static; max-height:none; margin-top:14px; }
+}
+.bm-bar { position:absolute; top:10px; right:10px; display:flex; flex-direction:column; gap:6px; z-index:30; }
+.bm-bar button { position:relative; width:40px; height:40px; border-radius:9px; padding:0; overflow:hidden;
+  border:1px solid rgba(var(--v-or),0.5); background:rgba(var(--v-noir),0.72); color:var(--v-titre);
+  font-size:1.05rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.bm-bar button:hover { background:rgba(var(--v-or),0.3); }
+.bm-bar button img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:8px; }
+.bm-barcfg { position:absolute; top:10px; right:58px; z-index:31; background:rgba(var(--v-noir),0.94);
+  border:1px solid rgba(var(--v-or),0.5); border-radius:10px; padding:10px 12px; color:var(--v-txt);
+  font-family:'Crimson Pro'; font-size:0.85rem; display:none; max-height:70%; overflow:auto; }
+#projMini { border-radius:6px; }
+
+/* ═══ V2.26 — sous-menus des trois familles ═══ */
+.sous-nav { display:flex; gap:8px; margin:0 0 16px; flex-wrap:wrap; }
+.sous-nav-btn { padding:7px 16px; border-radius:8px; cursor:pointer;
+  font-family:var(--font-title); font-size:0.8rem; letter-spacing:0.06em;
+  border:1px solid rgba(var(--v-or),0.45); background:rgba(var(--v-noir),0.35); color:var(--v-txt); }
+.sous-nav-btn:hover { background:rgba(var(--v-or),0.22); }
+.sous-nav-btn.sn-actif { background:var(--gold-fond); color:#fff; border-color:var(--gold-fond); }
 #bmCanvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
 #bmCanvas.fog { cursor:crosshair; }
 #bmCanvas.dragging { cursor:grabbing; }
@@ -16784,12 +17018,9 @@ html[data-theme="arcadie"] {
 <!-- APP -->
 <div id="appScreen" style="display:none">
   <nav>
-    <button id="navList" class="nav-active" onclick="_showTab('tab-list')">MES HÉROS</button>
-    <button id="navSheet" onclick="_showTab('tab-sheet')">FICHE</button>
+    <button id="navFiches" class="nav-active" onclick="_showTab('tab-list')">FICHES</button>
     <button id="navCompendium" onclick="_showTab('tab-compendium')">COMPENDIUM</button>
-    <button id="navGM" onclick="_showTab('tab-gm')">MAÎTRE DU JEU</button>
-    <button id="navGroups" onclick="_showTab('tab-groups')">GROUPES</button>
-    <button id="navEditor" onclick="_showTab('tab-editor')">ÉDITEUR</button>
+    <button id="navCampagne" onclick="_showTab('tab-groups')">CAMPAGNE</button>
     <button id="tourHelpBtn" onclick="window._startTour()" title="Tour guidé de l'application">❔ AIDE</button>
     <button onclick="window._openThemePicker()" title="Changer le thème de couleurs">🎨 THÈME</button>
     <button onclick="_doLogout()">QUITTER</button>
@@ -17843,10 +18074,10 @@ window._mainTourSteps = [
   { sel:'[onclick*="_openGrimoire"]', tab:"tab-sheet", optional:true, title:"Le Grimoire", body:"Apprends et prépare tes sorts par classe et niveau — les sorts de domaine et de serment sont accordés d'office 🔒. Les emplacements se cochent depuis la fiche." },
   { sel:".sheet-section", tab:"tab-sheet", optional:true, title:"Sections modulaires", body:"Inventaire, capacités, dons, familier, attaques… Chaque ➕ pioche dans le compendium, tout est cliquable pour le détail." },
   { sel:"#navCompendium", title:"Le Compendium", body:"La bibliothèque complète : sorts, objets, dons, historiques… et près de 1 000 créatures avec fiches techniques. Filtres par catégorie, tri, recherche instantanée." },
-  { sel:"#navGroups", title:"Les Groupes", body:"Rassemble les personnages de ta table : tout le monde voit les fiches du groupe, ton MJ suit la partie en temps réel." },
-  { sel:"#navEditor", title:"L'Éditeur homebrew", body:"Crée tes propres sorts, objets, monstres ou dons — ils rejoignent le compendium et deviennent utilisables sur les fiches." },
+  { sel:"#navCampagne", title:"Les Groupes", body:"Rassemble les personnages de ta table : tout le monde voit les fiches du groupe, ton MJ suit la partie en temps réel." },
+  { sel:"#navCompendium", title:"L'Éditeur homebrew", body:"Crée tes propres sorts, objets, monstres ou dons — ils rejoignent le compendium et deviennent utilisables sur les fiches." },
   { sel:'[onclick*="_openThemePicker"]', title:"Thèmes & ambiance visuelle", body:"Sept plans d'existence en guise d'habillages : Matériel, Neuf Enfers, Féerie, Gisombre, Mécanus, Plan Astral, Mont Céleste — chacun avec ses effets (braises infernales, lucioles fées, cendre du Gisombre, rouages de Mécanus, étoiles astrales…). L'interrupteur ✨ coupe tout si tu préfères la sobriété." },
-  { sel:"#navGM", title:"L'Écran du Maître", body:"Si tu mènes : tracker de combat, assistant Hibouquin, régisseur d'ambiances sonores, cartes de bataille projetables et journal de session. Son bouton ❓ Guide détaille tout." },
+  { sel:"#navCampagne", title:"L'Écran du Maître", body:"Si tu mènes : tracker de combat, assistant Hibouquin, régisseur d'ambiances sonores, cartes de bataille projetables et journal de session. Son bouton ❓ Guide détaille tout." },
   { center:true, title:"À toi de jouer ! 🎲", body:"Tu connais les fonctionnalités phares. Le ❔ relance ce tour, et chaque écran a ses infobulles. Bonne aventure !" }
 ];
 window._tourI = 0; window._tourDir = 1;
