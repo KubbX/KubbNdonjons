@@ -3879,6 +3879,7 @@ window._selectChar = (id) => {
     window._syncGrantedSpells(snap.id, _d);
     renderCharSheet(snap.id, _d);
     try { window._scRecu(snap.id, _d); } catch(e){ console.warn('[sc]', e); }
+  try { window._ccRecu(snap.id, _d); } catch(e){ console.warn('[cc]', e); }
     try { window._maybeSheetTour && window._maybeSheetTour(); } catch(e){}
   });
   window._showTab('tab-sheet');
@@ -6290,6 +6291,104 @@ window._combatSortByInit = () => {
     if (newIdx >= 0) window._combatState.turnIndex = newIdx;
   }
 };
+/* ═══════════ V2.32 — minuteurs de concentration ═══════════ */
+window._ccParTour = (() => {
+  try { const v = localStorage.getItem('kubbnd-cc-unite'); return v === null ? true : v === 'tour'; }
+  catch(_) { return true; }
+})();
+window._ccBasculeUnite = function(){
+  window._ccParTour = !window._ccParTour;
+  try { localStorage.setItem('kubbnd-cc-unite', window._ccParTour ? 'tour' : 'round'); } catch(_){}
+  if (window._combatState) window._combatState._ccRound = window._combatState.round;
+  window._combatRender();
+};
+/* « Concentration, 10 minutes » -> 600 secondes */
+window._ccDuree = function(txt){
+  const t = String(txt || '').toLowerCase();
+  if (!t.includes('concentration')) return 0;
+  const m = t.match(/(\d+)\s*(round|minute|heure|jour)/);
+  if (!m) return 60;
+  const n = parseInt(m[1], 10);
+  return n * ({ round: 6, minute: 60, heure: 3600, jour: 86400 }[m[2]] || 60);
+};
+window._ccFmt = function(s){
+  s = Math.max(0, Math.round(s));
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
+  return Math.floor(s / 3600) + ' h' + (Math.floor((s % 3600) / 60) ? ' ' + Math.floor((s % 3600) / 60) + ' min' : '');
+};
+/* Avance tous les compteurs de 6 s. Appelé une fois par tour, ou une fois
+   par round selon le réglage. Les PJ vivent dans Firestore (le joueur doit
+   voir son compteur), les créatures dans l'état local du tracker. */
+window._ccAvance = async function(){
+  const cs = window._combatState;
+  if (!cs || !cs.active) return;
+  for (const c of cs.combatants) {
+    if (c.kind === 'monster' && c.conc) {
+      c.conc.ecoule += 6;
+      if (c.conc.ecoule >= c.conc.max) {
+        window._ccAlerteLocale(c.name, c.conc.sort);
+        c.conc = null;
+      }
+    }
+  }
+  const pjs = cs.combatants.filter(c => c.kind === 'pc' && c.refId);
+  for (const c of pjs) {
+    try {
+      const snap = await getDoc(doc(db, 'characters', c.refId));
+      if (!snap.exists()) continue;
+      const d = snap.data();
+      const cc = d.conc;
+      if (!cc || !cc.max) continue;
+      const ecoule = (cc.ecoule || 0) + 6;
+      if (ecoule >= cc.max) {
+        const cond = (d.conditions || []).filter(x => x !== 'concentrating');
+        await updateDoc(doc(db, 'characters', c.refId), {
+          conc: null, conditions: cond, concentratingOn: null,
+          concFin: { sort: cc.sort, ts: new Date().toISOString(),
+                     id: 'cf_' + Math.random().toString(36).slice(2, 8) },
+        });
+      } else {
+        await updateDoc(doc(db, 'characters', c.refId), { 'conc.ecoule': ecoule });
+      }
+    } catch (e) { console.warn('[cc]', c.name, e); }
+  }
+  window._combatRender();
+};
+window._ccAlerteLocale = function(nom, sort){
+  if (typeof bmStatus === 'function') bmStatus('🧠 ' + nom + ' perd sa concentration sur ' + sort + '.');
+  const ov = document.getElementById('ccFin');
+  if (!ov) return;
+  document.getElementById('ccFinCorps').innerHTML =
+    '<div class="sc-de">Concentration rompue</div><div class="sc-sort">' + sort + '</div>'
+    + '<div class="sc-demande">' + nom + ' ne maintient plus le sort.</div>';
+  ov.style.display = 'flex';
+};
+/* pose / retrait à la main sur une créature du tracker */
+window._ccMonstre = function(idx){
+  const c = window._combatState.combatants[idx]; if (!c) return;
+  if (c.conc) { c.conc = null; window._combatRender(); return; }
+  const sort = prompt('Sort maintenu par « ' + c.name +' » ?', 'Concentration');
+  if (sort === null) return;
+  const min = prompt('Durée en minutes (1 = 1 minute, 10 = 10 minutes, 60 = 1 heure)', '1');
+  if (min === null) return;
+  c.conc = { sort: sort || 'Concentration', max: Math.max(6, (parseFloat(min) || 1) * 60), ecoule: 0 };
+  window._combatRender();
+};
+/* le popup de fin, côté joueur : branché sur l'abonnement de la fiche */
+window._ccRecu = function(charId, d){
+  const f = d && d.concFin;
+  const ov = document.getElementById('ccFin');
+  if (!ov) return;
+  if (!f || f.id === window._ccVu) return;
+  window._ccVu = f.id;
+  document.getElementById('ccFinCorps').innerHTML =
+      '<div class="sc-de">Ta concentration prend fin</div>'
+    + '<div class="sc-sort">' + (f.sort || '') + '</div>'
+    + '<div class="sc-demande">La durée du sort est écoulée.</div>';
+  ov.style.display = 'flex';
+};
+
 window._combatNextTurn = () => {
   const cs = window._combatState;
   if (!cs.combatants.length) return;
@@ -6303,6 +6402,11 @@ window._combatNextTurn = () => {
   }
   cs.turnIndex = next;
   window._combatRender();
+  /* V2.32 : 6 s par tour (demandé) ou 6 s par tour de table complet (règle) */
+  if (window._ccParTour) { window._ccAvance(); }
+  else if (cs._ccRound === undefined) { cs._ccRound = cs.round; }   /* pas d'avance parasite
+        au premier tour suivant une bascule : on note le round et on attend le suivant */
+  else if (cs.round !== cs._ccRound) { cs._ccRound = cs.round; window._ccAvance(); }
 };
 
 window._combatRemoveCombatant = (idx) => {
@@ -6405,6 +6509,8 @@ window._combatRender = () => {
       <div class="combat-name-cell">
         ${isActive?'▶ ':''}${c.name}
         <span class="combat-type">${c.kind==='pc'?'⚔ PJ':'👹 Créature'} · ${c.sub||''}</span>
+        ${c.conc ? `<span class="cc-pastille" title="Concentration — ${window._ccFmt(c.conc.max - c.conc.ecoule)} restantes">🧠 ${c.conc.sort} · ${window._ccFmt(c.conc.max - c.conc.ecoule)}</span>` : ''}
+        ${c.kind==='monster' ? `<button class="cc-btn" onclick="event.stopPropagation();window._ccMonstre(${idx})" title="${c.conc?'Retirer la concentration':'Poser une concentration'}">🧠</button>` : ''}
       </div>
       <div class="combat-hp-cell">
         <span class="combat-hp-num"><strong style="color:${hpColor}">${c.hp}</strong>/<span style="color:#888">${c.hpMax}</span></span>
@@ -6427,6 +6533,18 @@ window._combatRender = () => {
 };
 
 function renderGMCard(id, d) {
+  /* V2.32 : le tracker reflète le compteur de concentration de la fiche */
+  try {
+    const cs = window._combatState;
+    if (cs && cs.active) {
+      const c = cs.combatants.find(x => x.kind === 'pc' && x.refId === id);
+      if (c) {
+        const avant = c.conc && c.conc.ecoule;
+        c.conc = d.conc && d.conc.max ? d.conc : null;
+        if ((c.conc && c.conc.ecoule) !== avant) window._combatRender();
+      }
+    }
+  } catch(e) { console.warn('[cc] miroir', e); }
   const monitor = document.getElementById('gmMonitor');
   let card = document.getElementById(`gm_${id}`);
   const isNew = !card;
@@ -6938,6 +7056,9 @@ window._castSpell = async (charId, slotLevel, slotKey, spellName) => {
     if (!conditions.includes('concentrating')) conditions.push('concentrating');
     update.conditions = conditions;
     update.concentratingOn = spellName;
+    /* V2.32 : le minuteur, dont le maximum est la durée du sort */
+    const _dur = window._ccDuree(sp.duration);
+    if (_dur) update.conc = { sort: spellName, max: _dur, ecoule: 0, ts: new Date().toISOString() };
     concMessage = `<div style="color:#9b59b6;font-size:0.88rem;margin-top:8px">🧠 Concentration active sur ${spellName}</div>`;
     if ((d.conditions||[]).includes('concentrating') && d.concentratingOn) {
       concMessage += `<div style="color:#cc4444;font-size:0.82rem">Concentration sur ${d.concentratingOn} perdue</div>`;
@@ -13359,6 +13480,8 @@ function bmRefreshUI(){
   const f = document.getElementById('bmFogBtn');
   if (f) { f.classList.toggle('on', bm.tool === 'fog'); f.textContent = bm.tool === 'fog' ? (bm.fogMode === 'reveal' ? '🌫 Révéler' : '🌫 Masquer') : '🌫 Brouillard'; }
   const wl = document.getElementById('bmWallBtn'); if (wl) wl.classList.toggle('on', bm.showWalls);
+  const ccu = document.getElementById('ccUniteBtn');
+  if (ccu) ccu.textContent = window._ccParTour ? '⏱ 6 s / tour' : '⏱ 6 s / round';
   const pj = document.getElementById('bmProjBtn'); if (pj) { pj.classList.toggle('on', bm.projOn); pj.textContent = bm.projOn ? '📽 Projection ON' : '📽 Projeter'; }
   const wd = document.getElementById('bmWallDraw'); if (wd) wd.classList.toggle('on', bm.tool === 'wall');
   const rg = document.getElementById('bmRangeBtn'); if (rg) rg.classList.toggle('on', bm.tool === 'deplacement');
@@ -13562,6 +13685,15 @@ html.sorts-masquer .spell-level-group:not(:has(.spell-known-item:not(.not-prepar
 .sc-b-ko { border-color:rgba(220,120,100,0.6); color:#f0b0a0; }
 .sc-b-go { background:var(--gold-fond); color:#fff; border-color:var(--gold-fond); }
 .sc-b-neutre { flex:0 0 auto; }
+
+/* ═══ V2.32 — minuteurs de concentration ═══ */
+.cc-pastille { display:inline-block; margin-top:3px; padding:1px 8px; border-radius:9px;
+  font-size:0.7rem; font-family:'Crimson Pro'; background:rgba(155,89,182,0.22);
+  border:1px solid rgba(155,89,182,0.55); color:#d8b6e8; }
+html .cc-pastille { color:var(--v-txt); background:rgba(var(--v-or),0.16); border-color:rgba(var(--v-or),0.45); }
+.cc-btn { margin-left:6px; padding:0 5px; font-size:0.7rem; cursor:pointer; border-radius:5px;
+  border:1px solid rgba(var(--v-or),0.4); background:rgba(var(--v-noir),0.5); color:var(--v-titre); opacity:0.55; }
+.cc-btn:hover { opacity:1; background:rgba(var(--v-or),0.28); }
 .spell-known-item.not-prepared { opacity:0.55; }
 .spell-known-item.not-prepared .spell-known-main strong::after { content:' · non préparé'; font-size:0.68rem; font-style:italic; color:#a8967e; }
 .grim-open-btn { background:rgba(150,110,40,0.18); border-color:rgba(150,110,40,0.4); }
@@ -17861,6 +17993,7 @@ html[data-theme="arcadie"] {
           <button id="combatAddMonsterBtn" class="btn-gm-action" style="display:none" onclick="window._combatOpenMonsterPicker()">+ Créature</button>
           <button id="combatSyncPcsBtn" class="btn-gm-action" style="display:none" onclick="window._combatSyncPcs()">↻ Synchroniser PJ</button>
           <button id="combatNextBtn" class="btn-gm-action" style="display:none" onclick="window._combatNextTurn()">Tour suivant ▶</button>
+          <button id="ccUniteBtn" class="btn-gm-action" onclick="window._ccBasculeUnite()" title="6 s par tour de combattant, ou 6 s par tour de table complet (règle officielle : un round = 6 s)">⏱ 6 s / tour</button>
           <button id="combatEndBtn" class="btn-gm-action dmg" style="display:none" onclick="window._combatEnd()">Terminer</button>
         </div>
       </div>
@@ -17890,6 +18023,11 @@ html[data-theme="arcadie"] {
         <button class="sc-b sc-b-neutre" onclick="window._scFermerEnvoi()">Fermer</button>
         <button id="scEnvoyer" class="sc-b sc-b-go" onclick="window._scEnvoyer()">Envoyer</button>
       </div>
+    </div></div>
+    <div id="ccFin" class="sc-ov"><div class="sc-boite sc-boite-recu">
+      <div id="ccFinCorps"></div>
+      <div class="sc-pied"><button class="sc-b sc-b-neutre" style="flex:1"
+        onclick="document.getElementById('ccFin').style.display='none'">Compris</button></div>
     </div></div>
     <div id="scRecu" class="sc-ov"><div class="sc-boite sc-boite-recu">
       <div id="scRecuCorps"></div>
