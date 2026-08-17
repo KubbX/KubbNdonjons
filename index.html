@@ -2275,7 +2275,7 @@ onAuthStateChanged(auth, user => {
 const SOUS_NAV = {
   'tab-list':       [['🦸 Mes héros','tab-list'], ['📜 Fiche','tab-sheet']],
   'tab-sheet':      'tab-list',
-  'tab-compendium': [['📖 Consulter','tab-compendium'], ['✎ Éditer','tab-editor']],
+  'tab-compendium': [['📖 Consulter','tab-compendium']],
   'tab-editor':     'tab-compendium',
   'tab-groups':     [['🫂 Groupes','tab-groups'], ['🗺 Maître du jeu','tab-gm']],
   'tab-gm':         'tab-groups',
@@ -2291,6 +2291,7 @@ window._sousNavMaj = (tabId) => {
     .filter(p => p[1] !== 'tab-gm' || !window._estMJ || window._estMJ())
     .map(p => '<button class="sous-nav-btn' + (p[1] === tabId ? ' sn-actif' : '')
             + '" onclick="_showTab(\'' + p[1] + '\')">' + p[0] + '</button>').join('');
+  bar.style.display = bar.children.length > 1 ? 'flex' : 'none';
 };
 window._showTab = (tabId) => {
   if (tabId === 'tab-gm' && window._estMJ && !window._estMJ()) tabId = 'tab-groups';
@@ -4725,6 +4726,8 @@ function renderCharSheet(id, d) {
         <div class="spell-view-toggle">
           <button class="svt-btn ${spellView==='apps'?'active':''}" data-v="apps" onclick="window._setSpellView('apps')">▦ Applications</button>
           <button class="svt-btn ${spellView==='list'?'active':''}" data-v="list" onclick="window._setSpellView('list')">☰ Liste</button>
+          ${_dim0 ? `<button class="svt-btn svt-filtre${window._sortsMasquer?' active':''}" onclick="window._toggleSortsPrep()"
+            title="Les sorts connus mais non préparés sont affichés en grisé — ce bouton les masque complètement">${window._sortsMasquer?'👁 Montrer non préparés':'🚫 Masquer non préparés'}</button>` : ''}
         </div>
         <button class="sheet-add-cta" onclick="window._openGrimoire('${id}')"><span class="cta-plus">📖</span> Ouvrir le grimoire</button>
 
@@ -7740,11 +7743,17 @@ function renderCompendiumList(catId) {
   listEl.innerHTML = filtered.map((r) => {
     const isHomebrew = r.owner !== 'system';
     const isSystem = r.owner === 'system';
+    /* V2.28 : l'affichage de l'ancien mode Éditer vit ici — aperçu de la
+       description et marqueur d'exhaustivité */
+    const hasDesc = r.desc && String(r.desc).length > 20;
+    const apercu = hasDesc ? String(r.desc).replace(/</g,'&lt;').substring(0, 90) + '…' : '';
     return `<div class="comp-card" onclick="window._showResourceDetail('${catId}','${r._docId}')">
       <div class="comp-card-main">
         <div class="comp-card-name">${r.name||'?'} ${isHomebrew ? '<span class="comp-homebrew">Homebrew</span>' : ''}${isSystem && r._modified ? '<span class="comp-modified">Modifié</span>' : ''}</div>
         <div class="comp-card-sub">${getResourceSubtitle(catId, r)}</div>
+        ${apercu ? `<div class="comp-card-desc">${apercu}</div>` : ''}
       </div>
+      <span class="comp-etat ${hasDesc ? 'ok' : 'manque'}" title="${hasDesc ? 'Fiche décrite' : 'Description absente'}">${hasDesc ? '✓' : '!'}</span>
       <button class="btn-remove" onclick="event.stopPropagation();deleteResource('${r._docId}')" title="Supprimer">✕</button>
     </div>`;
   }).join('');
@@ -7776,7 +7785,7 @@ window._showResourceDetail = (catId, docId) => {
   let imgHtml = '';
   if (catId === 'monster') {
     const ms = spellSlug(r.name || '');
-    imgHtml = `<div class="rd-bimg-wrap"><img class="rd-bimg" src="assets/bestiaire/${ms}.jpg" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
+    imgHtml = `<div class="rd-bimg-wrap"><img class="rd-bimg" src="assets/bestiaire/${ms}.jpg?v=${window.IMG_VER}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
   }
   let html = `<div class="rd-sheet">${imgHtml}${renderResourceDetail(catId, r)}</div>`;
 
@@ -9025,6 +9034,22 @@ window._setWeaponField = async (charId, index, field, value) => {
 };
 
 // ── Bascule de vue des sorts (Applications / Liste) ──
+/* ═══ V2.29 — filtre des sorts non préparés ═══
+   Porté par <html> pour survivre aux re-rendus de la fiche (Firestore en
+   déclenche un à chaque modification du personnage) et mémorisé. */
+window._sortsMasquer = (() => {
+  try { return localStorage.getItem('kubbnd-sorts-masquer') === '1'; } catch(_) { return false; }
+})();
+document.documentElement.classList.toggle('sorts-masquer', window._sortsMasquer);
+window._toggleSortsPrep = () => {
+  window._sortsMasquer = !window._sortsMasquer;
+  try { localStorage.setItem('kubbnd-sorts-masquer', window._sortsMasquer ? '1' : '0'); } catch(_){}
+  document.documentElement.classList.toggle('sorts-masquer', window._sortsMasquer);
+  document.querySelectorAll('.svt-filtre').forEach(b => {
+    b.classList.toggle('active', window._sortsMasquer);
+    b.textContent = window._sortsMasquer ? '👁 Montrer non préparés' : '🚫 Masquer non préparés';
+  });
+};
 window._setSpellView = (v) => {
   window._spellView = v;
   document.querySelectorAll('[data-spellview]').forEach(el => {
@@ -10359,7 +10384,7 @@ function ambRenderBoards(){
       return `<button class="amb-nappe${aN && !aN.paused ? ' on' : ''}"
         onclick="window._ambNappeToggle('${n.id}')" title="${n.nom}">
         <span class="amb-b-forme">
-          <img src="assets/ambiances/nappes/${sl}.jpg" onerror="this.remove()" alt="">
+          <img src="assets/ambiances/nappes/${sl}.jpg?v=${window.IMG_VER}" onerror="this.remove()" alt="">
           <span class="amb-b-ini">${n.nom.slice(0,2).toUpperCase()}</span>
         </span>
         <span class="amb-b-nom">${n.nom}</span>
@@ -10375,7 +10400,7 @@ function ambRenderBoards(){
       const sl = (typeof spellSlug === 'function') ? spellSlug(o.nom) : '';
       return `<button class="amb-shot" onclick="window._ambShot('${o.id}')" title="${o.nom}">
         <span class="amb-b-forme">
-          <img src="assets/ambiances/sons/${sl}.jpg" onerror="this.remove()" alt="">
+          <img src="assets/ambiances/sons/${sl}.jpg?v=${window.IMG_VER}" onerror="this.remove()" alt="">
           <span class="amb-b-ini">${o.nom.slice(0,2).toUpperCase()}</span>
         </span>
         <span class="amb-b-nom">${o.nom}</span>
@@ -10511,7 +10536,13 @@ function ambSaveScenes(){ localStorage.setItem(AMB_LS, JSON.stringify(amb.scenes
 
 async function ambResolve(src){          // {mode:'url'|'idb', ref} -> URL jouable
   if (!src || !src.ref) return null;
-  if (src.mode === 'url') return src.ref;
+  if (src.mode === 'url') {
+    /* V2.28 : anti-cache sur nos propres assets (jamais sur les URL externes,
+       jamais dans la référence stockée) */
+    if (src.ref.startsWith('assets/') && src.ref.indexOf('?') < 0)
+      return src.ref + '?v=' + window.IMG_VER;
+    return src.ref;
+  }
   if (amb.urls.has(src.ref)) return amb.urls.get(src.ref);
   const blob = await ambGet(src.ref);
   if (!blob) return null;
@@ -10647,7 +10678,7 @@ async function ambRender(){
     const visibles = ambVisibles();
     cont.innerHTML = visibles.map((s,i) =>
       `<button class="amb-scene${s.id===amb.cur?' on':''}" draggable="true" data-id="${s.id}" style="--amb-c:${s.couleur||'#caa258'}" onclick="window._ambActivate('${s.id}')">
-        <span class="amb-scene-vis" id="ambVis_${s.id}"><img class="amb-scene-img" src="assets/ambiances/${s.slug||'_'}.jpg" onerror="this.remove()" alt=""><span class="amb-scene-emo">${(s.nom||'?').slice(0,2).toUpperCase()}</span></span>
+        <span class="amb-scene-vis" id="ambVis_${s.id}"><img class="amb-scene-img" src="assets/ambiances/${s.slug||'_'}.jpg?v=${window.IMG_VER}" onerror="this.remove()" alt=""><span class="amb-scene-emo">${(s.nom||'?').slice(0,2).toUpperCase()}</span></span>
         <span class="amb-scene-name">${(s.nom||'?').replace(/</g,'&lt;')}</span>
         ${i<9?`<span class="amb-scene-key">${i+1}</span>`:''}
       </button>`).join('');
@@ -10897,6 +10928,7 @@ window._ambInstallCatalogue = function(){
   document.body.appendChild(fv);
   /* 'opaque' pour un rush plein cadre (engrenages) : fond assombri au lieu d'additif */
   const FX_VER = '214';   /* V2.14 : bump a chaque remplacement de clip fx */
+  window.IMG_VER = '228'; /* V2.28 : bump a chaque remplacement d'IMAGES (ambiances, bestiaire) */
   /* V2.18 : les matières claires — parchemin, marbre, brume, écorce — composent
      en mode opaque. Le mode screen ajoute de la lumière et exige un fond noir ;
      il ne convient qu'aux matières sombres : laiton, fer noirci, ardoise. */
@@ -11829,7 +11861,16 @@ function bmPath(m, t, cibleCx, cibleCy){
       const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
       const c2 = bmCentreCell(m, nx, ny, demi);
       if (c2.x < -g || c2.y < -g || c2.x > m.w + g || c2.y > m.h + g) continue;
-      if (!bmPasLibre(m, c1.x, c1.y, c2.x, c2.y, segs)) continue;
+      if (dx && dy) {
+        /* V2.28 — règle du coin : le segment direct frôle les sommets de murs
+           (portes, couloirs) et faisait refuser la diagonale -> détour à 2
+           cases (3 m). La diagonale vaut si l'un des deux « L » passe ;
+           elle compte alors 1 case (1,5 m). */
+        const ca = bmCentreCell(m, x + dx, y, demi), cb = bmCentreCell(m, x, y + dy, demi);
+        const L1 = bmPasLibre(m, c1.x, c1.y, ca.x, ca.y, segs) && bmPasLibre(m, ca.x, ca.y, c2.x, c2.y, segs);
+        const L2 = bmPasLibre(m, c1.x, c1.y, cb.x, cb.y, segs) && bmPasLibre(m, cb.x, cb.y, c2.x, c2.y, segs);
+        if (!L1 && !L2 && !bmPasLibre(m, c1.x, c1.y, c2.x, c2.y, segs)) continue;
+      } else if (!bmPasLibre(m, c1.x, c1.y, c2.x, c2.y, segs)) continue;
       const ng = gc + 1 + (dx && dy ? 0.0001 : 0);   /* la diagonale ne sert que si nécessaire */
       if (ng < (gCost.get(k) ?? 1e9)) {
         gCost.set(k, ng);
@@ -12328,6 +12369,13 @@ function bmScene(ctx, W, H, mode){
     ctx.lineWidth = 3.5 / v.k; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.stroke();
   }
+  /* V2.28 — la valeur de mesure est projetée aux joueurs, près de la case visée */
+  if (mode === 'player' && bm.tool === 'deplacement' && bm.hoverInfo && bm.hoverInfo.mx != null) {
+    const bx = v.x + bm.hoverInfo.mx * v.k, by = v.y + bm.hoverInfo.my * v.k;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    bmBulleMesure(ctx, bx, by, bm.hoverInfo.txt, bm.hoverInfo.loin);
+    ctx.setTransform(v.k, 0, 0, v.k, v.x, v.y);
+  }
   if (mode === 'gm' && bm.projOn && bm.calib.lock && bm._projWH && bm._projWH.w) {
     const kp = (bm.projZoom || 1) * bmCellCss(bm._projWH.w) / (m.grid.px || 70);
     if (kp > 0) {
@@ -12399,15 +12447,7 @@ function bmRender(){
   if (bm.tool === 'deplacement' && bm.hoverInfo) {
     const { sx, sy, txt, loin } = bm.hoverInfo;
     ctx.setTransform(bmDPR(), 0, 0, bmDPR(), 0, 0);
-    ctx.font = 'bold 13px sans-serif';
-    const w2 = ctx.measureText(txt).width + 14;
-    ctx.fillStyle = 'rgba(var(--v-noir-c),0.88)';
-    ctx.strokeStyle = loin ? 'rgba(230,90,70,0.9)' : 'rgba(240,200,90,0.8)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(sx + 14, sy - 30, w2, 22, 6); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = loin ? '#f6a08c' : '#f4dfa4';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(txt, sx + 21, sy - 19);
+    bmBulleMesure(ctx, sx, sy, txt, loin);
   }
   bmTokCtlPos();
   bmGabCtlPos();
@@ -12551,7 +12591,7 @@ function bmInitCanvas(){
       const cases = chemin ? chemin.length : null;   /* longueur = nombre de pas, inchangée par le départage */
       const vit = bmVitesse(st);
       bm.hoverInfo = {
-        sx: p0.sx, sy: p0.sy,
+        sx: p0.sx, sy: p0.sy, mx: p.x, my: p.y,
         txt: chemin === null ? '∞ — bloqué par les murs'
            : (cases * BM_CASE_M).toLocaleString('fr-FR') + ' m (' + cases + ' case' + (cases > 1 ? 's' : '') + ')',
         loin: chemin === null || cases * BM_CASE_M > vit,
@@ -13088,6 +13128,20 @@ async function bmRestoreKubbmap(d){
   bmFit(); bmSave(); bmRefreshUI(); bmRender();
   bmStatus('Préparation « ' + map.nom + ' » restaurée : ' + map.tokens.length + ' pions, ' + map.walls.length + ' murs, brouillard et gabarits inclus. Prêt à projeter.');
 }
+/* V2.28 — bulle de mesure : parchemin opaque, encre sombre. L'ancien fond
+   'rgba(var(--v-noir-c),0.88)' était une couleur INVALIDE pour un canvas :
+   l'affectation était ignorée et le fond héritait du dernier fillStyle. */
+function bmBulleMesure(ctx, sx, sy, txt, loin){
+  ctx.font = 'bold 13px sans-serif';
+  const w2 = ctx.measureText(txt).width + 16;
+  ctx.fillStyle = loin ? '#f2d3ca' : '#f4e7c2';
+  ctx.strokeStyle = loin ? '#8c2f24' : '#7a5a1e';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(sx + 14, sy - 31, w2, 24, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = loin ? '#8c2f24' : '#3a2a0c';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(txt, sx + 22, sy - 19);
+}
 /* V2.24 : point d'entrée appelé par la boucle rAF de la fenêtre projetée */
 window.bmProjPump = function(){
   if (!bm.projOn) return;
@@ -13251,6 +13305,37 @@ function bmRefreshUI(){
 /* Indicateurs « préparé » dans l'onglet sorts */
 .spell-app.not-prepared { opacity:0.4; filter:grayscale(0.55); }
 .spell-app.not-prepared:hover { opacity:0.75; }
+
+/* ═══ V2.29 — lisibilité des noms de sorts ═══
+   `--ink` est l'encre du parchemin (sombre) : sur le fond de verre de la
+   fiche, les noms disparaissaient. `--v-txt` est jugé contre le composite
+   réel du verre — c'est la variable qui garantit le contraste. */
+html .spell-app-name { color:var(--v-txt); text-shadow:0 1px 2px rgba(0,0,0,0.5); }
+/* l'atténuation « non préparé » ne porte plus que sur l'icône : le nom reste
+   lisible, la distinction visuelle demeure */
+html .spell-app.not-prepared { opacity:1; filter:none; }
+html .spell-app.not-prepared .spell-app-icon { opacity:0.42; filter:grayscale(0.6); transition:opacity .15s, filter .15s; }
+html .spell-app.not-prepared:hover .spell-app-icon { opacity:0.85; filter:grayscale(0.15); }
+html .spell-app.not-prepared .spell-app-name { color:var(--v-txt-c); font-style:italic; }
+/* vue Liste : même principe */
+html .spell-known-main strong { color:var(--v-titre); }
+html .spell-known-meta { color:var(--v-txt-c); }
+html .spell-known-item.not-prepared { opacity:1; }
+html .spell-known-item.not-prepared .spell-known-thumb { opacity:0.45; filter:grayscale(0.6); }
+html .spell-known-item.not-prepared .spell-known-main strong { color:var(--v-txt-c); font-style:italic; }
+html .spell-known-item.not-prepared .spell-known-main strong::after { color:var(--v-txt-c); }
+
+/* ═══ V2.29 — filtre : masquer les sorts connus mais non préparés ═══
+   L'état vit sur <html> : il survit aux re-rendus de la fiche. */
+html.sorts-masquer .spell-app.not-prepared,
+html.sorts-masquer .spell-known-item.not-prepared { display:none; }
+html.sorts-masquer .spell-app-grid:not(:has(> .spell-app:not(.not-prepared))) { display:none; }
+/* l'en-tête de niveau part avec sa grille. Deux :has FRÈRES et non imbriqués
+   (un :has dans un :has invalide tout le sélecteur) : le premier exige qu'une
+   grille suive — sans lui, les en-têtes de la vue Liste seraient masqués. */
+html.sorts-masquer .spell-level-header:has(+ .spell-app-grid):not(:has(+ .spell-app-grid > .spell-app:not(.not-prepared))) { display:none; }
+html.sorts-masquer .spell-level-group:not(:has(.spell-known-item:not(.not-prepared))) { display:none; }
+.svt-btn.svt-filtre { margin-left:auto; }
 .spell-known-item.not-prepared { opacity:0.55; }
 .spell-known-item.not-prepared .spell-known-main strong::after { content:' · non préparé'; font-size:0.68rem; font-style:italic; color:#a8967e; }
 .grim-open-btn { background:rgba(150,110,40,0.18); border-color:rgba(150,110,40,0.4); }
@@ -14547,6 +14632,14 @@ em.ok { color:#7fc06a; font-style:normal; }
 .comp-card-main { padding:12px 16px; flex:1; }
 .comp-card-name { font-family:var(--font-title); font-size:0.92rem; color:var(--ink); }
 .comp-card-sub { color:#888; font-size:0.78rem; margin-top:2px; }
+/* V2.28 — héritage de l'éditeur + lisibilité sur les 27 thèmes */
+.comp-card-desc { font-size:0.76rem; font-style:italic; color:#777; margin-top:3px; }
+html .comp-card-desc { color:var(--v-txt-c); }
+html .comp-card-sub { color:var(--v-txt-b); }
+html .comp-card-name { color:var(--v-titre); }
+.comp-etat { flex:0 0 auto; padding:0 8px; font-weight:700; }
+.comp-etat.ok { color:#5cb85c; }
+.comp-etat.manque { color:#e67e22; }
 .comp-homebrew { background:var(--gold-fond); color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
   font-family:var(--font-title); letter-spacing:1px; vertical-align:middle; margin-left:6px; }
 .comp-modified { background:#555; color:#fff; font-size:0.6rem; padding:1px 6px; border-radius:8px;
@@ -15214,7 +15307,7 @@ html .combat-panel { padding:14px 16px; }
 html .gm-search { padding:12px 14px; }
 /* cartes de liste : translucides SANS blur (elles peuvent être des centaines) */
 html .comp-card {
-  background:rgba(26,17,8,0.55);
+  background:rgba(var(--v-noir),0.94);
   border:1px solid rgba(var(--v-or),0.22);
   border-radius:12px;
   transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
