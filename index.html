@@ -11439,6 +11439,8 @@ window._bmGabRot = function(sens){
 };
 window._bmGabDel = function(){
   const m = bmMap(), g = bmSelGabObj(); if (!m || !g) return;
+  bmUndoPush({ type:'gabDel', gab: JSON.parse(JSON.stringify(g)),
+               rang: m.gabarits.indexOf(g), libelle: 'retrait d\'un gabarit' });
   m.gabarits = m.gabarits.filter(x => x.id !== g.id);
   bm.selGab = null; bmSave(); bmRender();
 };
@@ -12142,7 +12144,73 @@ window._bmTokFlee = function(){
   bmInitRender();
   bmStatus('« ' + t.nom + ' » quitte le combat (fuite).');
 };
-window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) return; m.tokens = m.tokens.filter(x => x.id !== t.id); bm.sel = null; bmSave(); bmRender(); };
+/* ═══════════ V2.37 — historique d'annulation ═══════════
+   On enregistre l'INVERSE du geste, pas une copie de la carte : un
+   brouillard peut porter des milliers d'opérations. */
+bm.hist = [];
+function bmUndoPush(pas){
+  bm.hist.push(pas);
+  if (bm.hist.length > 30) bm.hist.shift();
+  const b = document.getElementById('bmUndoBtn');
+  if (b) { b.disabled = false; b.title = 'Annuler : ' + pas.libelle + '  (Ctrl+Z)'; }
+}
+window._bmGhostOk = function(){
+  const m = bmMap(); if (!m || !bm.ghost) return;
+  const t = m.tokens.find(x => x.id === bm.ghost.id);
+  if (t) {
+    bmUndoPush({ type:'tokPos', id: t.id, x: bm.ghost.x0, y: bm.ghost.y0,
+                 libelle: 'déplacement de « ' + t.nom + ' »' });
+    t.x = bm.ghost.x; t.y = bm.ghost.y;
+    bmSave();
+  }
+  bm.ghost = null; bm.hoverPath = null; bm.hoverInfo = null;
+  bmRender(); bmStatus('Déplacement validé. (Ctrl+Z pour revenir en arrière)');
+};
+window._bmGhostAnnule = function(){
+  if (!bm.ghost) return false;
+  bm.ghost = null; bmRender(); bmStatus('Déplacement abandonné.');
+  return true;
+};
+window._bmUndo = function(){
+  const m = bmMap();
+  const pas = bm.hist.pop();
+  if (!m || !pas) { bmStatus('Rien à annuler.'); return; }
+  try {
+    if (pas.type === 'tokPos') {
+      const t = m.tokens.find(x => x.id === pas.id);
+      if (t) { t.x = pas.x; t.y = pas.y; bm.sel = t.id; }
+    } else if (pas.type === 'tokMulti') {
+      for (const p of pas.pions) { const t = m.tokens.find(x => x.id === p.id);
+        if (t) { t.x = p.x; t.y = p.y; } }
+    } else if (pas.type === 'tokDel') {
+      m.tokens.splice(Math.min(pas.rang, m.tokens.length), 0, pas.pion);
+      bm.sel = pas.pion.id;
+    } else if (pas.type === 'tokAdd') {
+      m.tokens = m.tokens.filter(x => x.id !== pas.id);
+      if (bm.sel === pas.id) bm.sel = null;
+    } else if (pas.type === 'gabDel') {
+      if (!m.gabarits) m.gabarits = [];
+      m.gabarits.splice(Math.min(pas.rang, m.gabarits.length), 0, pas.gab);
+      bm.selGab = pas.gab.id;
+    } else if (pas.type === 'gabPos') {
+      const g = (m.gabarits || []).find(x => x.id === pas.id);
+      if (g) { g.x = pas.x; g.y = pas.y; }
+    } else if (pas.type === 'fog') {
+      m.fog = m.fog.slice(0, Math.max(0, m.fog.length - pas.nb));
+      bmFogDirty(m.id);
+    }
+  } catch(e) { console.warn('[undo]', e); }
+  bmSave(); bmRefreshUI(); bmRender();
+  bmStatus('Annulé : ' + pas.libelle + (bm.hist.length ? ' — ' + bm.hist.length + ' pas restants.' : '.'));
+  const b = document.getElementById('bmUndoBtn');
+  if (b) { b.disabled = !bm.hist.length;
+           b.title = bm.hist.length ? 'Annuler : ' + bm.hist[bm.hist.length-1].libelle + '  (Ctrl+Z)'
+                                    : 'Rien à annuler'; }
+};
+window._bmTokDel = function(){ const m = bmMap(), t = bmSelTok(); if (!m || !t) return;
+  bmUndoPush({ type:'tokDel', pion: JSON.parse(JSON.stringify(t)),
+               rang: m.tokens.indexOf(t), libelle: 'retrait de « ' + t.nom + ' »' });
+  m.tokens = m.tokens.filter(x => x.id !== t.id); bm.sel = null; bmSave(); bmRender(); };
 function bmSelTok(){ const m = bmMap(); return m ? m.tokens.find(t => t.id === bm.sel) : null; }
 
 /* ── géométrie partagée : murs -> segments (cache), intersections, visibilité, chemins ── */
@@ -12312,6 +12380,12 @@ window._bmTokSpeed = function(){
   if (v === null) return;
   t.vitesse = Math.max(0, parseFloat(String(v).replace(',', '.')) || 9);
   bmSave(); bmRender();
+};
+window._bmAnnotTool = function(){
+  bmWallCommit();
+  bm.tool = (bm.tool === 'annot') ? 'move' : 'annot';
+  bm.wallDraft = null; bm.selGab = null;
+  bmRefreshUI(); bmRender();
 };
 window._bmToolMove = function(){
   bmWallCommit(); bm.tool = 'move'; bm.wallDraft = null; bm.hoverPath = null; bm.hoverInfo = null;
@@ -12711,6 +12785,25 @@ function bmScene(ctx, W, H, mode){
       const [x, y] = k.split(',').map(Number);
       ctx.fillRect((m.grid.ox||0) + x * g + demi - g / 2, (m.grid.oy||0) + y * g + demi - g / 2, g, g);
     }
+    /* V2.37 — le fantôme du déplacement proposé */
+    if (bm.ghost) {
+      const gt = m.tokens.find(x => x.id === bm.ghost.id);
+      if (gt) {
+        const r2 = (m.grid.px * gt.taille) / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath(); ctx.arc(bm.ghost.x, bm.ghost.y, r2, 0, 7);
+        ctx.fillStyle = 'rgba(255,224,140,0.22)'; ctx.fill();
+        ctx.lineWidth = 3 / v.k; ctx.strokeStyle = '#ffd66e';
+        ctx.setLineDash([9 / v.k, 6 / v.k]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#ffd66e';
+        ctx.font = 'bold ' + Math.max(11, r2 * 0.5) + 'px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('↵', bm.ghost.x, bm.ghost.y);
+        ctx.restore();
+      }
+    }
     if (bm.hoverPath && bm.hoverPath.length) {
       ctx.strokeStyle = 'rgba(255,224,140,0.9)'; ctx.lineWidth = 3 / v.k;
       ctx.setLineDash([10 / v.k, 7 / v.k]); ctx.lineCap = 'round';
@@ -12939,7 +13032,9 @@ function bmInitCanvas(){
       bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y };
       cv.classList.add('dragging'); return;
     }
-    if (e.shiftKey && e.button === 0) { bm.drag = { kind: 'annot', pts: [{ x: p.x, y: p.y }] }; return; }
+    if ((e.shiftKey || bm.tool === 'annot') && e.button === 0) {
+      bm.drag = { kind: 'annot', pts: [{ x: p.x, y: p.y }] }; return;
+    }
     if (e.altKey) { bmPing(p.x, p.y); return; }
     if (bm.tool === 'aligner') {
       if (!bm.alignP1) { bm.alignP1 = { x: p.x, y: p.y }; bmStatus('Coin 1 posé — clique maintenant le coin inférieur droit de la même case.'); bmRender(); return; }
@@ -12986,9 +13081,15 @@ function bmInitCanvas(){
           const g = m.grid.px, demi = st.taille % 2 ? g / 2 : 0;
           const cx = Math.round((p.x - demi - (m.grid.ox||0)) / g), cy = Math.round((p.y - demi - (m.grid.oy||0)) / g);
           const c = bmCentreCell(m, cx, cy, demi);
-          st.x = c.x; st.y = c.y;
-          bm.hoverPath = null; bm.hoverInfo = null;
-          bmSave();
+          /* V2.37 : on ne téléporte plus. On PROPOSE — le pion ne bouge qu'à
+             la validation. Cliquer à nouveau le fantôme vaut validation. */
+          if (bm.ghost && bm.ghost.id === st.id
+              && Math.hypot(bm.ghost.x - c.x, bm.ghost.y - c.y) < g * 0.6) {
+            window._bmGhostOk();
+          } else {
+            bm.ghost = { id: st.id, x: c.x, y: c.y, x0: st.x, y0: st.y };
+            bmStatus('Déplacement proposé — Entrée ou clic sur le fantôme pour valider, Échap pour annuler.');
+          }
         }
       }
       bmRender(); return;
@@ -12998,7 +13099,10 @@ function bmInitCanvas(){
       bm.wallDraft.push({ x: Math.round(p.x), y: Math.round(p.y) });
       bmRender(); return;
     }
-    if (bm.tool === 'fog') { bm.drag = { kind: 'fog' }; bmFogPaint(p); return; }
+    if (bm.tool === 'fog') {
+      bm.drag = { kind: 'fog', fog0: (m.fog || []).length };   /* V2.37 : point de reprise */
+      bmFogPaint(p); return;
+    }
     const t = [...m.tokens].reverse().find(t => Math.hypot(t.x - p.x, t.y - p.y) <= (m.grid.px * t.taille) / 2 + 4 / bm.view.k);
     if (t) { if (e.ctrlKey) {
           const ix = bm.selMulti.indexOf(t.id);
@@ -13010,10 +13114,14 @@ function bmInitCanvas(){
         if (!bm.selMulti.includes(t.id)) bm.selMulti = [t.id];
         const p0g = toMap(pos(e));
         bm.drag = { kind: 'tok', id: t.id,
+          /* V2.37 : d'où viennent-ils, pour pouvoir les y remettre */
+          avant: bm.selMulti.map(gid => m.tokens.find(x => x.id === gid)).filter(Boolean)
+            .map(gt => ({ id: gt.id, x: gt.x, y: gt.y })),
           groupe: bm.selMulti.map(gid => m.tokens.find(x => x.id === gid)).filter(Boolean)
             .map(gt => ({ id: gt.id, dx: gt.x - p0g.x, dy: gt.y - p0g.y })) }; }
     else {
-      if (e.ctrlKey) { bmPing(p.x, p.y); return; }   /* V2.25 : marqueur d'attention */
+      /* V2.36 : Ctrl est réservé à la multi-sélection. Le marqueur d'attention
+         garde Alt+clic et le double-clic — il avait trois gestes pour lui. */
       bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
     bmRender();
   });
@@ -13084,8 +13192,26 @@ function bmInitCanvas(){
       bm.annots.push({ pts: bm.drag.pts, t0: performance.now() });
       bmAnimKick();
     }
+    /* V2.37 : ce glisser entre dans l'historique */
+    if (m && bm.drag && bm.drag.kind === 'tok' && bm.drag.avant && bm.drag.avant.length) {
+      const bouge = bm.drag.avant.some(p => { const t = m.tokens.find(x => x.id === p.id);
+        return t && (Math.abs(t.x - p.x) > 0.5 || Math.abs(t.y - p.y) > 0.5); });
+      if (bouge) bmUndoPush(bm.drag.avant.length > 1
+        ? { type:'tokMulti', pions: bm.drag.avant, libelle: 'déplacement de ' + bm.drag.avant.length + ' pions' }
+        : { type:'tokPos', id: bm.drag.avant[0].id, x: bm.drag.avant[0].x, y: bm.drag.avant[0].y,
+            libelle: 'déplacement d\'un pion' });
+    }
     if (bm.drag && (bm.drag.kind === 'tok' || bm.drag.kind === 'gab' || bm.drag.kind === 'pan')) bmSave();
-    if (bm.drag && bm.drag.kind === 'fog') { const mm = bmMap(); if (mm && mm.fog.length > 4000) mm.fog = mm.fog.slice(-4000); bmSave(); }
+    if (bm.drag && bm.drag.kind === 'fog') {
+      const mm = bmMap();
+      if (mm) {
+        const nb = (mm.fog || []).length - (bm.drag.fog0 || 0);
+        if (nb > 0) bmUndoPush({ type:'fog', nb,
+          libelle: (bm.fogMode === 'reveal' ? 'révélation' : 'masquage') + ' du brouillard' });
+        if (mm.fog.length > 4000) mm.fog = mm.fog.slice(-4000);
+      }
+      bmSave();
+    }
     bm.drag = null;
     cv.classList.remove('dragging');
     bmRender();
@@ -13098,7 +13224,25 @@ function bmInitCanvas(){
     if (!surPion) bmPing(p.x, p.y);
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && bm.tool === 'wall') { bmWallCommit(); bm.tool = 'move'; bm.wallDraft = null; bmRefreshUI(); bmRender(); }
+    if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)
+        && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+      e.preventDefault(); window._bmUndo(); return;
+    }
+    if (e.key === 'Enter' && bm.ghost
+        && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+      e.preventDefault(); window._bmGhostOk(); return;
+    }
+    if (e.key === 'Escape' && window._bmGhostAnnule && window._bmGhostAnnule()) return;
+    if (e.key === 'Escape' && bm.tool !== 'move') {
+      /* V2.36 : Échap ramène à Sélection depuis N'IMPORTE quel outil, en
+         refermant proprement ce qui est en cours. */
+      if (bm.tool === 'wall') { bmWallCommit(); bm.wallDraft = null; }
+      bm.selGab = null; bm.alignP1 = null; bm.drag = null;
+      bm.hoverPath = null; bm.hoverInfo = null;
+      bm.tool = 'move';
+      bmRefreshUI(); bmRender();
+      bmStatus('Retour à la Sélection.');
+    }
     else if (e.key === 'Escape' && bm.tool === 'gabarit') { bm.tool = 'move'; bm.selGab = null; bmRefreshUI(); bmRender(); }
     else if ((e.key === 'r' || e.key === 'R') && bm.selGab && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
       window._bmGabRot(e.shiftKey ? -1 : 1);
@@ -13124,6 +13268,70 @@ function bmInitCanvas(){
     bmRender();
   }, { passive: false });
   new ResizeObserver(() => bmRender()).observe(cv.parentElement);
+
+  /* ═══════════ V2.38 — nouvelle interface de la carte ═══════════
+     Trois zones autour du canvas. Les anciens boutons restent dans le
+     document (repliés) et demeurent la source de vérité : la colonne les
+     déclenche, l'état continue d'être calculé par bmRefreshUI. */
+  (function(){
+    const wrap = document.getElementById('bmCanvasWrap');
+    const bmw = document.querySelector('.bm-wrap');
+    if (!wrap || !bmw || document.getElementById('bmScene3')) return;
+
+    const scene = document.createElement('div');
+    scene.id = 'bmScene3';
+    wrap.parentNode.insertBefore(scene, wrap);
+
+    const col = document.createElement('nav');
+    col.id = 'bmOutils'; col.className = 'bmo';
+    const pan = document.createElement('aside');
+    pan.id = 'bmPan'; pan.className = 'bmp';
+    scene.appendChild(col); scene.appendChild(wrap); scene.appendChild(pan);
+
+    /* les sept outils : libellé, touche, et le bouton d'origine qu'ils pilotent */
+    const OUT = [
+      ['g', 'Se déplacer'],
+      ['move',        '✋', 'Sélection',       'S', 'bmToolMove'],
+      ['deplacement', '📏', 'Mesurer',         'M', 'bmRangeBtn'],
+      ['g', 'Agir sur la carte'],
+      ['fog',         '🌫', 'Cacher · révéler','C', 'bmFogBtn'],
+      ['gabarit',     '✨', 'Zone de sort',    'Z', 'bmGabBtn'],
+      ['annot',       '✒️', 'Annoter',         'A', null],
+      ['g', 'Préparer'],
+      ['wall',        '🧱', 'Murs',            'W', 'bmWallDraw'],
+      ['aligner',     '📐', 'Caler la grille', 'G', 'bmAlignBtn'],
+    ];
+    for (const o of OUT) {
+      if (o[0] === 'g') {
+        const d = document.createElement('div'); d.className = 'bmo-grp'; d.textContent = o[1];
+        col.appendChild(d); continue;
+      }
+      const [id, ic, nom, tou, src] = o;
+      const b = document.createElement('button');
+      b.className = 'bmo-b'; b.dataset.outil = id;
+      b.innerHTML = '<span class="ic">' + ic + '</span><span class="nom">' + nom
+                  + '</span><span class="tou">' + tou + '</span>';
+      b.title = nom + '  (' + tou + ')';
+      b.onclick = () => {
+        if (id === 'annot') { window._bmAnnotTool(); return; }
+        const o2 = document.getElementById(src);
+        if (o2) o2.click(); else { bm.tool = id; bmRefreshUI(); bmRender(); }
+      };
+      col.appendChild(b);
+    }
+    /* raccourcis à une touche */
+    const TOUCHES = { s:'move', m:'deplacement', c:'fog', z:'gabarit', a:'annot', w:'wall', g:'aligner' };
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+      const tab = document.getElementById('tab-gm');
+      if (!tab || !tab.classList.contains('active')) return;
+      const cible = TOUCHES[(e.key || '').toLowerCase()];
+      if (!cible) return;
+      const b = col.querySelector('[data-outil="' + cible + '"]');
+      if (b) { e.preventDefault(); b.click(); }
+    });
+  })();
   cv.addEventListener('contextmenu', e => e.preventDefault());
 
   /* ═══ V2.25 — écran scindé : le combat en colonne à droite de la carte ═══ */
@@ -13697,6 +13905,102 @@ function bmRefreshUI(){
   if (gpx && mm2 && +gpx.value !== mm2.grid.px && document.activeElement !== gpx) gpx.value = mm2.grid.px;
   const gp = document.getElementById('bmGridPx'); if (gp && m) gp.value = m.grid.px;
   const cv = document.getElementById('bmCanvas'); if (cv) cv.classList.toggle('fog', bm.tool === 'fog');
+  /* ═══ V2.36 — dire en permanence quel outil est actif ═══ */
+  if (cv) cv.dataset.outil = bm.tool || 'move';
+  (function(){
+    const OUTILS = {
+      move:        ['✋', 'Sélection',        'clic : prendre un pion · clic droit : déplacer la vue · molette : zoom'],
+      deplacement: ['📏', 'Mesure',           'clic : choisir un pion, puis la case visée · Échap : sortir'],
+      fog:         ['🌫', 'Brouillard',       (bm.fogMode === 'reveal' ? 'glisser : RÉVÉLER' : 'glisser : MASQUER') + ' · Échap : sortir'],
+      wall:        ['🧱', 'Murs',             'clic : poser un point · double-clic : fermer le mur · Échap : sortir'],
+      gabarit:     ['✨', 'Gabarit de sort',  'clic : poser une zone · R : pivoter · Échap : sortir'],
+      aligner:     ['📐', 'Ajuster la grille', (bm.alignP1 ? 'clique le coin BAS-DROIT de la même case' : 'clique le coin HAUT-GAUCHE d\'une case') + ' · Échap : sortir'],
+      annot:       ['✒️', 'Annoter',          'glisse pour dessiner — le trait s\'efface tout seul · Échap : sortir'],
+      cadrage:     ['🎯', 'Cadrage',          'clic : recentrer la zone projetée · molette : sa taille · Échap : sortir'],
+    };
+    const wrap = document.getElementById('bmCanvasWrap');
+    if (!wrap) return;
+    let b = document.getElementById('bmOutil');
+    if (!b) { b = document.createElement('div'); b.id = 'bmOutil'; b.className = 'bm-outil'; wrap.appendChild(b); }
+    const o = OUTILS[bm.tool] || OUTILS.move;
+    b.innerHTML = '<b>' + o[0] + ' ' + o[1] + '</b><span>' + o[2] + '</span>';
+    b.dataset.outil = bm.tool || 'move';
+    /* en Sélection (l'état de repos), le bandeau s'efface après 4 s */
+    clearTimeout(bm._outilT);
+    b.classList.remove('bm-outil-off');
+    if ((bm.tool || 'move') === 'move')
+      bm._outilT = setTimeout(() => b.classList.add('bm-outil-off'), 4000);
+  })();
+  /* V2.38 — la colonne d'outils reflète l'outil actif */
+  (function(){
+    const col = document.getElementById('bmOutils');
+    if (col) col.querySelectorAll('.bmo-b').forEach(b =>
+      b.classList.toggle('on', b.dataset.outil === (bm.tool || 'move')));
+  })();
+  /* V2.38 — panneau contextuel : ce qui est sélectionné, et ce qu'on peut en faire */
+  (function(){
+    const pan = document.getElementById('bmPan');
+    if (!pan) return;
+    const t = bmSelTok(), g = (typeof bmSelGabObj === 'function') ? bmSelGabObj() : null;
+    const ech = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if (t) {
+      const pct = t.hpMax ? Math.max(0, Math.min(100, Math.round((t.hp || 0) / t.hpMax * 100))) : null;
+      pan.innerHTML =
+        '<div class="bmp-tete">'
+        + '<div class="bmp-jeton" style="background:' + (t.couleur || '#b8860b') + '">'
+        + (typeof bmInitiales === 'function' ? bmInitiales(t.nom) : '?') + '</div>'
+        + '<div><div class="bmp-nom">' + ech(t.nom) + '</div>'
+        + '<div class="bmp-sub">' + (t.taille >= 2 ? 'Grande créature' : 'Pion') + '</div></div></div>'
+        + (pct !== null
+           ? '<div><div class="bmp-champ"><span>Points de vie</span><b>' + (t.hp||0) + ' / ' + t.hpMax + '</b></div>'
+             + '<div class="bmp-pv"><i style="width:' + pct + '%"></i></div></div>' : '')
+        + '<div class="bmp-champ"><span>Taille sur la carte</span><span>'
+        + '<button class="bmp-mini" onclick="window._bmTokSize(-1)" title="Réduire">−</button>'
+        + '<button class="bmp-mini" onclick="window._bmTokSize(1)" title="Agrandir">＋</button></span></div>'
+        + '<div class="bmp-liste">'
+        + '<button class="bmp-bas' + (t.torche ? ' on' : '') + '" onclick="window._bmTokTorch()">'
+        + '<span>🔥</span><span>Porte une torche</span><span class="et">' + (t.torche ? 'oui' : 'non') + '</span></button>'
+        + '<button class="bmp-bas' + (t.cache ? ' on' : '') + '" onclick="window._bmTokHide()">'
+        + '<span>🙈</span><span>Caché aux joueurs</span><span class="et">' + (t.cache ? 'oui' : 'non') + '</span></button>'
+        + '<button class="bmp-bas" onclick="window._tkOuvrir()"><span>🖼</span><span>Changer l\'image</span></button>'
+        + '<button class="bmp-bas" onclick="window._bmTokSpeed()"><span>👣</span><span>Vitesse de déplacement</span></button>'
+        + '<button class="bmp-bas" onclick="window._bmTokColor()"><span>🎨</span><span>Couleur du pion</span></button>'
+        + '<button class="bmp-bas" onclick="window._bmTokJoin()"><span>⚔</span><span>Faire entrer au combat</span></button>'
+        + '<button class="bmp-bas" onclick="window._bmTokFlee()"><span>🏃</span><span>Retirer du combat</span></button>'
+        + '</div>'
+        + '<button class="bmp-bas bmp-danger" onclick="window._bmTokDel()">'
+        + '<span>🗑</span><span>Retirer de la carte</span></button>';
+    } else if (g) {
+      pan.innerHTML =
+        '<div class="bmp-tete"><div class="bmp-jeton" style="background:'
+        + (g.couleur ? g.couleur.replace('VAR','1') : '#a87fc0') + '">✨</div>'
+        + '<div><div class="bmp-nom">Zone de sort</div>'
+        + '<div class="bmp-sub">' + ech(g.forme) + ' · ' + ech(g.taille) + ' m</div></div></div>'
+        + '<div class="bmp-liste">'
+        + '<button class="bmp-bas" onclick="window._bmGabRot(-1)"><span>↺</span><span>Pivoter à gauche</span><span class="et">Maj+R</span></button>'
+        + '<button class="bmp-bas" onclick="window._bmGabRot(1)"><span>↻</span><span>Pivoter à droite</span><span class="et">R</span></button>'
+        + '</div>'
+        + '<button class="bmp-bas bmp-danger" onclick="window._bmGabDel()">'
+        + '<span>🗑</span><span>Retirer la zone</span></button>';
+    } else {
+      pan.innerHTML = '<div class="bmp-vide"><span class="gros">👆</span>'
+        + 'Clique un pion sur la carte<br>pour voir ce que tu peux en faire.</div>';
+    }
+  })();
+  /* dette V2.25 : la barre d'actions de droite reflète enfin l'outil actif */
+  (function(){
+    const bar = document.getElementById('bmBar');
+    if (!bar) return;
+    const m2 = bmMap();
+    const etat = {
+      projeter: !!bm.projOn, cadrage: bm.tool === 'cadrage', brouillard: bm.tool === 'fog',
+      gabarit: bm.tool === 'gabarit', mesure: bm.tool === 'deplacement', murs: bm.tool === 'wall',
+      grille: !!(m2 && m2.grid && m2.grid.show),
+    };
+    bar.querySelectorAll('button[data-acte]').forEach(x => {
+      if (x.dataset.acte in etat) x.classList.toggle('on', !!etat[x.dataset.acte]);
+    });
+  })();
 }
 (function bmInit(){
   const go = () => {
@@ -15835,6 +16139,113 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 #bmCanvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
 #bmCanvas.fog { cursor:crosshair; }
 #bmCanvas.dragging { cursor:grabbing; }
+
+/* ═══ V2.36 — un curseur par outil ═══
+   Cinq outils sur sept affichaient la même main ouverte : le pointeur
+   annonçait « déplacer la vue » alors que le clic faisait tout autre chose. */
+#bmCanvas[data-outil="move"]        { cursor:grab; }
+#bmCanvas[data-outil="deplacement"] { cursor:pointer; }
+#bmCanvas[data-outil="fog"]         { cursor:cell; }
+#bmCanvas[data-outil="wall"]        { cursor:crosshair; }
+#bmCanvas[data-outil="gabarit"]     { cursor:copy; }
+#bmCanvas[data-outil="aligner"]     { cursor:nw-resize; }
+#bmCanvas[data-outil="cadrage"]     { cursor:move; }
+#bmCanvas[data-outil="annot"]       { cursor:crosshair; }
+#bmCanvas.dragging { cursor:grabbing !important; }   /* pendant un glisser */
+
+/* ═══ V2.36 — bandeau d'outil actif ═══ */
+.bm-outil {
+  position:absolute; top:10px; left:10px; z-index:32; pointer-events:none;
+  max-width:min(58%, 520px); padding:6px 12px; border-radius:10px;
+  background:rgba(var(--v-noir),0.86); border:1px solid rgba(var(--v-or),0.45);
+  border-left:4px solid var(--gold-fond);
+  font-family:'Crimson Pro',serif; color:var(--v-txt); font-size:0.8rem; line-height:1.3;
+  box-shadow:0 6px 18px rgba(0,0,0,0.4);
+  transition:opacity .5s ease; opacity:1;
+}
+.bm-outil b { display:block; font-family:var(--font-title); font-size:0.82rem;
+  letter-spacing:0.06em; color:var(--v-titre); }
+.bm-outil span { opacity:0.88; }
+.bm-outil-off { opacity:0.18; }
+/* chaque outil sa couleur de liseré : reconnaissable du coin de l'œil */
+.bm-outil[data-outil="fog"]         { border-left-color:#7fa8c8; }
+.bm-outil[data-outil="wall"]        { border-left-color:#c88a5a; }
+.bm-outil[data-outil="gabarit"]     { border-left-color:#c07fd0; }
+.bm-outil[data-outil="deplacement"] { border-left-color:#7fc890; }
+.bm-outil[data-outil="aligner"]     { border-left-color:#78c8d8; }
+.bm-outil[data-outil="cadrage"]     { border-left-color:#e8c478; }
+@media (max-width:900px){ .bm-outil { font-size:0.72rem; max-width:70%; } }
+
+/* ═══ V2.37 — bouton d'annulation ═══ */
+#bmUndoBtn:disabled { opacity:0.35; cursor:default; }
+#bmUndoBtn:not(:disabled) { border-color:rgba(var(--v-or),0.75); }
+
+/* ═══════════ V2.38 — la nouvelle interface de la carte ═══════════ */
+#bmScene3 { display:grid; grid-template-columns:186px minmax(0,1fr) 268px; gap:10px; align-items:stretch; }
+#bmScene3 > .bm-canvas-wrap { min-width:0; }
+@media (max-width:1400px){ #bmScene3 { grid-template-columns:170px minmax(0,1fr); } #bmPan { display:none; } }
+@media (max-width:980px){ #bmScene3 { grid-template-columns:minmax(0,1fr); } #bmOutils { display:none; } }
+
+/* la colonne d'outils */
+.bmo { display:flex; flex-direction:column; gap:4px; padding:9px; border-radius:12px; overflow:auto;
+  background:linear-gradient(150deg, rgba(var(--v-noir-a),0.9), rgba(var(--v-noir),0.96));
+  border:1px solid rgba(var(--v-or),0.28); }
+.bmo-grp { font-family:var(--font-title); font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase;
+  color:var(--v-txt-c); margin:9px 4px 3px; }
+.bmo-grp:first-child { margin-top:0; }
+.bmo-b { display:flex; align-items:center; gap:9px; width:100%; padding:9px 10px; border-radius:9px;
+  cursor:pointer; border:1px solid transparent; background:transparent; color:var(--v-txt);
+  font-family:'Crimson Pro',serif; font-size:0.9rem; text-align:left; transition:.14s; }
+.bmo-b:hover { background:rgba(var(--v-or),0.14); }
+.bmo-b .ic { font-size:1.1rem; width:1.5em; text-align:center; flex:0 0 auto; }
+.bmo-b .nom { flex:1; }
+.bmo-b .tou { font-size:0.66rem; color:var(--v-txt-c); border:1px solid rgba(255,255,255,0.14);
+  border-radius:5px; padding:1px 5px; }
+.bmo-b.on { background:linear-gradient(160deg, rgba(var(--v-or),0.34), rgba(var(--v-or),0.15));
+  border-color:rgba(var(--v-or),0.9); color:#fff; }
+.bmo-b.on .tou { color:#f6e6b8; border-color:rgba(255,255,255,0.3); }
+
+/* le panneau contextuel */
+.bmp { display:flex; flex-direction:column; gap:9px; padding:12px; border-radius:12px; overflow:auto;
+  background:linear-gradient(150deg, rgba(var(--v-noir-a),0.9), rgba(var(--v-noir),0.96));
+  border:1px solid rgba(var(--v-or),0.28); font-family:'Crimson Pro',serif; color:var(--v-txt); }
+.bmp-vide { margin:auto; text-align:center; color:var(--v-txt-c); font-style:italic; font-size:0.86rem; }
+.bmp-vide .gros { font-size:1.9rem; display:block; margin-bottom:9px; opacity:0.5; }
+.bmp-tete { display:flex; align-items:center; gap:10px; }
+.bmp-jeton { width:44px; height:44px; border-radius:50%; display:grid; place-items:center; flex:0 0 auto;
+  font-family:var(--font-title); font-size:0.95rem; color:#1a1206; }
+.bmp-nom { font-family:var(--font-title); font-size:0.98rem; color:var(--v-titre); }
+.bmp-sub { font-size:0.76rem; color:var(--v-txt-c); }
+.bmp-champ { display:flex; align-items:center; justify-content:space-between; gap:9px; padding:7px 10px;
+  border-radius:9px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);
+  font-size:0.86rem; color:var(--v-txt-c); }
+.bmp-champ b { color:var(--v-txt); }
+.bmp-mini { padding:2px 9px; margin-left:4px; border-radius:7px; cursor:pointer; font-size:0.9rem;
+  border:1px solid rgba(var(--v-or),0.4); background:rgba(var(--v-noir),0.5); color:var(--v-txt); }
+.bmp-mini:hover { background:rgba(var(--v-or),0.26); }
+.bmp-pv { height:8px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; margin-top:5px; }
+.bmp-pv i { display:block; height:100%; background:linear-gradient(90deg,#6fae72,#4f8a52); }
+.bmp-liste { display:flex; flex-direction:column; gap:5px; }
+.bmp-bas { display:flex; align-items:center; gap:9px; padding:9px 11px; border-radius:9px; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03);
+  font-family:'Crimson Pro',serif; font-size:0.86rem; color:var(--v-txt); text-align:left; }
+.bmp-bas:hover { background:rgba(var(--v-or),0.16); }
+.bmp-bas.on { border-color:rgba(var(--v-or),0.9); background:rgba(var(--v-or),0.2); color:#fff; }
+.bmp-bas .et { margin-left:auto; font-size:0.7rem; color:var(--v-txt-c); }
+.bmp-bas.on .et { color:var(--v-titre); }
+.bmp-danger { margin-top:auto; border-color:rgba(192,90,72,0.5); color:#f0b3a6; }
+.bmp-danger:hover { background:rgba(192,90,72,0.22); }
+
+/* les gestes, affichés en permanence */
+.bm-gestes { display:flex; flex-wrap:wrap; gap:12px; padding:6px 4px 0; font-size:0.76rem;
+  color:var(--v-txt-c); }
+.bm-gestes kbd { font-family:inherit; font-size:0.72rem; border:1px solid rgba(255,255,255,0.18);
+  border-radius:5px; padding:1px 6px; background:rgba(255,255,255,0.05); color:var(--v-txt); }
+
+/* ce que la nouvelle interface remplace : replié, jamais supprimé */
+#bmTokCtl, #bmGabCtl { display:none !important; }
+#bmBar { display:none !important; }
+.bm-head .bmc-grp:nth-child(3) { display:none; }   /* l'ancien groupe « Outils » */
 .bm-tokctl { position:absolute; display:none; gap:4px; background:rgba(var(--v-noir),0.92); border:1px solid rgba(185,140,72,0.55);
   border-radius:10px; padding:4px 6px; z-index:5; box-shadow:0 4px 12px rgba(0,0,0,0.5); }
 .bm-tokctl button { border:none; background:none; color:#e8d8ac; font-size:0.95rem; cursor:pointer; padding:2px 5px; }
@@ -18073,7 +18484,7 @@ html[data-theme="arcadie"] {
       <button class="bm-btn" onclick="window._ambSinkPick()" title="Choisir la sortie audio (télé HDMI) pour musiques, nappes et bruitages">Sortie audio</button>
       <select id="ambSinkSel" class="bm-sel" style="display:none;min-width:120px;max-width:170px"
         onchange="localStorage.setItem('kubbnd_sink', this.value); (window._ambAllAudio||[]).forEach(a=>a.setSinkId&&a.setSinkId(this.value||'').catch(()=>{}));"></select>
-      <button class="bm-btn" onclick="window._bmCalibSouris()" title="Corriger un décalage entre le curseur affiché et le point de clic (mémorisé pour cet appareil)">🖱 Calibrer</button><button class="bm-btn" onclick="const d=window._bmDiagSouris();bmStatus('Diagnostic — rectangle '+d.rectangle+' · conteneur '+d.conteneur+' · interne '+d.interne+' · densité '+d.densite+' · rapport '+d.rapport+' · calibration '+d.calibration);console.info('[cal] diagnostic', d);" title="Afficher les mesures du canvas — à me communiquer si un décalage persiste">🔎</button><button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">Guide</button>
+      <button class="bm-btn" id="bmUndoBtn" onclick="window._bmUndo()" disabled title="Rien à annuler">↶ Annuler</button><button class="bm-btn" onclick="window._bmCalibSouris()" title="Corriger un décalage entre le curseur affiché et le point de clic (mémorisé pour cet appareil)">🖱 Calibrer</button><button class="bm-btn" onclick="const d=window._bmDiagSouris();bmStatus('Diagnostic — rectangle '+d.rectangle+' · conteneur '+d.conteneur+' · interne '+d.interne+' · densité '+d.densite+' · rapport '+d.rapport+' · calibration '+d.calibration);console.info('[cal] diagnostic', d);" title="Afficher les mesures du canvas — à me communiquer si un décalage persiste">🔎</button><button class="bm-btn" onclick="window._bmGuideOpen()" title="Guide complet de l'écran MJ">Guide</button>
     </div>
   </div>
   <div class="bm-canvas-wrap" id="bmCanvasWrap"><div id="bmInitBar"></div>
@@ -18096,7 +18507,7 @@ html[data-theme="arcadie"] {
       <button onclick="window._bmTokDel()">Retirer</button>
     </div>
   </div>
-  <div class="bm-status" id="bmStatus">Importe une image ou un export Dungeon Alchemist (.dd2vtt) — grille, murs et portes seront calibrés automatiquement. Molette = zoom, glisser = déplacer.</div>
+  <div class="bm-gestes"><span><kbd>clic droit</kbd> déplacer la vue</span><span><kbd>molette</kbd> zoom</span><span><kbd>Échap</kbd> revenir</span><span><kbd>Ctrl+Z</kbd> annuler</span><span><kbd>Alt+clic</kbd> marqueur</span></div><div class="bm-status" id="bmStatus">Importe une image ou un export Dungeon Alchemist (.dd2vtt) — grille, murs et portes seront calibrés automatiquement. Molette = zoom, glisser = déplacer.</div>
   <input type="file" id="bmFile" accept=".dd2vtt,.uvtt,.df2vtt,.json,image/png,image/jpeg,image/webp" style="display:none">
   <input type="file" id="bmSrcFile" accept="image/*" style="display:none">
 </div>
