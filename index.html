@@ -11359,7 +11359,7 @@ const bm = {
   tool: 'move', fogMode: 'reveal', fogR: 100,
   sel: null, projOn: false, showWalls: true, showRange: true,
   calib: { cm: 60, lock: false },
-  projFollow: true, projCentre: null, alignP1: null,
+  projFollow: false, projCentre: null   /* V2.42 : suivi automatique retiré */, alignP1: null,
   selMulti: [],
   wallDraft: null,
   selGab: null, gabCouleurI: 0, pings: [], _pingRaf: null,
@@ -11369,6 +11369,7 @@ const bm = {
   fogMix: null, drag: null, saveT: null, _projScrW: 0,
 };
 const BM_CASE_M = 1.5;      /* 1 case = 1,5 m (D&D 5e) */
+const BM_CADRE_POIGNEE = 7;  /* demi-côté d'une poignée de cadrage, en px écran */
 const BM_POUCE_MM = 25.4;
 function bmMap(){ return bm.maps.find(m => m.id === bm.cur) || null; }
 function bmSave(){
@@ -11382,6 +11383,9 @@ function bmLoad(){
   try { const d = JSON.parse(localStorage.getItem('kubbnd_bm'));
     if (d) { bm.maps = d.maps || []; bm.cur = d.cur;
       if (d.calib) bm.calib = d.calib;
+      /* V2.42 : les deux réglages retirés ne se rallument pas depuis une
+         sauvegarde antérieure. */
+      bm.calib.lock = false; bm.projFollow = false;
       if (d.showRange !== undefined) bm.showRange = d.showRange; } }
   catch { /* première utilisation */ }
 }
@@ -12457,20 +12461,22 @@ window._bmGridNudge = function(dx, dy){
   m.grid.oy = (m.grid.oy||0) + dy;
   bmGeoDirty(m.id); bmSave(); bmRender();
 };
+/* V2.42 : le suivi automatique est retiré. Il recentrait la projection sur
+   le barycentre des pions porteurs de torche, et se coupait silencieusement au
+   moindre clic en Cadrage — la surprise relevée au second audit de la carte
+   (§E). Le rectangle de cadrage explicite le remplace. La fonction demeure
+   pour ne casser aucun appel existant. */
 window._bmFollow = function(){
-  bm.projFollow = !bm.projFollow;
-  if (bm.projFollow) bm.projCentre = null;
-  bmRefreshUI(); bmRender();
-  bmStatus(bm.projFollow ? 'Suivi automatique : la projection reste centrée sur le groupe.' : 'Suivi coupé : utilise Cadrage pour choisir la zone projetée.');
+  bm.projFollow = false;
+  bmStatus('Le suivi automatique a été retiré : la zone projetée se règle avec l\'outil 🎯 Cadrer la projection.');
 };
 window._bmCadrage = function(){
-  const m = bmMap(); if (!m) return;
-  if (!bm.calib.lock) { bmStatus('Le cadrage sert quand les cases sont verrouillées à 2,5 cm — active d\'abord ce verrou.'); return; }
+  /* V2.42 : plus de condition de verrou — le cadrage est un outil comme un
+     autre, et le choisir désactive celui qui était actif. */
   bm.tool = bm.tool === 'cadrage' ? 'move' : 'cadrage';
-  if (bm.tool === 'cadrage') bm.projFollow = false;
   bmRefreshUI(); bmRender();
   bmStatus(bm.tool === 'cadrage'
-    ? 'Cadrage : clique ou glisse sur la carte — le cadre doré montre exactement ce que voient les joueurs.'
+    ? 'Cadrage : glisse dans le cadre pour le déplacer, tire un coin pour le redimensionner. Ce qui est assombri ne sera pas projeté.'
     : 'Cadrage terminé.');
 };
 window._bmRangeToggle = function(){
@@ -12481,13 +12487,44 @@ window._bmRangeToggle = function(){
     ? 'Déplacement : clique un pion (halo = cases atteignables, murs respectés), survole = distance par le chemin, second clic = déplace le pion (même au-delà de sa vitesse). Reclique 👣 pour sortir.'
     : 'Outil déplacement standard.');
 };
+/* V2.42 : le verrou « 1 case = 2,5 cm » est retiré. Il imposait une échelle
+   physique déduite d'une largeur d'écran saisie à la main, et conditionnait le
+   cadrage lui-même : deux réglages pour une seule intention, qui se
+   contredisaient. Le rectangle de cadrage explicite les remplace. */
 window._bmLockToggle = function(){
-  bm.calib.lock = !bm.calib.lock;
-  bmSave(); bmRefreshUI(); bmProjRender();
-  bmStatus(bm.calib.lock
-    ? 'Projection verrouillée : 1 case = 1 pouce sur l\'écran (largeur saisie : ' + bm.calib.cm + ' cm). Vérifie avec le repère « 1″ » en bas à gauche de la projection — et pose tes figurines !'
-    : 'Verrou 1 pouce désactivé : la projection s\'ajuste à l\'écran.');
+  bm.calib.lock = false;
+  bmStatus('Le verrou « 1 case = 2,5 cm » a été retiré : la zone projetée se règle avec l\'outil 🎯 Cadrer la projection.');
 };
+/* ═══ V2.42 — la zone projetée devient un objet ═══
+   Avant : un centre (suivi automatique ou dernier clic) et un facteur de
+   zoom, le tout conditionné au verrou « 1 case = 2,5 cm ». Trois réglages
+   pour une seule intention, et rien qu'on puisse attraper.
+   Maintenant : un rectangle en coordonnées carte, propre à chaque carte,
+   qu'on déplace en glissant dedans et qu'on redimensionne par ses coins. */
+function bmCadre(m){
+  if (!m) return null;
+  if (!m.cadre || !(m.cadre.w > 0) || !(m.cadre.h > 0)) {
+    m.cadre = { x: 0, y: 0, w: (m.w || 800), h: (m.h || 600) };
+  }
+  return m.cadre;
+}
+/* les quatre coins, dans l'ordre : HG, HD, BG, BD */
+function bmCadreCoins(c){
+  return [[c.x, c.y], [c.x + c.w, c.y], [c.x, c.y + c.h], [c.x + c.w, c.y + c.h]];
+}
+function bmCadreCoinSous(c, p, tol){
+  const co = bmCadreCoins(c);
+  for (let i = 0; i < 4; i++)
+    if (Math.hypot(co[i][0] - p.x, co[i][1] - p.y) <= tol) return i;
+  return -1;
+}
+window._bmCadreReset = function(){
+  const m = bmMap(); if (!m) return;
+  m.cadre = { x: 0, y: 0, w: (m.w || 800), h: (m.h || 600) };
+  bmSave(); bmRender(); bmProjRender();
+  bmStatus('Zone projetée remise à la carte entière.');
+};
+
 function bmProjCentre(m){
   if (!bm.projFollow && bm.projCentre) return bm.projCentre;
   const pjs = m.tokens.filter(t => t.torche || t.couleur === '#4a90d9');
@@ -12768,19 +12805,11 @@ function bmScene(ctx, W, H, mode){
   const im = bm.imgs.get(m.id);
   let v = bm.view;
   if (mode === 'player') {
-    if (bm.calib.lock && bmCellCss(W)) {
-      const k = (bm.projZoom || 1) * bmCellCss(W) / (m.grid.px || 70);
-      const c = bmProjCentre(m);
-      const cx = c.x, cy = c.y;
-      v = { k, x: W / 2 - cx * k, y: H / 2 - cy * k };
-      v.x = Math.min(20, Math.max(W - (m.w||0) * k - 20, v.x));
-      v.y = Math.min(20, Math.max(H - (m.h||0) * k - 20, v.y));
-      if ((m.w||0) * k < W) v.x = (W - m.w * k) / 2;
-      if ((m.h||0) * k < H) v.y = (H - m.h * k) / 2;
-    } else {
-      const k = Math.min(W / (m.w||1), H / (m.h||1));
-      v = { k, x: (W - m.w*k)/2, y: (H - m.h*k)/2 };
-    }
+    /* V2.42 : la projection montre exactement le rectangle de cadrage, ajusté
+       à la fenêtre sans le déformer. */
+    const c = bmCadre(m);
+    const k = Math.min(W / c.w, H / c.h);
+    v = { k, x: (W - c.w * k) / 2 - c.x * k, y: (H - c.h * k) / 2 - c.y * k };
   }
   ctx.setTransform(v.k, 0, 0, v.k, v.x, v.y);
   if (im) ctx.drawImage(im, 0, 0);
@@ -12935,28 +12964,36 @@ function bmScene(ctx, W, H, mode){
     bmBulleMesure(ctx, bx, by, bm.hoverInfo.txt, bm.hoverInfo.loin);
     ctx.setTransform(v.k, 0, 0, v.k, v.x, v.y);
   }
-  if (mode === 'gm' && bm.projOn && bm.calib.lock && bm._projWH && bm._projWH.w) {
-    const kp = (bm.projZoom || 1) * bmCellCss(bm._projWH.w) / (m.grid.px || 70);
-    if (kp > 0) {
-      const rw = bm._projWH.w / kp, rh = bm._projWH.h / kp;
-      const c = bmProjCentre(m);
-      let rx = c.x - rw / 2, ry = c.y - rh / 2;
-      rx = Math.max(-20 / kp, Math.min((m.w||0) - rw + 20 / kp, rx));
-      ry = Math.max(-20 / kp, Math.min((m.h||0) - rh + 20 / kp, ry));
-      if ((m.w||0) < rw) rx = ((m.w||0) - rw) / 2;
-      if ((m.h||0) < rh) ry = ((m.h||0) - rh) / 2;
-      ctx.strokeStyle = 'rgba(232,196,120,0.55)'; ctx.lineWidth = 1.5 / v.k;
-      ctx.strokeRect(rx, ry, rw, rh);
-      ctx.strokeStyle = 'rgba(240,210,140,0.95)'; ctx.lineWidth = 3.5 / v.k;
-      const L = Math.min(rw, rh) * 0.09;
-      for (const [px2, py2, sx2, sy2] of [[rx,ry,1,1],[rx+rw,ry,-1,1],[rx,ry+rh,1,-1],[rx+rw,ry+rh,-1,-1]]) {
-        ctx.beginPath();
-        ctx.moveTo(px2 + sx2 * L, py2); ctx.lineTo(px2, py2); ctx.lineTo(px2, py2 + sy2 * L);
-        ctx.stroke();
+  /* V2.42 : la zone projetée se voit quand on la règle, ou quand elle sert. */
+  if (mode === 'gm' && (bm.tool === 'cadrage' || bm.projOn)) {
+    const c = bmCadre(m);
+    const actif = bm.tool === 'cadrage';
+    /* hors de la zone, le reste de la carte s'assombrit — on voit tout de
+       suite ce que les joueurs verront et ce qu'ils ne verront pas */
+    if (actif) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.42)';
+      ctx.beginPath();
+      ctx.rect(-1e5, -1e5, 2e5, 2e5);
+      ctx.rect(c.x, c.y, c.w, c.h);
+      ctx.fill('evenodd');
+      ctx.restore();
+    }
+    ctx.strokeStyle = actif ? 'rgba(240,210,140,0.95)' : 'rgba(232,196,120,0.45)';
+    ctx.lineWidth = (actif ? 2 : 1.5) / v.k;
+    ctx.strokeRect(c.x, c.y, c.w, c.h);
+    ctx.fillStyle = actif ? 'rgba(240,210,140,0.9)' : 'rgba(240,210,140,0.6)';
+    ctx.font = `${13 / v.k}px sans-serif`;
+    ctx.fillText('ZONE PROJETÉE', c.x + 8 / v.k, c.y - 6 / v.k);
+    if (actif) {
+      /* poignées de coin, comme un rognage d'image */
+      const r = BM_CADRE_POIGNEE / v.k;
+      for (const [hx, hy] of bmCadreCoins(c)) {
+        ctx.fillStyle = 'rgba(240,210,140,0.95)';
+        ctx.strokeStyle = 'rgba(40,26,10,0.9)'; ctx.lineWidth = 1.5 / v.k;
+        ctx.beginPath(); ctx.rect(hx - r, hy - r, r * 2, r * 2);
+        ctx.fill(); ctx.stroke();
       }
-      ctx.fillStyle = 'rgba(240,210,140,0.8)';
-      ctx.font = `${13 / v.k}px sans-serif`;
-      ctx.fillText('ZONE PROJETÉE', rx + 8 / v.k, ry - 6 / v.k);
     }
   }
   if (mode === 'player' && bm.calib.lock) {
@@ -13090,9 +13127,18 @@ function bmInitCanvas(){
       return;
     }
     if (bm.tool === 'cadrage') {
-      bm.projFollow = false;
-      bm.projCentre = { x: p.x, y: p.y };
-      bm.drag = { kind: 'cadr' };
+      /* V2.42 : on attrape un coin pour redimensionner, l'intérieur pour
+         déplacer. Un clic à l'extérieur ne fait rien — pas de saut de zone. */
+      const c = bmCadre(m);
+      const tol = (BM_CADRE_POIGNEE + 3) / bm.view.k;
+      const coin = bmCadreCoinSous(c, p, tol);
+      if (coin >= 0) {
+        bm.drag = { kind: 'cadrRz', coin, avant: { x:c.x, y:c.y, w:c.w, h:c.h } };
+      } else if (p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h) {
+        bm.drag = { kind: 'cadrMv', dx: c.x - p.x, dy: c.y - p.y,
+                    avant: { x:c.x, y:c.y, w:c.w, h:c.h } };
+        cv.classList.add('dragging');
+      }
       bmRender(); return;
     }
     if (bm.tool === 'gabarit') {
@@ -13151,7 +13197,7 @@ function bmInitCanvas(){
           bm.sel = ix >= 0 ? (bm.selMulti[0] || null) : t.id;
           bm.drag = null; bmRefreshUI(); bmRender(); return;
         }
-        bm.sel = t.id;
+        bm.sel = t.id; bm.selGab = null;   /* V2.42 : une seule sélection à la fois */
         if (!bm.selMulti.includes(t.id)) bm.selMulti = [t.id];
         const p0g = toMap(pos(e));
         bm.drag = { kind: 'tok', id: t.id,
@@ -13163,7 +13209,21 @@ function bmInitCanvas(){
     else {
       /* V2.36 : Ctrl est réservé à la multi-sélection. Le marqueur d'attention
          garde Alt+clic et le double-clic — il avait trois gestes pour lui. */
-      bm.sel = null; bm.drag = { kind: 'pan', x0: e.clientX, y0: e.clientY, vx: bm.view.x, vy: bm.view.y }; cv.classList.add('dragging'); }
+      /* V2.42 — le clic gauche n'interagit qu'avec le contenu : plus de
+         déplacement de la vue par défaut (c'était un pan accidentel à chaque
+         désélection). La vue se déplace au clic droit.
+         V2.42 — les zones de sort répondent à l'outil Sélection : il ne faut
+         plus changer d'outil pour déplacer un gabarit déjà posé. Les murs
+         restent réservés à leur outil : ce sont des arêtes, pas des objets. */
+      const gh = (m.gabarits || []).slice().reverse().find(g => bmGabHit(m, g, p.x, p.y));
+      if (gh) {
+        bm.sel = null; bm.selMulti = []; bm.selGab = gh.id;
+        bm.drag = { kind: 'gab', id: gh.id, dx: gh.x - p.x, dy: gh.y - p.y,
+                    avant: { x: gh.x, y: gh.y } };
+      } else {
+        bm.sel = null; bm.selMulti = []; bm.selGab = null; bm.drag = null;
+      }
+      bmRefreshUI(); }
     bmRender();
   });
   let bmHoverT = 0;
@@ -13201,9 +13261,20 @@ function bmInitCanvas(){
         const t = m.tokens.find(x => x.id === g.id);
         if (t) { t.x = p.x + g.dx; t.y = p.y + g.dy; }
       }
-    } else if (bm.drag.kind === 'cadr') {
-      const p = toMap(pos(e));
-      bm.projCentre = { x: p.x, y: p.y };
+    } else if (bm.drag.kind === 'cadrMv') {
+      const p = toMap(pos(e)), c = bmCadre(m);
+      c.x = p.x + bm.drag.dx; c.y = p.y + bm.drag.dy;
+    } else if (bm.drag.kind === 'cadrRz') {
+      const p = toMap(pos(e)), c = bmCadre(m), a = bm.drag.avant;
+      /* le coin opposé reste fixe ; taille minimale : deux cases */
+      const mini = Math.max(24, (m.grid.px || 70) * 2);
+      const fx = (bm.drag.coin === 1 || bm.drag.coin === 3) ? a.x : a.x + a.w;
+      const fy = (bm.drag.coin === 2 || bm.drag.coin === 3) ? a.y : a.y + a.h;
+      let x1 = Math.min(fx, p.x), x2 = Math.max(fx, p.x);
+      let y1 = Math.min(fy, p.y), y2 = Math.max(fy, p.y);
+      if (x2 - x1 < mini) { if (p.x < fx) x1 = fx - mini; else x2 = fx + mini; }
+      if (y2 - y1 < mini) { if (p.y < fy) y1 = fy - mini; else y2 = fy + mini; }
+      c.x = x1; c.y = y1; c.w = x2 - x1; c.h = y2 - y1;
     } else if (bm.drag.kind === 'gab') {
       const p = toMap(pos(e));
       const gb = (m.gabarits || []).find(g => g.id === bm.drag.id);
@@ -13220,6 +13291,9 @@ function bmInitCanvas(){
   });
   const fin = () => {
     const m = bmMap();
+    if (m && bm.drag && (bm.drag.kind === 'cadrMv' || bm.drag.kind === 'cadrRz')) {
+      bmSave(); bmProjRender();
+    }
     if (m && bm.drag && bm.drag.kind === 'tok' && m.grid.snap && m.grid.show) {
       for (const gdrop of (bm.drag.groupe || [])) {
         const t = m.tokens.find(x => x.id === gdrop.id);
@@ -13265,6 +13339,15 @@ function bmInitCanvas(){
     if (!surPion) bmPing(p.x, p.y);
   });
   document.addEventListener('keydown', e => {
+    /* V2.42 : Suppr efface ce qui est sélectionné — pion ou zone de sort.
+       Les deux passent par la pile d'annulation de la V2.37, donc Ctrl+Z les
+       ramène. Les murs ont leur propre annulation et ne sont pas concernés. */
+    if ((e.key === 'Delete' || e.key === 'Backspace')
+        && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)
+        && !document.activeElement.isContentEditable) {
+      if (bm.sel && window._bmTokDel) { e.preventDefault(); window._bmTokDel(); return; }
+      if (bm.selGab && window._bmGabDel) { e.preventDefault(); window._bmGabDel(); return; }
+    }
     if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)
         && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
       e.preventDefault(); window._bmUndo(); return;
@@ -13295,7 +13378,10 @@ function bmInitCanvas(){
     const m = bmMap(); if (!m) return;
     e.preventDefault();
     /* V2.25 : en outil Cadrage, la molette règle la TAILLE de la zone projetée */
-    if (bm.tool === 'cadrage' && bm.calib.lock) {
+    /* V2.42 : en Cadrage, la molette zoomait la TAILLE de la zone projetée au
+   lieu de la vue — la surprise la plus signalée du second audit (§E). Elle
+   zoome de nouveau la vue partout ; la zone se règle par ses coins. */
+if (false) {
       bm.projZoom = Math.max(0.3, Math.min(4, (bm.projZoom || 1) * (e.deltaY < 0 ? 1.08 : 0.926)));
       try { localStorage.setItem('kubbnd-projzoom', bm.projZoom.toFixed(3)); } catch(_){}
       bmStatus('Zone projetée : ' + Math.round(bm.projZoom * 100) + ' % du calibrage (molette en outil Cadrage)');
@@ -13341,6 +13427,10 @@ function bmInitCanvas(){
       ['g', 'Préparer'],
       ['wall',        '🧱', 'Murs',            'W', 'bmWallDraw'],
       ['aligner',     '📐', 'Caler la grille', 'G', 'bmAlignBtn'],
+      ['g', 'Projeter'],
+      /* V2.42 : le cadrage est un outil comme les autres — le choisir
+         désactive le précédent et fait apparaître la zone à régler. */
+      ['cadrage',     '🎯', 'Zone projetée',   'P', null],
     ];
     for (const o of OUT) {
       if (o[0] === 'g') {
@@ -13361,7 +13451,7 @@ function bmInitCanvas(){
       col.appendChild(b);
     }
     /* raccourcis à une touche */
-    const TOUCHES = { s:'move', m:'deplacement', c:'fog', z:'gabarit', a:'annot', w:'wall', g:'aligner' };
+    const TOUCHES = { s:'move', m:'deplacement', c:'fog', z:'gabarit', a:'annot', w:'wall', g:'aligner', p:'cadrage' };
     document.addEventListener('keydown', e => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
@@ -13957,7 +14047,7 @@ function bmRefreshUI(){
       gabarit:     ['✨', 'Gabarit de sort',  'clic : poser une zone · R : pivoter · Échap : sortir'],
       aligner:     ['📐', 'Ajuster la grille', (bm.alignP1 ? 'clique le coin BAS-DROIT de la même case' : 'clique le coin HAUT-GAUCHE d\'une case') + ' · Échap : sortir'],
       annot:       ['✒️', 'Annoter',          'glisse pour dessiner — le trait s\'efface tout seul · Échap : sortir'],
-      cadrage:     ['🎯', 'Cadrage',          'clic : recentrer la zone projetée · molette : sa taille · Échap : sortir'],
+      cadrage:     ['🎯', 'Cadrer la projection', 'glisse dans le cadre pour le déplacer · tire un coin pour le redimensionner · Échap : sortir'],
     };
     const wrap = document.getElementById('bmCanvasWrap');
     if (!wrap) return;
@@ -14023,9 +14113,28 @@ function bmRefreshUI(){
         + '</div>'
         + '<button class="bmp-bas bmp-danger" onclick="window._bmGabDel()">'
         + '<span>🗑</span><span>Retirer la zone</span></button>';
+    } else if (bm.tool === 'cadrage') {
+      /* V2.42 : quand l'outil de cadrage est actif, le panneau explique la
+         zone et offre le retour à la carte entière. */
+      const m3 = bmMap(), cad = m3 ? bmCadre(m3) : null;
+      const cases = (m3 && m3.grid && m3.grid.px > 0 && cad)
+        ? Math.round(cad.w / m3.grid.px) + ' × ' + Math.round(cad.h / m3.grid.px) + ' cases' : '—';
+      pan.innerHTML =
+        '<div class="bmp-tete"><div class="bmp-jeton" style="background:var(--gold-fond)">🎯</div>'
+        + '<div><div class="bmp-nom">Zone projetée</div>'
+        + '<div class="bmp-sub">Ce que les joueurs verront</div></div></div>'
+        + '<div class="bmp-champ"><span>Étendue</span><b>' + cases + '</b></div>'
+        + '<div class="bmp-liste">'
+        + '<button class="bmp-bas" onclick="window._bmCadreReset()">'
+        + '<span>⤢</span><span>Cadrer toute la carte</span></button></div>'
+        /* classe distincte de .bmp-vide : c'est elle qui commande le masquage
+           du panneau en surimpression, et cette carte a bien quelque chose à
+           dire. */
+        + '<div class="bmp-aide">Glisse dans le cadre pour le déplacer,'
+        + '<br>tire un coin pour le redimensionner.</div>';
     } else {
       pan.innerHTML = '<div class="bmp-vide"><span class="gros">👆</span>'
-        + 'Clique un pion sur la carte<br>pour voir ce que tu peux en faire.</div>';
+        + 'Clique un pion ou une zone de sort<br>pour voir ce que tu peux en faire.</div>';
     }
   })();
   /* dette V2.25 : la barre d'actions de droite reflète enfin l'outil actif */
@@ -16224,7 +16333,24 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 /* ═══════════ V2.38 — la nouvelle interface de la carte ═══════════ */
 #bmScene3 { display:grid; grid-template-columns:186px minmax(0,1fr) 268px; gap:10px; align-items:stretch; }
 #bmScene3 > .bm-canvas-wrap { min-width:0; }
-@media (max-width:1400px){ #bmScene3 { grid-template-columns:170px minmax(0,1fr); } #bmPan { display:none; } }
+/* V2.42 — le panneau ne disparaît plus quand la place manque : il se pose
+   au-dessus du bord droit de la carte. Sur l'écran du MJ la carte est dans
+   une colonne du #gmSplit, donc toujours sous 1400 px : masquer le panneau
+   à ce seuil revenait à le supprimer là où on en a le plus besoin. */
+@media (max-width:1400px){
+  #bmScene3 { grid-template-columns:170px minmax(0,1fr); position:relative; }
+  #bmPan {
+    position:absolute; top:8px; right:8px; z-index:34;
+    width:250px; max-height:calc(100% - 16px);
+    box-shadow:0 12px 34px rgba(0,0,0,0.55);
+    background:linear-gradient(150deg, rgba(var(--v-noir-a),0.97), rgba(var(--v-noir),0.99));
+  }
+  /* en surimpression, il ne s'affiche que s'il a quelque chose à dire */
+  #bmPan:has(.bmp-vide) { display:none; }
+}
+@media (max-width:980px){ #bmPan { width:216px; } }
+.bmp-aide { margin-top:10px; text-align:center; font-style:italic;
+  font-size:0.8rem; color:var(--v-txt-c); line-height:1.45; }
 @media (max-width:980px){ #bmScene3 { grid-template-columns:minmax(0,1fr); } #bmOutils { display:none; } }
 
 /* la colonne d'outils */
@@ -16285,6 +16411,8 @@ html.fx-off #fxParticles, html.fx-off #themeFrame { display:none !important; }
 
 /* ce que la nouvelle interface remplace : replié, jamais supprimé */
 #bmTokCtl, #bmGabCtl { display:none !important; }
+/* V2.42 — commandes retirées : suivi automatique et verrou « 2,5 cm ». */
+#bmFollowBtn, #bmLockBtn, #bmCalCm, label[for="bmCalCm"] { display:none !important; }
 #bmBar { display:none !important; }
 .bm-head .bmc-grp:nth-child(3) { display:none; }   /* l'ancien groupe « Outils » */
 .bm-tokctl { position:absolute; display:none; gap:4px; background:rgba(var(--v-noir),0.92); border:1px solid rgba(185,140,72,0.55);
