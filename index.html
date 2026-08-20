@@ -10305,6 +10305,110 @@ const AMB_SHOTS_DEFAUT = [
   ['Corne de brume','🚢','brume','synth',null,'signaux'],
   ['Battement de cœur','💓','coeur','synth',null,'signaux'],
 ];
+/* ═══ V2.43 — la collection de Tom ═══
+   23 nappes et 50 one-shots (64 fichiers, variantes comprises), normalisés et
+   ré-encodés. Les chemins sont relatifs : assets/sons/nappes/ et
+   assets/sons/oneshots/. Les anciens tableaux restent au-dessus, inertes :
+   ils ne sont plus lus que par la migration, qui s'en sert pour reconnaître
+   et retirer les entrées d'origine. */
+const AMB_SONS_VER = 43;
+const AMB_NAPPES_URL = 'assets/sons/nappes/';
+const AMB_SHOTS_URL_V43 = 'assets/sons/oneshots/';
+const AMB_NAPPES_V43 = [
+  ['Vent','🌬','vent.mp3','météo'],
+  ['Blizzard','🌨','blizzard.mp3','météo'],
+  ['Pluie','🌧','pluie.mp3','météo'],
+  ['Pluie sur les toits','🏙','pluie-sur-les-toits.mp3','météo'],
+  ['Orage','⛈','orage.mp3','météo'],
+  ['Orage lointain','🌩','orage-lointain.mp3','météo'],
+  ['Forêt','🌲','foret.mp3','nature'],
+  ['Jungle','🌴','jungle.mp3','nature'],
+  ['Nuit d’été','🦗','nuit-d-ete.mp3','nature'],
+  ['Rivière','⛲','riviere.mp3','nature'],
+  ['Ressac','🌊','ressac.mp3','nature'],
+  ['Taverne','🍺','taverne.mp3','lieux'],
+  ['Taverne au calme','🍻','taverne-au-calme.mp3','lieux'],
+  ['Marché','🧺','marche.mp3','lieux'],
+  ['Village','🏡','village.mp3','lieux'],
+  ['Murmures','🗣','murmures.mp3','lieux'],
+  ['Temple','⛪','temple.mp3','lieux'],
+  ['Forge','🔨','forge.mp3','lieux'],
+  ['Feu de camp','🏕','feu-de-camp.mp3','lieux'],
+  ['Brasier','🔥','brasier.mp3','lieux'],
+  ['Torche','🕯','torche.mp3','souterrain'],
+  ['Suintement','💧','suintement.mp3','souterrain'],
+  ['Chauves-souris','🦇','chauves-souris.mp3','souterrain'],
+];
+const AMB_SHOTS_V43 = [
+  ['Coup d’épée 1','⚔','coup-d-epee-1.mp3','armes'],
+  ['Coup d’épée 2','⚔','coup-d-epee-2.mp3','armes'],
+  ['Duel','🤺','duel.mp3','armes'],
+  ['Dégainer','🗡','degainer.mp3','armes'],
+  ['Dague','🔪','dague.mp3','armes'],
+  ['Hache sur métal','🪓','hache-sur-metal.mp3','armes'],
+  ['Hache dans la chair','🩸','hache-dans-la-chair.mp3','armes'],
+  ['Masse','🔨','masse.mp3','armes'],
+  ['Flèche','🏹','fleche.mp3','armes'],
+  ['Bagarre','👊','bagarre.mp3','armes'],
+  ['Trait magique 1','✨','trait-magique-1.mp3','magie'],
+  ['Trait magique 2','✨','trait-magique-2.mp3','magie'],
+  ['Magie de feu','🔥','magie-de-feu.mp3','magie'],
+  ['Foudre','⚡','foudre.mp3','magie'],
+  ['Magie radiante','🌟','magie-radiante.mp3','magie'],
+  ['Souffle ardent','🐲','souffle-ardent.mp3','magie'],
+  ['Explosion 1','💥','explosion-1.mp3','magie'],
+  ['Explosion 2','💥','explosion-2.mp3','magie'],
+  ['Explosion 3','💥','explosion-3.mp3','magie'],
+  ['Explosion 4','💥','explosion-4.mp3','magie'],
+  ['Soin','💚','soin.mp3','magie'],
+  ['Potion','🧪','potion.mp3','magie'],
+  ['Pétrification','🗿','petrification.mp3','magie'],
+  ['Rugissement 1','🐉','rugissement-1.mp3','créatures'],
+  ['Rugissement 2','🐉','rugissement-2.mp3','créatures'],
+  ['Grognement 1','😾','grognement-1.mp3','créatures'],
+  ['Grognement 2','😾','grognement-2.mp3','créatures'],
+  ['Pas lourds','👣','pas-lourds.mp3','créatures'],
+  ['Loups 1','🐺','loups-1.mp3','créatures'],
+  ['Loups 2','🐺','loups-2.mp3','créatures'],
+  ['Zombie 1','🧟','zombie-1.mp3','créatures'],
+  ['Zombie 2','🧟','zombie-2.mp3','créatures'],
+  ['Zombie hurlement','🧟','zombie-hurlement.mp3','créatures'],
+  ['Squelette','💀','squelette.mp3','créatures'],
+  ['Fantôme 1','👻','fantome-1.mp3','créatures'],
+  ['Fantôme 2','👻','fantome-2.mp3','créatures'],
+  ['Fantôme 3','👻','fantome-3.mp3','créatures'],
+  ['« Je te vois »','👁','je-te-vois.mp3','créatures'],
+  ['Monstre marin','🐙','monstre-marin.mp3','créatures'],
+  ['Rire de sorcière','🧙','rire-de-sorciere.mp3','créatures'],
+  ['Aigle','🦅','aigle.mp3','créatures'],
+  ['Rapace','🪶','rapace.mp3','créatures'],
+  ['Chouette','🦉','chouette.mp3','créatures'],
+  ['Poule','🐔','poule.mp3','créatures'],
+  ['Galop','🐴','galop.mp3','créatures'],
+  ['Hennissement','🐎','hennissement.mp3','créatures'],
+  ['Ébrouement','🫏','ebrouement.mp3','créatures'],
+  ['Porte','🚪','porte.mp3','matière'],
+  ['Porte métallique','⛩','porte-metallique.mp3','matière'],
+  ['Coffre','📦','coffre.mp3','matière'],
+  ['Pièce','🪙','piece.mp3','matière'],
+  ['Brindilles','🪵','brindilles.mp3','matière'],
+  ['Pas','🥾','pas.mp3','matière'],
+  ['Plongeon','💦','plongeon.mp3','matière'],
+  ['Séisme','🌋','seisme.mp3','matière'],
+  ['Applaudissements','👏','applaudissements.mp3','signaux'],
+  ['Ovation','🙌','ovation.mp3','signaux'],
+  ['Foule saisie','😲','foule-saisie.mp3','signaux'],
+  ['Foule déçue','😞','foule-decue.mp3','signaux'],
+  ['Cloches','🔔','cloches.mp3','signaux'],
+  ['Corne de brume','🚢','corne-de-brume.mp3','signaux'],
+  ['Tonnerre','🌩','tonnerre.mp3','signaux'],
+  ['Battement de cœur','💓','battement-de-coeur.mp3','signaux'],
+  ['Cor de guerre','📯','cor-de-guerre.mp3','signaux'],
+];
+/* Le cor synthétisé d'origine ne disparaît pas : il devient un œuf de Pâques,
+   sans bouton, joué par Alt+clic sur « Cor de guerre ». */
+const AMB_OEUF = { nom: 'Cor de guerre', synth: 'cor' };
+
 let ambCtx = null, ambNoiseBuf = null;
 function ambAudioCtx(){
   if (!ambCtx) ambCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -10580,27 +10684,116 @@ function ambLoadBoards(){
   try { amb.nappes = JSON.parse(localStorage.getItem('kubbnd_amb_nappes')) || []; } catch { amb.nappes = []; }
   try { amb.shots = JSON.parse(localStorage.getItem('kubbnd_amb_shots')) || []; } catch { amb.shots = []; }
 }
+/* ═══ V2.43 — nappes : boucle sans couture, superposition, dosage ═══
+   `<audio loop>` recolle la fin au début d'un coup sec. Sur un fond de 15 s
+   la couture s'entend à chaque tour. On fait donc jouer DEUX lecteurs en
+   alternance : quand le premier approche de sa fin, le second démarre et les
+   deux se croisent en douceur.
+
+   Chaque nappe garde son propre couple de lecteurs et son propre volume : en
+   empiler cinq ne pose aucun problème, c'est même l'intérêt. */
+const AMB_CROISE = 2.4;      /* durée du fondu croisé, en secondes */
+
+function ambNappeEtat(id){
+  let e = amb.napAudio.get(id);
+  if (!e || !e.a) return null;
+  return e;
+}
+function ambNappeVol(id){
+  const n = amb.nappes.find(x => x.id === id);
+  return amb.volN * ((n && typeof n.vol === 'number') ? n.vol : 1);
+}
+window._ambNappeVol = function(id, v){
+  const n = amb.nappes.find(x => x.id === id); if (!n) return;
+  n.vol = Math.max(0, Math.min(1, v));
+  const e = ambNappeEtat(id);
+  if (e) { const g = ambNappeVol(id); if (e.a) e.a.volume = e.aOn ? g : 0;
+                                      if (e.b) e.b.volume = e.aOn ? 0 : g; }
+  ambSaveBoards();
+};
+
+function ambNappeArret(id, sec){
+  const e = ambNappeEtat(id); if (!e) return;
+  clearInterval(e.fade); clearInterval(e.veille);
+  /* On retire l'entrée TOUT DE SUITE, pas à la fin du fondu : sinon couper
+     puis rallumer en moins de 400 ms fait voir la nappe comme encore active,
+     et le second clic la recoupe au lieu de la relancer. Le fondu de sortie
+     continue sur ses propres lecteurs, détachés de l'état. */
+  amb.napAudio.delete(id);
+  const a = e.a, b = e.b;
+  const fin = () => { try { a.pause(); } catch(x){} try { b && b.pause(); } catch(x){} };
+  if (sec) { fin(); return; }
+  const v0a = a.volume, v0b = b ? b.volume : 0, t0 = Date.now();
+  const f = setInterval(() => {
+    const k = Math.min((Date.now() - t0) / 400, 1);
+    a.volume = v0a * (1 - k); if (b) b.volume = v0b * (1 - k);
+    if (k >= 1) { clearInterval(f); fin(); }
+  }, 40);
+}
+
 async function ambNappeToggle(id){
   const n = amb.nappes.find(x => x.id === id); if (!n) return;
-  let a = amb.napAudio.get(id);
-  if (a && !a.paused) {
-    const v0 = a.volume, t0 = Date.now();
-    const f = setInterval(() => { const k = Math.min((Date.now()-t0)/400, 1); a.volume = v0*(1-k); if (k>=1){ clearInterval(f); a.pause(); } }, 40);
-  } else {
-    const h = await ambResolveAudio(n.src);
-    if (!h) { ambSetStatus('Nappe « ' + n.nom + ' » : source introuvable.'); return; }
-    if (h.kind === 'yt') { ambSetStatus('Les nappes ne prennent pas YouTube — utilise un fichier ou une URL audio.'); return; }
-    if (!a) { a = ambSink(new Audio()); a.loop = true; amb.napAudio.set(id, a); }
-    a.src = h.src; a.volume = 0;
-    a.play().then(() => {
-      const t0 = Date.now();
-      const f = setInterval(() => { const k = Math.min((Date.now()-t0)/500, 1); a.volume = amb.volN*k; if (k>=1) clearInterval(f); }, 40);
-    }).catch(e => ambSetStatus('Nappe bloquée : ' + (e.message||e)));
-  }
+  if (ambNappeEtat(id)) { ambNappeArret(id); setTimeout(ambRenderBoards, 450); return; }
+
+  const h = await ambResolveAudio(n.src);
+  if (!h) { ambSetStatus('Nappe « ' + n.nom + ' » : source introuvable.'); return; }
+  if (h.kind === 'yt') { ambSetStatus('Les nappes ne prennent pas YouTube — un fichier ou une URL audio.'); return; }
+
+  /* deux lecteurs sur la même source : l'un joue, l'autre attend son tour */
+  const a = ambSink(new Audio(h.src)), b = ambSink(new Audio(h.src));
+  a.preload = b.preload = 'auto';
+  const e = { a, b, aOn: true, fade: null, veille: null };
+  amb.napAudio.set(id, e);
+
+  const cible = ambNappeVol(id);
+  a.volume = 0; b.volume = 0;
+  try { await a.play(); } catch (err) { amb.napAudio.delete(id); ambSetStatus('Nappe bloquée : ' + (err.message||err)); return; }
+
+  const t0 = Date.now();
+  e.fade = setInterval(() => {
+    const k = Math.min((Date.now() - t0) / 500, 1);
+    const cur = e.aOn ? e.a : e.b;
+    cur.volume = ambNappeVol(id) * k;
+    if (k >= 1) clearInterval(e.fade);
+  }, 40);
+
+  /* le relais : dès qu'il reste moins d'un fondu à jouer, on lance l'autre
+     lecteur et on croise. Une seule surveillance légère, quatre fois par
+     seconde — rien à voir avec une animation. */
+  e.veille = setInterval(() => {
+    const cur = e.aOn ? e.a : e.b, autre = e.aOn ? e.b : e.a;
+    if (!cur.duration || isNaN(cur.duration)) return;
+    const reste = cur.duration - cur.currentTime;
+    if (reste > AMB_CROISE || e.croise) return;
+    e.croise = true;
+    autre.currentTime = 0; autre.volume = 0;
+    autre.play().catch(() => {});
+    const g = ambNappeVol(id), tc = Date.now();
+    const f = setInterval(() => {
+      const k = Math.min((Date.now() - tc) / (AMB_CROISE * 1000), 1);
+      autre.volume = g * k; cur.volume = g * (1 - k);
+      if (k >= 1) {
+        clearInterval(f);
+        try { cur.pause(); cur.currentTime = 0; } catch(x){}
+        e.aOn = !e.aOn; e.croise = false;
+      }
+    }, 40);
+  }, 250);
+
   setTimeout(ambRenderBoards, 450);
 }
+
+/* V2.43 : un bouton = un enregistrement. « Zombie 1 » et « Zombie 2 » sont
+   deux choses différentes, pas deux prises du même son — les regrouper
+   derrière un tirage au sort retirerait au MJ le choix de celui qu'il veut. */
 function ambShot(id){
   const s = amb.shots.find(x => x.id === id); if (!s) return;
+  if (s.src && s.src.mode === 'url' && /^assets\/sons\//.test(s.src.ref || '')) {
+    const a = ambSink(new Audio(s.src.ref));
+    a.volume = Math.min(1, amb.vol * 1.15);
+    a.play().catch(e => ambSetStatus('One-shot « ' + s.nom + ' » : ' + (e.message||e)));
+    return;
+  }
   if (s.src && s.src.mode === 'synth') { try { ambSynthPlay(s.src.ref); } catch(e) { ambSetStatus('Synthèse audio indisponible : ' + (e.message||e)); } return; }
   ambResolveAudio(s.src).then(h => {
     if (!h || h.kind === 'yt') { ambSetStatus('One-shot « ' + s.nom + ' » : fichier ou URL audio directe uniquement.'); return; }
@@ -10611,8 +10804,17 @@ function ambShot(id){
   });
 }
 window._ambNappeToggle = ambNappeToggle;
+/* V2.43 — l'ancien cor de guerre synthétisé n'a pas disparu : Alt+clic sur
+   « Cor de guerre » le joue à la place de l'enregistrement. */
+window._ambOeuf = function(id){
+  const s = amb.shots.find(x => x.id === id);
+  if (!s || s.nom !== AMB_OEUF.nom) return false;
+  try { ambSynthPlay(AMB_OEUF.synth); ambSetStatus('…'); return true; } catch(e) { return false; }
+};
 window._ambShot = function(id){
   const s = amb.shots.find(x => x.id === id); if (!s) return;
+  if (window.event && window.event.altKey && window._ambOeuf(id)) return;
+  if (s.src && s.src.mode === 'url' && /^assets\/sons\//.test(s.src.ref || '')) { ambShot(id); return; }
   const slug2 = (typeof spellSlug === 'function') ? spellSlug(s.nom) : s.nom.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   let delegue = false;
   const original = () => { if (!delegue) { delegue = true; ambShot(id); } };
@@ -10624,6 +10826,55 @@ window._ambShot = function(id){
   };
   essaieLocal('.ogg', () => essaieLocal('.mp3', original));
 };
+/* ═══ V2.43 — remplacement du catalogue sonore ═══
+   Retire TOUTES les entrées issues des anciens tableaux par défaut (nappes
+   Tabletop Audio et one-shots Wesnoth ou synthétisés) puis installe la
+   collection de Tom. Ce que l'utilisateur a ajouté lui-même est conservé :
+   on ne supprime que ce qu'on reconnaît comme livré d'origine. */
+window._ambRefonteV43 = function(silencieux){
+  const ancNappes = new Set(AMB_NAPPES_DEFAUT.map(x => x[0]));
+  const ancShots  = new Set(AMB_SHOTS_DEFAUT.map(x => x[0]));
+  let retires = 0, ajoutes = 0;
+
+  /* on coupe ce qui joue avant de retirer quoi que ce soit */
+  for (const [id, lec] of amb.napAudio) { try { ambNappeArret(id, true); } catch(e) {} }
+
+  /* Sept noms sont communs aux deux catalogues (Vent, Pluie, Marché…) : les
+     purger sur le seul critère du nom ferait de chaque passage une
+     réinstallation, avec de nouveaux identifiants à chaque fois. Une entrée
+     qui pointe déjà vers assets/sons/ est donc intouchable. */
+  const deja = x => x.src && /assets\/sons\//.test(x.src.ref || '');
+  const gardeNappe = n => deja(n) || !(ancNappes.has(n.nom)
+      || (n.src && n.src.mode === 'url' && /tabletopaudio\.com/.test(n.src.ref || '')));
+  const gardeShot = o => deja(o) || !(ancShots.has(o.nom)
+      || (o.src && o.src.mode === 'synth')
+      || (o.src && o.src.mode === 'url' && /wesnoth/.test(o.src.ref || '')));
+  retires += amb.nappes.length + amb.shots.length;
+  amb.nappes = amb.nappes.filter(gardeNappe);
+  amb.shots  = amb.shots.filter(gardeShot);
+  retires -= amb.nappes.length + amb.shots.length;
+
+  for (const [nom, emoji, fichier, groupe] of AMB_NAPPES_V43) {
+    if (amb.nappes.some(x => x.nom === nom)) continue;
+    amb.nappes.push({ id: 'nap_' + Math.random().toString(36).slice(2, 8), nom, emoji,
+                      groupe, src: { mode: 'url', ref: AMB_NAPPES_URL + fichier } });
+    ajoutes++;
+  }
+  for (const [nom, emoji, fichier, groupe] of AMB_SHOTS_V43) {
+    if (amb.shots.some(x => x.nom === nom)) continue;
+    amb.shots.push({ id: 'sh_' + Math.random().toString(36).slice(2, 8), nom, emoji, groupe,
+                     src: { mode: 'url', ref: AMB_SHOTS_URL_V43 + fichier } });
+    ajoutes++;
+  }
+  ambSaveBoards();
+  ambRenderBoards();
+  if (!silencieux)
+    ambSetStatus(retires + ' entrées retirées, ' + ajoutes + ' installées — '
+      + amb.nappes.length + ' nappes, ' + amb.shots.length + ' one-shots.');
+  try { localStorage.setItem('kubbnd_amb_sons_ver', String(AMB_SONS_VER)); } catch(e) {}
+  return { retires, ajoutes };
+};
+
 window._ambReseedDefaults = function(){
   let n = 0;
   for (const [nom, emoji, url, groupe] of AMB_NAPPES_DEFAUT) {
@@ -10679,46 +10930,103 @@ window._ambAddBoardItem = function(type){
   };
   inp.click();
 };
+/* ═══ V2.43 — planches compactes ═══
+   Les pastilles de 64 px avec vignette prenaient toute la hauteur utile de
+   l'écran du MJ, et il y a désormais 73 entrées au lieu de 49. Elles laissent
+   place à des jetons d'une ligne : emoji + nom, posés en grille dense. Les
+   groupes se replient, un champ filtre l'ensemble, et les nappes en cours
+   remontent dans une mixette où chacune a son propre curseur. */
+function ambEch(t){ return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function ambFiltreOk(it, q){
+  if (!q) return true;
+  return (it.nom + ' ' + (it.groupe || '')).toLowerCase().indexOf(q) >= 0;
+}
+function ambGrpReplie(type, g){
+  /* Mesuré à 1100 px de large : les 73 entrées dépliées occupent 502 px, contre
+     443 px pour les 49 d'avant. Avec les groupes de one-shots repliés au départ,
+     on tombe à 330 px — un quart de moins qu'avant, pour la moitié d'entrées en
+     plus. Les nappes restent ouvertes : c'est ce qu'on pose en début de scène.
+     Le choix est mémorisé dès qu'on touche à un groupe. */
+  let m = {};
+  try { m = JSON.parse(localStorage.getItem('kubbnd_amb_replis') || '{}'); } catch(e) {}
+  const v = m[type + ':' + g];
+  if (v === undefined) return type === 'shot';
+  return v === 1;
+}
+window._ambGrpToggle = function(type, g){
+  let m = {};
+  try { m = JSON.parse(localStorage.getItem('kubbnd_amb_replis') || '{}'); } catch(e) {}
+  /* On inverse l'état EFFECTIF, pas la valeur enregistrée : sans préférence,
+     un groupe de one-shots est replié par défaut, et inverser `undefined`
+     l'aurait laissé replié au premier clic. */
+  m[type + ':' + g] = ambGrpReplie(type, g) ? 0 : 1;
+  try { localStorage.setItem('kubbnd_amb_replis', JSON.stringify(m)); } catch(e) {}
+  ambRenderBoards();
+};
+window._ambRech = function(v){ amb.rech = (v || '').toLowerCase().trim(); ambRenderBoards(); };
+window._ambNappesStop = function(){
+  for (const id of [...amb.napAudio.keys()]) ambNappeArret(id);
+  setTimeout(ambRenderBoards, 450);
+};
+
+function ambMixette(){
+  const actives = amb.nappes.filter(n => ambNappeEtat(n.id));
+  if (!actives.length) return '';
+  return '<div class="amb-mix">'
+    + '<div class="amb-mix-tete"><span>' + actives.length + ' nappe'
+    + (actives.length > 1 ? 's' : '') + ' en cours</span>'
+    + '<button class="amb-mix-stop" onclick="window._ambNappesStop()">Tout couper</button></div>'
+    + actives.map(function(n){
+        const v = Math.round(((typeof n.vol === 'number') ? n.vol : 1) * 100);
+        return '<div class="amb-mix-l">'
+          + '<button class="amb-mix-x" onclick="window._ambNappeToggle(&quot;' + n.id + '&quot;)" title="Couper">&#9632;</button>'
+          + '<span class="amb-mix-n">' + (n.emoji || '') + ' ' + ambEch(n.nom) + '</span>'
+          + '<input type="range" min="0" max="100" value="' + v + '" '
+          + 'oninput="window._ambNappeVol(&quot;' + n.id + '&quot;, this.value/100)" '
+          + 'title="Niveau de cette couche">'
+          + '</div>';
+      }).join('')
+    + '</div>';
+}
+
 function ambRenderBoards(){
   const nb = document.getElementById('ambNappes'), sb = document.getElementById('ambShots');
   if (!nb) return;
-  const chip = (it, on, type) =>
-    `<button class="amb-chip2${on?' on':''}" onclick="window._amb${type==='nappe'?'NappeToggle':'Shot'}('${it.id}')">${it.emoji||''} ${it.nom.replace(/</g,'&lt;')}${amb.editBoards?`<span class="amb-chip2-x" onclick="event.stopPropagation();window._ambDelBoardItem('${type}','${it.id}')">✕</span>`:''}</button>`;
-  const _grpN = {};
-  for (const n of amb.nappes) (_grpN[n.groupe || 'autres'] = _grpN[n.groupe || 'autres'] || []).push(n);
-  nb.innerHTML = Object.entries(_grpN).map(([g2, liste]) =>
-    `<div class="amb-grp-lab">${g2}</div>` +
-    liste.map(n => {
-      const sl = (typeof spellSlug === 'function') ? spellSlug(n.nom) : '';
-      const aN = amb.napAudio.get(n.id);
-      return `<button class="amb-nappe${aN && !aN.paused ? ' on' : ''}"
-        onclick="window._ambNappeToggle('${n.id}')" title="${n.nom}">
-        <span class="amb-b-forme">
-          <img src="assets/ambiances/nappes/${sl}.jpg?v=${window.IMG_VER}" onerror="this.remove()" alt="">
-          <span class="amb-b-ini">${n.nom.slice(0,2).toUpperCase()}</span>
-        </span>
-        <span class="amb-b-nom">${n.nom}</span>
-        ${amb.editBoards ? `<span class="amb-b-del" onclick="event.stopPropagation();window._ambDelBoardItem('nappe','${n.id}')" title="Supprimer">✕</span>` : ''}
-      </button>`;
-    }).join('')
-  ).join('') || '<span class="amb-board-vide">aucune nappe — ↺ pour installer les planches par défaut</span>';
-  const _grpS = {};
-  for (const o of amb.shots) (_grpS[o.groupe || 'autres'] = _grpS[o.groupe || 'autres'] || []).push(o);
-  sb.innerHTML = Object.entries(_grpS).map(([g2, liste]) =>
-    `<div class="amb-grp-lab">${g2}</div>` +
-    liste.map(o => {
-      const sl = (typeof spellSlug === 'function') ? spellSlug(o.nom) : '';
-      return `<button class="amb-shot" onclick="window._ambShot('${o.id}')" title="${o.nom}">
-        <span class="amb-b-forme">
-          <img src="assets/ambiances/sons/${sl}.jpg?v=${window.IMG_VER}" onerror="this.remove()" alt="">
-          <span class="amb-b-ini">${o.nom.slice(0,2).toUpperCase()}</span>
-        </span>
-        <span class="amb-b-nom">${o.nom}</span>
-        ${amb.editBoards ? `<span class="amb-b-del" onclick="event.stopPropagation();window._ambDelBoardItem('shot','${o.id}')" title="Supprimer">✕</span>` : ''}
-      </button>`;
-    }).join('')
-  ).join('') || '<span class="amb-board-vide">aucun one-shot — ↺ pour installer les planches par défaut</span>';
+  const q = amb.rech || '';
+
+  const grille = function(items, type){
+    const grp = {};
+    for (const it of items) if (ambFiltreOk(it, q)) (grp[it.groupe || 'autres'] = grp[it.groupe || 'autres'] || []).push(it);
+    const noms = Object.keys(grp);
+    if (!noms.length) return '<span class="amb-board-vide">' + (q ? 'rien pour &laquo; ' + ambEch(q) + ' &raquo;' : 'aucune entrée — ↺ pour installer la collection') + '</span>';
+    return noms.map(function(g){
+      const replie = !q && ambGrpReplie(type, g);
+      const fn = type === 'nappe' ? 'NappeToggle' : 'Shot';
+      const cle = type === 'nappe' ? 'nappe' : 'shot';
+      return '<div class="amb-grp">'
+        + '<button class="amb-grp-lab2" onclick="window._ambGrpToggle(&quot;' + type + '&quot;,&quot;' + g + '&quot;)">'
+        + '<span class="amb-grp-fl">' + (replie ? '▸' : '▾') + '</span>' + ambEch(g)
+        + '<span class="amb-grp-n">' + grp[g].length + '</span></button>'
+        + (replie ? '' : '<div class="amb-jetons">' + grp[g].map(function(it){
+            const actif = type === 'nappe' && ambNappeEtat(it.id);
+            const nbv = 0;
+            return '<button class="amb-jeton' + (actif ? ' on' : '') + '" '
+              + 'onclick="window._amb' + fn + '(&quot;' + it.id + '&quot;)" '
+              + 'title="' + ambEch(it.nom) + (nbv ? ' — ' + nbv + ' variantes' : '') + '">'
+              + '<span class="amb-j-ic">' + (it.emoji || '•') + '</span>'
+              + '<span class="amb-j-nom">' + ambEch(it.nom) + '</span>'
+              + (nbv ? '<span class="amb-j-var">' + nbv + '</span>' : '')
+              + (amb.editBoards ? '<span class="amb-j-del" onclick="event.stopPropagation();window._ambDelBoardItem(&quot;' + cle + '&quot;,&quot;' + it.id + '&quot;)">✕</span>' : '')
+              + '</button>';
+          }).join('') + '</div>')
+        + '</div>';
+    }).join('');
+  };
+
+  nb.innerHTML = ambMixette() + grille(amb.nappes, 'nappe');
+  sb.innerHTML = grille(amb.shots, 'shot');
 }
+
 function ambYtId(u){
   const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
   return m ? m[1] : null;
@@ -11175,7 +11483,17 @@ window._ambInstallCatalogue = function(){
 (function ambInit(){
   const wrap = document.getElementById('ambWrap');
   if (!wrap) return;
-  ambLoadScenes(); ambLoadBoards(); ambRender();
+  ambLoadScenes(); ambLoadBoards();
+  /* V2.43 : la collection est installée une fois, au premier démarrage qui
+     suit la mise à jour. Le numéro de version évite de recommencer — et de
+     réinstaller ce que l'utilisateur aurait volontairement retiré ensuite. */
+  try {
+    if (+(localStorage.getItem('kubbnd_amb_sons_ver') || 0) < AMB_SONS_VER) {
+      const _r43 = window._ambRefonteV43(true);
+      console.info('[amb] collection V2.43 installée :', _r43);
+    }
+  } catch(e) { console.warn('[amb] migration impossible', e); }
+  ambRender();
   const volN = document.getElementById('ambVolN');
   volN.addEventListener('input', () => {
     amb.volN = volN.value / 100;
@@ -18482,6 +18800,89 @@ html[data-theme="arcadie"] {
 .tour-spot, .tour-tip { z-index:1600; }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   V2.43 — LE RÉGISSEUR TIENT DANS UN TIERS DE LA PLACE
+   Les pastilles de 64 px avec vignette occupaient toute la hauteur utile pour
+   49 entrées ; il y en a maintenant 73. Un jeton d'une ligne suffit : l'emoji
+   porte la reconnaissance immédiate, le nom la certitude.
+   ══════════════════════════════════════════════════════════════════════════ */
+.amb-rech {
+  width:100%; margin:0 0 6px; padding:4px 9px; border-radius:9px;
+  border:1px solid rgba(var(--v-or),0.3); background:rgba(var(--v-noir-c),0.55);
+  color:var(--v-saisie); font-family:'Crimson Pro',serif; font-size:0.82rem;
+}
+.amb-grp { margin-bottom:4px; }
+.amb-grp-lab2 {
+  display:flex; align-items:center; gap:7px; width:100%; padding:1px 3px;
+  background:none; border:none; cursor:pointer; text-align:left;
+  font-family:var(--font-title); font-size:0.58rem; letter-spacing:0.14em;
+  text-transform:uppercase; color:var(--v-txt-b);
+  border-bottom:1px dotted rgba(var(--v-or),0.22);
+}
+.amb-grp-lab2:hover { color:var(--v-titre); }
+.amb-grp-fl { font-size:0.7rem; width:1em; }
+.amb-grp-n { margin-left:auto; opacity:0.6; letter-spacing:0; }
+.amb-jetons {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(104px, 1fr));
+  gap:3px; padding:3px 0 1px;
+}
+.amb-jeton {
+  position:relative; display:flex; align-items:center; gap:6px;
+  padding:3px 7px; border-radius:8px; cursor:pointer; text-align:left;
+  border:1px solid rgba(var(--v-or),0.22); background:rgba(var(--v-noir),0.5);
+  color:var(--v-txt); font-family:'Crimson Pro',serif; font-size:0.78rem;
+  line-height:1.15; transition:background .12s, border-color .12s;
+}
+.amb-jeton:hover { background:rgba(var(--v-or),0.16); border-color:rgba(var(--v-or),0.5); }
+.amb-jeton.on {
+  border-color:rgba(var(--v-eclat),0.9);
+  background:linear-gradient(160deg, rgba(var(--v-or),0.34), rgba(var(--v-or),0.14));
+  color:#fff;
+}
+.amb-j-ic { font-size:0.92rem; flex:0 0 auto; }
+.amb-j-nom { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.amb-j-var {
+  flex:0 0 auto; font-size:0.6rem; padding:0 4px; border-radius:5px;
+  background:rgba(var(--v-or),0.24); color:var(--v-titre);
+}
+.amb-j-del { flex:0 0 auto; color:#e79a9a; font-size:0.75rem; }
+
+/* la mixette : ce qui joue, et à quel niveau */
+.amb-mix {
+  margin-bottom:9px; padding:8px 9px; border-radius:10px;
+  border:1px solid rgba(var(--v-eclat),0.4);
+  background:linear-gradient(150deg, rgba(var(--v-or),0.16), rgba(var(--v-noir),0.6));
+}
+.amb-mix-tete {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  font-family:var(--font-title); font-size:0.64rem; letter-spacing:0.1em;
+  text-transform:uppercase; color:var(--v-titre); margin-bottom:5px;
+}
+.amb-mix-stop {
+  padding:2px 8px; border-radius:6px; cursor:pointer; font-family:inherit;
+  font-size:0.6rem; letter-spacing:0.08em; text-transform:uppercase;
+  border:1px solid rgba(231,154,154,0.5); background:none; color:#e79a9a;
+}
+.amb-mix-stop:hover { background:rgba(231,154,154,0.16); }
+.amb-mix-l { display:flex; align-items:center; gap:7px; padding:2px 0; }
+.amb-mix-x {
+  flex:0 0 auto; width:18px; height:18px; border-radius:5px; cursor:pointer;
+  border:1px solid rgba(var(--v-or),0.4); background:rgba(var(--v-noir),0.5);
+  color:var(--v-txt-b); font-size:0.6rem; line-height:1; padding:0;
+}
+.amb-mix-x:hover { color:#fff; border-color:rgba(var(--v-eclat),0.8); }
+.amb-mix-n {
+  flex:0 0 40%; font-family:'Crimson Pro',serif; font-size:0.78rem;
+  color:var(--v-txt); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.amb-mix-l input[type="range"] { flex:1; min-width:0; accent-color:var(--gold-fond); }
+
+@media (max-width:800px){
+  .amb-jetons { grid-template-columns:repeat(auto-fill, minmax(104px, 1fr)); }
+  .amb-jeton { font-size:0.76rem; padding:4px 6px; }
+  .amb-mix-n { flex:0 0 34%; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    V2.41 — LES PARTICULES REDEVIENNENT VISIBLES, SUR LES 27 PLANS, ET GRATUITES
 
    Trois constats, trois correctifs.
@@ -19733,6 +20134,10 @@ html .comp-cat-btn.comp-cat-active, html .spell-filter-toggle.active { color:var
       <label class="amb-vol">🔊 <input type="range" id="ambVol" min="0" max="100" value="60"></label>
       <button class="amb-ctl" onclick="window._ambBlack()" title="Fondu au noir sur l'écran projeté (Alt+N)">☾ Noir</button>
       <button class="amb-ctl stop" onclick="window._ambStop()" title="Tout couper (Alt+0)">⏹ Stop</button>
+    </div>
+    <div class="amb-subrow amb-subrow-rech">
+      <input id="ambRech" class="amb-rech" type="search" placeholder="Filtrer les 73 sons…"
+             oninput="window._ambRech(this.value)" autocomplete="off">
     </div>
     <div class="amb-subrow">
       <span class="amb-sublabel">Nappes</span>
